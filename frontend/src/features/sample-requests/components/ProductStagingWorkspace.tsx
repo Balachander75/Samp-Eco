@@ -427,9 +427,18 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   const handleSaveStagedCustomDetails = async (
     item: StagedProductItem,
     details: NonNullable<StagedProductItem["customDetails"]>,
-    productDescription: string
+    productDescription: string,
+    hasCreativeChanges?: boolean,
+    creativePendingCharacteristicKeys?: Array<{ className: string; characteristicName: string }>
   ) => {
-    const updatedItem = { ...item, customDetails: details, productDescription };
+    const updatedItem: StagedProductItem = {
+      ...item,
+      customDetails: details,
+      productDescription,
+      hasCreativeChanges: hasCreativeChanges ?? item.hasCreativeChanges,
+      creativeCharacteristicsCleared: hasCreativeChanges ?? item.creativeCharacteristicsCleared,
+      creativePendingCharacteristicKeys: creativePendingCharacteristicKeys ?? item.creativePendingCharacteristicKeys,
+    };
     const nextProducts = stagedProducts.map((product) => product.id === item.id ? updatedItem : product);
 
     if (item.savedRequestId) {
@@ -441,6 +450,17 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           value: detail.value,
           uom: detail.uom || null,
         })).filter((detail) => detail.characteristicName),
+        mockupWorkflowState: item.scopes.includes("mockup") ? {
+          stage: "marketing",
+          designNeeded: item.mockupMetadata?.designNeeded ?? (item.creationMode === "new" || item.scopes.includes("design")),
+          creativeChangesRequired: Boolean(updatedItem.hasCreativeChanges || updatedItem.creativeCharacteristicsCleared || updatedItem.creativePendingCharacteristicKeys?.length),
+          marketingShutterstockNo: item.mockupMetadata?.marketingShutterstockNo || "",
+          marketingRemark: item.mockupMetadata?.marketingRemark || "",
+          qtyForMockup: item.qtyForMockup || item.mockupMetadata?.qtyForMockup || "1",
+          requiredDate: item.mockupMetadata?.requiredDate || item.mockupRequiredDate || "",
+          creativePendingCharacteristicKeys: creativePendingCharacteristicKeys ?? item.creativePendingCharacteristicKeys ?? [],
+          events: [],
+        } : undefined,
       });
       if (!saved) throw new Error("The staged product could not be updated. Please retry.");
     } else {
@@ -1498,17 +1518,21 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       // 2. Release every persisted product, grouping mixed batches by workflow.
       const itemsByStatus = new Map<string, StagedProductItem[]>();
       for (const item of stagedProducts) {
-        const mockupNeedsDesign = item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === true;
-        const mockupGoesDirectToStudio = item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === false;
-        const status = item.scopes.includes("design")
+        const hasCreativeWork = Boolean(
+          item.scopes.includes("design") ||
+          (item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === true) ||
+          item.hasCreativeChanges ||
+          item.creativeCharacteristicsCleared
+        );
+        const mockupGoesDirectToStudio =
+          item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === false && !item.hasCreativeChanges;
+        const status = hasCreativeWork
           ? "Creative"
-          : item.scopes.includes("sample")
-            ? "Sampling Review (PMT)"
-            : mockupNeedsDesign
-              ? "Creative"
-              : mockupGoesDirectToStudio
-                ? "Studio"
-                : "Sampling Review (PMT)";
+          : mockupGoesDirectToStudio
+            ? "Studio"
+            : item.scopes.includes("sample")
+              ? "Sampling Review (PMT)"
+              : "Sampling Review (PMT)";
         itemsByStatus.set(status, [...(itemsByStatus.get(status) || []), item]);
       }
       if (stagedProducts.length === 0 && programContext.parentRequestId) {

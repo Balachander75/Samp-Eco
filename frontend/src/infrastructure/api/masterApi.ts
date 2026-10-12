@@ -1,7 +1,6 @@
 import { apiFetch, API_BASE_URL, createApiHeaders } from "./client";
 import {
   PlantItem,
-  CreatePlantForm,
   CustomerItem,
   BindingHierarchyResponse,
   ProductSearchResult,
@@ -132,34 +131,6 @@ export async function fetchPlantsApi(): Promise<PlantItem[]> {
   } catch (err) {
     console.error("Error fetching plants from API:", err);
     return [];
-  }
-}
-
-export async function createPlantApi(payload: CreatePlantForm, createdBy: string = "Admin"): Promise<PlantItem | null> {
-  try {
-    const p = await apiFetch<any>("/api/v1/plants", {
-      method: "POST",
-      jsonBody: {
-        code: payload.code,
-        name: payload.name,
-        location: payload.location,
-        created_by: createdBy,
-        is_active: payload.isActive ?? true,
-      },
-    });
-    return {
-      id: p.id,
-      code: p.code,
-      name: p.name,
-      location: p.location || undefined,
-      isActive: p.is_active,
-      createdBy: p.created_by,
-      createdAt: p.created_at ? p.created_at.split("T")[0] : "",
-      updatedAt: p.updated_at ? p.updated_at.split("T")[0] : "",
-    };
-  } catch (err) {
-    console.error("Error adding plant:", err);
-    throw err;
   }
 }
 
@@ -718,35 +689,6 @@ export async function deleteUserApi(id: number): Promise<boolean> {
   }
 }
 
-export async function updatePlantApi(
-  id: number,
-  payload: { code?: string; name?: string; location?: string; is_active?: boolean }
-): Promise<PlantItem> {
-  const p = await apiFetch<any>(`/api/v1/plants/${id}`, {
-    method: "PATCH",
-    jsonBody: payload,
-  });
-  return {
-    id: p.id,
-    code: p.code,
-    name: p.name,
-    location: p.location || undefined,
-    isActive: p.is_active,
-    createdBy: p.created_by,
-    createdAt: p.created_at ? p.created_at.split("T")[0] : "",
-    updatedAt: p.updated_at ? p.updated_at.split("T")[0] : "",
-  };
-}
-
-export async function deletePlantApi(id: number): Promise<boolean> {
-  try {
-    await apiFetch(`/api/v1/plants/${id}`, { method: "DELETE" });
-    return true;
-  } catch (err) {
-    console.error("Error deleting plant:", err);
-    return false;
-  }
-}
 
 export async function fetchProductCategoriesApi(): Promise<ProductCategoriesResponse> {
   try {

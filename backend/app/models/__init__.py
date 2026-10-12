@@ -6,7 +6,7 @@ from app.models.feasibility import (
     FeasibilityRequest,
     FeasibilityTechnicalAttachment,
 )
-from app.models.master import Customer, Plant, User, UserPlantAssignment
+from app.models.master import Customer, Plant, User
 from app.models.program_request import (
     ProgramActivityLog,
     ProgramMaterialSpecification,
@@ -41,7 +41,6 @@ __all__ = [
     "SampleRequestActivityLog",
     "StudioDieline",
     "User",
-    "UserPlantAssignment",
 ]
 
 

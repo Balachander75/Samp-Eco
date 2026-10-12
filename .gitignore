@@ -44,3 +44,6 @@ __pycache__/
 *.tmp
 *.tmp.*
 
+# Slide presentations
+*.pptx
+

@@ -30,7 +30,7 @@ import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 import { releaseSampleToPlantApi, submitSamplingFeedbackApi } from "@/infrastructure/api/sampleRequestsApi";
-import { CatalogProductInspectModal } from "@/features/sample-requests/components/staging/CatalogProductInspectModal";
+import { SampleRequestInspector } from "@/features/sample-requests/components/SampleRequestInspector";
 
 export interface SamplingReviewQueuePageProps {
   requests: SampleRequestItem[];
@@ -981,27 +981,15 @@ export const SamplingReviewQueuePage: React.FC<SamplingReviewQueuePageProps> = (
         </div>
       )}
 
-      {/* ── Modal: Full Product Docket Inspection ── */}
-      {inspectProduct && (
-        <CatalogProductInspectModal
-          product={inspectProduct}
+      {/* ── Modal: Comprehensive 5-Section Sample Request Inspector ── */}
+      {inspectModalItem && (
+        <SampleRequestInspector
+          request={inspectModalItem}
+          isOpen={Boolean(inspectModalItem)}
           onClose={() => setInspectModalItem(null)}
-          heading="Product Docket Technical Review"
-          intro="Review the complete product category, characteristics, classes and specifications before sampling release."
-          footer={
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-500">
-                Target Plant: {inspectModalItem?.targetPlant || "Khaniwade"}
-              </span>
-              <button
-                type="button"
-                onClick={() => setInspectModalItem(null)}
-                className="px-4 py-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 font-semibold"
-              >
-                Close
-              </button>
-            </div>
-          }
+          onRefresh={onRefresh}
+          role="sampling"
+          isAdmin={!readOnly}
         />
       )}
     </div>

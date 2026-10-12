@@ -15,7 +15,9 @@ export interface StagedProductDrawerProps {
   onSaveCustomDetails?: (
     item: StagedProductItem,
     details: NonNullable<StagedProductItem["customDetails"]>,
-    productDescription: string
+    productDescription: string,
+    hasCreativeChanges?: boolean,
+    creativePendingCharacteristicKeys?: Array<{ className: string; characteristicName: string }>
   ) => Promise<void>;
 }
 
@@ -145,15 +147,44 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
     setIsSavingDetails(true);
     setDetailsError("");
     try {
-      const details = characteristics.map((detail) => ({
-        className: detail.className,
-        characteristicName: detail.characteristicName,
-        value: editedValues[`${detail.className}::${detail.characteristicName}`]?.trim() || null,
-        uom: detail.uom || null,
-      }));
+      const anyChanged = characteristics.some((detail) => {
+        const key = `${detail.className}::${detail.characteristicName}`;
+        const original = (initialValues[key] || "").trim();
+        const current = (editedValues[key] || "").trim();
+        return original !== current;
+      });
+
+      const creativePendingCharacteristicKeys = anyChanged
+        ? characteristics
+            .filter((detail) =>
+              isMockupCreativeCharacteristic(detail.className, detail.characteristicName) &&
+              Boolean((initialValues[`${detail.className}::${detail.characteristicName}`] || "").trim())
+            )
+            .map((detail) => ({ className: detail.className, characteristicName: detail.characteristicName }))
+        : inspectingProduct.creativePendingCharacteristicKeys || [];
+
+      // If user changed specifications, blank the creative highlighted fields for Creative to fill
+      const details = characteristics.map((detail) => {
+        const isCreative = isMockupCreativeCharacteristic(detail.className, detail.characteristicName);
+        if (anyChanged && isCreative) {
+          return {
+            className: detail.className,
+            characteristicName: detail.characteristicName,
+            value: "", // blanked for Creative
+            uom: detail.uom || null,
+          };
+        }
+        return {
+          className: detail.className,
+          characteristicName: detail.characteristicName,
+          value: editedValues[`${detail.className}::${detail.characteristicName}`]?.trim() || null,
+          uom: detail.uom || null,
+        };
+      });
+
       const description = editedDescription.trim();
       if (!description) throw new Error("Product description is required.");
-      await onSaveCustomDetails(inspectingProduct, details, description);
+      await onSaveCustomDetails(inspectingProduct, details, description, anyChanged, creativePendingCharacteristicKeys);
       setProductDescription(description);
       setSpecView("configured");
       setIsEditingDetails(false);

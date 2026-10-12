@@ -95,7 +95,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       samplingMockupItems.filter((r) => {
         const scopes = r.requestTypes || [];
         const hasMockup = scopes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes";
-        return hasMockup && (!r.mockupWorkflowState || r.mockupWorkflowState.stage === "creative");
+        return hasMockup && (!r.mockupWorkflowState || ["creative", "creative_approval"].includes(r.mockupWorkflowState.stage));
       }).length,
     [samplingMockupItems]
   );
@@ -164,7 +164,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       const hasMockup = scopes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes";
       const hasSample = scopes.includes("sample");
       const isAwaitingHandoff =
-        hasMockup && (!r.mockupWorkflowState || r.mockupWorkflowState.stage === "creative");
+        hasMockup && (!r.mockupWorkflowState || ["creative", "creative_approval"].includes(r.mockupWorkflowState.stage));
 
       // Stage Tab filter
       if (selectedStageTab === "awaiting_handoff" && !isAwaitingHandoff) return false;
@@ -692,7 +692,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
                   const qty = (r as any).quantity || r.qtyForSampling || 1;
                   const isSelected = selectedIds.has(r.id);
                   const isCreativeAwaiting =
-                    hasMockup && (!r.mockupWorkflowState || r.mockupWorkflowState.stage === "creative");
+                    hasMockup && (!r.mockupWorkflowState || ["creative", "creative_approval"].includes(r.mockupWorkflowState.stage));
                   const categoryHierarchy = [
                     r.productCategory,
                     r.productSubCategory,

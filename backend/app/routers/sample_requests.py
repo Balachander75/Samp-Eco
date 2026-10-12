@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 import re
 from urllib.parse import urlsplit
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
@@ -91,6 +92,7 @@ def _is_mockup_creative_characteristic(class_name: Any, characteristic_name: Any
 def _clear_mockup_creative_characteristics(
     record: CreateSampleRequest,
     db: Session,
+    pending_keys: Optional[List[Dict[str, Any]]] = None,
 ) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     empty_values = {"", "NA", "N/A", "NAN", "NULL", "NONE", "-"}
     request_classes = {_normalize_binding(detail.class_name).upper() for detail in record.product_details}
@@ -109,6 +111,14 @@ def _clear_mockup_creative_characteristics(
                 "characteristicName": characteristic.characteristic_name,
             }
     required = []
+    pending_lookup = {
+        (
+            _normalize_binding(item.get("className") or item.get("class_name")),
+            _normalize_binding(item.get("characteristicName") or item.get("characteristic_name")),
+        )
+        for item in (pending_keys or [])
+        if isinstance(item, dict)
+    }
     for detail in record.product_details:
         if not _is_mockup_creative_characteristic(detail.class_name, detail.characteristic_name):
             continue
@@ -118,10 +128,24 @@ def _clear_mockup_creative_characteristics(
         )
         creative_fields.setdefault(key, {"className": detail.class_name, "characteristicName": detail.characteristic_name})
         value = str(detail.value or "").strip()
-        if value.upper() in empty_values:
+        if value.upper() not in empty_values or key in pending_lookup:
+            required.append({"className": detail.class_name, "characteristicName": detail.characteristic_name})
+        if value.upper() not in empty_values:
+            detail.value = None
+    for item in pending_keys or []:
+        if not isinstance(item, dict):
             continue
-        required.append({"className": detail.class_name, "characteristicName": detail.characteristic_name})
-        detail.value = None
+        class_name = str(item.get("className") or item.get("class_name") or "").strip()
+        characteristic_name = str(item.get("characteristicName") or item.get("characteristic_name") or "").strip()
+        if not class_name or not characteristic_name or not _is_mockup_creative_characteristic(class_name, characteristic_name):
+            continue
+        key = (_normalize_binding(class_name), _normalize_binding(characteristic_name))
+        creative_fields.setdefault(key, {"className": class_name, "characteristicName": characteristic_name})
+        if not any(
+            (_normalize_binding(value["className"]), _normalize_binding(value["characteristicName"])) == key
+            for value in required
+        ):
+            required.append({"className": class_name, "characteristicName": characteristic_name})
     return [creative_fields[key] for key in sorted(creative_fields)], required
 
 
@@ -242,7 +266,7 @@ def _mockup_claimed_by_another_member(sample: Dict[str, Any], current_user: Any)
     if not isinstance(state, dict):
         return False
     stage = state.get("stage")
-    if stage not in {"creative", "studio"} or state.get("claimedStage") != stage:
+    if stage not in {"creative", "studio", "creative_approval"} or state.get("claimedStage") != stage:
         return False
     claim_id = state.get("claimedByUserId")
     claim_name = str(state.get("claimedBy") or "").strip().casefold()
@@ -291,6 +315,70 @@ def _mockup_route_state(payload: Dict[str, Any]) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _mockup_today(now: Optional[datetime] = None) -> date:
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    return current.astimezone(ZoneInfo("Asia/Kolkata")).date()
+
+
+def _parse_mockup_date(value: Any, field_name: str) -> date:
+    raw = str(value or "").strip()
+    try:
+        return date.fromisoformat(raw)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail=f"{field_name} must be a valid date.")
+
+
+def _validate_mockup_required_date(state: Dict[str, Any], now: Optional[datetime] = None) -> date:
+    required_date = _parse_mockup_date(
+        state.get("requiredDate", state.get("required_date")),
+        "Mockup required date",
+    )
+    earliest = _mockup_today(now) + timedelta(days=2)
+    if required_date < earliest:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Mockup required date must be at least 48 hours after release. Choose {earliest.isoformat()} or later.",
+        )
+    state["requiredDate"] = required_date.isoformat()
+    return required_date
+
+
+def _initialize_mockup_release_dates(
+    state: Dict[str, Any],
+    stage: str,
+    now: Optional[datetime] = None,
+) -> date:
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    required_date = _validate_mockup_required_date(state, current)
+    state["marketingRequiredDate"] = required_date.isoformat()
+    state["studioSystemRequiredDate"] = required_date.isoformat()
+    if _mockup_requires_design(state):
+        state["creativeSystemRequiredDate"] = (required_date - timedelta(days=1)).isoformat()
+    if stage == "creative":
+        state["releasedToCreativeAt"] = current.astimezone(timezone.utc).isoformat()
+        state["creativeDateDecisionDueAt"] = (
+            current.astimezone(timezone.utc) + timedelta(hours=24)
+        ).isoformat()
+    elif stage == "studio":
+        state["releasedToStudioAt"] = current.astimezone(timezone.utc).isoformat()
+        state.setdefault("studioEarliestStartDate", _mockup_today(current).isoformat())
+    return required_date
+
+
+def _mockup_datetime(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
+
+
 def _prepare_mockup_intake_state(payload: Dict[str, Any]) -> None:
     """Accept route metadata at intake, but never let a client pre-release a task."""
     raw_types = payload.get("request_types", payload.get("requestTypes", [])) or []
@@ -310,6 +398,13 @@ def _prepare_mockup_intake_state(payload: Dict[str, Any]) -> None:
         "claimedBy", "claimedByUserId", "claimedAt", "claimedStage",
         "creativeCharacteristicKeys", "creativeRequiredCharacteristicKeys", "creativeCharacteristicsClearedAt",
         "creativeShutterstockNo", "creativeRemark",
+        "creativeSystemRequiredDate", "creativeDateDecisionDueAt", "creativeDateDecision",
+        "creativeDateDecisionAt", "creativeDateDecisionLate", "creativeInputDate",
+        "creativeConfirmedDate", "creativeProposedDate", "studioSystemRequiredDate",
+        "studioEarliestStartDate", "studioSubmittedAt", "creativeApprovalDueAt",
+        "creativeApprovalActualAt", "creativeApprovedAt", "marketingAcceptedAt",
+        "marketingRevisionRemark", "studioRevisionRequestedAt", "studioRevisionRemark",
+        "creativeRevisionRequestedAt", "creativeRevisionRemark",
     ):
         state.pop(key, None)
     state["stage"] = "marketing"
@@ -330,7 +425,16 @@ def _validate_mockup_route(payload: Dict[str, Any]) -> None:
         return
 
     state = _mockup_route_state(payload)
-    if state.get("stage") not in (None, "marketing", "awaiting_design_acceptance", "creative", "studio"):
+    if state.get("stage") not in (
+        None,
+        "marketing",
+        "awaiting_design_acceptance",
+        "creative",
+        "studio",
+        "creative_approval",
+        "awaiting_marketing_acceptance",
+        "done",
+    ):
         raise HTTPException(status_code=422, detail="Invalid Mockup workflow stage.")
     mode = str(payload.get("creation_mode", payload.get("creationMode", ""))).strip().lower()
     decision = state.get("designNeeded", state.get("design_needed"))
@@ -355,6 +459,19 @@ def _validate_mockup_route(payload: Dict[str, Any]) -> None:
         state.pop("creativeCharacteristicsClearedAt", None)
         state.pop("creativeShutterstockNo", None)
         state.pop("creativeRemark", None)
+        state.setdefault("stage", "marketing")
+        state.setdefault("events", [])
+        payload["mockup_workflow_state"] = state
+        return
+
+    if state.get("creativeChangesRequired") or state.get("creativePendingCharacteristicKeys"):
+        shutterstock = str(state.get("marketingShutterstockNo", state.get("marketing_shutterstock_no", "")) or "").strip()
+        remark = str(state.get("marketingRemark", state.get("marketing_remark", "")) or "").strip()
+        if len(shutterstock) > 100 or len(remark) > 1000:
+            raise HTTPException(status_code=422, detail="Shutterstock number must be 100 characters or fewer and remark 1,000 characters or fewer.")
+        state["designNeeded"] = False
+        state["marketingShutterstockNo"] = shutterstock
+        state["marketingRemark"] = remark
         state.setdefault("stage", "marketing")
         state.setdefault("events", [])
         payload["mockup_workflow_state"] = state
@@ -684,9 +801,14 @@ def update_sample_request(
         old_stage = old_state.get("stage", "marketing")
         if requested_state.get("stage", old_stage) != old_stage:
             raise HTTPException(status_code=409, detail="Mockup stages can only change through the workflow handoff actions.")
-        route_keys = ("designNeeded", "design_needed", "marketingShutterstockNo", "marketing_shutterstock_no", "marketingRemark", "marketing_remark")
+        route_keys = (
+            "designNeeded", "design_needed",
+            "marketingShutterstockNo", "marketing_shutterstock_no",
+            "marketingRemark", "marketing_remark",
+            "requiredDate", "required_date", "qtyForMockup", "qty_for_mockup",
+        )
         route_changed = any(requested_state.get(key) != old_state.get(key) for key in route_keys)
-        if old_stage != "marketing" and route_changed:
+        if old_stage not in {"marketing", "awaiting_design_acceptance"} and route_changed:
             raise HTTPException(status_code=409, detail="Marketing routing details are locked after the Mockup request is released.")
         requested_state["events"] = list(old_state.get("events") or [])
         body[workflow_state_key] = requested_state
@@ -770,6 +892,7 @@ def batch_update_status(
         raise HTTPException(status_code=404, detail="One or more sample requests were not found.")
 
     candidates = {record.id: service.serialize(record) for record in records}
+    now = datetime.now(timezone.utc)
     try:
         if status_key in {"creative", "studio"}:
             for request_id in numeric_ids:
@@ -778,19 +901,23 @@ def batch_update_status(
                 is_mockup = "mockup" in (candidate.get("request_types") or []) or str(candidate.get("mockup_required") or "").casefold() == "yes"
                 if status_key == "studio" and not is_mockup:
                     raise HTTPException(status_code=422, detail="Only a Mockup request can be released directly to Studio.")
-                if is_mockup and (
-                    "designNeeded" in state or "design_needed" in state
-                ):
-                    _validate_mockup_route(candidate)
+                if is_mockup and state.get("stage") == "awaiting_design_acceptance":
+                    raise HTTPException(status_code=409, detail="This Mockup is waiting for Marketing to accept its Design output.")
+                if is_mockup:
                     design_needed = state.get("designNeeded", state.get("design_needed"))
+                    if status_key == "creative" and design_needed is False:
+                        state["creativeChangesRequired"] = True
+                        candidate["mockup_workflow_state"] = state
+                    _validate_mockup_route(candidate)
                     if status_key == "studio" and design_needed is True:
                         raise HTTPException(status_code=422, detail="This Mockup request needs Design and must be released to Creative first.")
                     if status_key == "studio" and design_needed is not False:
                         raise HTTPException(status_code=422, detail="Choose No Design and provide a Shutterstock number or remark before releasing to Studio.")
+                if is_mockup and state.get("stage", "marketing") in {None, "marketing"}:
+                    _validate_mockup_required_date(state, now)
     except Exception:
         db.rollback()
         raise
-    now = datetime.now(timezone.utc)
     actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Marketing")
     try:
         for record in records:
@@ -819,10 +946,21 @@ def batch_update_status(
             )
             if is_mockup and release_mockup_owner:
                 state = dict(record.mockup_workflow_state or {})
-                if state.get("stage") in {None, "marketing", "creative", "awaiting_design_acceptance"}:
+                if state.get("stage") in {None, "marketing"}:
+                    if state.get("stage") in {None, "marketing"}:
+                        design_needed = state.get("designNeeded", state.get("design_needed"))
+                        if status_key == "creative":
+                            state["creativeChangesRequired"] = design_needed is False or bool(state.get("creativePendingCharacteristicKeys"))
+                            requested_stage = "creative"
+                        elif status_key == "studio":
+                            requested_stage = "studio"
+                        else:
+                            requested_stage = "creative" if _mockup_requires_design(state) or state.get("creativeChangesRequired") else "studio"
+                        _initialize_mockup_release_dates(state, requested_stage, now)
                     events = list(state.get("events") or [])
                     design_needed = state.get("designNeeded", state.get("design_needed"))
-                    if status_key == "studio" or design_needed is False:
+                    needs_creative = _mockup_requires_design(state) or bool(state.get("creativeChangesRequired"))
+                    if status_key == "studio" or (status_key != "creative" and not needs_creative):
                         next_stage = "studio"
                         event_action = "MOCKUP_RELEASED_TO_STUDIO"
                         event_title = "Mockup request released directly to Studio"
@@ -848,8 +986,10 @@ def batch_update_status(
                             from_status=previous_status,
                             to_status=record.status,
                         )
-                    if next_stage == "creative" and design_needed is True and not state.get("creativeCharacteristicsClearedAt"):
-                        creative_fields, required_fields = _clear_mockup_creative_characteristics(record, db)
+                    if next_stage == "creative" and not state.get("creativeCharacteristicsClearedAt"):
+                        creative_fields, required_fields = _clear_mockup_creative_characteristics(
+                            record, db, state.get("creativePendingCharacteristicKeys")
+                        )
                         state["creativeCharacteristicKeys"] = creative_fields
                         state["creativeRequiredCharacteristicKeys"] = required_fields
                         state["creativeCharacteristicsClearedAt"] = now.isoformat()
@@ -932,14 +1072,15 @@ def _serialize_sample_activity(row: SampleRequestActivityLog) -> Dict[str, Any]:
 def _require_mockup_request(sample: Dict[str, Any]) -> Dict[str, Any]:
     request_types = sample.get("request_types") or []
     is_mockup = "mockup" in request_types or str(sample.get("mockup_required") or "").casefold() == "yes"
-    is_sample = "sample" in request_types
-    if not (is_mockup or is_sample):
-        raise HTTPException(status_code=409, detail="This request does not include a mockup or sampling deliverable")
+    if not is_mockup:
+        raise HTTPException(status_code=409, detail="This request does not include a mockup deliverable")
     state = sample.get("mockup_workflow_state") or {}
     return state if isinstance(state, dict) else {}
 
 
 def _mockup_requires_design(state: Dict[str, Any]) -> bool:
+    if state.get("creativeChangesRequired") is True:
+        return True
     decision = state.get("designNeeded", state.get("design_needed"))
     if decision is False:
         return False
@@ -951,6 +1092,8 @@ def _mockup_requires_design(state: Dict[str, Any]) -> bool:
 def _require_mockup_stage_claim(state: Dict[str, Any], current_user: Any, stage: str) -> None:
     if is_admin(current_user):
         return
+    if is_team_head(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to mockup tasks.")
     if state.get("stage") != stage or state.get("claimedStage") != stage or not state.get("claimedBy"):
         raise HTTPException(status_code=409, detail="Claim this mockup task before continuing")
     claimed_by_id = state.get("claimedByUserId")
@@ -985,18 +1128,41 @@ def claim_mockup_request(
     sample = service.serialize(record)
     state = dict(_require_mockup_request(sample))
     stage = state.get("stage")
-    if stage not in {"creative", "studio"}:
+    if is_team_head(current_user) and not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to mockup tasks.")
+    if stage not in {"creative", "studio", "creative_approval"}:
         raise HTTPException(status_code=409, detail="This mockup request is not waiting for Creative or Studio")
+    if stage == "studio" and state.get("studioEarliestStartDate"):
+        earliest = _parse_mockup_date(state.get("studioEarliestStartDate"), "Studio earliest start date")
+        if _mockup_today() < earliest:
+            raise HTTPException(status_code=409, detail=f"Studio work can start on {earliest.isoformat()} or later.")
     actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Creative Studio").strip()[:100]
     claimed_by = str(state.get("claimedBy") or "").strip()
     claimed_stage = state.get("claimedStage")
     claimed_by_id = state.get("claimedByUserId")
+    changed = False
+    now = datetime.now(timezone.utc).isoformat()
+    if stage == "creative" and "creativeCharacteristicKeys" not in state:
+        fields, required = _clear_mockup_creative_characteristics(record, service.db, state.get("creativePendingCharacteristicKeys"))
+        state["creativeCharacteristicKeys"] = fields
+        state["creativeRequiredCharacteristicKeys"] = required
+        state["creativeCharacteristicsClearedAt"] = now
+        events = list(state.get("events") or [])
+        events.append({
+            "action": "MOCKUP_CREATIVE_FIELDS_PREPARED",
+            "title": "Creative fields cleared and highlighted for completion",
+            "actorName": "System",
+            "actorDepartment": "System",
+            "timestamp": now,
+        })
+        state["events"] = events[-100:]
+        _record_sample_activity(service, record, current_user, "MOCKUP_CREATIVE_FIELDS_PREPARED", "System", payload={"field_count": len(fields), "required_count": len(required)})
+        changed = True
     if claimed_stage == stage and claimed_by:
         is_same_owner = claimed_by_id == current_user.id if claimed_by_id is not None else claimed_by.casefold() == actor.casefold()
         if not is_same_owner:
             raise HTTPException(status_code=409, detail=f"This task is already claimed by {claimed_by}")
     else:
-        now = datetime.now(timezone.utc).isoformat()
         state.update({
             "claimedBy": actor,
             "claimedByUserId": current_user.id,
@@ -1012,12 +1178,14 @@ def claim_mockup_request(
             "timestamp": now,
         })
         state["events"] = events[-100:]
-        record.mockup_workflow_state = state
-        record.updated_at = datetime.now(timezone.utc)
         _record_sample_activity(
             service, record, current_user, "MOCKUP_TASK_CLAIMED", "Creative Studio",
             payload={"stage": stage},
         )
+        changed = True
+    if changed:
+        record.mockup_workflow_state = state
+        record.updated_at = datetime.now(timezone.utc)
         service.db.commit()
         service.db.refresh(record)
     return service.serialize(record)
@@ -1041,6 +1209,13 @@ def send_mockup_request_to_studio(
     state = dict(state)
     _require_mockup_stage_claim(state, current_user, "creative")
     if _mockup_requires_design(state):
+        if state.get("creativeDateDecision") not in {"confirmed", "proposed"} or not state.get("creativeInputDate"):
+            raise HTTPException(status_code=422, detail="Confirm or propose the Creative input date before sending this Mockup to Studio.")
+        earliest_studio_date = _parse_mockup_date(
+            state.get("studioEarliestStartDate"), "Studio earliest start date"
+        )
+        if _mockup_today() < earliest_studio_date:
+            raise HTTPException(status_code=409, detail=f"Studio work can start on {earliest_studio_date.isoformat()} or later.")
         creative_shutterstock = str(body.get("creative_shutterstock_no") or body.get("creativeShutterstockNo") or "").strip()
         creative_remark = str(body.get("creative_remark") or body.get("creativeRemark") or "").strip()
         if not creative_shutterstock and not creative_remark:
@@ -1082,6 +1257,8 @@ def send_mockup_request_to_studio(
     })
     state.update({"stage": "studio", "sentToStudioAt": now, "sentToStudioBy": actor, "events": events[-100:]})
     _clear_mockup_stage_claim(state)
+    previous_status = record.status
+    record.status = "Studio"
     record.mockup_workflow_state = state
     record.updated_at = datetime.now(timezone.utc)
     _record_sample_activity(
@@ -1090,13 +1267,178 @@ def send_mockup_request_to_studio(
             "creative_shutterstock_no": state.get("creativeShutterstockNo"),
             "creative_remark": state.get("creativeRemark"),
         },
+        from_status=previous_status,
+        to_status=record.status,
     )
     service.db.commit()
     service.db.refresh(record)
     return service.serialize(record)
 
 
-@router.post("/api/v1/sample-requests/{sample_id}/mockup/submit", summary="Submit a Studio mockup link to Marketing")
+@router.post("/api/v1/sample-requests/{sample_id}/mockup/creative-date", summary="Confirm or propose the Creative input date")
+def set_mockup_creative_date(
+    sample_id: int,
+    body: Dict[str, Any] = Body(...),
+    service: SampleRequestService = Depends(get_sample_request_service),
+    current_user = Depends(get_current_user),
+):
+    require_team(current_user, "creative_studio")
+    record = service.db.query(CreateSampleRequest).filter(CreateSampleRequest.id == sample_id).with_for_update().first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Sample request not found")
+    state = dict(_require_mockup_request(service.serialize(record)))
+    if state.get("stage") != "creative":
+        raise HTTPException(status_code=409, detail="This mockup is not waiting for Creative input.")
+    _require_mockup_stage_claim(state, current_user, "creative")
+    decision = str(body.get("decision") or "").strip().lower()
+    if decision not in {"confirmed", "proposed"}:
+        raise HTTPException(status_code=422, detail="Choose Confirmed or Proposed for the Creative input date.")
+    chosen = _parse_mockup_date(body.get("date"), "Creative input date")
+    today = _mockup_today()
+    required = _parse_mockup_date(state.get("requiredDate"), "Mockup required date")
+    system_date = _parse_mockup_date(state.get("creativeSystemRequiredDate"), "System Creative date")
+    if chosen < today or chosen >= required:
+        raise HTTPException(status_code=422, detail="Creative input date must be today or later and at least one day before the Marketing required date.")
+    if decision == "confirmed" and chosen != system_date:
+        raise HTTPException(status_code=422, detail=f"Confirm the system date {system_date.isoformat()} or choose Proposed.")
+    if decision == "proposed" and chosen == system_date:
+        raise HTTPException(status_code=422, detail="Choose Confirmed when keeping the system date.")
+
+    now = datetime.now(timezone.utc)
+    due = _mockup_datetime(state.get("creativeDateDecisionDueAt"))
+    late = bool(due and now > due)
+    actor = _mockup_actor(current_user, body) or "Creative"
+    state.update({
+        "creativeDateDecision": decision,
+        "creativeInputDate": chosen.isoformat(),
+        "creativeConfirmedDate": chosen.isoformat() if decision == "confirmed" else None,
+        "creativeProposedDate": chosen.isoformat() if decision == "proposed" else None,
+        "creativeDateDecisionAt": now.isoformat(),
+        "creativeDateDecisionLate": late,
+        "studioEarliestStartDate": (chosen + timedelta(days=1)).isoformat(),
+    })
+    events = list(state.get("events") or [])
+    events.append({
+        "action": "CREATIVE_DATE_DECIDED",
+        "title": f"Creative input date {decision}: {chosen.isoformat()}",
+        "actorName": actor,
+        "actorDepartment": "Creative",
+        "timestamp": now.isoformat(),
+    })
+    state["events"] = events[-100:]
+    record.mockup_workflow_state = state
+    record.updated_at = now
+    _record_sample_activity(service, record, current_user, "CREATIVE_DATE_DECIDED", "Creative", payload={"decision": decision, "date": chosen.isoformat(), "late": late})
+    service.db.commit()
+    service.db.refresh(record)
+    return service.serialize(record)
+
+
+@router.post("/api/v1/sample-requests/{sample_id}/mockup/creative-approval", summary="Creative approves or returns Studio mockup output")
+def decide_mockup_creative_approval(
+    sample_id: int,
+    body: Dict[str, Any] = Body(...),
+    service: SampleRequestService = Depends(get_sample_request_service),
+    current_user = Depends(get_current_user),
+):
+    require_team(current_user, "creative_studio")
+    record = service.db.query(CreateSampleRequest).filter(CreateSampleRequest.id == sample_id).with_for_update().first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Sample request not found")
+    state = dict(_require_mockup_request(service.serialize(record)))
+    if state.get("stage") != "creative_approval":
+        raise HTTPException(status_code=409, detail="This mockup is not waiting for Creative approval.")
+    _require_mockup_stage_claim(state, current_user, "creative_approval")
+    decision = str(body.get("decision") or "").strip().lower()
+    remark = str(body.get("remark") or "").strip()
+    if decision not in {"accept", "request_revision"}:
+        raise HTTPException(status_code=422, detail="Choose Accept or Request revision.")
+    if decision == "request_revision" and not remark:
+        raise HTTPException(status_code=422, detail="Add a note explaining the requested revision.")
+    if len(remark) > 1000:
+        raise HTTPException(status_code=422, detail="Revision note must be 1,000 characters or fewer.")
+    now = datetime.now(timezone.utc).isoformat()
+    actor = _mockup_actor(current_user, body) or "Creative"
+    approval_due = _mockup_datetime(state.get("creativeApprovalDueAt"))
+    approval_late = bool(approval_due and datetime.now(timezone.utc) > approval_due)
+    next_stage = "awaiting_marketing_acceptance" if decision == "accept" else "studio"
+    action = "CREATIVE_APPROVED_MOCKUP" if decision == "accept" else "CREATIVE_REQUESTED_STUDIO_REVISION"
+    title = "Creative approved Studio output" if decision == "accept" else "Creative returned output to Studio for revision"
+    state.update({"stage": next_stage, "creativeApprovalDecision": decision, "creativeApprovalActualAt": now, "creativeApprovalLate": approval_late})
+    if decision == "accept":
+        state["creativeApprovedAt"] = now
+        state.pop("creativeRevisionRemark", None)
+    else:
+        state["creativeRevisionRemark"] = remark
+        state["creativeRevisionRequestedAt"] = now
+    events = list(state.get("events") or [])
+    events.append({"action": action, "title": title, "actorName": actor, "actorDepartment": "Creative", "timestamp": now, "remark": remark or None})
+    state["events"] = events[-100:]
+    _clear_mockup_stage_claim(state)
+    previous_status = record.status
+    record.mockup_workflow_state = state
+    record.status = "Awaiting Marketing Mockup Acceptance" if decision == "accept" else "Studio Revision Requested"
+    record.updated_at = datetime.now(timezone.utc)
+    _record_sample_activity(service, record, current_user, action, "Creative", payload={"decision": decision, "remark": remark, "late": approval_late}, from_status=previous_status, to_status=record.status)
+    service.db.commit()
+    service.db.refresh(record)
+    return service.serialize(record)
+
+
+@router.post("/api/v1/sample-requests/{sample_id}/mockup/marketing-decision", summary="Accept or return Creative-approved mockup")
+def decide_mockup_marketing_acceptance(
+    sample_id: int,
+    body: Dict[str, Any] = Body(...),
+    service: SampleRequestService = Depends(get_sample_request_service),
+    current_user = Depends(get_current_user),
+):
+    require_team(current_user, "marketing")
+    if is_team_head(current_user) and not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to mockup acceptance.")
+    record = service.db.query(CreateSampleRequest).filter(CreateSampleRequest.id == sample_id).with_for_update().first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Sample request not found")
+    sample = service.serialize(record)
+    _require_marketing_sample_owner(sample, current_user)
+    state = dict(_require_mockup_request(sample))
+    if state.get("stage") != "awaiting_marketing_acceptance":
+        raise HTTPException(status_code=409, detail="This mockup is not waiting for Marketing acceptance.")
+    decision = str(body.get("decision") or "").strip().lower()
+    remark = str(body.get("remark") or "").strip()
+    if decision not in {"accept", "request_revision"}:
+        raise HTTPException(status_code=422, detail="Choose Accept or Request revision.")
+    if decision == "request_revision" and not remark:
+        raise HTTPException(status_code=422, detail="Add a note explaining the requested revision.")
+    if len(remark) > 1000:
+        raise HTTPException(status_code=422, detail="Revision note must be 1,000 characters or fewer.")
+    now = datetime.now(timezone.utc).isoformat()
+    actor = _mockup_actor(current_user, body) or "Marketing"
+    has_sampling = "sample" in (sample.get("request_types") or [])
+    next_stage = "done" if decision == "accept" else "studio"
+    action = "MARKETING_ACCEPTED_MOCKUP" if decision == "accept" else "MARKETING_REQUESTED_STUDIO_REVISION"
+    title = "Marketing accepted mockup; deliverable closed" if decision == "accept" else "Marketing requested a Studio revision"
+    state.update({"stage": next_stage, "marketingDecision": decision, "marketingDecisionAt": now})
+    if decision == "accept":
+        state["marketingAcceptedAt"] = now
+        state.pop("marketingRevisionRemark", None)
+        record.status = "Sampling Review (PMT)" if has_sampling else "Approved / Closed"
+    else:
+        state["marketingRevisionRemark"] = remark
+        state["studioRevisionRequestedAt"] = now
+        record.status = "Studio Revision Requested"
+    events = list(state.get("events") or [])
+    events.append({"action": action, "title": title, "actorName": actor, "actorDepartment": "Marketing", "timestamp": now, "remark": remark or None})
+    state["events"] = events[-100:]
+    _clear_mockup_stage_claim(state)
+    record.mockup_workflow_state = state
+    record.updated_at = datetime.now(timezone.utc)
+    _record_sample_activity(service, record, current_user, action, "Marketing", payload={"decision": decision, "remark": remark, "scope_closed": decision == "accept", "sampling_remains_open": decision == "accept" and has_sampling})
+    service.db.commit()
+    service.db.refresh(record)
+    return service.serialize(record)
+
+
+@router.post("/api/v1/sample-requests/{sample_id}/mockup/submit", summary="Submit a Studio mockup link to Creative for approval")
 @router.post("/api/v1/sample-requests/{sample_id}/studio-output", summary="Studio submits output link or file path")
 def submit_studio_mockup(
     sample_id: int,
@@ -1111,25 +1453,25 @@ def submit_studio_mockup(
     sample = service.serialize(record)
     state = _require_mockup_request(sample)
     stage = state.get("stage")
-    if stage and stage not in ("studio", "marketing"):
-        raise HTTPException(status_code=409, detail="This deliverable is not waiting for Studio or Marketing")
+    if stage != "studio":
+        raise HTTPException(status_code=409, detail="This deliverable is not waiting for Studio")
     state = dict(state)
-    if stage == "studio" and state.get("claimedStage") == "studio":
-        _require_mockup_stage_claim(state, current_user, "studio")
+    _require_mockup_stage_claim(state, current_user, "studio")
     mockup_url = str(body.get("mockup_url") or body.get("mockupUrl") or "").strip()
     if not mockup_url or len(mockup_url) > 2048:
         raise HTTPException(status_code=422, detail="Enter a valid mockup link or file path")
     parsed_url = urlsplit(mockup_url)
     is_web_url = parsed_url.scheme in {"http", "https"} and bool(parsed_url.netloc)
     is_file_path = (
-        mockup_url.startswith(("\\\\", "//", "file://"))
+        parsed_url.scheme == "file"
+        or mockup_url.startswith(("\\\\", "//"))
         or (len(mockup_url) > 2 and mockup_url[1] == ":" and mockup_url[2] in ("\\", "/"))
-        or ("/" in mockup_url or "\\" in mockup_url)
-        or bool(parsed_url.scheme)
+        or (("/" in mockup_url or "\\" in mockup_url) and not parsed_url.scheme)
     )
     if not (is_web_url or is_file_path):
         raise HTTPException(status_code=422, detail="Enter a valid link (http/https) or file path")
     actor = _mockup_actor(current_user, body) or "Studio"
+    previous_status = record.status
     now = datetime.now(timezone.utc).isoformat()
     events = list(state.get("events") or [])
     events.append({
@@ -1141,19 +1483,25 @@ def submit_studio_mockup(
         "mockupUrl": mockup_url,
     })
     state.update({
-        "stage": "marketing",
+        "stage": "creative_approval",
         "mockupUrl": mockup_url,
-        "submittedToMarketingAt": now,
-        "submittedToMarketingBy": actor,
+        "studioSubmittedAt": now,
+        "submittedToCreativeAt": now,
+        "submittedToCreativeBy": actor,
+        "creativeApprovalDueAt": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
         "events": events[-100:],
     })
+    for key in ("creativeRevisionRemark", "marketingRevisionRemark", "creativeApprovalDecision", "marketingDecision"):
+        state.pop(key, None)
     _clear_mockup_stage_claim(state)
     record.mockup_workflow_state = state
-    record.target_artwork_date_studio = now
+    record.status = "Creative Mockup Approval"
     record.updated_at = datetime.now(timezone.utc)
     _record_sample_activity(
-        service, record, current_user, "STUDIO_OUTPUT_SUBMITTED", "Creative Studio",
+        service, record, current_user, "STUDIO_OUTPUT_SUBMITTED", "Studio",
         payload={"mockup_url": mockup_url},
+        from_status=previous_status,
+        to_status=record.status,
     )
     service.db.commit()
     service.db.refresh(record)
@@ -2385,7 +2733,7 @@ def get_product_details(
         user_has_team(current_user, "creative_studio")
         and is_mockup
         and isinstance(state, dict)
-        and state.get("stage") in {"creative", "studio"}
+        and state.get("stage") in {"creative", "studio", "creative_approval"}
     )
     if not creative_workflow_read:
         _require_marketing_sample_owner(sample, current_user)

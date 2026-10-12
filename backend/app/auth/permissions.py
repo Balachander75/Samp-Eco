@@ -74,29 +74,27 @@ def require_smps_member(user=Depends(get_current_user)):
 
 
 def assigned_plant_values(user, db) -> set[str]:
-    from app.models.master import Plant, UserPlantAssignment
+    from app.models.master import Plant
 
     labels = set()
-    assignments = (
-        db.query(Plant)
-        .join(UserPlantAssignment, UserPlantAssignment.plant_id == Plant.id)
-        .filter(UserPlantAssignment.user_id == user.id)
-        .all()
-    )
-    for plant in assignments:
-        labels.update((plant.code, plant.name))
-    if labels:
-        return labels
-
-    legacy_code = str(getattr(user, "plant_code", None) or "").strip()
-    if legacy_code:
-        legacy_plant = (
+    plant_code = str(getattr(user, "plant_code", None) or "").strip()
+    if plant_code:
+        plant = (
             db.query(Plant)
-            .filter((Plant.code.ilike(legacy_code)) | (Plant.name.ilike(legacy_code)))
+            .filter((Plant.code.ilike(plant_code)) | (Plant.name.ilike(plant_code)))
             .first()
         )
-        if legacy_plant:
-            labels.update((legacy_plant.code, legacy_plant.name))
+        if plant:
+            labels.update((plant.code, plant.name))
+        else:
+            labels.add(plant_code)
+    else:
+        # Default plant constant is Khaniwade (1505)
+        plant = db.query(Plant).filter(Plant.code.ilike("1505")).first()
+        if plant:
+            labels.update((plant.code, plant.name))
+        else:
+            labels.add("1505")
     return labels
 
 

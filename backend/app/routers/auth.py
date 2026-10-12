@@ -4,8 +4,7 @@ Handles /api/auth/login, /api/auth/refresh, /api/auth/logout, /api/auth/me,
 and /api/auth/audit-logs with full production-level JWT auth, sliding-window
 brute-force rate limiting, refresh token rotation, and security telemetry.
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Query
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from sqlalchemy.orm import Session
@@ -18,7 +17,6 @@ from app.auth.rate_limiter import login_rate_limiter
 from app.auth.security import (
     verify_password,
     create_access_token,
-    decode_access_token,
     create_refresh_token,
     rotate_refresh_token,
     revoke_refresh_token,
@@ -27,7 +25,6 @@ from app.auth.security import (
 )
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
-bearer_scheme = HTTPBearer(auto_error=False)
 ThemeId = Literal[
     "emerald",
     "ocean",
@@ -244,21 +241,32 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
             },
         )
 
-    # 1. Check Rate Limiter (by IP and Identifier)
-    rate_key = f"ip:{client_ip}:id:{identifier.lower()}"
-    is_limited, retry_after = login_rate_limiter.is_rate_limited(
-        rate_key,
+    # 1. Dual-Tier Rate Limiter
+    # A) Account-level limit (prevents targeted brute-forcing against a specific user)
+    id_rate_key = f"id:{identifier.lower()}"
+    is_id_limited, id_retry_after = login_rate_limiter.is_rate_limited(
+        id_rate_key,
         max_attempts=settings.RATE_LIMIT_LOGIN_MAX_ATTEMPTS,
         window_seconds=settings.RATE_LIMIT_LOGIN_WINDOW_SECONDS,
     )
-    if is_limited:
+
+    # B) IP-level limit (prevents distributed password spraying across many users from the same IP)
+    ip_rate_key = f"ip:{client_ip}"
+    is_ip_limited, ip_retry_after = login_rate_limiter.is_rate_limited(
+        ip_rate_key,
+        max_attempts=settings.RATE_LIMIT_LOGIN_MAX_ATTEMPTS * 5,
+        window_seconds=settings.RATE_LIMIT_LOGIN_WINDOW_SECONDS,
+    )
+
+    if is_id_limited or is_ip_limited:
+        retry_after = max(id_retry_after, ip_retry_after)
         _record_audit(
             db,
             identifier=identifier,
             status_label="FAILED_RATE_LIMITED",
             ip_address=client_ip,
             user_agent=user_agent,
-            failure_reason=f"Rate limit exceeded. Wait {retry_after}s.",
+            failure_reason=f"Rate limit exceeded ({'Account' if is_id_limited else 'IP'}). Wait {retry_after}s.",
         )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -295,7 +303,8 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
     )
 
     if user is None:
-        login_rate_limiter.record_attempt(rate_key)
+        login_rate_limiter.record_attempt(id_rate_key)
+        login_rate_limiter.record_attempt(ip_rate_key)
         _record_audit(
             db,
             identifier=identifier,
@@ -307,7 +316,8 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
         raise INVALID_CREDS
 
     if not verify_password(payload.password, user.password_hash):
-        login_rate_limiter.record_attempt(rate_key)
+        login_rate_limiter.record_attempt(id_rate_key)
+        login_rate_limiter.record_attempt(ip_rate_key)
         _record_audit(
             db,
             identifier=identifier,
@@ -340,8 +350,8 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
             },
         )
 
-    # Authentication Success: Reset rate limiter attempts
-    login_rate_limiter.reset_key(rate_key)
+    # Authentication Success: Reset rate limiter attempts for this identifier
+    login_rate_limiter.reset_key(id_rate_key)
 
     # Issue Short-Lived Access Token + Long-Lived Refresh Token
     access_token = create_access_token(
@@ -417,44 +427,9 @@ def logout(payload: LogoutRequest, db: Session = Depends(get_db)):
     },
     summary="Get the currently authenticated user's profile",
 )
-def get_me(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-):
-    """
-    Returns the profile of the user identified by the Bearer token.
-    """
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "success": False,
-                "error": {
-                    "code": "INVALID_TOKEN",
-                    "message": "Authorization header missing or invalid.",
-                },
-            },
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    payload = decode_access_token(credentials.credentials)
-    user_id = payload.get("sub")
-
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    if user is None or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "success": False,
-                "error": {
-                    "code": "USER_NOT_FOUND",
-                    "message": "User account not found or has been deactivated.",
-                },
-            },
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return _user_to_out(user)
+def get_me(current_user: User = Depends(get_current_user)):
+    """Returns the profile of the user identified by the Bearer token."""
+    return _user_to_out(current_user)
 
 
 @router.get(

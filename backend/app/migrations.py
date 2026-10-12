@@ -34,7 +34,6 @@ def _bootstrap_existing_schema() -> None:
         ensure_sample_reference_columns,
         ensure_sample_request_draft_keys,
         ensure_sample_request_types_default,
-        ensure_user_plant_assignments,
         ensure_user_team_columns,
         ensure_user_theme_column,
     )
@@ -43,7 +42,6 @@ def _bootstrap_existing_schema() -> None:
         ensure_design_requests_table,
         ensure_user_team_columns,
         ensure_user_theme_column,
-        ensure_user_plant_assignments,
         ensure_feasibility_workflow_columns,
         ensure_design_workflow_columns,
         ensure_program_review_columns,

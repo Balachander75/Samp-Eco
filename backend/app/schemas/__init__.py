@@ -3,7 +3,6 @@ from app.schemas.master import (
     CustomerCreate,
     CustomerOut,
     PlantBase,
-    PlantCreate,
     PlantOut,
     UserOut,
 )
@@ -20,7 +19,6 @@ __all__ = [
     "CustomerCreate",
     "CustomerOut",
     "PlantBase",
-    "PlantCreate",
     "PlantOut",
     "UserOut",
     "SampleRequestBase",

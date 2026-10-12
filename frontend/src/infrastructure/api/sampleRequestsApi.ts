@@ -561,6 +561,48 @@ export async function sendMockupRequestToStudioApi(
   return mapSampleRequest(data);
 }
 
+export async function saveMockupCreativeDateApi(
+  sampleRequestId: string | number,
+  decision: "confirmed" | "proposed",
+  date: string,
+  actorName?: string,
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/mockup/creative-date`, {
+    method: "POST",
+    jsonBody: { decision, date, actor_name: actorName },
+  });
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  return mapSampleRequest(data);
+}
+
+export async function decideMockupCreativeApprovalApi(
+  sampleRequestId: string | number,
+  decision: "accept" | "request_revision",
+  remark?: string,
+  actorName?: string,
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/mockup/creative-approval`, {
+    method: "POST",
+    jsonBody: { decision, remark, actor_name: actorName },
+  });
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  return mapSampleRequest(data);
+}
+
+export async function decideMockupMarketingAcceptanceApi(
+  sampleRequestId: string | number,
+  decision: "accept" | "request_revision",
+  remark?: string,
+  actorName?: string,
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/mockup/marketing-decision`, {
+    method: "POST",
+    jsonBody: { decision, remark, actor_name: actorName },
+  });
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  return mapSampleRequest(data);
+}
+
 export async function submitStudioMockupToMarketingApi(
   sampleRequestId: string | number,
   mockupUrl: string,

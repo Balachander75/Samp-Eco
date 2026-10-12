@@ -159,7 +159,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
 
   return (
     <div
-      className={embedded ? "w-full" : "fixed inset-0 z-[180] flex items-center justify-center bg-slate-950/65 p-2 backdrop-blur-[2px] sm:p-5"}
+      className={embedded ? "w-full" : "fixed inset-0 z-[180] flex items-center justify-center bg-[var(--on-surface)]/45 p-2 backdrop-blur-[2px] sm:p-5"}
       onMouseDown={embedded ? undefined : (event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -169,10 +169,10 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
         aria-modal={embedded ? undefined : "true"}
         aria-labelledby="catalog-inspect-title"
         className={embedded
-          ? "w-full overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
-          : `flex h-[88vh] max-h-[94vh] w-full ${view === "docket" ? "max-w-[1140px]" : "max-w-[960px]"} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(2,6,23,0.32)] transition-[max-width] duration-200 dark:border-zinc-700 dark:bg-zinc-950`}
+          ? "w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)]"
+          : `flex h-[88vh] max-h-[94vh] w-full ${view === "docket" ? "max-w-[1140px]" : "max-w-[960px]"} flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-[0_24px_80px_rgba(2,6,23,0.2)] transition-[max-width] duration-200`}
       >
-        <header className="shrink-0 border-b border-slate-200 bg-slate-50/90 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900 sm:px-6">
+        <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-4 sm:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -181,17 +181,17 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                     {product.material_code}
                   </span>
                 )}
-                <h2 id="catalog-inspect-title" className="min-w-0 text-base font-bold text-slate-900 dark:text-zinc-100 sm:text-lg">
+                <h2 id="catalog-inspect-title" className="min-w-0 text-base font-bold text-[var(--on-surface)] sm:text-lg">
                   {product.product_description || "Product specification"}
                 </h2>
               </div>
-              {!embedded && <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-slate-600 dark:text-zinc-300">
-                {product.customer && <span className="rounded-md bg-white px-2 py-1 dark:bg-zinc-900"><span className="text-slate-400">Customer:</span> {product.customer}</span>}
-                {product.target_plant && <span className="rounded-md bg-white px-2 py-1 dark:bg-zinc-900"><span className="text-slate-400">Plant:</span> {product.target_plant}</span>}
-                {product.sr_number && <span className="rounded-md bg-white px-2 py-1 font-mono dark:bg-zinc-900">{product.sr_number}</span>}
+              {!embedded && <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-[var(--on-surface-muted)]">
+                {product.customer && <span className="rounded-md bg-[var(--surface-lowest)] px-2 py-1"><span className="text-[var(--on-surface-subtle)]">Customer:</span> {product.customer}</span>}
+                {product.target_plant && <span className="rounded-md bg-[var(--surface-lowest)] px-2 py-1"><span className="text-[var(--on-surface-subtle)]">Plant:</span> {product.target_plant}</span>}
+                {product.sr_number && <span className="rounded-md bg-[var(--surface-lowest)] px-2 py-1 font-mono">{product.sr_number}</span>}
                 {(product.product_category || product.product_sub_category || product.product_third_category) && (
-                  <span className="rounded-md bg-white px-2 py-1 dark:bg-zinc-900">
-                    <span className="text-slate-400">Category:</span>{" "}
+                  <span className="rounded-md bg-[var(--surface-lowest)] px-2 py-1">
+                    <span className="text-[var(--on-surface-subtle)]">Category:</span>{" "}
                     {[product.product_category, product.product_sub_category, product.product_third_category].filter(Boolean).join(" / ")}
                   </span>
                 )}
@@ -201,7 +201,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
               type="button"
               onClick={onClose}
               aria-label="Close product inspection"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] dark:hover:bg-zinc-800 dark:hover:text-white"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-container)] hover:text-[var(--on-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
             >
               <X className="h-4 w-4" />
             </button>}
@@ -210,7 +210,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
 
         <div className={embedded ? "min-w-0" : "min-h-0 flex-1 overflow-y-auto lg:flex lg:flex-col lg:overflow-hidden"}>
           <main className={embedded ? "min-w-0" : "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden"}>
-            <div className="space-y-2.5 border-b border-slate-200 p-3 dark:border-zinc-800 sm:p-3.5 lg:shrink-0">
+            <div className="space-y-2.5 border-b border-[var(--border-subtle)] p-3 sm:p-3.5 lg:shrink-0">
               <div className="flex flex-wrap items-center justify-between gap-2.5">
                 <div>
                   <h3 className="text-xs font-bold text-slate-900 dark:text-zinc-100">{heading || "Product specifications"}</h3>
@@ -289,12 +289,12 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                       const configuredInClass = allSpecsInClass.filter((item) => hasConfiguredValue(item.value)).length;
                       const expanded = expandedClasses.has(className);
                       return (
-                        <section key={className} className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50">
+                      <section key={className} className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]">
                           <button
                             type="button"
                             aria-expanded={expanded}
                             onClick={() => toggleClass(className)}
-                            className="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)] dark:hover:bg-zinc-800/70 sm:px-3.5"
+                            className="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-[var(--surface-low)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)] sm:px-3.5"
                           >
                             <span className="min-w-0">
                               <span className="text-xs font-semibold text-slate-800 dark:text-zinc-100">
@@ -309,7 +309,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                             <span className="flex shrink-0 items-center gap-2">
                               <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-zinc-800 sm:block">
                                 <span
-                                  className="block h-full rounded-full bg-emerald-500"
+                                  className="block h-full rounded-full bg-[var(--accent-primary)]"
                                   style={{
                                     width: `${allSpecsInClass.length ? (configuredInClass / allSpecsInClass.length) * 100 : 0}%`,
                                   }}
@@ -319,8 +319,8 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                             </span>
                           </button>
                           {expanded && (
-                            <div className="border-t border-slate-200 dark:border-zinc-800">
-                              <div className="grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 bg-slate-50 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wide text-slate-500 dark:bg-zinc-900 dark:text-zinc-400 sm:px-3.5">
+                          <div className="border-t border-[var(--border-subtle)]">
+                              <div className="grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 bg-[var(--surface-low)] px-3 py-1.5 text-[9px] font-bold uppercase tracking-wide text-[var(--on-surface-subtle)] sm:px-3.5">
                                 <span>Characteristic</span>
                                 <span>Value</span>
                                 <span>UOM</span>
@@ -328,7 +328,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                               {specs.map((item) => (
                                 <div
                                   key={`${item.className}-${item.characteristicName}`}
-                                  className={`grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 border-t border-slate-100 px-3 py-2 text-[11px] dark:border-zinc-800/80 sm:px-3.5 ${highlightCreativeFields && (isMockupCreativeCharacteristic(item.className, item.characteristicName) || isListedCreativeCharacteristic(item, creativeCharacteristicKeys)) ? "border-l-2 border-rose-500 bg-rose-50/80 dark:border-rose-400 dark:bg-rose-950/25" : ""}`}
+                                  className={`grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 border-t border-slate-100 px-3 py-2 text-[11px] dark:border-zinc-800/80 sm:px-3.5 ${highlightCreativeFields && (isMockupCreativeCharacteristic(item.className, item.characteristicName) || isListedCreativeCharacteristic(item, creativeCharacteristicKeys)) ? "border border-rose-500 bg-rose-50/80 ring-1 ring-inset ring-rose-400 dark:border-rose-400 dark:bg-rose-950/25 dark:ring-rose-500" : ""}`}
                                 >
                                   <div className="min-w-0 break-words">
                                     <span className="font-medium text-slate-700 dark:text-zinc-200">

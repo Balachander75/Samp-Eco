@@ -35,10 +35,14 @@ async def lifespan(app: FastAPI):
     apply_database_migrations()
     try:
         from app.services.downstream_service import DownstreamService
+        from app.auth.security import prune_expired_refresh_tokens
         with SessionLocal() as db:
             DownstreamService(db).seed_if_empty()
+            pruned_tokens = prune_expired_refresh_tokens(db, older_than_days=14)
+            if pruned_tokens:
+                logger.info("[Startup] Cleaned up %d expired/revoked refresh token(s).", pruned_tokens)
     except Exception as e:
-        logger.warning("[Startup] Downstream seeding skipped: %s", e)
+        logger.warning("[Startup] Downstream seeding or token prune skipped: %s", e)
     logger.info("[Startup] Database migrations applied.")
     from app.services.feasibility_service import FeasibilityService
 

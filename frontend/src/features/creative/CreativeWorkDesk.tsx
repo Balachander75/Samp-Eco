@@ -231,7 +231,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
     try {
       const hasMockup =
         (req.requestTypes || []).includes("mockup") || String(req.mockupRequired || "").toLowerCase() === "yes";
-      const isCreativeStage = !req.mockupWorkflowState || req.mockupWorkflowState.stage === "creative";
+      const isCreativeStage = !req.mockupWorkflowState || ["creative", "creative_approval"].includes(req.mockupWorkflowState.stage);
 
       if (hasMockup && isCreativeStage && !isReadOnlyTeamHead(user)) {
         try {
@@ -317,6 +317,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
             role="creative"
             readOnly={isReadOnlyTeamHead(user)}
             actorName={user?.name || user?.userid}
+            actorUserId={user?.id}
             onClose={() => setIsMockupInspectorOpen(false)}
             onRefresh={loadData}
           />

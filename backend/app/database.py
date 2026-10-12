@@ -41,6 +41,8 @@ def ensure_user_team_columns():
         "ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'",
         "CREATE INDEX IF NOT EXISTS ix_users_team ON users (team)",
         "CREATE INDEX IF NOT EXISTS ix_users_team_head ON users (team, is_team_head)",
+        "CREATE INDEX IF NOT EXISTS ix_users_userid_lower ON users (lower(userid))",
+        "CREATE INDEX IF NOT EXISTS ix_users_email_lower ON users (lower(email))",
         "UPDATE users SET team = 'marketing' WHERE NULLIF(trim(team), '') IS NULL AND (lower(coalesce(role, '')) LIKE '%marketing%' OR lower(coalesce(sub_role, '')) LIKE '%marketing%')",
         "UPDATE users SET team = 'samp' WHERE NULLIF(trim(team), '') IS NULL AND (lower(coalesce(role, '')) LIKE '%samp%' OR lower(coalesce(sub_role, '')) LIKE '%samp%' OR lower(coalesce(sub_role, '')) LIKE '%sampling%')",
         "UPDATE users SET team = 'plant' WHERE NULLIF(trim(team), '') IS NULL AND (lower(coalesce(role, '')) LIKE '%plant%' OR lower(coalesce(sub_role, '')) LIKE '%plant%')",
@@ -72,23 +74,6 @@ def ensure_user_theme_column():
     with engine.begin() as connection:
         connection.execute(text(
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme_id VARCHAR(20) NOT NULL DEFAULT 'emerald'"
-        ))
-
-
-def ensure_user_plant_assignments():
-    """Create multi-plant assignments and preserve each legacy plant_code."""
-    from app.models.master import UserPlantAssignment
-
-    UserPlantAssignment.__table__.create(bind=engine, checkfirst=True)
-    with engine.begin() as connection:
-        connection.execute(text(
-            """INSERT INTO user_plant_assignments (user_id, plant_id)
-               SELECT users.id, plants.id
-               FROM users
-             JOIN plants ON lower(plants.code) = lower(trim(users.plant_code))
-                         OR lower(plants.name) = lower(trim(users.plant_code))
-               WHERE users.plant_code IS NOT NULL AND trim(users.plant_code) <> ''
-               ON CONFLICT (user_id, plant_id) DO NOTHING"""
         ))
 
 
@@ -306,6 +291,36 @@ def ensure_mockup_workflow_columns():
         connection.execute(text(
             "ALTER TABLE create_sample_requests ADD COLUMN IF NOT EXISTS mockup_workflow_state JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
+        connection.execute(text("""
+            UPDATE create_sample_requests
+            SET mockup_workflow_state = jsonb_set(
+                jsonb_set(
+                    COALESCE(mockup_workflow_state, '{}'::jsonb),
+                    '{stage}', to_jsonb('creative_approval'::text), true
+                ),
+                '{creativeApprovalDueAt}',
+                to_jsonb(COALESCE(
+                    NULLIF(mockup_workflow_state->>'creativeApprovalDueAt', ''),
+                    (timezone('utc', now()) + interval '24 hours')::text
+                )),
+                true
+            ) || jsonb_build_object(
+                'events', COALESCE(mockup_workflow_state->'events', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                    'action', 'MOCKUP_LEGACY_OUTPUT_ROUTED_TO_CREATIVE_APPROVAL',
+                    'title', 'Legacy Studio output routed to Creative approval',
+                    'actorName', 'System',
+                    'actorDepartment', 'System',
+                    'timestamp', timezone('utc', now())::text
+                ))
+            ),
+            updated_at = timezone('utc', now())
+            WHERE COALESCE(mockup_workflow_state->>'stage', '') = 'marketing'
+              AND NULLIF(trim(COALESCE(mockup_workflow_state->>'mockupUrl', mockup_workflow_state->>'mockup_url', '')), '') IS NOT NULL
+              AND (request_types @> '["mockup"]'::jsonb OR lower(COALESCE(mockup_required, '')) = 'yes')
+              AND lower(COALESCE(status, '')) NOT LIKE '%draft%'
+              AND lower(COALESCE(status, '')) NOT LIKE '%closed%'
+              AND lower(COALESCE(status, '')) NOT LIKE '%approved%'
+        """))
         connection.execute(text("""
             UPDATE create_sample_requests
             SET mockup_workflow_state = jsonb_set(
