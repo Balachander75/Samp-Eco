@@ -17,13 +17,14 @@ import {
 } from "lucide-react";
 import { SampleRequestItem } from "../types";
 import { releaseDraftRequestsApi, deleteAnyRequestApi } from "@/infrastructure/api";
-import { getRequestTrackType, getStageIdForRequest, isDesignRequest } from "../utils/trackTypes";
+import { getDraftReleaseStatus, getRequestTrackType, getStageIdForRequest, isDesignRequest } from "../utils/trackTypes";
 
 export interface DraftPackageGroup {
   id: string;
   customer: string;
   programName: string;
   programYear: string;
+  year: string;
   targetPlant: string;
   createdBy: string;
   dateRequestCreated: string;
@@ -42,7 +43,7 @@ const isDesignPackageGroup = (group: DraftPackageGroup) =>
   group.requestKind === "design" || (group.items.length > 0 && group.items.every(isDesignRequest));
 
 const getReleaseDestination = (group: DraftPackageGroup) =>
-  Array.from(new Set(group.items.map((item) => isDesignRequest(item) ? "Creative" : "Sampling Review (PMT)"))).join(" and ");
+  Array.from(new Set(group.items.map(getDraftReleaseStatus))).join(" and ");
 
 export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
   requests,
@@ -84,6 +85,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
           customer,
           programName,
           programYear,
+          year: item.year || "",
           targetPlant: item.targetPlant || "1505- Khaniwade",
           createdBy: item.createdBy || "Marketing",
           dateRequestCreated: item.dateRequestCreated || item.createdAt || "",
@@ -117,7 +119,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
     try {
       const itemsByStatus = new Map<string, SampleRequestItem[]>();
       for (const item of quickReleaseGroup.items) {
-        const status = isDesignRequest(item) ? "Creative" : "Sampling Review (PMT)";
+        const status = getDraftReleaseStatus(item);
         itemsByStatus.set(status, [...(itemsByStatus.get(status) || []), item]);
       }
       for (const [status, items] of itemsByStatus) {
@@ -125,7 +127,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       }
 
       showToast(
-        `✓ Released package "${quickReleaseGroup.programName}" (${quickReleaseGroup.items.length} items) to Creative!`,
+        `✓ Released package "${quickReleaseGroup.programName}" (${quickReleaseGroup.items.length} items) to ${getReleaseDestination(quickReleaseGroup)}.`,
         "success"
       );
       setQuickReleaseGroup(null);
@@ -133,7 +135,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
     } catch (err) {
       console.error("Failed to quick release package:", err);
       await onRefresh();
-      showToast("Error releasing draft package to Creative.", "error");
+      showToast("Error releasing draft package to its workflow.", "error");
     } finally {
       setIsReleasing(false);
     }
@@ -191,7 +193,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-200 dark:border-white/[0.08]">
         <div>
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2">
-            <Package className="w-4 h-4 text-[#714B67]" />
+            <Package className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             Draft Packages Queue ({packageGroups.length})
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -208,16 +210,16 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
           return (
             <div
               key={group.id}
-              className="bg-white dark:bg-[#12141d] rounded-xl border border-zinc-200 dark:border-white/[0.08] shadow-xs hover:shadow-md hover:border-[#714B67]/40 dark:hover:border-[#d5bdd0]/40 transition-all flex flex-col justify-between overflow-hidden group"
+              className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-white/[0.08] shadow-xs hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700/50 transition-all flex flex-col justify-between overflow-hidden group"
             >
               {/* Card Top */}
               <div className="p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#714B67]/10 text-[#714B67] dark:bg-purple-900/30 dark:text-purple-300 border border-[#714B67]/20 mb-1.5">
+                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-600/10 text-purple-600 dark:text-purple-400 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 mb-1.5">
                       {group.customer}
                     </span>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate group-hover:text-[#714B67] dark:group-hover:text-[#d5bdd0] transition-colors">
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate group-hover:text-purple-600 dark:text-purple-400 dark:group-hover:text-purple-300 transition-colors">
                       {group.programName}
                     </h3>
                   </div>
@@ -289,7 +291,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
                   <button
                     type="button"
                     onClick={() => handleOpenWorkspace(group)}
-                    className="px-3 py-1.5 rounded text-xs font-semibold text-white bg-[#714B67] hover:bg-[#5B3C53] flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                    className="px-3 py-1.5 rounded text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                   >
                     <span>Open Workspace</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -304,7 +306,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       {/* Quick Release Confirmation Modal */}
       {quickReleaseGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70">
-          <div className="bg-white dark:bg-[#12141d] rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
@@ -388,7 +390,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       {/* Delete Package Modal */}
       {deleteGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70">
-          <div className="bg-white dark:bg-[#12141d] rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-2.5 text-rose-600">
               <div className="w-9 h-9 rounded-lg bg-rose-100 dark:bg-rose-950/60 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5" />

@@ -13,137 +13,155 @@ import {
   Sparkles,
   ShieldCheck,
   Building2,
+  ArrowRight,
+  Layers,
 } from "lucide-react";
+import { StatusPill } from "@/components/ui/StatusPill";
 
 export interface FeasibilitySheetHeaderProps {
   activeRequest: SampleRequestItem;
   classificationLabel: string;
-  previewableImagesCount: number;
-  referenceLinks: string[];
-  canEvaluateTechnical: boolean;
-  canMakeCommercialDecision: boolean;
-  isClaiming: boolean;
-  isSubmittingDecision: boolean;
-  isConverting: boolean;
-  onClaimTask: () => void;
-  onOpenReviewTab: () => void;
-  onMarketingFinalApprove: (approved: boolean) => void;
-  onConvertToSampling: () => void;
+  previewableImagesCount?: number;
+  referenceLinks?: string[];
+  canEvaluateTechnical?: boolean;
+  canMakeCommercialDecision?: boolean;
+  isClaiming?: boolean;
+  isSubmittingDecision?: boolean;
+  isConverting?: boolean;
+  onClaimTask?: () => void;
+  onOpenReviewTab?: () => void;
+  onMarketingFinalApprove?: (approved: boolean) => void;
+  onConvertToSampling?: () => void;
 }
 
 export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
   activeRequest,
   classificationLabel,
 }) => {
-  const code = activeRequest.srNumber || activeRequest.materialCode || `FS-${activeRequest.id}`;
+  const code = activeRequest.materialCode || `FC-${String(activeRequest.id).padStart(4, "0")}`;
   const isEvaluated = Boolean(activeRequest.samplingFeasibilityResponse);
-  const isClaimed = Boolean(activeRequest.takenBySamp);
   const isDecided = Boolean(activeRequest.marketingDecision);
   const isConverted = Boolean(activeRequest.convertedSrNumber);
 
   return (
-    <div className="bg-white dark:bg-[#161928] border-b border-slate-100 dark:border-white/5">
+    <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
       {/* ── Top Bar: Reference Code & Flow Progression ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-8 py-3 bg-[#f8f9ff]/70 dark:bg-zinc-900/40 border-b border-slate-100/80 dark:border-white/5">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 sm:px-8 py-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2.5">
-          <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg bg-[#eff4ff] dark:bg-[#006d32]/20 text-[#006d32] dark:text-[#00d166] border border-[#006d32]/20">
+          <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg bg-[var(--surface-lowest)] text-[var(--accent-primary)] border border-[var(--border-subtle)] shadow-2xs">
             {code}
           </span>
-          <span className="text-slate-300 dark:text-zinc-700">/</span>
-          <span className="text-xs font-display font-semibold text-slate-500 dark:text-zinc-400">
-            Feasibility Specification Sheet
+          <span className="text-[var(--border-strong)]">/</span>
+          <span className="text-xs font-display font-semibold text-[var(--on-surface-muted)] flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+            <span>NPD Technical Feasibility Dossier</span>
           </span>
         </div>
 
         {/* Status Badges Group */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Feasibility Scope Badge */}
-          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-display font-semibold bg-[#eff4ff] dark:bg-[#006d32]/20 text-[#006d32] dark:text-[#00d166] border border-[#006d32]/25">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono font-semibold bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)]">
             {classificationLabel}
           </span>
 
           {/* Technical Verdict Badge */}
           {activeRequest.samplingFeasibilityResponse === "Yes" ? (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-[#eff4ff] text-[#006d32] dark:bg-[#006d32]/25 dark:text-[#00d166] border border-[#006d32]/20">
-              Feasible (Approved)
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Feasible (Approved)</span>
             </span>
           ) : activeRequest.samplingFeasibilityResponse === "Maybe" ? (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300">
-              Conditional Review
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Conditional Feasibility</span>
             </span>
           ) : activeRequest.samplingFeasibilityResponse === "No" ? (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300">
-              Not Feasible
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300">
+              <XCircle className="w-3.5 h-3.5" />
+              <span>Not Feasible</span>
             </span>
           ) : activeRequest.takenBySamp ? (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-display font-semibold bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-950/40 dark:text-sky-300">
-              Under Review ({activeRequest.takenBySamp})
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-semibold bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-950/40 dark:text-sky-300">
+              <Clock className="w-3.5 h-3.5" />
+              <span>In Trial ({activeRequest.takenBySamp})</span>
             </span>
           ) : (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-display font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300">
-              Awaiting SAMP Claim
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-semibold bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
+              <span>Awaiting SAMP Claim</span>
             </span>
           )}
 
           {/* Converted Sampling Badge */}
           {activeRequest.convertedSrNumber && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-[#006d32] text-white">
-              Sampling: {activeRequest.convertedSrNumber}
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-[var(--accent-primary)] text-white shadow-2xs">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Sampling: {activeRequest.convertedSrNumber}</span>
             </span>
           )}
         </div>
       </div>
 
       {/* ── Document Hero Section ── */}
-      <div className="px-8 py-5">
+      <div className="px-6 sm:px-8 py-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-slate-900 dark:text-zinc-50">
-              {activeRequest.customer || "General Customer Account"}
+            <h1 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-[var(--on-surface)]">
+              {activeRequest.customer || "Unassigned Customer Account"}
             </h1>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 flex items-center gap-1.5">
-              <span>Initiated by</span>
-              <span className="font-semibold text-slate-800 dark:text-zinc-200">
-                {activeRequest.createdBy || "Marketing Desk"}
+            <p className="text-xs text-[var(--on-surface-muted)] mt-1 flex items-center gap-1.5 font-mono">
+              <span>Raised by</span>
+              <span className="font-semibold text-[var(--on-surface)]">
+                {activeRequest.createdBy || "Marketing"}
               </span>
-              <span>·</span>
-              <span>on {formatOdooDate(activeRequest.dateRequestCreated || activeRequest.createdAt)}</span>
+              <span className="text-[var(--border-strong)]">·</span>
+              <span>
+                on{" "}
+                {activeRequest.dateRequestCreated
+                  ? formatOdooDate(activeRequest.dateRequestCreated)
+                  : activeRequest.createdAt
+                  ? formatOdooDate(activeRequest.createdAt)
+                  : "—"}
+              </span>
             </p>
           </div>
         </div>
 
         {/* ── 4-Card Executive Metrics Strip ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
           {/* Card 1: Feasibility Type Scope */}
-          <div className="p-3.5 rounded-2xl bg-[#eff4ff]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 space-y-1">
-            <span className="text-[10px] font-display uppercase tracking-wider text-slate-400 dark:text-zinc-400 block font-semibold">
+          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-0.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
               Feasibility Type
             </span>
-            <div className="font-display font-bold text-xs text-slate-900 dark:text-zinc-100 truncate" title={classificationLabel}>
+            <div
+              className="font-display font-bold text-xs text-[var(--on-surface)] truncate"
+              title={classificationLabel}
+            >
               {classificationLabel}
             </div>
           </div>
 
           {/* Card 2: Target Required Date */}
-          <div className="p-3.5 rounded-2xl bg-[#eff4ff]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 space-y-1">
-            <span className="text-[10px] font-display uppercase tracking-wider text-slate-400 dark:text-zinc-400 block font-semibold">
+          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-0.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
               Required Target Date
             </span>
-            <div className="font-display font-bold text-xs text-slate-900 dark:text-zinc-100">
+            <div className="font-mono font-bold text-xs text-[var(--on-surface)]">
               {activeRequest.sampleRequiredDate
                 ? formatOdooDate(activeRequest.sampleRequiredDate)
-                : "Flexible Turnaround"}
+                : "Flexible"}
             </div>
           </div>
 
           {/* Card 3: SAMP Team Assignee */}
-          <div className="p-3.5 rounded-2xl bg-[#eff4ff]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 space-y-1">
-            <span className="text-[10px] font-display uppercase tracking-wider text-slate-400 dark:text-zinc-400 block font-semibold">
-              SAMP Team Assignee
+          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-0.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
+              SAMP Lab Reviewer
             </span>
-            <div className="font-display font-bold text-xs">
+            <div className="font-sans font-bold text-xs">
               {activeRequest.takenBySamp ? (
-                <span className="text-slate-900 dark:text-zinc-100 truncate">
+                <span className="text-[var(--on-surface)] truncate">
                   {activeRequest.takenBySamp}
                 </span>
               ) : (
@@ -155,21 +173,27 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
           </div>
 
           {/* Card 4: Commercial Status */}
-          <div className="p-3.5 rounded-2xl bg-[#eff4ff]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 space-y-1">
-            <span className="text-[10px] font-display uppercase tracking-wider text-slate-400 dark:text-zinc-400 block font-semibold">
-              Commercial State
+          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-0.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
+              Commercial Sign-Off
             </span>
-            <div className="font-display font-bold text-xs">
+            <div className="font-sans font-bold text-xs">
               {activeRequest.convertedSrNumber ? (
-                <span className="text-[#006d32] dark:text-[#00d166]">Converted to Sample</span>
+                <span className="text-emerald-600 dark:text-emerald-400">Converted to Sample</span>
               ) : activeRequest.marketingDecision ? (
-                <span className={activeRequest.marketingDecision === "Accepted" ? "text-[#006d32] dark:text-[#00d166]" : "text-rose-600"}>
+                <span
+                  className={
+                    activeRequest.marketingDecision === "Accepted"
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-rose-600 dark:text-rose-400"
+                  }
+                >
                   {activeRequest.marketingDecision}
                 </span>
               ) : isEvaluated ? (
-                <span className="text-sky-600 dark:text-sky-400">Ready for Decision</span>
+                <span className="text-purple-600 dark:text-purple-400">Ready for Marketing</span>
               ) : (
-                <span className="text-slate-500 font-medium">Pending SAMP Sign-Off</span>
+                <span className="text-[var(--on-surface-subtle)] font-medium">Pending Lab Trial</span>
               )}
             </div>
           </div>

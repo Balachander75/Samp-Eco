@@ -4,34 +4,19 @@ import { SampleRequestItem } from "../types";
 import { getRequestTrackType } from "../utils/trackTypes";
 import { useNavigate } from "react-router-dom";
 import {
-  FolderGit2,
   Plus,
   RefreshCw,
   Search,
   X,
-  Building2,
-  Calendar,
-  Sparkles,
   Trash2,
-  Clock,
-  Highlighter,
-  CheckCircle2,
   Download,
-  ClipboardCheck,
-  ChevronRight,
-  Layers,
 } from "lucide-react";
-import { parseSampRemark } from "./utils/programRemarkUtils";
 import { CopyBadge } from "@/components/ui/CopyBadge";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { PaginationBar } from "@/components/erp/PaginationBar";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 
 const NewProgramPlanningModal = React.lazy(() =>
   import("./components/NewProgramPlanningModal").then((m) => ({ default: m.NewProgramPlanningModal }))
-);
-const ProgramPlanningInspectorModal = React.lazy(() =>
-  import("./components/ProgramPlanningInspectorModal").then((m) => ({ default: m.ProgramPlanningInspectorModal }))
 );
 
 export interface ProgramPlanningPageProps {
@@ -43,30 +28,27 @@ export interface ProgramPlanningPageProps {
   uniqueCustomers?: string[];
   user?: UserProfile | null;
   isAdmin: boolean;
+  isReadOnly?: boolean;
   onOpenNewModal: () => void;
   onInspectRequest: (req: SampleRequestItem) => void;
   onDeleteRequest: (req: SampleRequestItem, e?: React.MouseEvent) => Promise<void>;
   onRefresh: () => Promise<void>;
 }
 
-export type ProgramStageTab = "all" | "awaiting_review" | "reviewed" | "production";
+export type ProgramStageTab = "all" | "awaiting_samp" | "samp_added" | "plant_added";
 
-const PROGRAM_STAGE_TABS: { id: ProgramStageTab; label: string }[] = [
-  { id: "all", label: "All Programs" },
-  { id: "awaiting_review", label: "Awaiting SAMP Review" },
-  { id: "reviewed", label: "Reviewed by SAMP" },
-  { id: "production", label: "Production Handoff" },
-];
+const hasSampOutput = (request: SampleRequestItem) => Boolean((request.samplingRemark || "").trim());
+const hasPlantOutput = (request: SampleRequestItem) => Boolean((request.plantRemark || "").trim());
 
 export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
   requests,
   isLoading,
   selectedYear,
   selectedPlant,
-  uniquePlants,
   uniqueCustomers,
   user,
   isAdmin,
+  isReadOnly = false,
   onOpenNewModal,
   onInspectRequest,
   onDeleteRequest,
@@ -81,7 +63,6 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
 
   // Local Modal States
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
-  const [inspectingProgram, setInspectingProgram] = useState<SampleRequestItem | null>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -125,66 +106,46 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
   // Operational metrics
   const programStats = useMemo(() => {
     const totalPrograms = programRequests.length;
-    let awaitingReviewCount = 0;
-    let reviewedCount = 0;
-    let productionCount = 0;
+    let awaitingSampCount = 0;
+    let sampOutputCount = 0;
+    let plantOutputCount = 0;
     let totalSkus = 0;
-    const plantSet = new Set<string>();
 
     programRequests.forEach((r) => {
       const matCount = r.programMaterials?.length || 1;
       totalSkus += matCount;
-      if (r.targetPlant) plantSet.add(r.targetPlant);
 
-      const status = (r.status || "").toLowerCase();
-      if (status.includes("reviewed") || status.includes("samp reviewed") || status.includes("approved")) {
-        reviewedCount++;
-      } else if (status.includes("prod") || status.includes("handoff") || status.includes("deal")) {
-        productionCount++;
-      } else {
-        awaitingReviewCount++;
-      }
+      if (hasSampOutput(r)) sampOutputCount++;
+      else awaitingSampCount++;
+      if (hasPlantOutput(r)) plantOutputCount++;
     });
 
     return {
       totalPrograms,
-      awaitingReviewCount,
-      reviewedCount,
-      productionCount,
+      awaitingSampCount,
+      sampOutputCount,
+      plantOutputCount,
       totalSkus,
-      plantsCount: plantSet.size || uniquePlants.length || 2,
     };
-  }, [programRequests, uniquePlants]);
+  }, [programRequests]);
 
   // Stage tab counts
   const stageCounts = useMemo(() => {
     return {
       all: programStats.totalPrograms,
-      awaiting_review: programStats.awaitingReviewCount,
-      reviewed: programStats.reviewedCount,
-      production: programStats.productionCount,
+      awaiting_samp: programStats.awaitingSampCount,
+      samp_added: programStats.sampOutputCount,
+      plant_added: programStats.plantOutputCount,
     };
   }, [programStats]);
 
   // Filtered requests
   const filteredRequests = useMemo(() => {
     return programRequests.filter((r) => {
-      const status = (r.status || "").toLowerCase();
-
       // Tab filter
-      if (filterTab === "awaiting_review") {
-        if (status.includes("reviewed") || status.includes("prod") || status.includes("approved")) {
-          return false;
-        }
-      } else if (filterTab === "reviewed") {
-        if (!status.includes("reviewed") && !status.includes("approved") && !status.includes("samp reviewed")) {
-          return false;
-        }
-      } else if (filterTab === "production") {
-        if (!status.includes("prod") && !status.includes("handoff") && !status.includes("dispatch")) {
-          return false;
-        }
-      }
+      if (filterTab === "awaiting_samp" && hasSampOutput(r)) return false;
+      if (filterTab === "samp_added" && !hasSampOutput(r)) return false;
+      if (filterTab === "plant_added" && !hasPlantOutput(r)) return false;
 
       // Customer filter
       if (customerFilter !== "all" && r.customer !== customerFilter) {
@@ -224,6 +185,14 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
 
   const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setCustomerFilter("all");
+    setSelectedPlantFilter("all");
+    setFilterTab("all");
+    setCurrentPage(1);
+  };
+
   // Selection
   const handleToggleSelectRow = (id: string | number, e?: React.SyntheticEvent) => {
     if (e) e.stopPropagation();
@@ -244,7 +213,6 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
   };
 
   const handleOpenInspector = (req: SampleRequestItem) => {
-    setInspectingProgram(req);
     onInspectRequest(req);
   };
 
@@ -260,65 +228,50 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
         { header: "Program Title", accessor: (r) => r.programName || r.productDescription },
         { header: "Year", accessor: (r) => r.programYear || "2026" },
         { header: "Plant", accessor: (r) => r.targetPlant },
-        { header: "Status", accessor: (r) => r.status || "Program Planning" },
+        { header: "SAMP Note", accessor: (r) => hasSampOutput(r) ? "Added" : "Awaiting" },
+        { header: "Plant Note", accessor: (r) => hasPlantOutput(r) ? "Added" : "Awaiting" },
         { header: "Total SKUs", accessor: (r) => r.programMaterials?.length || 1 },
       ],
       data: filteredRequests,
     });
   };
 
-  const navTabs: { id: ProgramStageTab; label: string; count: number }[] = [
-    { id: "all", label: "All Programs", count: stageCounts.all },
-    { id: "awaiting_review", label: "Awaiting SAMP Review", count: stageCounts.awaiting_review },
-    { id: "reviewed", label: "Reviewed by SAMP", count: stageCounts.reviewed },
-    { id: "production", label: "Production Handoff", count: stageCounts.production },
-  ];
-
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white text-slate-800 select-text overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-base)] text-[var(--on-surface)] select-text">
       {/* ── 1. Compact Editorial Header (Maximized Space for Requests) ── */}
-      <header className="bg-white px-6 py-3 shrink-0 border-b border-slate-200/60 shadow-[0_1px_4px_rgba(11,28,48,0.02)]">
+      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 font-display">
+          <div>
+            <h1 className="text-base font-bold tracking-tight text-[var(--on-surface)] sm:text-lg">
               Seasonal Program Planning
             </h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-slate-100 text-slate-600">
-              {programStats.totalPrograms} Programs
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-[#006d32]/10 text-[#006d32] border border-[#006d32]/20">
-              {programStats.totalSkus} Total SKUs
-            </span>
-            {programStats.awaitingReviewCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-amber-50 text-amber-700 animate-pulse">
-                ⚡ {programStats.awaitingReviewCount} In SAMP Queue
-              </span>
-            )}
+            <p className="mt-0.5 text-[11px] text-[var(--on-surface-subtle)]">Seasonal campaign plans with SAMP and Plant team notes</p>
           </div>
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2 shrink-0">
             {/* New Program Button */}
-            <button
-              type="button"
-              onClick={() => setIsNewModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] transition-all cursor-pointer active:scale-98"
-              style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
-              title="Initialize New Seasonal Program with Matrix"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Program Planning</span>
-            </button>
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={() => setIsNewModalOpen(true)}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold text-white transition bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] cursor-pointer"
+                title="Initialize New Seasonal Program with Matrix"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Program Planning</span>
+              </button>
+            )}
 
             {/* Refresh */}
             <button
               type="button"
               onClick={onRefresh}
               disabled={isLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-xs font-semibold text-slate-700 transition cursor-pointer disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] cursor-pointer disabled:opacity-50"
               title="Refresh Program Records"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-[#006d32]" : "text-slate-500"}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
 
@@ -327,51 +280,59 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
               type="button"
               onClick={handleExportCSV}
               disabled={filteredRequests.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-xs font-semibold text-slate-700 transition cursor-pointer disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] cursor-pointer disabled:opacity-50"
               title="Export To CSV"
             >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <Download className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Export</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* ── 2. Floating Filter & Search Strip ── */}
-      <div className="px-6 py-2 bg-white shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200">
-        {/* Soft Segmented Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 select-none">
-          {navTabs.map((t) => {
-            const isActive = filterTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  setFilterTab(t.id);
-                  setCurrentPage(1);
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
-                  isActive
-                    ? "bg-[#006d32] text-white shadow-[0_2px_8px_rgba(0,109,50,0.25)]"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 bg-transparent"
-                }`}
-              >
-                <span>{t.label}</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full tabular-nums ${
-                    isActive ? "bg-white/25 text-white" : "bg-slate-200/70 text-slate-600"
-                  }`}
-                >
-                  {t.count}
+      <section aria-label="Program planning summary" className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-2.5 sm:px-6">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+          {[
+            { label: "Programs", value: stageCounts.all, detail: "All seasonal plans", color: "bg-[var(--accent-primary)]", filter: "all" as const },
+            { label: "Awaiting SAMP", value: stageCounts.awaiting_samp, detail: "SAMP note needed", color: "bg-amber-500", filter: "awaiting_samp" as const },
+            { label: "SAMP note added", value: stageCounts.samp_added, detail: "Sampling input received", color: "bg-sky-500", filter: "samp_added" as const },
+            { label: "Plant note added", value: stageCounts.plant_added, detail: "Plant input received", color: "bg-emerald-500", filter: "plant_added" as const },
+            { label: "Total SKUs", value: programStats.totalSkus, detail: "Across program plans", color: "bg-violet-500" },
+          ].map((item) => {
+            const active = "filter" in item && item.filter
+              ? item.filter === "all"
+                ? filterTab === "all" && customerFilter === "all" && selectedPlantFilter === "all" && !searchTerm
+                : filterTab === item.filter
+              : false;
+            const content = (
+              <>
+                <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.color}`} />
+                  <span className="truncate">{item.label}</span>
                 </span>
+                <span className="mt-1 flex items-baseline justify-between gap-2">
+                  <span className="text-lg font-bold leading-none tabular-nums text-[var(--on-surface)]">{item.value}</span>
+                  <span className="truncate text-[10px] text-[var(--on-surface-subtle)]">{item.detail}</span>
+                </span>
+              </>
+            );
+            return "filter" in item && item.filter ? (
+              <button key={item.label} type="button" onClick={() => { if (item.filter === "all") clearFilters(); else { setFilterTab(item.filter); setCurrentPage(1); } }} aria-pressed={active} className={`min-w-0 rounded-lg border px-3 py-2 text-left shadow-2xs transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--surface-low)] ${active ? "border-[var(--accent-primary)] bg-[var(--surface-lowest)] ring-2 ring-[var(--accent-primary)]/20" : "border-[var(--border-subtle)] bg-[var(--surface-lowest)]"}`}>
+                {content}
               </button>
+            ) : (
+              <div key={item.label} className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2 shadow-2xs">
+                {content}
+              </div>
             );
           })}
         </div>
+      </section>
 
+      {/* ── 2. Floating Filter & Search Strip ── */}
+      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-4 py-2.5 sm:px-6">
         {/* Right Search, Customer, Plant Select */}
-        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+        <div className="flex flex-wrap items-center gap-2">
           {selectedIds.size > 0 && isAdmin && (
             <button
               type="button"
@@ -379,7 +340,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                 const target = programRequests.find((r) => selectedIds.has(r.id));
                 if (target) onDeleteRequest(target);
               }}
-              className="h-9 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700 cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete ({selectedIds.size})</span>
@@ -393,7 +354,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                 setCustomerFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 text-xs font-medium text-slate-700 border border-slate-200/70 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition"
+              className="h-9 min-w-[160px] max-w-[240px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--border-focus)] cursor-pointer"
             >
               <option value="all">All Customers</option>
               {customerList.map((c) => (
@@ -411,7 +372,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                 setSelectedPlantFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 text-xs font-medium text-slate-700 border border-slate-200/70 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition font-mono"
+              className="h-9 min-w-[140px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--border-focus)] cursor-pointer font-mono"
             >
               <option value="all">All Plants</option>
               {plantList.map((p) => (
@@ -423,7 +384,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
           )}
 
           <div className="relative w-60 sm:w-72 group">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#006d32] transition-colors pointer-events-none" />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--on-surface-subtle)] transition-colors group-focus-within:text-[var(--accent-primary)]" />
             <input
               type="text"
               placeholder="Search code, customer, title..."
@@ -432,27 +393,40 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-9 pl-9 pr-8 rounded-xl bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-medium text-slate-800 placeholder:text-slate-400 border border-slate-200/80 focus:border-[#006d32]/40 focus:outline-none focus:ring-4 focus:ring-[#006d32]/[0.08] shadow-2xs transition-all"
+              className="h-9 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] pl-[34px] pr-8 text-xs text-[var(--on-surface)] outline-none transition-all placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--accent-primary)]/15"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/80 transition-colors cursor-pointer"
+                className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-low)] cursor-pointer"
                 title="Clear search"
               >
-                ✕
+                <X className="h-3 w-3" />
               </button>
             )}
           </div>
+          {(customerFilter !== "all" || selectedPlantFilter !== "all" || filterTab !== "all" || searchTerm) && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="h-9 rounded-lg px-2.5 text-xs font-medium text-[var(--on-surface-muted)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)]"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       </div>
 
       {/* ── 3. Full-Bleed Table Workspace (Seamlessly Blended into Full UI) ── */}
-      <div className="flex-1 min-h-0 overflow-auto bg-white flex flex-col">
-        <table className="w-full text-left text-xs border-collapse">
-          <thead className="sticky top-0 z-10 bg-[#f8fafc] border-b border-slate-200">
-            <tr className="text-slate-600 font-mono text-[11px] uppercase tracking-wider select-none">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2 text-xs text-[var(--on-surface-muted)] sm:px-6">
+        <span>Showing <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">{filteredRequests.length}</span> of <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">{programRequests.length}</span> programs</span>
+        <span className="font-mono text-[10px] text-[var(--on-surface-subtle)]">Newest plans first</span>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col">
+        <table className="w-full min-w-[1180px] text-left text-xs border-collapse">
+          <thead className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--surface-low)]">
+            <tr className="font-mono text-[11px] uppercase tracking-wider text-[var(--on-surface-subtle)] select-none">
               <th className="py-3 pl-6 pr-3 w-10 text-center">
                 <input
                   type="checkbox"
@@ -461,7 +435,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                     paginatedRequests.every((r) => selectedIds.has(r.id))
                   }
                   onChange={handleToggleSelectAll}
-                  className="rounded text-[#006d32] focus:ring-[#006d32] cursor-pointer"
+                  className="cursor-pointer rounded accent-[var(--accent-primary)]"
                 />
               </th>
               <th className="py-3 px-4 font-semibold whitespace-nowrap">Program ID</th>
@@ -470,29 +444,25 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
               <th className="py-3 px-4 font-semibold whitespace-nowrap">Plant</th>
               <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Year</th>
               <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Matrix SKUs</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">SAMP Technical Review</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Target Date</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">Team Notes</th>
               <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Commercial Action</th>
             </tr>
           </thead>
 
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={10} className="py-16 text-center text-slate-400 font-mono">
-                      <RefreshCw className="w-5 h-5 animate-spin mx-auto text-[#006d32] mb-2" />
+                    <td colSpan={9} className="py-16 text-center font-mono text-[var(--on-surface-subtle)]">
+                      <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin text-[var(--accent-primary)]" />
                       <span>Loading seasonal program planning matrix...</span>
                     </td>
                   </tr>
                 ) : paginatedRequests.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-16 text-center">
-                      <div className="max-w-sm mx-auto flex flex-col items-center">
-                        <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-                          <FolderGit2 className="w-6 h-6" />
-                        </div>
-                        <h3 className="text-sm font-bold text-slate-800">No Seasonal Programs Found</h3>
-                        <p className="text-xs text-slate-500 mt-1">
+                    <td colSpan={9} className="py-16 text-center">
+                        <div className="max-w-sm mx-auto flex flex-col items-center">
+                        <h3 className="text-sm font-semibold text-[var(--on-surface)]">No seasonal programs</h3>
+                        <p className="mt-1 text-xs text-[var(--on-surface-subtle)]">
                           {searchTerm || customerFilter !== "all" || filterTab !== "all" || selectedPlantFilter !== "all"
                             ? "No programs match your search or active filter criteria."
                             : "There are currently no seasonal program planning requests submitted."}
@@ -500,13 +470,8 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                         {(searchTerm || customerFilter !== "all" || filterTab !== "all" || selectedPlantFilter !== "all") && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setSearchTerm("");
-                              setCustomerFilter("all");
-                              setSelectedPlantFilter("all");
-                              setFilterTab("all");
-                            }}
-                            className="mt-3 text-xs font-semibold text-[#006d32] hover:underline cursor-pointer"
+                            onClick={clearFilters}
+                            className="mt-3 text-xs font-semibold text-[var(--accent-primary)] hover:underline cursor-pointer"
                           >
                             Reset filters
                           </button>
@@ -519,22 +484,16 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                     const srCode = row.srNumber || `PG-${row.id}`;
                     const materials = row.programMaterials || [];
                     const skuCount = materials.length > 0 ? materials.length : 1;
-                    const isReviewed = (row.status || "").toLowerCase().includes("reviewed");
+                    const hasSampNote = hasSampOutput(row);
+                    const hasPlantNote = hasPlantOutput(row);
                     const isSelected = selectedIds.has(row.id);
-
-                    // Compute flagged columns by Sampling
-                    let flaggedCount = 0;
-                    materials.forEach((m) => {
-                      const parsed = parseSampRemark(m.sampRemark);
-                      flaggedCount += parsed.highlightedCols.length;
-                    });
 
                     return (
                       <tr
                         key={row.id}
                         onClick={() => handleOpenInspector(row)}
-                        className={`hover:bg-slate-50/80 transition-colors cursor-pointer group ${
-                          isSelected ? "bg-emerald-50/40" : ""
+                        className={`transition-colors cursor-pointer group ${
+                          isSelected ? "bg-[var(--accent-primary-subtle)]" : "hover:bg-[var(--surface-low)]"
                         }`}
                       >
                         {/* Checkbox */}
@@ -543,7 +502,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                             type="checkbox"
                             checked={isSelected}
                             onChange={(e) => handleToggleSelectRow(row.id, e)}
-                            className="rounded text-[#006d32] focus:ring-[#006d32] cursor-pointer"
+                            className="cursor-pointer rounded accent-[var(--accent-primary)]"
                           />
                         </td>
 
@@ -554,74 +513,44 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
 
                         {/* Title & Description */}
                         <td className="py-3 px-4 max-w-sm">
-                          <div className="font-semibold text-slate-900 truncate">
+                          <div className="truncate font-semibold text-[var(--on-surface)]">
                             {row.programName || row.programCampaignTitle || "Seasonal Program"}
                           </div>
-                          <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                          <div className="mt-0.5 truncate text-[11px] text-[var(--on-surface-subtle)]">
                             {row.productDescription || "Multi-SKU scholastic program range"}
                           </div>
                         </td>
 
                         {/* Customer */}
-                        <td className="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">
+                        <td className="whitespace-nowrap px-4 py-3 font-semibold text-[var(--on-surface)]">
                           {row.customer || "—"}
                         </td>
 
                         {/* Plant */}
-                        <td className="py-3 px-4 font-mono text-slate-600 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                            <span>Plant {row.targetPlant || "1505"}</span>
-                          </div>
+                        <td className="whitespace-nowrap px-4 py-3 font-mono text-[var(--on-surface-muted)]">
+                          Plant {row.targetPlant || "1505"}
                         </td>
 
                         {/* Program Year */}
                         <td className="py-3 px-4 text-center font-mono font-bold whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px]">
+                          <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 text-[11px] text-[var(--on-surface-muted)]">
                             {row.programYear || "2026"}
                           </span>
                         </td>
 
                         {/* Matrix SKUs */}
                         <td className="py-3 px-4 text-center font-mono whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-full bg-[#006d32]/10 text-[#006d32] font-bold text-[11px]">
+                          <span className="rounded-full bg-[var(--accent-primary-subtle)] px-2 py-0.5 text-[11px] font-bold text-[var(--accent-primary)]">
                             {skuCount} SKU{skuCount !== 1 ? "s" : ""}
                           </span>
                         </td>
 
-                        {/* SAMP Technical Review Status */}
+                        {/* Team planning notes */}
                         <td className="py-3 px-4 whitespace-nowrap">
-                          {isReviewed ? (
-                            <div className="space-y-0.5">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>Reviewed by SAMP</span>
-                              </span>
-                              {flaggedCount > 0 && (
-                                <div className="text-[10px] text-amber-700 font-mono font-semibold flex items-center gap-1 pl-1">
-                                  <Highlighter className="w-3 h-3 text-amber-600" />
-                                  <span>{flaggedCount} column{flaggedCount !== 1 ? "s" : ""} flagged</span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-50 text-amber-700">
-                              <Clock className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Pending SAMP Review</span>
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Target Date */}
-                        <td className="py-3 px-4 font-mono text-slate-600 whitespace-nowrap">
-                          {row.sampleRequiredDate ? (
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{row.sampleRequiredDate.slice(5)}</span>
-                            </span>
-                          ) : (
-                            <span>Flexible</span>
-                          )}
+                          <div className="flex flex-col items-start gap-1">
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${hasSampNote ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"}`}>SAMP: {hasSampNote ? "Note added" : "Awaiting"}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${hasPlantNote ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"}`}>Plant: {hasPlantNote ? "Note added" : "Awaiting"}</span>
+                          </div>
                         </td>
 
                         {/* Actions */}
@@ -630,17 +559,17 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                             <button
                               type="button"
                               onClick={() => handleOpenInspector(row)}
-                              className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium font-mono transition cursor-pointer"
-                              title="Inspect technical matrix & remarks"
+                              className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-low)] px-3 py-1.5 text-xs font-semibold text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-container)] cursor-pointer"
+                              title="Open the program plan and team notes"
                             >
-                              Inspect
+                              Inspect plan
                             </button>
 
                             {isAdmin && (
                               <button
                                 type="button"
                                 onClick={(e) => onDeleteRequest(row, e)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 transition cursor-pointer rounded-lg hover:bg-rose-50"
+                                className="rounded-lg p-1.5 text-[var(--on-surface-subtle)] transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 cursor-pointer"
                                 title="Delete record"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -656,7 +585,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
             </table>
 
             {/* Table Footer Pager */}
-            <div className="mt-auto px-6 py-2.5 bg-white border-t border-slate-100 shrink-0">
+            <div className="mt-auto shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-6 py-2.5">
               <PaginationBar
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -679,15 +608,6 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
           }}
         />
 
-        <ProgramPlanningInspectorModal
-          request={inspectingProgram}
-          isOpen={Boolean(inspectingProgram)}
-          onClose={() => setInspectingProgram(null)}
-          onRefresh={onRefresh}
-          mode="marketing"
-          userRole="Marketing Specialist"
-          currentUser={user}
-        />
       </React.Suspense>
     </div>
   );

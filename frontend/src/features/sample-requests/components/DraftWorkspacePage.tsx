@@ -19,7 +19,7 @@ import {
 import { UserProfile } from "@/features/auth";
 import { SampleRequestItem } from "../types";
 import {
-  fetchAllMarketingRequestsApi,
+  fetchDraftMarketingRequestsApi,
   fetchDesignRequestsApi,
   mapDesignRequestToSampleRequest,
   updateSampleRequestApi,
@@ -33,7 +33,7 @@ import {
   ProductDetailItem,
 } from "@/infrastructure/api";
 import { DraftPackageGroup } from "./DraftPackagesView";
-import { isDesignRequest } from "../utils/trackTypes";
+import { getDraftReleaseStatus, isDesignRequest } from "../utils/trackTypes";
 
 export interface DraftWorkspacePageProps {
   user?: UserProfile | null;
@@ -106,8 +106,8 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
     setIsLoading(true);
     try {
       const allRequests = packageContext.requestKind === "design"
-        ? (await fetchDesignRequestsApi()).map(mapDesignRequestToSampleRequest)
-        : await fetchAllMarketingRequestsApi();
+        ? (await fetchDesignRequestsApi(packageContext.year || undefined, true)).map(mapDesignRequestToSampleRequest)
+        : await fetchDraftMarketingRequestsApi(packageContext.year || undefined);
       const targetCustomer = packageContext.customer.toLowerCase().trim();
       const targetProgram = packageContext.programName.toLowerCase().trim();
       const targetYear = String(packageContext.programYear).replace(/BTS/gi, "").trim();
@@ -310,6 +310,15 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
           materialCode: "",
           creationMode: item.creationMode || "binding",
           requestTypes: item.requestTypes || [],
+          mockupWorkflowState: (item.requestTypes || []).includes("mockup") || item.mockupRequired === "Yes"
+            ? {
+                stage: "marketing",
+                designNeeded: item.mockupWorkflowState?.designNeeded ?? (item.creationMode === "new" || (item.requestTypes || []).includes("design")),
+                marketingShutterstockNo: item.mockupWorkflowState?.marketingShutterstockNo || "",
+                marketingRemark: item.mockupWorkflowState?.marketingRemark || "",
+                events: [],
+              }
+            : undefined,
           numberOfDesigns: item.numberOfDesigns,
           trend: item.trend || undefined,
           targetAudience: item.targetAudience || undefined,
@@ -376,14 +385,14 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
       if (targetItems.length === 0) throw new Error("There are no draft requests to release.");
       const itemsByStatus = new Map<string, SampleRequestItem[]>();
       for (const item of targetItems) {
-        const status = isDesignRequest(item) ? "Creative" : "Sampling Review (PMT)";
+        const status = getDraftReleaseStatus(item);
         itemsByStatus.set(status, [...(itemsByStatus.get(status) || []), item]);
       }
       for (const [status, items] of itemsByStatus) {
         await releaseDraftRequestsApi(items, status);
       }
 
-      const destinations = Array.from(new Set(targetItems.map((item) => isDesignRequest(item) ? "Creative" : "Sampling Review (PMT)")));
+      const destinations = Array.from(new Set(targetItems.map(getDraftReleaseStatus)));
       showToast(`✓ Released ${targetItems.length} item(s) to ${destinations.join(" and ")}.`, "success");
       setIsReleaseModalOpen(false);
 
@@ -411,7 +420,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
         <p className="text-zinc-500 text-sm">No active draft package selected.</p>
         <button
           onClick={() => navigate("/sample-requests")}
-          className="mt-3 px-4 py-2 bg-[#714B67] text-white text-xs font-semibold rounded-lg"
+          className="mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg"
         >
           Return to Sample Requests Desk
         </button>
@@ -421,12 +430,12 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
 
   const itemsToRelease = selectedIds.size > 0 ? packageItems.filter((item) => selectedIds.has(item.id)) : packageItems;
   const itemsToReleaseCount = itemsToRelease.length;
-  const releaseDestinations = Array.from(new Set(itemsToRelease.map((item) => isDesignRequest(item) ? "Creative" : "Sampling Review (PMT)")));
+  const releaseDestinations = Array.from(new Set(itemsToRelease.map(getDraftReleaseStatus)));
   const isDesignPackage = packageContext.requestKind === "design" ||
     (packageItems.length > 0 && packageItems.every(isDesignRequest));
 
   return (
-    <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-[#0c0d14] overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-zinc-950 overflow-hidden">
       {/* Toast */}
       {toastMessage && (
         <div className={`fixed top-4 right-6 z-50 text-[12px] font-semibold px-4 py-2.5 rounded-lg shadow-xl border flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${
@@ -439,7 +448,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
       )}
 
       {/* Workspace Header / Program Banner */}
-      <div className="bg-white dark:bg-[#12141d] border-b border-zinc-200 dark:border-white/[0.08] px-6 py-4 shrink-0 shadow-2xs">
+      <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-white/[0.08] px-6 py-4 shrink-0 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <button
@@ -452,7 +461,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#714B67]/10 text-[#714B67] dark:bg-purple-900/30 dark:text-purple-300 border border-[#714B67]/25">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
                   {packageContext.customer}
                 </span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
@@ -512,8 +521,8 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
       <div className="flex-1 p-6 overflow-y-auto space-y-3">
         {/* Bulk Action Ribbon if items selected */}
         {selectedIds.size > 0 && (
-          <div className="bg-[#714B67]/10 dark:bg-purple-950/30 border border-[#714B67]/25 rounded-lg px-4 py-2 flex items-center justify-between text-xs font-semibold animate-in fade-in duration-150">
-            <span className="text-[#714B67] dark:text-purple-300 font-mono">
+          <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 rounded-lg px-4 py-2 flex items-center justify-between text-xs font-semibold animate-in fade-in duration-150">
+            <span className="text-purple-700 dark:text-purple-300 font-mono">
               {selectedIds.size} of {packageItems.length} {isDesignPackage ? "brief(s)" : "product(s)"} selected
             </span>
             <div className="flex items-center gap-2">
@@ -537,7 +546,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
         )}
 
         {/* Products Table Card */}
-        <div className="bg-white dark:bg-[#12141d] rounded-xl border border-zinc-200 dark:border-white/[0.08] shadow-xs overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-white/[0.08] shadow-xs overflow-hidden">
           <table className="w-full text-left text-xs">
             <thead className="bg-zinc-50 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-white/[0.08] text-[11px] font-mono text-zinc-500 uppercase tracking-wider select-none">
               <tr>
@@ -548,7 +557,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
                     className="cursor-pointer text-zinc-400 hover:text-zinc-600"
                   >
                     {selectedIds.size === packageItems.length && packageItems.length > 0 ? (
-                      <CheckSquare className="w-4 h-4 text-[#714B67]" />
+                      <CheckSquare className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                     ) : (
                       <Square className="w-4 h-4" />
                     )}
@@ -585,7 +594,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
                     <tr
                       key={item.id}
                       className={`hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30 transition-colors ${
-                        isChecked ? "bg-[#714B67]/5 dark:bg-purple-950/20" : ""
+                        isChecked ? "bg-purple-50/50 dark:bg-purple-950/20" : ""
                       }`}
                     >
                       {/* Checkbox */}
@@ -596,7 +605,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
                           className="cursor-pointer text-zinc-400 hover:text-zinc-600"
                         >
                           {isChecked ? (
-                            <CheckSquare className="w-4 h-4 text-[#714B67]" />
+                            <CheckSquare className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                           ) : (
                             <Square className="w-4 h-4" />
                           )}
@@ -704,7 +713,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
       {/* Release Confirmation Modal */}
       {isReleaseModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70">
-          <div className="bg-white dark:bg-[#12141d] rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
@@ -744,7 +753,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
             </div>
 
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              Draft design requests enter <strong>Creative</strong>; sample requests enter <strong>Sampling Review (PMT)</strong>.
+              Design requests go to <strong>Creative</strong>; Mockup requests go to <strong>Creative or Studio</strong> based on the saved Design decision; other sample requests enter <strong>Sampling Review (PMT)</strong>.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -774,9 +783,9 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70">
           <form
             onSubmit={handleSaveMetadata}
-            className="bg-white dark:bg-[#12141d] rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-lg w-full shadow-2xl overflow-hidden flex flex-col"
+            className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-lg w-full shadow-2xl overflow-hidden flex flex-col"
           >
-            <div className="px-6 py-4 bg-[#714B67] text-white flex items-center justify-between">
+            <div className="px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-between">
               <h3 className="text-sm font-bold">{isDesignRequest(editingItem) ? "Edit Design Brief" : "Edit Product Metadata"}</h3>
               <button
                 type="button"
@@ -937,7 +946,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
               <button
                 type="submit"
                 disabled={isSavingMetadata}
-                className="px-4 py-1.5 rounded bg-[#714B67] hover:bg-[#5B3C53] text-white text-xs font-semibold transition"
+                className="px-4 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition"
               >
                 {isSavingMetadata ? "Saving..." : "Save Changes"}
               </button>
@@ -948,20 +957,20 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
 
       {/* Specifications Drawer */}
       {specItem && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70">
-          <div className="w-full max-w-xl bg-white dark:bg-[#12141d] h-full shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-right duration-200">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-smooth-backdrop">
+          <div className="w-full max-w-xl bg-[var(--surface-lowest)] h-full shadow-2xl flex flex-col border-l border-[var(--border-subtle)] animate-smooth-drawer">
             {/* Drawer Header */}
-            <div className="px-6 py-4 bg-[#714B67] text-white flex items-center justify-between shrink-0">
+            <div className="px-6 py-4 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] text-[var(--on-surface)] flex items-center justify-between shrink-0">
               <div>
-                <span className="font-mono text-[10px] bg-white/20 px-2 py-0.5 rounded font-bold">
+                <span className="font-mono text-[10px] bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] px-2 py-0.5 rounded font-bold">
                   {specItem.materialCode || specItem.srNumber}
                 </span>
-                <h3 className="text-sm font-bold mt-1 text-white">Product Characteristic Specifications</h3>
+                <h3 className="text-sm font-bold mt-1 text-[var(--on-surface)] font-display">Product Characteristic Specifications</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSpecItem(null)}
-                className="text-white/80 hover:text-white"
+                className="text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] p-1 rounded-lg hover:bg-[var(--surface-container)] transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1042,7 +1051,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
                 type="button"
                 onClick={handleSaveSpecs}
                 disabled={isSavingSpecs}
-                className="px-4 py-1.5 rounded bg-[#714B67] hover:bg-[#5B3C53] text-white text-xs font-semibold transition flex items-center gap-1.5"
+                className="px-4 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition flex items-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{isSavingSpecs ? "Saving..." : "Save Specifications"}</span>

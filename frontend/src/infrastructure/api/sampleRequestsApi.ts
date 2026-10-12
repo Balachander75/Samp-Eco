@@ -8,6 +8,7 @@ import {
   DesignRequestForm,
 } from "@/features/sample-requests/types";
 import { getBusinessYearForDate } from "@/lib/businessYear";
+import { readAuthUser } from "@/lib/session";
 import { getRequestTrackType } from "@/features/sample-requests/utils/trackTypes";
 import { fetchFeasibilityRequestsApi, deleteFeasibilityRequestApi } from "./feasibilityApi";
 import { fetchProgramRequestsApi, deleteProgramRequestApi } from "./programsApi";
@@ -62,6 +63,7 @@ export function mapDesignRequest(item: Record<string, unknown>): DesignRequest {
       rows: (Array.isArray(batch.rows) ? batch.rows : []).map((row: any) => ({
         designNumber: String(row.design_number || row.designNumber || ""),
         description: String(row.description || ""),
+        shutterstockNo: String(row.shutterstock_no || row.shutterstockNo || ""),
         remarks: String(row.remarks || ""),
       })),
     })),
@@ -138,8 +140,12 @@ export function mapDesignRequestToSampleRequest(item: DesignRequest): SampleRequ
   };
 }
 
-export async function fetchDesignRequestsApi(): Promise<DesignRequest[]> {
-  const data = await apiFetch<Record<string, unknown>[]>("/api/v1/design-requests");
+export async function fetchDesignRequestsApi(year?: string, draftOnly = false): Promise<DesignRequest[]> {
+  const params = new URLSearchParams();
+  if (year && year.toUpperCase() !== "ALL") params.set("year", year);
+  if (draftOnly) params.set("draft_only", "true");
+  const query = params.size ? `?${params.toString()}` : "";
+  const data = await apiFetch<Record<string, unknown>[]>(`/api/v1/design-requests${query}`);
   return (data || []).map(mapDesignRequest);
 }
 
@@ -279,6 +285,21 @@ export async function releaseDraftRequestsApi(
   for (const request of directDesigns) {
     await updateAnyRequestStatusApi(request, status);
   }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  }
+}
+
+export async function releaseSampleRequestIdsApi(ids: Array<string | number>, status: string): Promise<void> {
+  const uniqueIds = Array.from(new Set(ids.map((id) => String(id).trim()).filter(Boolean)));
+  if (!uniqueIds.length) throw new Error("No saved sample requests were found to release.");
+  const result = await batchUpdateStatusApi(uniqueIds, status);
+  if (!result.success || result.updatedCount !== uniqueIds.length) {
+    throw new Error(`Released ${result.updatedCount} of ${uniqueIds.length} requests to ${status}.`);
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  }
 }
 
 export async function createDesignBriefFromSampleApi(sampleRequestId: string | number, brief: {
@@ -310,14 +331,14 @@ export async function createDesignBriefFromSampleApi(sampleRequestId: string | n
 
 export async function submitCreativeDesignOutputApi(id: number, payload: {
   designFileUrl: string;
-  rows: Array<{ description: string; remarks: string }>;
+  rows: Array<{ shutterstockNo: string; remarks: string }>;
 }, designerName?: string): Promise<DesignRequest> {
   const data = await apiFetch<Record<string, unknown>>(`/api/v1/design-requests/${id}/creative-output`, {
     method: "PUT",
     jsonBody: {
       design_file_url: payload.designFileUrl,
       designer_name: designerName,
-      rows: payload.rows.map((row) => ({ description: row.description, remarks: row.remarks })),
+      rows: payload.rows.map((row) => ({ shutterstock_no: row.shutterstockNo, remarks: row.remarks })),
     },
   });
   if (typeof window !== "undefined") {
@@ -335,6 +356,20 @@ export async function recordMarketingDesignDecisionApi(id: number, decision: "ac
     window.dispatchEvent(new CustomEvent("samp:requests-changed"));
   }
   return mapDesignRequest(data);
+}
+
+export async function requestPostDesignDeliverablesApi(
+  id: number,
+  deliverables: Array<"mockup" | "sample">,
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/design-requests/${id}/request-followup`, {
+    method: "POST",
+    jsonBody: { deliverables },
+  });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  }
+  return mapSampleRequest(data);
 }
 
 export async function claimDesignRequestApi(id: number, designerName: string): Promise<DesignRequest> {
@@ -479,9 +514,13 @@ export function mapSampleRequest(item: ApiSampleRequest, fallbackDate = ""): Sam
   };
 }
 
-export async function fetchSampleRequestsApi(year?: string): Promise<SampleRequestItem[]> {
+export async function fetchSampleRequestsApi(year?: string, draftOnly = false, requestType?: "design" | "mockup" | "sample" | "costing"): Promise<SampleRequestItem[]> {
   try {
-    const query = year && year.toUpperCase() !== "ALL" ? `?year=${encodeURIComponent(year)}` : "";
+    const params = new URLSearchParams();
+    if (year && year.toUpperCase() !== "ALL") params.set("year", year);
+    if (draftOnly) params.set("draft_only", "true");
+    if (requestType) params.set("request_type", requestType);
+    const query = params.size ? `?${params.toString()}` : "";
     const data = await apiFetch<ApiSampleRequest[]>(`/api/v1/sample-requests${query}`);
     return (data || []).map((item) => mapSampleRequest(item));
   } catch (err) {
@@ -490,13 +529,31 @@ export async function fetchSampleRequestsApi(year?: string): Promise<SampleReque
   }
 }
 
+export async function claimMockupRequestApi(
+  sampleRequestId: string | number
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/mockup/claim`, {
+    method: "POST",
+    jsonBody: {},
+  });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  }
+  return mapSampleRequest(data);
+}
+
 export async function sendMockupRequestToStudioApi(
   sampleRequestId: string | number,
-  actorName?: string
+  actorName?: string,
+  creativeDetails?: { shutterstockNo?: string; remark?: string }
 ): Promise<SampleRequestItem> {
   const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/mockup/send-to-studio`, {
     method: "POST",
-    jsonBody: { actor_name: actorName },
+    jsonBody: {
+      actor_name: actorName,
+      creative_shutterstock_no: creativeDetails?.shutterstockNo,
+      creative_remark: creativeDetails?.remark,
+    },
   });
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("samp:requests-changed"));
@@ -519,64 +576,93 @@ export async function submitStudioMockupToMarketingApi(
   return mapSampleRequest(data);
 }
 
+export async function releaseSampleToPlantApi(
+  sampleRequestId: string | number,
+  payload: { targetPlant?: string; samplingRemark?: string }
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/release-to-plant`, {
+    method: "POST",
+    jsonBody: {
+      target_plant: payload.targetPlant,
+      sampling_remark: payload.samplingRemark,
+    },
+  });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  }
+  return mapSampleRequest(data);
+}
+
+export async function submitSamplingFeedbackApi(
+  sampleRequestId: string | number,
+  feedback: string
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/sampling-feedback`, {
+    method: "POST",
+    jsonBody: { feedback },
+  });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  }
+  return mapSampleRequest(data);
+}
+
+const marketingRequestsCache = new Map<string, {
+  expiresAt: number;
+  data?: SampleRequestItem[];
+  pending?: Promise<SampleRequestItem[]>;
+}>();
+let marketingRequestsCacheListenerInstalled = false;
+
 export async function fetchAllMarketingRequestsApi(year?: string): Promise<SampleRequestItem[]> {
+  if (typeof window !== "undefined" && !marketingRequestsCacheListenerInstalled) {
+    window.addEventListener("samp:requests-changed", () => marketingRequestsCache.clear());
+    marketingRequestsCacheListenerInstalled = true;
+  }
+  const authUser = readAuthUser<{ id?: number; userid?: string }>();
+  const cacheKey = `${authUser?.id ?? authUser?.userid ?? "anonymous"}:${year?.trim() || "ALL"}`;
+  const cached = marketingRequestsCache.get(cacheKey);
+  if (cached?.pending) return cached.pending;
+  if (cached?.data && cached.expiresAt > Date.now()) return cached.data;
+
+  const pending = loadAllMarketingRequestsApi(year);
+  marketingRequestsCache.set(cacheKey, { expiresAt: 0, pending });
   try {
-    const [sampleRequests, designRequests, feasibilityRequests, programRequests] = await Promise.all([
-      fetchSampleRequestsApi(year),
-      fetchDesignRequestsApi(),
-      fetchFeasibilityRequestsApi().catch(() => []),
-      fetchProgramRequestsApi().catch(() => []),
+    const data = await pending;
+    marketingRequestsCache.set(cacheKey, { expiresAt: Date.now() + 15_000, data });
+    return data;
+  } catch (err) {
+    marketingRequestsCache.delete(cacheKey);
+    throw err;
+  }
+}
+
+/** Load only the Sample and Design draft queues for the Marketing draft workspace. */
+export async function fetchDraftMarketingRequestsApi(year?: string): Promise<SampleRequestItem[]> {
+  const [sampleRequests, designRequests] = await Promise.all([
+    fetchSampleRequestsApi(year, true),
+    fetchDesignRequestsApi(year, true),
+  ]);
+  return mergeSampleAndDesignRequests(sampleRequests, designRequests, year);
+}
+
+/** Load the Sample and Design workstream without unrelated Feasibility/Program records. */
+export async function fetchMarketingSamplingRequestsApi(year?: string): Promise<SampleRequestItem[]> {
+  const [sampleRequests, designRequests] = await Promise.all([
+    fetchSampleRequestsApi(year),
+    fetchDesignRequestsApi(year),
+  ]);
+  return mergeSampleAndDesignRequests(sampleRequests, designRequests, year);
+}
+
+async function loadAllMarketingRequestsApi(year?: string): Promise<SampleRequestItem[]> {
+  try {
+    const [samplingRequests, feasibilityRequests, programRequests] = await Promise.all([
+      fetchMarketingSamplingRequestsApi(year),
+      fetchFeasibilityRequestsApi(year).catch(() => []),
+      fetchProgramRequestsApi(year).catch(() => []),
     ]);
-
-    const mappedDesignRequests = designRequests.map(mapDesignRequestToSampleRequest);
-    const designBySrNumber = new Map(
-      mappedDesignRequests.filter((item) => item.srNumber).map((item) => [item.srNumber, item])
-    );
-    const sampleSrNumbers = new Set(sampleRequests.filter((item) => item.srNumber).map((item) => item.srNumber));
-    const mergedSamples = sampleRequests.map((sample) => {
-      const design = sample.srNumber ? designBySrNumber.get(sample.srNumber) : undefined;
-      return design ? {
-        ...sample,
-        status: design.status,
-        designRequestId: design.designRequestId,
-        designRequestStatus: design.designRequestStatus,
-        numberOfDesigns: design.numberOfDesigns || sample.numberOfDesigns,
-        trend: design.trend || sample.trend,
-        targetAudience: design.targetAudience || sample.targetAudience,
-        referenceImage: design.referenceImage || sample.productImagePath,
-        designRemarks: design.designRemarks || sample.designRemarks,
-        referenceImages: (design.referenceImages && design.referenceImages.length > 0) ? design.referenceImages : sample.referenceImages,
-        referenceLinks: (design.referenceLinks && design.referenceLinks.length > 0) ? design.referenceLinks : sample.referenceLinks,
-        creativeSubmissions: design.creativeSubmissions,
-        marketingDesignDecision: design.marketingDesignDecision,
-        remainingDesignCount: design.remainingDesignCount,
-        releasedAt: design.releasedAt,
-        designRequestCreatedAt: design.designRequestCreatedAt,
-        claimedBy: design.claimedBy,
-        claimedAt: design.claimedAt,
-        isCounterDateActive: design.isCounterDateActive,
-        proposedTargetDate: design.proposedTargetDate,
-        counterDateReason: design.counterDateReason,
-        counterDateRequestedAt: design.counterDateRequestedAt,
-        counterDateRequestedBy: design.counterDateRequestedBy,
-        counterDateDecision: design.counterDateDecision,
-        counterDateDecisionAt: design.counterDateDecisionAt,
-        counterDateDecisionNotes: design.counterDateDecisionNotes,
-        workflowEvents: design.workflowEvents,
-        workflowNotes: design.workflowNotes,
-        targetArtworkDateCreative: design.designRequiredDate || sample.targetArtworkDateCreative,
-      } : sample;
-    });
-    const mappedDesignOnly = mappedDesignRequests.filter((design) =>
-      !design.srNumber || !sampleSrNumbers.has(design.srNumber)
-    );
-
-    let allItems = [
-      ...mergedSamples,
-      ...mappedDesignOnly,
-      ...feasibilityRequests,
-      ...programRequests,
-    ];
+    let allItems = [...samplingRequests, ...feasibilityRequests, ...programRequests];
 
     if (year && year.toUpperCase() !== "ALL") {
       allItems = allItems.filter((r) => {
@@ -596,6 +682,72 @@ export async function fetchAllMarketingRequestsApi(year?: string): Promise<Sampl
   }
 }
 
+function mergeSampleAndDesignRequests(
+  sampleRequests: SampleRequestItem[],
+  designRequests: DesignRequest[],
+  year?: string,
+): SampleRequestItem[] {
+  const mappedDesignRequests = designRequests.map(mapDesignRequestToSampleRequest);
+  const designBySrNumber = new Map(
+    mappedDesignRequests.filter((item) => item.srNumber).map((item) => [item.srNumber, item]),
+  );
+  const sampleSrNumbers = new Set(sampleRequests.filter((item) => item.srNumber).map((item) => item.srNumber));
+  const mergedSamples = sampleRequests.map((sample) => {
+    const design = sample.srNumber ? designBySrNumber.get(sample.srNumber) : undefined;
+    return design ? {
+      ...sample,
+      status: design.marketingDesignDecision === "accepted" &&
+        (sample.requestTypes || []).some((type) => type === "mockup" || type === "sample")
+        ? sample.status
+        : design.status,
+      designRequestId: design.designRequestId,
+      designRequestStatus: design.designRequestStatus,
+      numberOfDesigns: design.numberOfDesigns || sample.numberOfDesigns,
+      trend: design.trend || sample.trend,
+      targetAudience: design.targetAudience || sample.targetAudience,
+      referenceImage: design.referenceImage || sample.productImagePath,
+      designRemarks: design.designRemarks || sample.designRemarks,
+      referenceImages: design.referenceImages?.length ? design.referenceImages : sample.referenceImages,
+      referenceLinks: design.referenceLinks?.length ? design.referenceLinks : sample.referenceLinks,
+      creativeSubmissions: design.creativeSubmissions,
+      marketingDesignDecision: design.marketingDesignDecision,
+      remainingDesignCount: design.remainingDesignCount,
+      releasedAt: design.releasedAt,
+      designRequestCreatedAt: design.designRequestCreatedAt,
+      claimedBy: design.claimedBy,
+      claimedAt: design.claimedAt,
+      isCounterDateActive: design.isCounterDateActive,
+      proposedTargetDate: design.proposedTargetDate,
+      counterDateReason: design.counterDateReason,
+      counterDateRequestedAt: design.counterDateRequestedAt,
+      counterDateRequestedBy: design.counterDateRequestedBy,
+      counterDateDecision: design.counterDateDecision,
+      counterDateDecisionAt: design.counterDateDecisionAt,
+      counterDateDecisionNotes: design.counterDateDecisionNotes,
+      workflowEvents: design.workflowEvents,
+      workflowNotes: design.workflowNotes,
+      targetArtworkDateCreative: design.designRequiredDate || sample.targetArtworkDateCreative,
+    } : sample;
+  });
+  const mappedDesignOnly = mappedDesignRequests.filter((design) =>
+    !design.srNumber || !sampleSrNumbers.has(design.srNumber),
+  );
+  let result = [...mergedSamples, ...mappedDesignOnly];
+  if (year && year.toUpperCase() !== "ALL") {
+    result = result.filter((item) => {
+      const itemYear = item.year && item.year.includes("-")
+        ? item.year
+        : getBusinessYearForDate(item.dateRequestCreated || item.createdAt);
+      return itemYear === year;
+    });
+  }
+  return result.sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.dateRequestCreated || 0).getTime();
+    const dateB = new Date(b.createdAt || b.dateRequestCreated || 0).getTime();
+    return dateB - dateA;
+  });
+}
+
 export async function createSampleRequestApi(form: CreateSampleRequestForm): Promise<SampleRequestItem | null> {
   try {
     const rawYear = form.programYear || "2026";
@@ -605,6 +757,7 @@ export async function createSampleRequestApi(form: CreateSampleRequestForm): Pro
     const itemYear = form.year && form.year.includes("-") ? form.year : calcBy;
 
     const payload = {
+      client_draft_key: form.clientDraftKey || null,
       sr_number: (form as any).srNumber || (form as any).sr_number || undefined,
       year: itemYear,
       program_year: selectedYear,
@@ -631,6 +784,7 @@ export async function createSampleRequestApi(form: CreateSampleRequestForm): Pro
       costing_counter_date: form.costingCounterDate || null,
       costing_output_path: form.costingOutputPath || null,
       mockup_required: form.mockupRequired || null,
+      mockup_workflow_state: form.mockupWorkflowState || {},
       designs_customer_creative: form.designsCustomerCreative || null,
       product_artwork_nos: form.productArtworkNos != null ? String(form.productArtworkNos) : null,
       product_image_path: form.productImagePath || null,
@@ -742,12 +896,19 @@ export async function updateSampleRequestApi(
       costing_counter_date: payload.costingCounterDate,
       costing_output_path: payload.costingOutputPath,
       mockup_required: payload.mockupRequired,
+      mockup_workflow_state: payload.mockupWorkflowState,
       designs_customer_creative: payload.designsCustomerCreative,
       product_artwork_nos: payload.productArtworkNos != null ? String(payload.productArtworkNos) : undefined,
       product_image_path: payload.productImagePath,
       creation_mode: payload.creationMode,
       request_types: payload.requestTypes,
       source_sample_code: payload.sourceSampleCode,
+      custom_details: payload.customDetails !== undefined ? payload.customDetails.map((detail) => ({
+        class_name: detail.className,
+        characteristic_name: detail.characteristicName,
+        value: detail.value,
+        uom: detail.uom ?? null,
+      })) : undefined,
       status: payload.status,
       trend: payload.trend !== undefined ? payload.trend : (payload as any).trend,
       target_audience: payload.targetAudience !== undefined ? payload.targetAudience : (payload as any).target_audience,

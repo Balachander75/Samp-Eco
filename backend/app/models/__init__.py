@@ -1,7 +1,12 @@
 """SQLAlchemy model exports."""
 from app.models.downstream import CostingEstimation, CreativeBrief, StudioDieline
-from app.models.feasibility import FeasibilityActivityLog, FeasibilityReferenceImage, FeasibilityRequest
-from app.models.master import Customer, Plant, User
+from app.models.feasibility import (
+    FeasibilityActivityLog,
+    FeasibilityReferenceImage,
+    FeasibilityRequest,
+    FeasibilityTechnicalAttachment,
+)
+from app.models.master import Customer, Plant, User, UserPlantAssignment
 from app.models.program_request import (
     ProgramActivityLog,
     ProgramMaterialSpecification,
@@ -12,6 +17,7 @@ from app.models.sample_request import (
     DesignRequest,
     ProductCharacteristic,
     ProductDetail,
+    SampleRequestActivityLog,
     SampleRequestType,
 )
 
@@ -24,6 +30,7 @@ __all__ = [
     "FeasibilityActivityLog",
     "FeasibilityReferenceImage",
     "FeasibilityRequest",
+    "FeasibilityTechnicalAttachment",
     "Plant",
     "ProductCharacteristic",
     "ProductDetail",
@@ -31,8 +38,10 @@ __all__ = [
     "ProgramMaterialSpecification",
     "ProgramRequest",
     "SampleRequestType",
+    "SampleRequestActivityLog",
     "StudioDieline",
     "User",
+    "UserPlantAssignment",
 ]
 
 

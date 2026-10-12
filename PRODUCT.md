@@ -13,6 +13,7 @@ The product is for internal Navneet users, including Marketing, Creative, Studio
 ## Current capabilities
 
 - Sign-in through the FastAPI authentication API, with client-side session persistence and protected application routes.
+- Root Admin has global access, including Operations Overview and user administration. Each team account is assigned to one department; Members can use its workflow, while Team Heads have read-only access to their team's workflow data.
 - Operations Overview, Marketing/Sample Requests, Seasonal Program Planning, Product Staging, Creative, Studio, Costing, and SAMP Team workspaces.
 - Sample request records with product characteristics and request types.
 - Feasibility requests with SAMP verdicts, Marketing decisions, and an activity timeline.

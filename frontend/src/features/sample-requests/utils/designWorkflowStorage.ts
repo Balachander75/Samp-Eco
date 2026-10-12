@@ -5,7 +5,7 @@ export function mergeWithWorkflowState(request: SampleRequestItem): SampleReques
   return request;
 }
 
-/** Check the 48-hour claim and counter-date window from Marketing's request timestamp. */
+/** Check the 48-hour claim and counter-date window from Marketing's release timestamp. */
 export function checkCounterDateSla(
   request: SampleRequestItem,
   now = Date.now()
@@ -15,7 +15,7 @@ export function checkCounterDateSla(
   label: string;
   deadlineIso: string;
 } {
-  const baseTimeStr = request.designRequestCreatedAt || request.createdAt || request.releasedAt;
+  const baseTimeStr = request.releasedAt || request.designRequestCreatedAt || request.createdAt;
   if (!baseTimeStr) {
     return { isEligible: false, hoursRemaining: 0, label: "Request time unavailable", deadlineIso: "" };
   }

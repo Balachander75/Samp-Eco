@@ -21,8 +21,11 @@ export interface AddProductSamplingStepProps {
   samplingSearchMode: "new" | "material_code" | "binding";
   isEditing?: boolean;
   designNeeded: boolean | null;
-  designBriefComplete: boolean;
+  marketingShutterstockNo: string;
+  marketingMockupRemark: string;
   productDescription: string;
+  qtyForSampling?: string;
+  onSetQtyForSampling?: (val: string) => void;
   qtyDesignCosting: string;
   customerProductCode: string;
   barcode: string;
@@ -49,7 +52,9 @@ export interface AddProductSamplingStepProps {
   onSetSampleType: (val: "full" | "partial") => void;
   onSetPartialRequirements: (val: string) => void;
   onSetSamplingSearchMode: (val: "new" | "material_code" | "binding") => void;
-  onSetDesignNeeded: (val: boolean) => void;
+  onSetDesignNeeded: (val: boolean | null) => void;
+  onSetMarketingShutterstockNo: (val: string) => void;
+  onSetMarketingMockupRemark: (val: string) => void;
   onSetProductDescription: (val: string) => void;
   onSetQtyDesignCosting: (val: string) => void;
   onSetCustomerProductCode: (val: string) => void;
@@ -72,7 +77,7 @@ export interface AddProductSamplingStepProps {
 }
 
 const BINDING_RESULT_ROW_HEIGHT = 72;
-const BINDING_RESULT_VIEWPORT_HEIGHT = 280;
+const BINDING_RESULT_VIEWPORT_HEIGHT = 320;
 
 const BindingProductResults: React.FC<{
   items: ProductSearchResult[];
@@ -155,14 +160,14 @@ const BindingProductResults: React.FC<{
             }}
             className={`h-[72px] px-3.5 text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
               isSelected
-                ? "bg-emerald-500/10 dark:bg-emerald-500/15 border-l-3 border-[#006d32] text-zinc-900 dark:text-zinc-100"
+                ? "bg-emerald-500/10 dark:bg-emerald-500/15 border-l-3 border-[var(--accent-primary)] text-zinc-900 dark:text-zinc-100"
                 : "hover:bg-slate-50/80 dark:hover:bg-zinc-800/60 text-zinc-900 dark:text-zinc-100"
-            } ${activeIndex === index ? "ring-1 ring-inset ring-[#006d32]/40" : ""}`}
+            } ${activeIndex === index ? "ring-1 ring-inset ring-[var(--accent-primary)]/40" : ""}`}
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 {item.material_code && (
-                  <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-[#006d32] dark:text-emerald-300 border border-[#006d32]/25 shrink-0">
+                  <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-[var(--accent-primary)] dark:text-emerald-300 border border-[var(--accent-primary)]/25 shrink-0">
                     {item.material_code}
                   </span>
                 )}
@@ -171,7 +176,7 @@ const BindingProductResults: React.FC<{
                 </span>
               </div>
               {(item.customer || item.sr_number || item.product_category) && (
-                <div className="flex items-center gap-2 mt-1 text-[11px] text-[#64748B] dark:text-zinc-400 truncate">
+                <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 dark:text-zinc-400 truncate">
                   {item.customer && <span className="truncate font-medium">{item.customer}</span>}
                   {item.sr_number && <span className="shrink-0 font-mono">Ref: {item.sr_number}</span>}
                   {item.product_category && (
@@ -200,7 +205,7 @@ const BindingProductResults: React.FC<{
               aria-hidden="true"
               className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${
                 isSelected
-                  ? "border-[#006d32] bg-[#006d32] text-white shadow-2xs"
+                  ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white shadow-2xs"
                   : "border-zinc-300 dark:border-zinc-600 hover:border-zinc-400"
               }`}
             >
@@ -227,8 +232,11 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
   samplingSearchMode,
   isEditing = false,
   designNeeded,
-  designBriefComplete,
+  marketingShutterstockNo,
+  marketingMockupRemark,
   productDescription,
+  qtyForSampling = "1",
+  onSetQtyForSampling,
   qtyDesignCosting,
   customerProductCode,
   barcode,
@@ -256,6 +264,8 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
   onSetPartialRequirements,
   onSetSamplingSearchMode,
   onSetDesignNeeded,
+  onSetMarketingShutterstockNo,
+  onSetMarketingMockupRemark,
   onSetProductDescription,
   onSetQtyDesignCosting,
   onSetCustomerProductCode,
@@ -276,6 +286,8 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const [showMockupReferenceDialog, setShowMockupReferenceDialog] = useState(false);
+  const [mockupReferenceError, setMockupReferenceError] = useState("");
   const includesSample = selectedScopes.includes("sample");
   const includesMockup = selectedScopes.includes("mockup");
   const includesCosting = selectedScopes.includes("costing");
@@ -283,8 +295,13 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
   const hasExistingMockupProduct =
     includesMockup && samplingSearchMode !== "new" && Boolean(selectedDbSample || isEditing);
   const needsDesignDecision = hasExistingMockupProduct && designNeeded === null;
-  const needsDesignBrief =
-    includesMockup && (samplingSearchMode === "new" || designNeeded === true) && !designBriefComplete;
+  const needsMarketingReference = hasExistingMockupProduct && designNeeded === false
+    && !marketingShutterstockNo.trim() && !marketingMockupRemark.trim();
+
+  useEffect(() => {
+    setShowMockupReferenceDialog(false);
+    setMockupReferenceError("");
+  }, [selectedDbSample?.id]);
 
   // Derive cascading taxonomy options based on current selections
   const currentCategoryItem = productCategories.find((c) => c.name === selectedCategory);
@@ -294,12 +311,9 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
 
   // Derive cascading binding 2 options
   const binding2Options = selectedBinding1
-    ? bindingHierarchy.hierarchy[selectedBinding1] ?? bindingHierarchy.binding2_options ?? []
+    ? bindingHierarchy.hierarchy[selectedBinding1] ?? []
     : [];
   const activeBindingFilters = [
-    selectedCategory,
-    selectedSubCategory,
-    selectedThirdCategory,
     selectedBinding1,
     selectedBinding2,
   ].filter(Boolean);
@@ -313,9 +327,9 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
         : "Configure Product Specification";
 
   return (
-    <div className="relative w-full max-w-5xl bg-white dark:bg-[#161822] border border-slate-200/80 dark:border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden animate-smooth-modal max-h-[92vh] flex flex-col">
+    <div className="relative flex h-[min(88vh,760px)] max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl animate-smooth-modal dark:border-white/[0.08] dark:bg-zinc-900">
       {/* Modal Header */}
-      <div className="flex items-center justify-between gap-4 px-6 py-4 bg-white dark:bg-[#161822] text-slate-900 dark:text-white shrink-0 border-b border-slate-100 dark:border-white/[0.06]">
+      <div className="flex items-center justify-between gap-4 px-6 py-4 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shrink-0 border-b border-slate-100 dark:border-white/[0.06]">
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
@@ -323,7 +337,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
             </h3>
             <div className="flex items-center gap-1">
               {includesSample && (
-                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-mono font-bold bg-[#006d32]/10 text-[#006d32] dark:text-emerald-400 border border-[#006d32]/25 tracking-wider uppercase">
+                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-mono font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/25 tracking-wider uppercase">
                   SAMPLE
                 </span>
               )}
@@ -332,7 +346,8 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                   MOCKUP
                 </span>
               )}
-              {includesCosting && (
+
+          {includesCosting && (
                 <span className="px-2 py-0.5 rounded-full text-[9.5px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 tracking-wider uppercase">
                   COSTING
                 </span>
@@ -346,7 +361,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
           </div>
           <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
             {includesMockup
-              ? "Choose an existing product by Material Code or Category & Binding, or add a Brand New Product."
+              ? "Choose an existing product by material code or binding, or add a brand-new product."
               : "Choose an existing product reference or describe a new prototype specification."}
           </p>
         </div>
@@ -394,8 +409,8 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                   onClick={() => onSetSampleType("full")}
                   className={`min-h-[3.5rem] p-3 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between gap-3 ${
                     sampleType === "full"
-                      ? "border-[#006d32] bg-[#006d32]/5 ring-1 ring-[#006d32]/30 text-zinc-900 dark:text-zinc-100"
-                      : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/60 hover:border-[#006d32]/40"
+                      ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/5 ring-1 ring-[var(--accent-primary)]/30 text-zinc-900 dark:text-zinc-100"
+                      : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/60 hover:border-[var(--accent-primary)]/40"
                   }`}
                 >
                   <div>
@@ -407,7 +422,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                   <div
                     className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
                       sampleType === "full"
-                        ? "border-[#006d32] bg-[#006d32] text-white"
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
                         : "border-zinc-300 dark:border-zinc-600"
                     }`}
                   >
@@ -420,8 +435,8 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                   onClick={() => onSetSampleType("partial")}
                   className={`min-h-[3.5rem] p-3 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between gap-3 ${
                     sampleType === "partial"
-                      ? "border-[#006d32] bg-[#006d32]/5 ring-1 ring-[#006d32]/30 text-zinc-900 dark:text-zinc-100"
-                      : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/60 hover:border-[#006d32]/40"
+                      ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/5 ring-1 ring-[var(--accent-primary)]/30 text-zinc-900 dark:text-zinc-100"
+                      : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/60 hover:border-[var(--accent-primary)]/40"
                   }`}
                 >
                   <div>
@@ -433,7 +448,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                   <div
                     className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
                       sampleType === "partial"
-                        ? "border-[#006d32] bg-[#006d32] text-white"
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
                         : "border-zinc-300 dark:border-zinc-600"
                     }`}
                   >
@@ -454,14 +469,66 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                     value={partialRequirements}
                     onChange={(e) => onSetPartialRequirements(e.target.value)}
                     placeholder="e.g. Spiral binding mockup without inner pages, only 4-color printed cover..."
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] resize-none"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] resize-none"
                   />
                 </div>
               )}
             </div>
           )}
 
-          {/* Product source tabs: New | Material Code | Category */}
+
+              {/* Sampling-only quantity and packaging */}
+              {includesSample && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans mb-1">
+                      Sample Quantity <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={qtyForSampling}
+                      onChange={(e) => onSetQtyForSampling?.(e.target.value)}
+                      placeholder="e.g. 1"
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans mb-1">
+                      Unit (PC / Pack) <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={unitPcPack || "PC"}
+                      onChange={(e) => onSetUnitPcPack(e.target.value)}
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 cursor-pointer"
+                    >
+                      <option value="PC">PC (Pieces)</option>
+                      <option value="Pack">Pack</option>
+                    </select>
+                  </div>
+
+                  {unitPcPack === "Pack" && (
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans mb-1">
+                        Pieces Per Pack <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={qtyPerPack || "1"}
+                        onChange={(e) => onSetQtyPerPack(e.target.value)}
+                        placeholder="e.g. 10"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+          {/* Product source tabs: New | Material Code | Binding */}
           <div className="space-y-2.5">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans">
               Product Source
@@ -472,9 +539,9 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                 type="button"
                 aria-pressed={samplingSearchMode === "new"}
                 onClick={() => onSetSamplingSearchMode("new")}
-                className={`min-h-9 px-1.5 py-2 rounded-lg text-center text-[10px] leading-tight font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006d32] sm:px-3 sm:text-xs ${
+                className={`min-h-9 px-1.5 py-2 rounded-lg text-center text-[10px] leading-tight font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] sm:px-3 sm:text-xs ${
                   samplingSearchMode === "new"
-                    ? "bg-[#006d32] text-white shadow-2xs"
+                    ? "bg-[var(--accent-primary)] text-white shadow-2xs"
                     : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200"
                 }`}
               >
@@ -485,9 +552,9 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                 type="button"
                 aria-pressed={samplingSearchMode === "material_code"}
                 onClick={() => onSetSamplingSearchMode("material_code")}
-                className={`min-h-9 px-1.5 py-2 rounded-lg text-center text-[10px] leading-tight font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006d32] sm:px-3 sm:text-xs ${
+                className={`min-h-9 px-1.5 py-2 rounded-lg text-center text-[10px] leading-tight font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] sm:px-3 sm:text-xs ${
                   samplingSearchMode === "material_code"
-                    ? "bg-[#006d32] text-white shadow-2xs"
+                    ? "bg-[var(--accent-primary)] text-white shadow-2xs"
                     : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200"
                 }`}
               >
@@ -498,13 +565,13 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                 type="button"
                 aria-pressed={samplingSearchMode === "binding"}
                 onClick={() => onSetSamplingSearchMode("binding")}
-                className={`min-h-9 px-1.5 py-2 rounded-lg text-center text-[10px] leading-tight font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006d32] sm:px-3 sm:text-xs ${
+                className={`min-h-9 px-1.5 py-2 rounded-lg text-center text-[10px] leading-tight font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] sm:px-3 sm:text-xs ${
                   samplingSearchMode === "binding"
-                    ? "bg-[#006d32] text-white shadow-2xs"
+                    ? "bg-[var(--accent-primary)] text-white shadow-2xs"
                     : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200"
                 }`}
               >
-                Category & Binding
+                Binding
               </button>
             </div>
 
@@ -524,7 +591,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                     value={productDescription}
                     onChange={(e) => onSetProductDescription(e.target.value)}
                     placeholder="Enter product title or prototype description (e.g. A5 Spiral Notebook, 160 pages)..."
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] resize-none"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] resize-none"
                   />
                 </div>
 
@@ -563,7 +630,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                             onSelectSubCategory("");
                             onSelectThirdCategory("");
                           }}
-                          className="w-full h-9 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium text-zinc-900 dark:text-zinc-100 outline-none focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] cursor-pointer appearance-none"
+                          className="w-full h-9 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium text-zinc-900 dark:text-zinc-100 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer appearance-none"
                         >
                           <option value="">Select Category...</option>
                           {productCategories.map((c) => (
@@ -592,7 +659,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                           className={`w-full h-9 pl-3 pr-8 rounded-xl border text-xs font-medium outline-none appearance-none ${
                             !selectedCategory || subCategoryOptions.length === 0
                               ? "border-slate-200/60 dark:border-zinc-800 bg-slate-100/70 dark:bg-zinc-800/40 text-slate-400 dark:text-zinc-500 cursor-not-allowed"
-                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] cursor-pointer"
+                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer"
                           }`}
                         >
                           <option value="">
@@ -625,7 +692,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                           className={`w-full h-9 pl-3 pr-8 rounded-xl border text-xs font-medium outline-none appearance-none ${
                             !selectedSubCategory || thirdCategoryOptions.length === 0
                               ? "border-slate-200/60 dark:border-zinc-800 bg-slate-100/70 dark:bg-zinc-800/40 text-slate-400 dark:text-zinc-500 cursor-not-allowed"
-                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] cursor-pointer"
+                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer"
                           }`}
                         >
                           <option value="">
@@ -661,7 +728,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                     value={materialSearchQuery}
                     onChange={(e) => onSetMaterialSearchQuery(e.target.value)}
                     placeholder="Search material code or product description..."
-                    className="w-full h-9 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32]"
+                    className="w-full h-9 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                   />
                   {materialSearchQuery && (
                     <button
@@ -674,13 +741,13 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                   )}
                 </div>
 
-                <div className={`border border-slate-200 dark:border-zinc-700 rounded-xl ${includesMockup ? "max-h-72" : "max-h-48"} overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-800 bg-slate-50/40 dark:bg-zinc-900/40`}>
+                <div className="h-80 shrink-0 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/40 divide-y divide-slate-100 dark:border-zinc-700 dark:bg-zinc-900/40 dark:divide-zinc-800">
                   {isSearchingMaterial ? (
-                    <div className="py-6 text-center text-xs text-zinc-400 font-mono">
+                    <div className="flex h-full min-h-36 items-center justify-center px-3 text-center text-xs text-zinc-400 font-mono">
                       Searching product catalog...
                     </div>
                   ) : materialSearchResults.length === 0 ? (
-                    <div className="py-6 px-3 text-center text-xs text-slate-400 dark:text-zinc-500">
+                    <div className="flex h-full min-h-36 items-center justify-center px-3 text-center text-xs text-slate-400 dark:text-zinc-500">
                       {materialSearchQuery.trim()
                         ? "No matching products found."
                         : "Enter a material code or description to search."}
@@ -693,7 +760,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                           key={item.id}
                           className={`p-2.5 transition-colors flex items-center justify-between gap-3 text-left ${
                             isSelected
-                              ? "bg-emerald-500/10 dark:bg-emerald-950/40 border-l-3 border-[#006d32]"
+                              ? "bg-emerald-500/10 dark:bg-emerald-950/40 border-l-3 border-[var(--accent-primary)]"
                               : "hover:bg-white dark:hover:bg-zinc-800"
                           }`}
                         >
@@ -701,11 +768,11 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                             type="button"
                             onClick={() => onSelectDbSample(item)}
                             aria-pressed={isSelected}
-                            className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#006d32]"
+                            className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)]"
                           >
                             <div className="flex items-center gap-2">
                               {item.material_code && (
-                                <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.2 rounded bg-white dark:bg-zinc-800 text-[#006d32] dark:text-emerald-300 border border-[#006d32]/20">
+                                <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.2 rounded bg-white dark:bg-zinc-800 text-[var(--accent-primary)] dark:text-emerald-300 border border-[var(--accent-primary)]/20">
                                   {item.material_code}
                                 </span>
                               )}
@@ -714,7 +781,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                               </span>
                             </div>
                             {(item.customer || item.sr_number || item.product_category) && (
-                              <div className="flex items-center gap-2 mt-0.5 text-[10.5px] text-[#64748B] dark:text-zinc-400">
+                              <div className="flex items-center gap-2 mt-0.5 text-[10.5px] text-slate-500 dark:text-zinc-400">
                                 {item.customer && <span>{item.customer}</span>}
                                 {item.sr_number && <span>• Ref: {item.sr_number}</span>}
                                 {item.product_category && (
@@ -740,7 +807,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                           <div
                             className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
                               isSelected
-                                ? "border-[#006d32] bg-[#006d32] text-white"
+                                ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
                                 : "border-zinc-300 dark:border-zinc-600"
                             }`}
                           >
@@ -759,135 +826,13 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                ══════════════════════════════════════════════════════════════ */}
             {samplingSearchMode === "binding" && (
               <div className="space-y-3 pt-0.5">
-                <p className="-mt-1 text-[11px] text-slate-500 dark:text-zinc-400">
-                  Narrow saved products by category first, then refine by their recorded binding values.
-                </p>
-                {/* Category Hierarchy */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                      Category Hierarchy
-                    </label>
-                    {(selectedCategory || selectedSubCategory || selectedThirdCategory) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onSelectCategory("");
-                          onSelectSubCategory("");
-                          onSelectThirdCategory("");
-                        }}
-                        className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {/* Category */}
-                    <div>
-                      <label className="block text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 mb-0.5">
-                        Category
-                      </label>
-                      <div className="relative">
-                        <select
-                          value={selectedCategory}
-                          onChange={(e) => {
-                            onSelectCategory(e.target.value);
-                            onSelectSubCategory("");
-                            onSelectThirdCategory("");
-                          }}
-                          className="w-full h-9 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium text-zinc-900 dark:text-zinc-100 outline-none focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] cursor-pointer appearance-none"
-                        >
-                          <option value="">All Categories...</option>
-                          {productCategories.map((c) => (
-                            <option key={c.name} value={c.name}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="w-3.5 h-3.5 text-zinc-400 pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
-                      </div>
-                    </div>
-
-                    {/* Sub Category */}
-                    <div>
-                      <label className="block text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 mb-0.5">
-                        Sub Category
-                      </label>
-                      <div className="relative">
-                        <select
-                          disabled={!selectedCategory || subCategoryOptions.length === 0}
-                          value={selectedSubCategory}
-                          onChange={(e) => {
-                            onSelectSubCategory(e.target.value);
-                            onSelectThirdCategory("");
-                          }}
-                          className={`w-full h-9 pl-3 pr-8 rounded-xl border text-xs font-medium outline-none appearance-none ${
-                            !selectedCategory || subCategoryOptions.length === 0
-                              ? "border-slate-200/60 dark:border-zinc-800 bg-slate-100/70 dark:bg-zinc-800/40 text-slate-400 dark:text-zinc-500 cursor-not-allowed"
-                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] cursor-pointer"
-                          }`}
-                        >
-                          <option value="">
-                            {!selectedCategory
-                              ? "Select Category first"
-                              : subCategoryOptions.length === 0
-                                ? "No sub-categories"
-                                : "All Sub Categories..."}
-                          </option>
-                          {subCategoryOptions.map((s) => (
-                            <option key={s.name} value={s.name}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="w-3.5 h-3.5 text-zinc-400 pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
-                      </div>
-                    </div>
-
-                    {/* Third Category */}
-                    <div>
-                      <label className="block text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 mb-0.5">
-                        Third Category
-                      </label>
-                      <div className="relative">
-                        <select
-                          disabled={!selectedSubCategory || thirdCategoryOptions.length === 0}
-                          value={selectedThirdCategory}
-                          onChange={(e) => onSelectThirdCategory(e.target.value)}
-                          className={`w-full h-9 pl-3 pr-8 rounded-xl border text-xs font-medium outline-none appearance-none ${
-                            !selectedSubCategory || thirdCategoryOptions.length === 0
-                              ? "border-slate-200/60 dark:border-zinc-800 bg-slate-100/70 dark:bg-zinc-800/40 text-slate-400 dark:text-zinc-500 cursor-not-allowed"
-                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] cursor-pointer"
-                          }`}
-                        >
-                          <option value="">
-                            {!selectedSubCategory
-                              ? "Select Sub Category first"
-                              : thirdCategoryOptions.length === 0
-                                ? "None"
-                                : "All Third Categories..."}
-                          </option>
-                          {thirdCategoryOptions.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="w-3.5 h-3.5 text-zinc-400 pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
+                <p className="-mt-1 text-[11px] text-slate-500 dark:text-zinc-400">Binding 2 shows only values linked to the selected Binding 1 in saved catalog products.</p>
                 {/* Binding Selection */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                      Binding
+                      Binding filters
                     </label>
-                    <span className="text-[10px] text-slate-500 dark:text-zinc-400">Options from NB_BINDING</span>
                     {(selectedBinding1 || selectedBinding2) && (
                       <button
                         type="button"
@@ -916,15 +861,15 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                           className={`w-full h-9 pl-3 pr-8 rounded-xl border text-xs font-medium outline-none appearance-none ${
                             isLoadingBindingHierarchy
                               ? "border-slate-200/60 dark:border-zinc-800 bg-slate-100/70 dark:bg-zinc-800/40 text-slate-400 dark:text-zinc-500 cursor-wait"
-                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] cursor-pointer"
+                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer"
                           }`}
                         >
                           <option value="">
                             {isLoadingBindingHierarchy
                               ? "Loading binding options..."
-                              : selectedCategory && bindingHierarchy.binding1_options.length === 0
-                                ? "No NB_BINDING options available"
-                                : "All Binding 1 Types..."}
+                              : bindingHierarchy.binding1_options.length === 0
+                                ? "No binding options available"
+                                : "Select Binding 1..."}
                           </option>
                           {bindingHierarchy.binding1_options.map((opt) => (
                             <option key={opt} value={opt}>
@@ -949,7 +894,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                           className={`w-full h-9 pl-3 pr-8 rounded-xl border text-xs font-medium outline-none appearance-none ${
                             isLoadingBindingHierarchy || !selectedBinding1 || binding2Options.length === 0
                               ? "border-slate-200/60 dark:border-zinc-800 bg-slate-100/70 dark:bg-zinc-800/40 text-slate-400 dark:text-zinc-500 cursor-not-allowed"
-                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[#006d32] focus:ring-1 focus:ring-[#006d32] cursor-pointer"
+                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer"
                           }`}
                         >
                           <option value="">
@@ -958,8 +903,8 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                               : !selectedBinding1
                                 ? "Select Binding 1 first..."
                                 : binding2Options.length === 0
-                                  ? "No Binding 2 options"
-                                  : "All Binding 2 Types..."}
+                                  ? "No linked Binding 2 values"
+                                  : "Any linked Binding 2"}
                           </option>
                           {binding2Options.map((opt: string) => (
                             <option key={opt} value={opt}>
@@ -971,9 +916,6 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                       </div>
                     </div>
                   </div>
-                  <p className="text-[10.5px] leading-relaxed text-slate-500 dark:text-zinc-400">
-                    Product results require saved NB_BINDING values that match these catalog choices.
-                  </p>
                 </div>
 
                 {/* Matching Products (Unlimited) */}
@@ -983,7 +925,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                       <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
                         Matching Products
                       </span>
-                      <span className="px-1.5 py-0.2 rounded font-mono text-[10.5px] font-bold bg-[#006d32]/10 text-[#006d32] dark:text-emerald-400">
+                      <span className="px-1.5 py-0.2 rounded font-mono text-[10.5px] font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400">
                         {isSearchingBinding ? "..." : bindingSearchResults.length}
                       </span>
                     </div>
@@ -998,20 +940,18 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                     )}
                   </div>
 
-                  <div className="border border-slate-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-slate-50/40 dark:bg-zinc-900/40">
+                  <div className="h-80 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40 dark:border-zinc-700 dark:bg-zinc-900/40">
                     {activeBindingFilters.length === 0 ? (
-                      <div className="py-8 text-center text-xs text-slate-400 dark:text-zinc-500">
-                        Choose a Category or Binding type above
+                      <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-xs text-slate-400 dark:text-zinc-500">
+                        Choose Binding 1 to search the catalog
                       </div>
                     ) : isSearchingBinding ? (
-                      <div className="py-8 text-center text-xs text-slate-400 dark:text-zinc-500 font-mono">
+                      <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-xs text-slate-400 dark:text-zinc-500 font-mono">
                         Searching products...
                       </div>
                     ) : bindingSearchResults.length === 0 ? (
-                      <div className="py-8 px-3 text-center text-xs text-slate-400 dark:text-zinc-500">
-                        {selectedBinding1 || selectedBinding2
-                          ? "No saved products match these NB_BINDING values in the selected category path."
-                          : "No products match these category filters."}
+                      <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-xs text-slate-400 dark:text-zinc-500">
+                        No saved products match this binding combination.
                       </div>
                     ) : (
                       <BindingProductResults
@@ -1019,7 +959,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                         selectedItem={selectedDbSample}
                         onSelect={onSelectDbSample}
                         onInspect={onInspectProduct}
-                        viewportHeight={includesMockup ? 360 : BINDING_RESULT_VIEWPORT_HEIGHT}
+                        viewportHeight={BINDING_RESULT_VIEWPORT_HEIGHT}
                       />
                     )}
                   </div>
@@ -1028,31 +968,53 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
             )}
           </div>
 
-          {hasExistingMockupProduct && (
-            <section className="rounded-xl border border-amber-200/80 bg-amber-50/60 p-3 dark:border-amber-800/50 dark:bg-amber-950/20">
+              {hasExistingMockupProduct && (
+            <section className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/60">
               <div className="mb-2">
                 <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100">Is Design Needed?</h4>
                 <p className="mt-0.5 text-[11px] text-slate-600 dark:text-zinc-400">
-                  Choose whether this existing product also needs a design request.
+                  Choose whether Creative should review the design before Studio.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {[true, false].map((needed) => (
                   <button
                     key={String(needed)}
                     type="button"
                     aria-pressed={designNeeded === needed}
-                    onClick={() => onSetDesignNeeded(needed)}
-                    className={`h-8.5 rounded-lg border text-xs font-bold transition-colors ${
+                    onClick={() => {
+                      onSetDesignNeeded(needed);
+                      setMockupReferenceError("");
+                      setShowMockupReferenceDialog(!needed);
+                    }}
+                    className={`flex min-h-[68px] flex-col items-start justify-center gap-1 rounded-xl border px-3.5 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${
                       designNeeded === needed
-                        ? "border-[#006d32] bg-[#006d32] text-white"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-[#006d32]/50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] shadow-sm dark:bg-[var(--accent-primary)]/15"
+                        : "border-slate-200 bg-white text-slate-800 hover:border-[var(--accent-primary)]/50 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
                     }`}
                   >
-                    {needed ? "Yes, add Design" : "No, Design not needed"}
+                    <span className="text-sm font-bold">{needed ? "Yes, design is needed" : "No, use existing artwork"}</span>
+                    <span className={`text-[11px] font-normal ${designNeeded === needed ? "text-[var(--accent-primary)]/80 dark:text-zinc-300" : "text-slate-500 dark:text-zinc-400"}`}>
+                      {needed ? "Creative reviews first, then sends it to Studio." : "Send directly to Studio with a reference."}
+                    </span>
                   </button>
                 ))}
               </div>
+              {designNeeded === false && (
+                <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-200 pt-2 dark:border-zinc-700">
+                  <div className={`min-w-0 text-[11px] ${needsMarketingReference ? "text-amber-700 dark:text-amber-300" : "text-slate-600 dark:text-zinc-400"}`}>
+                    {needsMarketingReference ? "Add a Shutterstock No. or remark to continue." : (
+                      <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1">
+                        {marketingShutterstockNo.trim() && <span className="truncate"><strong>Shutterstock:</strong> {marketingShutterstockNo}</span>}
+                        {marketingMockupRemark.trim() && <span className="truncate"><strong>Remark:</strong> {marketingMockupRemark}</span>}
+                      </div>
+                    )}
+                  </div>
+                  <button type="button" onClick={() => setShowMockupReferenceDialog(true)} className="shrink-0 text-[11px] font-semibold text-[var(--accent-primary)] hover:underline">
+                    {needsMarketingReference ? "Add details" : "Edit details"}
+                  </button>
+                </div>
+              )}
             </section>
           )}
 
@@ -1070,16 +1032,16 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                 </span>
               </div>
               <p className="mt-1.5 text-[11px] leading-relaxed text-slate-600 dark:text-zinc-400">
-                Brand-new Mockup products always include a Design brief. Complete it before staging.
+                This Mockup request will go to Creative first. Creative will review it before handing it to Studio.
               </p>
             </section>
           )}
 
           {/* Selected Product Summary Card */}
           {selectedDbSample && samplingSearchMode !== "new" && (
-            <div className="rounded-xl border border-[#006d32]/25 bg-emerald-50/60 p-2.5 dark:border-emerald-500/20 dark:bg-emerald-950/25 flex items-center justify-between gap-2 animate-smooth-toast">
+            <div className="rounded-xl border border-[var(--accent-primary)]/25 bg-emerald-50/60 p-2.5 dark:border-emerald-500/20 dark:bg-emerald-950/25 flex items-center justify-between gap-2 animate-smooth-toast">
               <div className="min-w-0 flex-1 flex items-center gap-2">
-                <span className="font-bold text-xs text-[#006d32] dark:text-emerald-400 shrink-0">
+                <span className="font-bold text-xs text-[var(--accent-primary)] dark:text-emerald-400 shrink-0">
                   Selected:
                 </span>
                 {(selectedDbSample.material_code || selectedDbSample.sr_number) && (
@@ -1092,7 +1054,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                 </span>
               </div>
               {selectedDbSample.product_category && (
-                <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-100/70 text-[#006d32] dark:bg-emerald-900/60 dark:text-emerald-300">
+                <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-100/70 text-[var(--accent-primary)] dark:bg-emerald-900/60 dark:text-emerald-300">
                   {selectedDbSample.product_category}
                 </span>
               )}
@@ -1110,27 +1072,27 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                   <span>Costing required date <span className="text-rose-500">*</span></span>
-                  <input required type="date" value={costingRequiredDate} onChange={(event) => onSetCostingRequiredDate(event.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+                  <input required type="date" value={costingRequiredDate} onChange={(event) => onSetCostingRequiredDate(event.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
                 </label>
                 <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                   <span>Quantity for costing <span className="text-rose-500">*</span></span>
-                  <input required min="1" step="1" type="number" inputMode="numeric" value={qtyDesignCosting} onChange={(event) => onSetQtyDesignCosting(event.target.value)} placeholder="e.g. 10000" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+                  <input required min="1" step="1" type="number" inputMode="numeric" value={qtyDesignCosting} onChange={(event) => onSetQtyDesignCosting(event.target.value)} placeholder="e.g. 10000" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
                 </label>
                 <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                   <span>Customer SKU <span className="text-rose-500">*</span></span>
-                  <input required value={customerProductCode} onChange={(event) => onSetCustomerProductCode(event.target.value)} placeholder="Customer product code" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+                  <input required value={customerProductCode} onChange={(event) => onSetCustomerProductCode(event.target.value)} placeholder="Customer product code" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
                 </label>
                 <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                   <span>Barcode <span className="text-rose-500">*</span></span>
-                  <input required value={barcode} onChange={(event) => onSetBarcode(event.target.value)} placeholder="Barcode" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+                  <input required value={barcode} onChange={(event) => onSetBarcode(event.target.value)} placeholder="Barcode" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
                 </label>
                 <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                   <span>Brand <span className="text-rose-500">*</span></span>
-                  <input required value={brandName} onChange={(event) => onSetBrandName(event.target.value)} placeholder="Brand name" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+                  <input required value={brandName} onChange={(event) => onSetBrandName(event.target.value)} placeholder="Brand name" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
                 </label>
                 <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                   <span>Unit <span className="text-rose-500">*</span></span>
-                  <select required value={unitPcPack} onChange={(event) => onSetUnitPcPack(event.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+                  <select required value={unitPcPack} onChange={(event) => onSetUnitPcPack(event.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
                     <option value="PC">PC</option>
                     <option value="Pack">Pack</option>
                   </select>
@@ -1138,7 +1100,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                 {unitPcPack === "Pack" && (
                   <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                     <span>Pieces per pack <span className="text-rose-500">*</span></span>
-                    <input required min="1" step="1" type="number" inputMode="numeric" value={qtyPerPack} onChange={(event) => onSetQtyPerPack(event.target.value)} placeholder="e.g. 10" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+                    <input required min="1" step="1" type="number" inputMode="numeric" value={qtyPerPack} onChange={(event) => onSetQtyPerPack(event.target.value)} placeholder="e.g. 10" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
                   </label>
                 )}
               </div>
@@ -1148,7 +1110,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
         </div>
 
         {/* Actions Footer */}
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-6 py-4 dark:border-white/[0.06] dark:bg-[#161822]">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-6 py-4 dark:border-white/[0.06] dark:bg-zinc-900">
           <button
             type="button"
             onClick={onBackToScopes}
@@ -1169,16 +1131,15 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
 
             <button
               type="submit"
-              disabled={isSubmittingAll || needsDesignDecision}
-              className="h-9 px-3.5 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006d32] focus-visible:ring-offset-2 disabled:opacity-50 active:scale-98"
-              style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
+              disabled={isSubmittingAll || needsDesignDecision || needsMarketingReference}
+              className="h-9 px-3.5 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 disabled:opacity-50 active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>
                 {needsDesignDecision
                   ? "Choose Design Need"
-                  : needsDesignBrief
-                    ? "Continue to Design Brief"
+                  : needsMarketingReference
+                    ? "Add Studio Handoff Details"
                     : includesCosting && selectedScopes.length === 1
                       ? "Add Costing Request"
                       : "Stage Product"}
@@ -1187,6 +1148,41 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
           </div>
         </div>
       </form>
+      {showMockupReferenceDialog && hasExistingMockupProduct && designNeeded === false && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/45 p-3" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="mockup-reference-title" className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 id="mockup-reference-title" className="text-sm font-bold text-slate-900 dark:text-zinc-100">Studio handoff details</h3>
+                <p className="mt-1 text-[11px] text-slate-600 dark:text-zinc-400">Enter either a Shutterstock number or a remark. One is required.</p>
+              </div>
+              <button type="button" aria-label="Close handoff details" onClick={() => { setShowMockupReferenceDialog(false); setMockupReferenceError(""); }} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
+                Shutterstock No. <span className="font-normal text-slate-400">(optional)</span>
+                <input autoFocus maxLength={100} value={marketingShutterstockNo} onChange={(event) => { onSetMarketingShutterstockNo(event.target.value); setMockupReferenceError(""); }} placeholder="Enter Shutterstock No." className="mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-normal text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+              </label>
+              <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
+                Marketing remark <span className="font-normal text-slate-400">(optional)</span>
+                <input maxLength={1000} value={marketingMockupRemark} onChange={(event) => { onSetMarketingMockupRemark(event.target.value); setMockupReferenceError(""); }} placeholder="Add a short reference or note" className="mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-normal text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+              </label>
+            </div>
+            {mockupReferenceError && <p role="alert" className="mt-2 text-[11px] text-rose-600">{mockupReferenceError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => { setShowMockupReferenceDialog(false); onSetDesignNeeded(null); onSetMarketingShutterstockNo(""); onSetMarketingMockupRemark(""); }} className="h-8 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">Cancel</button>
+              <button type="button" onClick={() => {
+                if (!marketingShutterstockNo.trim() && !marketingMockupRemark.trim()) {
+                  setMockupReferenceError("Enter a Shutterstock number or a remark to continue.");
+                  return;
+                }
+                setMockupReferenceError("");
+                setShowMockupReferenceDialog(false);
+              }} className="h-8 rounded-lg bg-[var(--accent-primary)] px-3 text-xs font-semibold text-white hover:bg-[var(--accent-primary-hover)]">Save details</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

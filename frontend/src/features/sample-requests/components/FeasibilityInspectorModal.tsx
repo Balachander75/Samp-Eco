@@ -9,13 +9,18 @@ import {
   convertFeasibilityToSamplingApi,
   cleanFeasibilityDescription,
   addFeasibilityNoteApi,
+  proposeFeasibilityCounterDateApi,
+  decideFeasibilityCounterDateApi,
+  fetchFeasibilityRequestApi,
 } from "@/infrastructure/api";
+import { useFeasibilityImageSources } from "../hooks/useFeasibilityImageSources";
 import {
   ExternalLink,
   CheckCircle2,
   AlertTriangle,
   XCircle,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 
 // Modular Sub-Components
@@ -44,11 +49,7 @@ export interface FeasibilityInspectorModalProps {
   request: SampleRequestItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onMarketingApprove?: (
-    requestId: string | number,
-    approved: boolean,
-    remark?: string
-  ) => Promise<void>;
+  onRefresh?: () => Promise<void>;
   onDeleteRequest?: (req: SampleRequestItem) => void;
   user?: UserProfile | null;
   isAdmin?: boolean;
@@ -59,7 +60,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   request,
   isOpen,
   onClose,
-  onMarketingApprove,
+  onRefresh,
   onDeleteRequest,
   user,
   isAdmin = false,
@@ -71,6 +72,21 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     setLocalOverride(null);
   }, [request?.id]);
 
+  useEffect(() => {
+    if (!isOpen || !request?.id) return;
+    let stopped = false;
+    fetchFeasibilityRequestApi(request.id)
+      .then((latest) => {
+        if (!stopped) setLocalOverride(latest);
+      })
+      .catch((error) => {
+        console.warn("Could not load feasibility detail:", error);
+      });
+    return () => {
+      stopped = true;
+    };
+  }, [isOpen, request?.id]);
+
   const activeRequest = localOverride || request;
 
   // Feasibility flow states
@@ -78,19 +94,59 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   const [isConverting, setIsConverting] = useState(false);
   const [sampVerdictChoice, setSampVerdictChoice] = useState<"Yes" | "No" | "Maybe">("Yes");
   const [sampVerdictRemark, setSampVerdictRemark] = useState("");
+  const [sampConditions, setSampConditions] = useState("");
+  const [sampLeadTimeNote, setSampLeadTimeNote] = useState("");
   const [sampVerdictError, setSampVerdictError] = useState<string | null>(null);
   const [isSubmittingSampVerdict, setIsSubmittingSampVerdict] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [isSubmittingDecision, setIsSubmittingDecision] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionRemark, setDecisionRemark] = useState("");
+  const [counterDate, setCounterDate] = useState("");
+  const [counterDateReason, setCounterDateReason] = useState("");
+  const [counterDateError, setCounterDateError] = useState<string | null>(null);
+  const [isSubmittingCounterDate, setIsSubmittingCounterDate] = useState(false);
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"specs" | "review" | "decision">(
-    sourceDesk === "samp" ? "review" : "specs"
-  );
+  const [activeTab, setActiveTab] = useState<"specs" | "review" | "decision">("specs");
 
   useEffect(() => {
-    setActiveTab(sourceDesk === "samp" ? "review" : "specs");
-  }, [request?.id, sourceDesk]);
+    setSampVerdictChoice("Yes");
+    setSampVerdictRemark("");
+    setSampConditions("");
+    setSampLeadTimeNote("");
+    setDecisionRemark("");
+    setCounterDate("");
+    setCounterDateReason("");
+    setCounterDateError(null);
+  }, [request?.id]);
+
+  useEffect(() => {
+    setActiveTab("specs");
+  }, [isOpen, request?.id, sourceDesk]);
+
+  useEffect(() => {
+    if (!isOpen || !activeRequest?.id || activeRequest.counterDateDecision !== "pending") return;
+    let stopped = false;
+    const refreshCounterDate = async () => {
+      try {
+        const latest = await fetchFeasibilityRequestApi(activeRequest.id);
+        if (!stopped) {
+          setLocalOverride(latest);
+          if (latest.counterDateDecision !== "pending") {
+            window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+            await onRefresh?.();
+          }
+        }
+      } catch (error) {
+        console.warn("Could not refresh pending counter-date decision:", error);
+      }
+    };
+    const timer = window.setInterval(() => void refreshCounterDate(), 15000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [isOpen, activeRequest?.id, activeRequest?.counterDateDecision, onRefresh]);
 
   // Strict role permissions based on active operational desk persona
   const isMarketingDesk = sourceDesk === "marketing";
@@ -165,6 +221,9 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     }
     return list;
   }, [feasibilityDetails.referenceImages, activeRequest?.productImagePath]);
+  const { sourceFor: imageSourceFor, statusFor: imageStatusFor } = useFeasibilityImageSources(
+    isOpen ? previewableImages.map((image) => image.url) : []
+  );
 
   const classificationLabel = useMemo(() => {
     if (!activeRequest) return "New Category";
@@ -202,7 +261,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
   // Actions
   const handleCopyCode = () => {
-    const code = activeRequest?.srNumber || activeRequest?.materialCode || `FS-${activeRequest?.id}`;
+    const code = activeRequest?.materialCode || `FC-${String(activeRequest?.id).padStart(4, "0")}`;
     if (!code) return;
     navigator.clipboard.writeText(code);
     setCopiedCode(true);
@@ -237,6 +296,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
       const updated = await recordFeasibilitySampVerdictApi(activeRequest.id, {
         response: sampVerdictChoice,
         remark: sampVerdictRemark.trim() || undefined,
+        conditions: sampConditions.trim() || undefined,
+        lead_time_note: sampLeadTimeNote.trim() || undefined,
       });
       setLocalOverride(updated);
       window.dispatchEvent(new CustomEvent("samp:requests-changed"));
@@ -248,9 +309,45 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     }
   };
 
+  const handleProposeCounterDate = async () => {
+    if (!activeRequest?.id || !counterDate || !counterDateReason.trim() || isSubmittingCounterDate) return;
+    setCounterDateError(null);
+    setIsSubmittingCounterDate(true);
+    try {
+      const updated = await proposeFeasibilityCounterDateApi(activeRequest.id, counterDate, counterDateReason.trim());
+      setLocalOverride(updated);
+      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+    } catch (err) {
+      setCounterDateError(err instanceof Error ? err.message : "Could not propose the revised date.");
+    } finally {
+      setIsSubmittingCounterDate(false);
+    }
+  };
+
+  const handleCounterDateDecision = async (accepted: boolean) => {
+    if (!activeRequest?.id || isSubmittingDecision) return;
+    setDecisionError(null);
+    setIsSubmittingDecision(true);
+    try {
+      const updated = await decideFeasibilityCounterDateApi(activeRequest.id, accepted ? "accepted" : "rejected");
+      setLocalOverride(updated);
+      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
+    } catch (err) {
+      setDecisionError(err instanceof Error ? err.message : "Could not record the counter-date decision.");
+    } finally {
+      setIsSubmittingDecision(false);
+    }
+  };
+
   // Marketing Final Decision (Accept / Reject)
   const handleMarketingFinalApprove = async (approved: boolean) => {
     if (!activeRequest?.id || isSubmittingDecision || !canMakeCommercialDecision) return;
+    if (approved && activeRequest.samplingFeasibilityResponse === "No" && !decisionRemark.trim()) {
+      setDecisionError("Add a reason to document this Marketing exception for a Not Feasible result.");
+      return;
+    }
+    setDecisionError(null);
     setIsSubmittingDecision(true);
     try {
       const decisionStr = approved ? "Accepted" : "Rejected";
@@ -259,10 +356,6 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
         decision: decisionStr,
         decision_remark: decisionRemark.trim() || undefined,
       });
-
-      if (onMarketingApprove) {
-        await onMarketingApprove(activeRequest.id, approved, decisionRemark.trim());
-      }
 
       setLocalOverride({
         ...updated,
@@ -273,28 +366,33 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
         status: approved ? "Feasibility Approved" : "Feasibility Rejected",
       });
       window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
     } catch (err) {
       console.error("Failed to record marketing decision:", err);
+      setDecisionError(err instanceof Error ? err.message : "Failed to record Marketing decision.");
     } finally {
       setIsSubmittingDecision(false);
     }
   };
 
   // Convert to Commercial Sampling Request
-  const handleConvertToSampling = async () => {
+  const handleConvertToSampling = async (requestTypes: Array<"sample" | "costing"> = ["sample"]) => {
     if (!activeRequest?.id || isConverting || !canMakeCommercialDecision) return;
     setIsConverting(true);
     try {
       const converter = user?.name || user?.userid || "Marketing Team";
-      const result = await convertFeasibilityToSamplingApi(activeRequest.id);
+      const result = await convertFeasibilityToSamplingApi(activeRequest.id, requestTypes);
       if (result && result.sampleSrNumber) {
         setLocalOverride({
           ...activeRequest,
           convertedSampleRequestId: result.sampleRequestId,
           convertedSrNumber: result.sampleSrNumber,
+          convertedRequestTypes: result.requestTypes,
           convertedBy: converter,
           convertedAt: new Date().toISOString(),
-          status: "Converted to Sampling",
+          status: result.requestTypes.includes("sample")
+            ? result.requestTypes.includes("costing") ? "Converted to Sampling and Costing" : "Converted to Sampling"
+            : "Converted to Costing",
         });
         window.dispatchEvent(new CustomEvent("samp:requests-changed"));
       }
@@ -317,15 +415,6 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     }
   };
 
-  const imageSourceFor = (url?: string) => {
-    if (!url) return "";
-    if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
-      return url;
-    }
-    const cleanPath = url.replace(/^\/+/, "");
-    return `http://127.0.0.1:8001/${cleanPath}`;
-  };
-
   const movePreview = (direction: -1 | 1) => {
     const currentIndex = previewableImages.findIndex((image) => image.url === selectedPreviewImage);
     if (previewableImages.length < 2 || currentIndex < 0) return;
@@ -343,7 +432,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[#f8f9ff] dark:bg-[#0f121d] border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
+        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 1. TOP CONTROL PANEL */}
@@ -358,8 +447,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG) */}
         <div className="flex-1 flex overflow-hidden">
           {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[#f8f9ff] dark:bg-[#0f121d]">
-            <div className="max-w-4xl mx-auto rounded-2xl bg-white dark:bg-[#161928] border border-slate-100 dark:border-white/5 shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
+            <div className="max-w-4xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
               <FeasibilitySheetHeader
                 activeRequest={activeRequest}
                 classificationLabel={classificationLabel}
@@ -377,20 +466,20 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
               />
 
               {/* Notebook Tab Strip */}
-              <div className="px-8 pb-6 pt-3">
-                <div className="border-b border-slate-100 dark:border-white/10 flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
+              <div className="px-6 sm:px-8 pb-6 pt-3">
+                <div className="border-b border-[var(--border-subtle)] flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => setActiveTab("specs")}
                     className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                       activeTab === "specs"
-                        ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
-                        : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
                     <span>1. Scope &amp; Specifications</span>
                     {(previewableImages.length > 0 || feasibilityDetails.referenceLinks.length > 0) && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#eff4ff] dark:bg-[#006d32]/25 text-[#006d32] dark:text-[#00d166] font-bold border border-[#006d32]/20">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
                         {previewableImages.length + feasibilityDetails.referenceLinks.length}
                       </span>
                     )}
@@ -401,8 +490,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     onClick={() => setActiveTab("review")}
                     className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                       activeTab === "review"
-                        ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
-                        : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
                     <span>2. SAMP Technical Review</span>
@@ -410,16 +499,16 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                       <span
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
                           activeRequest.samplingFeasibilityResponse === "Yes"
-                            ? "bg-emerald-50 text-[#006d32] dark:bg-emerald-950/60 dark:text-[#00d166]"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
                             : activeRequest.samplingFeasibilityResponse === "No"
                             ? "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
-                            : "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                            : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
                         }`}
                       >
                         {activeRequest.samplingFeasibilityResponse}
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
                         {activeRequest.takenBySamp ? "In Review" : "Pending Claim"}
                       </span>
                     )}
@@ -430,27 +519,31 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     onClick={() => setActiveTab("decision")}
                     className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                       activeTab === "decision"
-                        ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
-                        : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
                     <span>3. Commercial Decision &amp; Sampling</span>
                     {activeRequest.convertedSrNumber ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[#eff4ff] dark:bg-[#006d32]/25 text-[#006d32] dark:text-[#00d166] border border-[#006d32]/20">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--border-subtle)]">
                         ✓ {activeRequest.convertedSrNumber}
                       </span>
                     ) : activeRequest.marketingDecision ? (
                       <span
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
                           activeRequest.marketingDecision === "Accepted"
-                            ? "bg-emerald-50 text-[#006d32]"
-                            : "bg-rose-50 text-rose-700"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
                         }`}
                       >
                         {activeRequest.marketingDecision}
                       </span>
+                    ) : activeRequest.counterDateDecision === "pending" ? (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+                        Date Decision
+                      </span>
                     ) : activeRequest.samplingFeasibilityResponse ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[#eff4ff] text-[#006d32] dark:bg-[#006d32]/20 dark:text-[#00d166] animate-pulse">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
                         Ready
                       </span>
                     ) : null}
@@ -460,12 +553,25 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                 {/* Tab 1: Scope & Specifications */}
                 {activeTab === "specs" && (
                   <div className="py-5 space-y-5">
+                    {canMakeCommercialDecision && activeRequest.counterDateDecision === "pending" && (
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-4">
+                        <div>
+                          <p className="text-xs font-bold text-amber-900 dark:text-amber-200">SAMP proposed revised date: {activeRequest.sampCounterDate}</p>
+                          <p className="mt-1 text-[11px] text-amber-800/80 dark:text-amber-300/80">Marketing response is due within 4 working days.</p>
+                        </div>
+                        <button type="button" onClick={() => setActiveTab("decision")} className="rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] px-3.5 py-2 text-xs font-bold text-white transition-colors cursor-pointer shadow-2xs">Review Date</button>
+                      </div>
+                    )}
+                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-3">
+                      <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Feasibility Required Date</div>
+                      <div className="mt-1 text-sm font-semibold font-mono text-[var(--on-surface)]">{activeRequest.sampleRequiredDate || "—"}</div>
+                    </div>
                     {/* Primary Technical Description & Product Scope */}
                     <div>
-                      <div className="text-[11px] font-display font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-2">
+                      <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-2">
                         Technical Description &amp; Product Scope
                       </div>
-                      <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-zinc-900/60 text-xs sm:text-[13px] text-slate-800 dark:text-zinc-100 leading-relaxed font-sans shadow-2xs whitespace-pre-wrap">
+                      <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-[13px] text-[var(--on-surface)] leading-relaxed font-sans shadow-2xs whitespace-pre-wrap">
                         {displayDescription || "No technical description specified."}
                       </div>
                     </div>
@@ -473,10 +579,10 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     {/* Marketing Directives & Commercial Notes (Render ONLY if filled!) */}
                     {displayRemark && (
                       <div>
-                        <div className="text-[11px] font-display font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-2">
+                        <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--accent-primary)] mb-2">
                           Marketing Directives &amp; Commercial Notes
                         </div>
-                        <div className="p-4 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20 text-xs text-amber-950 dark:text-amber-200 font-sans leading-relaxed shadow-2xs">
+                        <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs">
                           {displayRemark}
                         </div>
                       </div>
@@ -485,7 +591,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     {/* Benchmark URLs & Links (Render ONLY if filled!) */}
                     {feasibilityDetails.referenceLinks.length > 0 && (
                       <div>
-                        <div className="text-[11px] font-display font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-2">
+                        <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-2">
                           Client Reference URLs &amp; Benchmark Links ({feasibilityDetails.referenceLinks.length})
                         </div>
                         <div className="flex flex-wrap gap-2.5">
@@ -495,7 +601,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                               href={url.startsWith("http") ? url : `https://${url}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:border-[#006d32] hover:text-[#006d32] dark:hover:text-[#00d166] text-xs font-mono text-slate-700 dark:text-zinc-300 transition shadow-2xs group"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] text-xs font-mono text-[var(--on-surface)] transition shadow-2xs group"
                             >
                               <span className="truncate max-w-xs">{url.replace(/^https?:\/\//, "")}</span>
                             </a>
@@ -507,33 +613,50 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     {/* Attached Reference Images (Render ONLY if filled!) */}
                     {previewableImages.length > 0 && (
                       <div>
-                        <div className="text-[11px] font-display font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-2.5">
+                        <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-2.5">
                           Attached Reference Images ({previewableImages.length})
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                           {previewableImages.map((img, idx) => (
-                            <div
+                            <button
                               key={img.id}
-                              onClick={() => img.url && setSelectedPreviewImage(img.url)}
-                              className="group relative rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 overflow-hidden cursor-pointer hover:border-[#006d32] dark:hover:border-[#00d166] transition shadow-xs"
+                              type="button"
+                              onClick={() => img.url && imageStatusFor(img.url) === "ready" && setSelectedPreviewImage(img.url)}
+                              disabled={imageStatusFor(img.url) !== "ready"}
+                              aria-label={`Open full-size preview of ${img.name}`}
+                              className="group relative rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] overflow-hidden text-left enabled:cursor-zoom-in enabled:hover:border-[var(--accent-primary)] transition shadow-xs disabled:cursor-wait"
                             >
-                              <div className="aspect-[4/3] w-full bg-slate-100 dark:bg-zinc-800 overflow-hidden relative">
-                                <img
-                                  src={imageSourceFor(img.url)}
-                                  alt={img.name}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                                />
-                                <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                                  <span className="text-[11px] font-display font-semibold text-white bg-black/75 px-2.5 py-1 rounded-lg">
-                                    View Full Image
-                                  </span>
-                                </div>
+                              <div className="aspect-[4/3] w-full bg-[var(--surface-low)] overflow-hidden relative">
+                                {imageSourceFor(img.url) ? (
+                                  <img
+                                    src={imageSourceFor(img.url)}
+                                    alt={img.name}
+                                    className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-300"
+                                  />
+                                ) : imageStatusFor(img.url) === "error" ? (
+                                  <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center text-[11px] text-rose-600 dark:text-rose-300">
+                                    <AlertTriangle className="h-5 w-5" />
+                                    <span>Couldn’t load this image</span>
+                                  </div>
+                                ) : (
+                                  <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[11px] text-[var(--on-surface-subtle)]">
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                    <span>Loading image…</span>
+                                  </div>
+                                )}
+                                {imageStatusFor(img.url) === "ready" && (
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                    <span className="text-[11px] font-sans font-semibold text-white bg-black/75 px-2.5 py-1 rounded-lg">
+                                      View full size
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                              <div className="p-2 flex items-center justify-between text-[10.5px] text-slate-600 dark:text-zinc-400 font-display">
+                              <div className="p-2 flex items-center justify-between text-[10.5px] text-[var(--on-surface-muted)] font-sans">
                                 <span className="truncate">{img.name}</span>
-                                <span className="font-mono text-slate-400">#{idx + 1}</span>
+                                <span className="font-mono text-[var(--on-surface-subtle)]">#{idx + 1}</span>
                               </div>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -541,22 +664,22 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
                     {/* ── In-Context SAMP Team Technical Verdict Spotlight (Immediately visible to Marketing) ── */}
                     {activeRequest.samplingFeasibilityResponse && (
-                      <div className="p-5 rounded-2xl border border-emerald-200/70 dark:border-emerald-900/60 bg-[#eff4ff]/60 dark:bg-[#006d32]/10 space-y-3 mt-3">
+                      <div className="p-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] space-y-3 mt-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-display font-bold text-slate-800 dark:text-zinc-200">
+                            <span className="text-xs font-mono font-bold text-[var(--on-surface)]">
                               SAMP Team Response:
                             </span>
                             <span
                               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-display font-bold border ${
                                 activeRequest.samplingFeasibilityResponse === "Yes"
-                                  ? "bg-emerald-50 text-[#006d32] border-emerald-200/70 dark:bg-emerald-950/50 dark:text-[#00d166]"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300"
                                   : activeRequest.samplingFeasibilityResponse === "No"
                                   ? "bg-rose-50 text-rose-700 border-rose-200/70 dark:bg-rose-950/50 dark:text-rose-300"
-                                  : "bg-amber-50 text-amber-700 border-amber-200/70 dark:bg-amber-950/50 dark:text-amber-300"
+                                  : "bg-amber-50 text-amber-800 border-amber-200/70 dark:bg-amber-950/50 dark:text-amber-300"
                               }`}
                             >
-                              {activeRequest.samplingFeasibilityResponse === "Yes" && <CheckCircle2 className="w-3.5 h-3.5 text-[#006d32] dark:text-[#00d166]" />}
+                              {activeRequest.samplingFeasibilityResponse === "Yes" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
                               {activeRequest.samplingFeasibilityResponse === "No" && <XCircle className="w-3.5 h-3.5 text-rose-600" />}
                               {activeRequest.samplingFeasibilityResponse === "Maybe" && <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
                               <span>
@@ -566,13 +689,13 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                               </span>
                             </span>
                           </div>
-                          <span className="text-[11px] font-display text-slate-500">
-                            Evaluated by: <span className="font-bold text-slate-800 dark:text-zinc-200">{activeRequest.samplingFeasibilityApprovedBy || "SAMP Team"}</span>
+                          <span className="text-[11px] font-mono text-[var(--on-surface-muted)]">
+                            Evaluated by: <span className="font-bold text-[var(--on-surface)]">{activeRequest.samplingFeasibilityApprovedBy || "SAMP Team"}</span>
                           </span>
                         </div>
 
                         {activeRequest.samplingFeasibilityRemark && (
-                          <p className="text-xs text-slate-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-slate-100 dark:border-zinc-800 leading-relaxed font-sans shadow-2xs">
+                          <p className="text-xs text-[var(--on-surface)] bg-[var(--surface-lowest)] p-3 rounded-xl border border-[var(--border-subtle)] leading-relaxed font-sans shadow-2xs">
                             {activeRequest.samplingFeasibilityRemark}
                           </p>
                         )}
@@ -581,7 +704,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                           <button
                             type="button"
                             onClick={() => setActiveTab("review")}
-                            className="text-[#006d32] dark:text-[#00d166] hover:underline font-display font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                            className="text-[var(--accent-primary)] hover:underline font-semibold text-xs flex items-center gap-1.5 cursor-pointer"
                           >
                             <span>View Full Technical Sign-Off</span>
                             <ArrowRight className="w-3 h-3" />
@@ -591,7 +714,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                             <button
                               type="button"
                               onClick={() => setActiveTab("decision")}
-                              className="px-4 py-2 rounded-xl bg-[#006d32] hover:bg-[#00883e] text-white text-xs font-display font-bold flex items-center gap-1.5 cursor-pointer transition shadow-[0_4px_14px_rgba(0,109,50,0.25)] active:scale-95"
+                              className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
                             >
                               <span>Take Commercial Decision</span>
                               <ArrowRight className="w-3 h-3" />
@@ -611,6 +734,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     isClaiming={isClaiming}
                     sampVerdictChoice={sampVerdictChoice}
                     sampVerdictRemark={sampVerdictRemark}
+                    sampConditions={sampConditions}
+                    sampLeadTimeNote={sampLeadTimeNote}
                     sampVerdictError={sampVerdictError}
                     isSubmittingSampVerdict={isSubmittingSampVerdict}
                     onClaimTask={handleClaimTask}
@@ -622,7 +747,19 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                       setSampVerdictRemark(remark);
                       if (sampVerdictError) setSampVerdictError(null);
                     }}
+                    onSampConditionsChange={setSampConditions}
+                    onSampLeadTimeNoteChange={setSampLeadTimeNote}
                     onSubmitSampVerdict={handleSubmitSampVerdict}
+                    counterDate={counterDate}
+                    counterDateReason={counterDateReason}
+                    counterDateError={counterDateError}
+                    isSubmittingCounterDate={isSubmittingCounterDate}
+                    onCounterDateChange={setCounterDate}
+                    onCounterDateReasonChange={setCounterDateReason}
+                    onProposeCounterDate={handleProposeCounterDate}
+                    currentUserId={user?.id}
+                    currentUserName={user?.name}
+                    isAdmin={isAdmin}
                   />
                 )}
 
@@ -632,10 +769,12 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     activeRequest={activeRequest}
                     canMakeCommercialDecision={canMakeCommercialDecision}
                     decisionRemark={decisionRemark}
+                    decisionError={decisionError}
                     isSubmittingDecision={isSubmittingDecision}
                     isConverting={isConverting}
                     onDecisionRemarkChange={setDecisionRemark}
                     onMarketingFinalApprove={handleMarketingFinalApprove}
+                    onCounterDateDecision={handleCounterDateDecision}
                     onConvertToSampling={handleConvertToSampling}
                   />
                 )}
@@ -659,6 +798,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
         images={previewableImages}
         onClose={() => setSelectedPreviewImage(null)}
         onNavigate={movePreview}
+        imageSourceFor={imageSourceFor}
+        imageStatusFor={imageStatusFor}
       />
     </div>,
     document.body

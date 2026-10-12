@@ -67,7 +67,7 @@ export const InspectorAttachmentsTab: React.FC<InspectorAttachmentsTabProps> = (
                   href={url.startsWith("http") ? url : `https://${url}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#006d32] dark:text-[#00d166] hover:underline truncate font-mono text-xs flex-1 font-semibold"
+                  className="text-[var(--accent-primary)] dark:text-[var(--accent-primary)] hover:underline truncate font-mono text-xs flex-1 font-semibold"
                 >
                   {url}
                 </a>

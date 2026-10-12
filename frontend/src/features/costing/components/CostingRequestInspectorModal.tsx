@@ -39,8 +39,8 @@ export const CostingRequestInspectorModal: React.FC<CostingRequestInspectorModal
   const pack = request.unitPcPack === "Pack" || request.unitPcPack === "PACK";
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-[2px] sm:p-6" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section role="dialog" aria-modal="true" aria-labelledby="costing-inspector-title" className="relative flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#12151c]">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-xs animate-smooth-backdrop sm:p-6" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section role="dialog" aria-modal="true" aria-labelledby="costing-inspector-title" className="relative flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 animate-smooth-modal">
         <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-100 px-6 py-4 dark:border-white/[0.07]">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-700/10 text-teal-800 dark:text-teal-300"><CalculatorIcon /></div>
@@ -98,11 +98,11 @@ export const CostingRequestInspectorModal: React.FC<CostingRequestInspectorModal
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                 <span>Counter date offered <span className="font-normal text-slate-500">(optional)</span></span>
-                <span className="relative block"><CalendarClock className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><input type="date" value={counterDate} onChange={(event) => setCounterDate(event.target.value)} className="h-10 w-full rounded-xl bg-white pl-9 pr-3 text-xs text-slate-900 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-teal-700 dark:bg-[#11151c] dark:text-white dark:ring-white/10" /></span>
+                <span className="relative block"><CalendarClock className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><input type="date" value={counterDate} onChange={(event) => setCounterDate(event.target.value)} className="h-10 w-full rounded-xl bg-white pl-9 pr-3 text-xs text-slate-900 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-teal-700 dark:bg-zinc-900 dark:text-white dark:ring-white/10" /></span>
               </label>
               <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                 <span>Completed costing output path <span className="text-rose-500">*</span></span>
-                <span className="relative block"><ExternalLink className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><input required value={outputPath} onChange={(event) => setOutputPath(event.target.value)} placeholder="Shared path or output URL" className="h-10 w-full rounded-xl bg-white pl-9 pr-3 text-xs text-slate-900 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-teal-700 dark:bg-[#11151c] dark:text-white dark:ring-white/10" /></span>
+                <span className="relative block"><ExternalLink className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><input required value={outputPath} onChange={(event) => setOutputPath(event.target.value)} placeholder="Shared path or output URL" className="h-10 w-full rounded-xl bg-white pl-9 pr-3 text-xs text-slate-900 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-teal-700 dark:bg-zinc-900 dark:text-white dark:ring-white/10" /></span>
               </label>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-teal-900/10 pt-3 dark:border-white/[0.08]">

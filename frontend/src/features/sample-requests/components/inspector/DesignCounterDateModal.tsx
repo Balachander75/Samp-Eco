@@ -42,6 +42,19 @@ export const DesignCounterDateModal: React.FC<DesignCounterDateModalProps> = ({
     setError(null);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || isSubmitting) return;
+      setProposedDate("");
+      setReason("");
+      setError(null);
+      onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isSubmitting, onClose]);
+
   if (!isOpen) return null;
 
   const resetAndClose = () => {
@@ -113,9 +126,9 @@ export const DesignCounterDateModal: React.FC<DesignCounterDateModalProps> = ({
         aria-hidden="true"
       />
 
-      <div className="relative z-10 w-full max-w-lg bg-white dark:bg-[#161822] border border-slate-200/90 dark:border-white/[0.08] rounded-2xl shadow-2xl animate-smooth-modal">
+      <div className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-white/[0.08] rounded-2xl shadow-2xl animate-smooth-modal">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-[#161822] border-b border-slate-100 dark:border-white/[0.06]">
+        <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-zinc-900 border-b border-slate-100 dark:border-white/[0.06]">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
               <Calendar className="w-4 h-4 stroke-[2.2]" />
@@ -154,7 +167,7 @@ export const DesignCounterDateModal: React.FC<DesignCounterDateModalProps> = ({
         >
           <div className="flex items-center gap-2">
             {isSlaEligible ? (
-              <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+              <Clock className="w-3.5 h-3.5 text-amber-600 " />
             ) : (
               <Lock className="w-3.5 h-3.5 text-rose-600" />
             )}
@@ -175,7 +188,7 @@ export const DesignCounterDateModal: React.FC<DesignCounterDateModalProps> = ({
           )}
 
           {/* Current vs Proposed Date Comparison */}
-          <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-[#12141d] border border-slate-200/80 dark:border-zinc-800">
+          <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800">
             <div>
               <span className="text-[10px] font-mono uppercase text-slate-500 dark:text-zinc-400 block font-bold">
                 Current committed deadline
@@ -185,7 +198,7 @@ export const DesignCounterDateModal: React.FC<DesignCounterDateModalProps> = ({
               </span>
             </div>
             <div>
-              <span className="text-[10px] font-mono uppercase text-[#006d32] dark:text-emerald-400 block font-bold">
+              <span className="text-[10px] font-mono uppercase text-[var(--accent-primary)] dark:text-emerald-400 block font-bold">
                 Counter Proposed Date <span className="text-rose-500">*</span>
               </span>
               <div className="mt-1">
@@ -213,7 +226,7 @@ export const DesignCounterDateModal: React.FC<DesignCounterDateModalProps> = ({
               onChange={(e) => setReason(e.target.value)}
               disabled={!isSlaEligible || isSubmitting}
               placeholder="Explain why the required date is not feasible (e.g. Studio queue at capacity; 10 artwork concepts require 12 business days for proofing)..."
-              className="w-full p-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-[#714B67] focus:ring-2 focus:ring-[#714B67]/15 transition resize-none"
+              className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 placeholder:text-slate-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             />
             <p className="text-[10.5px] text-slate-400 dark:text-zinc-500 mt-1">
               This message will be shown directly to Marketing for acceptance or rejection.
@@ -234,7 +247,7 @@ export const DesignCounterDateModal: React.FC<DesignCounterDateModalProps> = ({
             <button
               type="submit"
               disabled={!isSlaEligible || isSubmitting || !proposedDate || !reason.trim()}
-              className="h-9 px-4 rounded-xl bg-gradient-to-r from-[#714B67] to-[#5B3C53] hover:from-[#5B3C53] hover:to-[#482E42] text-white text-xs font-bold shadow-md transition active:scale-98 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-4 text-xs font-bold text-white transition hover:bg-[var(--accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/30 focus-visible:ring-offset-2 active:scale-98 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
               <span>{isSubmitting ? "Submitting..." : "Send Counter Date"}</span>

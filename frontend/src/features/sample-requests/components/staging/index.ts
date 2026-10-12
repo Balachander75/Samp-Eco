@@ -1,6 +1,7 @@
 export * from "./StagingWorkspaceHeader";
 export * from "./StagingProductList";
 export * from "./StagedProductDrawer";
+export * from "./StagedProductEditModal";
 export * from "./AddProductScopesStep";
 export * from "./AddProductDesignStep";
 export * from "./AddProductSamplingStep";

@@ -41,6 +41,8 @@ export interface StagedProductItem {
   qtyForSampling?: string;
   qtyDesignCosting?: string;
   qtyPerPack?: string;
+  qtyForMockup?: string;
+  mockupRequiredDate?: string;
   costingRequiredDate?: string;
   customerProductCode?: string;
   barcode?: string;
@@ -59,6 +61,13 @@ export interface StagedProductItem {
     images: Array<{ id: string; url: string; name: string; size?: string }>;
     webLinks: string[];
     referenceImage: string;
+  };
+  mockupMetadata?: {
+    designNeeded: boolean;
+    marketingShutterstockNo?: string;
+    marketingRemark?: string;
+    qtyForMockup?: string;
+    requiredDate?: string;
   };
   samplingMetadata?: {
     sampleType: "full" | "partial";

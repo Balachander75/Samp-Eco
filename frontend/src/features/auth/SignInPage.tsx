@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, Lock, Eye, EyeOff, ArrowRight, Loader2, X, ShieldCheck, AlertCircle } from "lucide-react";
+import { User, Lock, Eye, EyeOff, Loader2, X, AlertCircle, ArrowRight } from "lucide-react";
 import { AuthResponse } from "./types";
 import { API_BASE_URL } from "@/infrastructure/api/client";
 import { persistAuthSession } from "@/lib/session";
@@ -16,22 +16,70 @@ interface ParsedError {
   field?: "identifier" | "password" | "general";
 }
 
-/** Extract error message and code from backend response shape */
-function parseErrorMessage(data: Record<string, unknown>): ParsedError {
-  const detail = data?.detail as Record<string, unknown> | undefined;
-  if (detail?.error) {
-    const err = detail.error as Record<string, unknown>;
-    return {
-      message: (err.message as string) || "Authentication failed.",
-      code: (err.code as string) || undefined,
-      field: "general",
-    };
+function extractString(val: unknown): string | undefined {
+  if (typeof val === "string" && val.trim().length > 0) return val.trim();
+  return undefined;
+}
+
+/** Safely extract error message and code from backend response shape without ever returning an object */
+function parseErrorMessage(data: unknown, status?: number): ParsedError {
+  let message = "Invalid credentials. Please verify your username and password.";
+  let code: string | undefined = undefined;
+  let field: "identifier" | "password" | "general" = "general";
+
+  if (data && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+
+    // Case 1: FastAPI detail payload
+    if (obj.detail) {
+      if (typeof obj.detail === "string") {
+        message = obj.detail;
+      } else if (typeof obj.detail === "object" && obj.detail !== null) {
+        const detailObj = obj.detail as Record<string, unknown>;
+        if (detailObj.error && typeof detailObj.error === "object" && detailObj.error !== null) {
+          const err = detailObj.error as Record<string, unknown>;
+          if (extractString(err.message)) message = String(err.message);
+          if (extractString(err.code)) code = String(err.code);
+          if (err.field === "identifier" || err.field === "password") field = err.field;
+        } else if (extractString(detailObj.message)) {
+          message = String(detailObj.message);
+        }
+      }
+    }
+    // Case 2: standard { success: false, error: { code, message, field } }
+    else if (obj.error && typeof obj.error === "object" && obj.error !== null) {
+      const err = obj.error as Record<string, unknown>;
+      if (extractString(err.message)) message = String(err.message);
+      if (extractString(err.code)) code = String(err.code);
+      if (err.field === "identifier" || err.field === "password") field = err.field;
+    }
+    // Case 3: standard { message: "..." }
+    else if (extractString(obj.message)) {
+      message = String(obj.message);
+      if (extractString(obj.code)) code = String(obj.code);
+      if (obj.field === "identifier" || obj.field === "password") field = obj.field;
+    }
   }
-  if (typeof detail === "string") return { message: detail, field: "general" };
+
+  // Fallback defaults based on HTTP status
+  if (status === 401) {
+    if (!code) code = "INVALID_CREDENTIALS";
+  } else if (status === 403) {
+    message = "Access restricted. Your account may be inactive or lack permissions.";
+    if (!code) code = "ACCOUNT_RESTRICTED";
+  } else if (status === 429) {
+    message = "Too many sign-in attempts. Please wait a moment before trying again.";
+    if (!code) code = "RATE_LIMITED";
+  } else if (status && status >= 500) {
+    message = "The authentication server is temporarily unavailable. Please try again shortly.";
+    if (!code) code = `SERVER_ERROR_${status}`;
+  }
+
+  // Guarantees message is strictly a primitive string for React rendering
   return {
-    message: (data?.message as string) || "Invalid credentials. Please verify username and password.",
-    code: (data?.code as string) || undefined,
-    field: "general",
+    message: typeof message === "string" ? message : "Authentication failed.",
+    code: typeof code === "string" ? code : undefined,
+    field,
   };
 }
 
@@ -43,12 +91,12 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorInfo, setErrorInfo] = useState<ParsedError | null>(null);
 
-  // Auto-dismiss floating toast notification after 5 seconds
+  // Auto-dismiss floating toast notification after 6 seconds
   useEffect(() => {
     if (!errorInfo) return;
     const timer = setTimeout(() => {
       setErrorInfo(null);
-    }, 5000);
+    }, 6000);
     return () => clearTimeout(timer);
   }, [errorInfo]);
 
@@ -90,15 +138,21 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
         }),
       });
 
-      const data = await response.json();
+      let data: unknown = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
 
       if (!response.ok) {
-        setErrorInfo(parseErrorMessage(data));
+        setErrorInfo(parseErrorMessage(data, response.status));
         return;
       }
 
-      const token = data.access_token || data.token || "";
-      const user = data.user;
+      const resObj = data as Record<string, unknown> | null;
+      const token = (resObj?.access_token || resObj?.token || "") as string;
+      const user = resObj?.user;
 
       if (!token || !user) {
         setErrorInfo({
@@ -111,18 +165,21 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
 
       const authData: AuthResponse = {
         access_token: token,
-        refresh_token: data.refresh_token,
+        refresh_token: (resObj?.refresh_token as string) || undefined,
         token_type: "bearer",
-        expires_in: data.expires_in,
-        user,
+        expires_in: resObj?.expires_in as number | undefined,
+        user: user as AuthResponse["user"],
       };
 
-      persistAuthSession(token, user, rememberMe, data.refresh_token);
+      persistAuthSession(token, user as Parameters<typeof persistAuthSession>[1], rememberMe, (resObj?.refresh_token as string) || undefined);
       onSignInSuccess(authData);
     } catch {
+      const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
       setErrorInfo({
-        message: "Unable to reach authentication server. Please check your network connection.",
-        code: "NETWORK_ERROR",
+        message: isOffline
+          ? "You appear to be offline. Please verify your internet connection."
+          : "Unable to reach the authentication server. Please verify network connectivity.",
+        code: isOffline ? "NETWORK_OFFLINE" : "NETWORK_ERROR",
         field: "general",
       });
     } finally {
@@ -131,92 +188,59 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen w-full relative flex flex-col justify-center items-center p-4 sm:p-6 select-none overflow-hidden font-sans">
-      {/* Brand Hero Background - Crystal Clear in Both Light & Night/Dark Mode */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <img
-          src={brandHeroImg}
-          alt=""
-          className="h-full w-full object-cover object-center scale-105 transition-transform duration-1000 opacity-90 dark:opacity-75"
-        />
-        {/* Cinematic atmospheric overlay: keeps hero photo rich and visible in dark mode without blacking out */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/30 to-black/60 dark:from-black/70 dark:via-black/50 dark:to-black/80 backdrop-blur-[1px]" />
+    <div
+      className="relative isolate flex min-h-screen w-full items-center justify-center overflow-y-auto bg-cover bg-center px-4 py-8 font-sans text-onSurface select-none"
+      style={{ backgroundImage: `url(${brandHeroImg})` }}
+    >
+      {/* Background with subtle blur effect and dark depth overlay */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 bg-slate-950/65 backdrop-blur-[3px] transition-all"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/50"
+      />
 
-        {/* Luminous subtle energy ambient glow in corners */}
-        <div className="absolute -top-[10%] left-[15%] w-[500px] h-[500px] rounded-full bg-[#00d166]/15 dark:bg-[#00d166]/10 blur-[130px]" />
-        <div className="absolute -bottom-[15%] right-[15%] w-[550px] h-[550px] rounded-full bg-[#0070ff]/15 dark:bg-[#0070ff]/10 blur-[140px]" />
-      </div>
-
-      {/* Luminous Floating Notification Toast for Exceptions */}
-      {errorInfo && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="fixed bottom-6 right-6 z-50 max-w-[400px] w-[calc(100vw-3rem)] animate-in fade-in slide-in-from-bottom-4 duration-200"
-        >
-          <div className="bg-white/95 dark:bg-[#0e121a]/95 backdrop-blur-2xl text-slate-900 dark:text-white p-4 rounded-2xl shadow-[0_20px_50px_-10px_rgba(225,29,72,0.25)] dark:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.8)] border border-rose-200/80 dark:border-rose-900/40 flex items-start gap-3.5 text-xs">
-            {/* Luminous alert badge icon */}
-            <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-500 flex items-center justify-center shrink-0 border border-rose-200/60 dark:border-rose-800/40 shadow-xs">
-              <AlertCircle className="w-4.5 h-4.5" />
+      {/* Main Solid Form Container (solid panel conforming to theme tokens) */}
+      <main className="relative z-10 w-full max-w-md py-4 select-text">
+        <section className="rounded-2xl bg-surface-lowest p-7 sm:p-9 shadow-xl border border-[var(--border-subtle)] transition-all">
+          {/* Header Branding */}
+          <header className="mb-7 flex flex-col items-center text-center select-none">
+            <div className="mb-4 flex items-center justify-center">
+              <img
+                src={logoImg}
+                alt="Navneet"
+                className="h-10 sm:h-11 w-auto object-contain"
+              />
             </div>
-
-            <div className="flex-1 min-w-0 pt-0.5">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-bold text-rose-500 tracking-wider uppercase text-[10px] font-display">
-                  {errorInfo.code ? errorInfo.code.replace(/_/g, " ") : "Authentication Notice"}
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-              </div>
-              <p className="text-slate-700 dark:text-slate-200 text-xs font-medium leading-relaxed">
-                {errorInfo.message}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setErrorInfo(null)}
-              className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
-              aria-label="Close notification"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Main Sign-In Floating Card */}
-      <main className="relative z-10 w-full max-w-[420px]">
-        {/* High-Contrast Frosted Glass Card */}
-        <div className="bg-white/95 dark:bg-[#0e121a]/95 backdrop-blur-2xl rounded-3xl border border-white/60 dark:border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.4)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] p-7 sm:p-9 transition-colors duration-150">
-          
-          {/* Brand Header: Compact & Tight with Title */}
-          <div className="flex flex-col items-center mb-6 text-center">
-            <img
-              src={logoImg}
-              alt="Navneet"
-              className="h-11 sm:h-12 w-auto object-contain mb-2.5 drop-shadow-xs"
-            />
-            <h1 className="text-2xl font-bold font-display tracking-tight text-slate-900 dark:text-white">
+            <h1 className="font-display text-2xl sm:text-[26px] font-bold tracking-tight text-onSurface">
               Sign In
             </h1>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Enter your corporate credentials to continue
+            <p className="mt-1.5 text-xs text-onSurface-muted leading-relaxed max-w-xs">
+              Enter your corporate credentials to access the enterprise operations workspace
             </p>
-          </div>
+          </header>
 
-          <form onSubmit={handleFormSubmit} className="space-y-5" noValidate>
-            {/* Username / Email Field */}
+          {/* Form */}
+          <form onSubmit={handleFormSubmit} className="space-y-4" noValidate>
+            {/* Username/Email Input */}
             <div>
               <label
                 htmlFor="identifier"
-                className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 font-display"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-onSurface select-none"
               >
                 Username or Email
               </label>
-              <div className="relative flex items-center">
-                <div className="absolute left-3.5 text-slate-400 dark:text-slate-400 pointer-events-none">
-                  <User className="w-4 h-4" />
-                </div>
+              <div className="group relative">
+                <User
+                  className={`pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors ${
+                    errorInfo?.field === "identifier"
+                      ? "text-rose-500"
+                      : "text-onSurface-subtle group-focus-within:text-[var(--accent-primary)]"
+                  }`}
+                  aria-hidden="true"
+                />
                 <input
                   id="identifier"
                   type="text"
@@ -229,32 +253,41 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
                   placeholder="Enter your corporate ID"
                   autoFocus
                   required
-                  className={`w-full h-11 pl-10 pr-3.5 text-sm rounded-xl bg-slate-50 dark:bg-[#161c26] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 border border-slate-200/90 dark:border-white/10 transition-all duration-150 outline-none ${
+                  aria-invalid={errorInfo?.field === "identifier"}
+                  aria-describedby={errorInfo?.field === "identifier" ? "identifier-error" : undefined}
+                  className={[
+                    "h-11 w-full rounded-lg border bg-surface-low pl-10 pr-3.5 text-sm text-onSurface placeholder:text-onSurface-subtle/70 outline-none transition-all focus:bg-surface-lowest focus:ring-2",
                     errorInfo?.field === "identifier"
-                      ? "border-rose-500 focus:border-rose-500 ring-2 ring-rose-500/15"
-                      : "focus:border-[#00d166] dark:focus:border-[#00d166] focus:ring-2 focus:ring-[#00d166]/20 focus:bg-white dark:focus:bg-[#1a2230]"
-                  }`}
+                      ? "border-rose-400 ring-2 ring-rose-500/20 focus:border-rose-500"
+                      : "border-[var(--border-subtle)] focus:border-[var(--accent-primary)] focus:ring-[var(--accent-primary)]/20",
+                  ].join(" ")}
                 />
               </div>
               {errorInfo?.field === "identifier" && (
-                <p className="mt-1.5 text-[11px] text-rose-500 font-medium">
-                  {errorInfo.message}
-                </p>
+                <div id="identifier-error" className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{errorInfo.message}</span>
+                </div>
               )}
             </div>
 
-            {/* Password Field */}
+            {/* Password Input */}
             <div>
               <label
                 htmlFor="password"
-                className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 font-display"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-onSurface select-none"
               >
                 Password
               </label>
-              <div className="relative flex items-center">
-                <div className="absolute left-3.5 text-slate-400 dark:text-slate-400 pointer-events-none">
-                  <Lock className="w-4 h-4" />
-                </div>
+              <div className="group relative">
+                <Lock
+                  className={`pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors ${
+                    errorInfo?.field === "password"
+                      ? "text-rose-500"
+                      : "text-onSurface-subtle group-focus-within:text-[var(--accent-primary)]"
+                  }`}
+                  aria-hidden="true"
+                />
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -264,80 +297,119 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
                     setPassword(e.target.value);
                     if (errorInfo) setErrorInfo(null);
                   }}
-                  placeholder="••••••••••••"
+                  placeholder="Enter your password"
                   required
-                  className={`w-full h-11 pl-10 pr-10 text-sm rounded-xl bg-slate-50 dark:bg-[#161c26] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 border border-slate-200/90 dark:border-white/10 transition-all duration-150 outline-none font-mono ${
+                  aria-invalid={errorInfo?.field === "password"}
+                  aria-describedby={errorInfo?.field === "password" ? "password-error" : undefined}
+                  className={[
+                    "h-11 w-full rounded-lg border bg-surface-low pl-10 pr-11 text-sm text-onSurface placeholder:text-onSurface-subtle/70 outline-none transition-all focus:bg-surface-lowest focus:ring-2",
                     errorInfo?.field === "password"
-                      ? "border-rose-500 focus:border-rose-500 ring-2 ring-rose-500/15"
-                      : "focus:border-[#00d166] dark:focus:border-[#00d166] focus:ring-2 focus:ring-[#00d166]/20 focus:bg-white dark:focus:bg-[#1a2230]"
-                  }`}
+                      ? "border-rose-400 ring-2 ring-rose-500/20 focus:border-rose-500"
+                      : "border-[var(--border-subtle)] focus:border-[var(--accent-primary)] focus:ring-[var(--accent-primary)]/20",
+                  ].join(" ")}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-0.5 cursor-pointer"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-onSurface-subtle transition-colors hover:bg-surface-container hover:text-onSurface focus-visible:outline-none cursor-pointer"
                   aria-label={showPassword ? "Hide password" : "Show password"}
-                  tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {errorInfo?.field === "password" && (
-                <p className="mt-1.5 text-[11px] text-rose-500 font-medium">
-                  {errorInfo.message}
-                </p>
+                <div id="password-error" className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{errorInfo.message}</span>
+                </div>
               )}
             </div>
 
-            {/* Remember Me Option */}
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            {/* Remember Me */}
+            <div className="flex items-center pt-1 select-none">
+              <label htmlFor="rememberMe" className="flex cursor-pointer items-center gap-2 text-xs font-medium text-onSurface-muted hover:text-onSurface transition-colors">
                 <input
                   type="checkbox"
                   id="rememberMe"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded-md border-slate-300 dark:border-zinc-700 text-[#00d166] focus:ring-[#00d166]/20 accent-[#00a854] cursor-pointer"
+                  className="h-4 w-4 cursor-pointer rounded border-[var(--border-subtle)] accent-[var(--accent-primary)] focus-visible:outline-none"
                 />
-                <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
-                  Keep me signed in
-                </span>
+                <span>Keep me signed in</span>
               </label>
-
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-mono">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#00d166]" />
-                256-bit Secure
-              </span>
             </div>
 
-            {/* High-Contrast Luminous Emerald Action Button */}
+            {/* Submit Button */}
             <div className="pt-2">
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-12 py-3 px-4 rounded-xl bg-[#00d166] hover:bg-[#00ba5a] active:bg-[#009e4d] text-slate-950 font-bold font-display text-sm sm:text-[15px] flex items-center justify-center gap-2.5 shadow-lg shadow-[#00d166]/30 hover:shadow-[#00d166]/45 active:scale-[0.99] transition-all duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="group relative flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[var(--accent-primary)] px-4 text-sm font-bold text-[var(--on-accent-primary,white)] shadow-sm transition-all hover:brightness-105 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden="true" />
                     <span>Authenticating…</span>
                   </>
                 ) : (
                   <>
                     <span>Sign In to System</span>
-                    <ArrowRight className="w-4.5 h-4.5 text-slate-950" />
+                    <ArrowRight className="h-4 w-4 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden="true" />
                   </>
                 )}
               </button>
             </div>
           </form>
-        </div>
+        </section>
 
-        {/* High-Legibility Footer */}
-        <p className="mt-6 text-center text-xs text-white/85 dark:text-white/65 font-medium font-display drop-shadow-sm">
-          Navneet Education Limited • Enterprise Operations
-        </p>
+        {/* Corporate Footer */}
+        <footer className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-white/80 drop-shadow select-none font-sans">
+          <span>Navneet Education Limited</span>
+          <span className="text-white/40">·</span>
+          <span>Enterprise Operations</span>
+        </footer>
       </main>
+
+      {/* Bottom-Right Floating Toast / Popup Notification (Integrated with Theme Tokens & Animate-Smooth-Toast) */}
+      {errorInfo && (
+        <aside
+          role="alert"
+          aria-live="assertive"
+          className="fixed bottom-6 right-6 z-50 flex max-w-sm sm:max-w-md items-start gap-3.5 rounded-xl border border-rose-300/80 dark:border-rose-900/70 bg-surface-lowest text-onSurface p-4 shadow-2xl ring-1 ring-black/5 animate-smooth-toast select-text"
+        >
+          {/* Status Indicator Icon */}
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/60">
+            <AlertCircle className="h-4 w-4" aria-hidden="true" />
+          </div>
+
+          {/* Toast Message Body */}
+          <div className="min-w-0 flex-1 pt-0.5">
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-semibold text-onSurface tracking-tight">
+                Authentication Error
+              </h4>
+              {errorInfo.code && (
+                <span className="rounded bg-rose-50 dark:bg-rose-950/60 border border-rose-200/80 dark:border-rose-800/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                  {errorInfo.code}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-onSurface-muted leading-relaxed">
+              {errorInfo.message}
+            </p>
+          </div>
+
+          {/* Dismiss Action */}
+          <button
+            type="button"
+            onClick={() => setErrorInfo(null)}
+            className="shrink-0 rounded-md p-1 text-onSurface-subtle transition-colors hover:text-onSurface hover:bg-surface-low focus-visible:outline-none cursor-pointer"
+            aria-label="Dismiss notification"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </aside>
+      )}
     </div>
   );
 };

@@ -16,6 +16,7 @@ import {
   Sparkles,
   Sliders,
 } from "lucide-react";
+import { Select } from "@/components/ui/Select";
 
 interface MembersGovernancePageProps {
   currentUser: UserProfile;
@@ -103,9 +104,9 @@ export const MembersGovernancePage: React.FC<MembersGovernancePageProps> = ({
   ];
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#fafafa] dark:bg-[#08090d] overflow-y-auto p-6 space-y-6">
+    <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-zinc-950 overflow-y-auto p-6 space-y-6">
       {/* Overview Card */}
-      <div className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] p-6 shadow-2xs">
+      <div className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-zinc-900 p-6 shadow-2xs">
         <div className="max-w-3xl">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold uppercase tracking-wider mb-2">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -160,7 +161,7 @@ export const MembersGovernancePage: React.FC<MembersGovernancePageProps> = ({
           </div>
 
           {/* Tier 3: Global Admin */}
-          <div className="rounded-xl border border-zinc-900 dark:border-zinc-700 p-5 bg-zinc-950 text-white dark:bg-[#141724] flex flex-col justify-between shadow-xs">
+          <div className="rounded-xl border border-zinc-900 dark:border-zinc-700 p-5 bg-zinc-950 text-white dark:bg-zinc-900 flex flex-col justify-between shadow-xs">
             <div>
               <div className="w-9 h-9 rounded-xl bg-white text-zinc-900 flex items-center justify-center font-bold text-xs mb-3">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
@@ -181,7 +182,7 @@ export const MembersGovernancePage: React.FC<MembersGovernancePageProps> = ({
       </div>
 
       {/* Interactive Live User Access Simulator */}
-      <div className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] p-6 shadow-2xs">
+      <div className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-zinc-900 p-6 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-zinc-100 dark:border-white/[0.06]">
           <div>
             <h3 className="text-sm font-bold text-zinc-950 dark:text-zinc-50 flex items-center gap-2">
@@ -196,17 +197,17 @@ export const MembersGovernancePage: React.FC<MembersGovernancePageProps> = ({
           {/* User Selector Dropdown */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-zinc-500 font-medium">Simulate User:</span>
-            <select
+            <Select
               value={simulatedUserId}
               onChange={(e) => setSimulatedUserId(Number(e.target.value))}
-              className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              selectClassName="px-3 py-1.5 text-xs font-semibold"
             >
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name} ({u.isTeamHead ? "Head" : u.role === "admin" ? "Admin" : "Member"} - {u.team})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -239,17 +240,17 @@ export const MembersGovernancePage: React.FC<MembersGovernancePageProps> = ({
                   <span>Department: <strong className="text-zinc-800 dark:text-zinc-200 uppercase">{selectedSimUser.team || "None"}</strong></span>
                   <span className="mx-2">•</span>
                   <span>Role: {selectedSimUser.subRole || "Specialist"}</span>
-                  {selectedSimUser.plantCode && (
+                  {(selectedSimUser.plantCodes?.length ? selectedSimUser.plantCodes : selectedSimUser.plantCode ? [selectedSimUser.plantCode] : []).length > 0 && (
                     <>
                       <span className="mx-2">•</span>
-                      <span>Assigned Plant: {selectedSimUser.plantCode}</span>
+                      <span>Assigned Plants: {(selectedSimUser.plantCodes?.length ? selectedSimUser.plantCodes : [selectedSimUser.plantCode]).filter(Boolean).join(", ")}</span>
                     </>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="text-xs p-2.5 rounded-lg bg-white dark:bg-[#0f1118] border border-zinc-200/80 dark:border-white/[0.08] max-w-sm">
+            <div className="text-xs p-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] max-w-sm">
               <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-0.5">
                 Dashboard & Queue Behavior
               </span>
@@ -266,7 +267,7 @@ export const MembersGovernancePage: React.FC<MembersGovernancePageProps> = ({
       </div>
 
       {/* Comprehensive Permissions Matrix Table */}
-      <div className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] overflow-hidden shadow-2xs">
+      <div className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-zinc-900 overflow-hidden shadow-2xs">
         <div className="px-6 py-4 border-b border-zinc-100 dark:border-white/[0.06] bg-zinc-50/60 dark:bg-zinc-900/40">
           <h3 className="text-sm font-bold text-zinc-950 dark:text-zinc-50">
             Feature & Operational Permissions Matrix

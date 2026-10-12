@@ -14,6 +14,7 @@ import {
   recordFeasibilityViewedApi,
   convertFeasibilityToSamplingApi,
   cleanFeasibilityDescription,
+  fetchProductDetailsApi,
 } from "@/infrastructure/api";
 import { FeasibilityActivityTimeline } from "./FeasibilityActivityTimeline";
 import { useFeasibilityImageSources } from "../hooks/useFeasibilityImageSources";
@@ -79,6 +80,7 @@ export interface SampleRequestInspectorProps {
   onDeleteRequest?: (request: SampleRequestItem) => void;
   onReleaseDraft?: (request: SampleRequestItem) => Promise<void> | void;
   isAdmin?: boolean;
+  readOnly?: boolean;
 }
 
 export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
@@ -89,6 +91,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   onMaterialsUpdated,
   onDeleteRequest,
   onReleaseDraft,
+  readOnly = false,
 }) => {
   const [localOverride, setLocalOverride] = useState<SampleRequestItem | null>(null);
   useEffect(() => {
@@ -98,9 +101,48 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   const activeRequest = localOverride || request;
   const trackType = activeRequest ? getRequestTrackType(activeRequest) : null;
 
+  // Request lists carry a compact detail summary; load the full specification
+  // only for the single record the user opens in Inspect.
+  useEffect(() => {
+    if (!isOpen || !request || request.customDetails?.length) return;
+    const numericId = Number(String(request.id).replace(/^sample-/, ""));
+    if (!Number.isInteger(numericId) || numericId <= 0) return;
+    let cancelled = false;
+    fetchProductDetailsApi(numericId, false)
+      .then((details) => {
+        if (cancelled) return;
+        setLocalOverride((current) => ({
+          ...(current || request),
+          customDetails: details.map((detail) => ({
+            id: detail.id,
+            className: detail.className,
+            characteristicName: detail.characteristicName,
+            value: detail.value,
+            uom: detail.uom,
+          })),
+        }));
+      })
+      .catch((error) => console.error("Failed to load request specifications:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, request?.id]);
+
   // Feasibility flow states
   const [isConverting, setIsConverting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // Keyboard navigation: Escape to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<string | null>(null);
@@ -358,7 +400,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
         request.referenceImageNames
       )
     : null;
-  const imageSourceFor = useFeasibilityImageSources(
+  const { sourceFor: imageSourceFor, statusFor: imageStatusFor } = useFeasibilityImageSources(
     isOpen ? imageDetails?.referenceImages.map((image) => image.url) || [] : []
   );
 
@@ -448,13 +490,13 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-950/70"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-smooth-backdrop"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[#f8f9ff] dark:bg-[#0f121d] border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
+        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs animate-smooth-modal"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 1. TOP CONTROL PANEL */}
@@ -466,6 +508,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
           isConverting={isConverting}
           isReleasing={isReleasing}
           isSubmitting={isSubmitting}
+          readOnly={readOnly}
           onClose={onClose}
           onCopyCode={handleCopyCode}
           onDeleteRequest={onDeleteRequest}
@@ -478,7 +521,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + CHATTER) */}
         <div className="flex-1 flex overflow-hidden">
           {/* LEFT: DOCUMENT FORM SHEET */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[#f8f9ff] dark:bg-[#0f121d]">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
             {submitFeedback && (
               <div
                 className={`max-w-4xl mx-auto p-3 rounded-xl text-xs font-medium border ${
@@ -491,7 +534,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
               </div>
             )}
 
-            <div className="max-w-4xl mx-auto rounded-2xl bg-white dark:bg-[#161928] border border-slate-100 dark:border-white/5 shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
+            <div className="max-w-4xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
               <InspectorSheetHeader
                 request={request}
                 activeRequest={activeRequest}
@@ -518,13 +561,13 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         onClick={() => setActiveTab("specs")}
                         className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                           activeTab === "specs"
-                            ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
+                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                             : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                         }`}
                       >
                         <span>1. Specifications &amp; Scope</span>
                         {(previewableImages.length > 0 || feasibilityDetails.referenceLinks.length > 0) && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#eff4ff] dark:bg-[#006d32]/25 text-[#006d32] dark:text-[#00d166] font-bold border border-[#006d32]/20">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold border border-[var(--accent-primary)]/25">
                             {previewableImages.length + feasibilityDetails.referenceLinks.length}
                           </span>
                         )}
@@ -535,7 +578,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         onClick={() => setActiveTab("review")}
                         className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                           activeTab === "review"
-                            ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
+                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                             : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                         }`}
                       >
@@ -544,7 +587,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                           <span
                             className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
                               activeRequest.samplingFeasibilityResponse === "Yes"
-                                ? "bg-emerald-50 text-[#006d32] dark:bg-emerald-950/60 dark:text-[#00d166]"
+                                ? "bg-emerald-50 text-[var(--accent-primary)] dark:bg-emerald-950/60 text-[var(--accent-primary)]"
                                 : activeRequest.samplingFeasibilityResponse === "No"
                                 ? "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
                                 : "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
@@ -564,27 +607,27 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         onClick={() => setActiveTab("decision")}
                         className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                           activeTab === "decision"
-                            ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
+                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                             : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                         }`}
                       >
                         <span>3. Commercial Sign-Off &amp; Sampling</span>
                         {activeRequest.convertedSrNumber ? (
-                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[#eff4ff] dark:bg-[#006d32]/25 text-[#006d32] dark:text-[#00d166] border border-[#006d32]/20">
+                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/30">
                             ✓ {activeRequest.convertedSrNumber}
                           </span>
                         ) : activeRequest.marketingDecision ? (
                           <span
                             className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
                               activeRequest.marketingDecision === "Accepted"
-                                ? "bg-emerald-50 text-[#006d32]"
+                                ? "bg-emerald-50 text-[var(--accent-primary)]"
                                 : "bg-rose-50 text-rose-700"
                             }`}
                           >
                             {activeRequest.marketingDecision}
                           </span>
                         ) : activeRequest.samplingFeasibilityResponse ? (
-                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-50 text-teal-800 border border-teal-200 animate-pulse">
+                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-50 text-teal-800 border border-teal-200 ">
                             Ready
                           </span>
                         ) : null}
@@ -595,7 +638,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         onClick={() => setActiveTab("attachments")}
                         className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                           activeTab === "attachments"
-                            ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
+                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                             : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                         }`}
                       >
@@ -607,7 +650,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         onClick={() => setActiveTab("timeline")}
                         className={`pb-3 border-b-2 font-display transition cursor-pointer select-none whitespace-nowrap ${
                           activeTab === "timeline"
-                            ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
+                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                             : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                         }`}
                       >
@@ -621,7 +664,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         onClick={() => setActiveTab("specs")}
                         className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                           activeTab === "specs"
-                            ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
+                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                             : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                         }`}
                       >
@@ -642,7 +685,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         onClick={() => setActiveTab("review")}
                         className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                           activeTab === "review"
-                            ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
+                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                             : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                         }`}
                       >
@@ -658,13 +701,13 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         onClick={() => setActiveTab("attachments")}
                         className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                           activeTab === "attachments"
-                            ? "border-[#006d32] text-[#006d32] dark:text-[#00d166] font-bold"
+                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                             : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                         }`}
                       >
                         <span>3. Attachments &amp; Benchmark Links</span>
                         {(previewableImages.length > 0 || feasibilityDetails.referenceLinks.length > 0) && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#eff4ff] dark:bg-[#006d32]/25 text-[#006d32] dark:text-[#00d166] font-bold border border-[#006d32]/20">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold border border-[var(--accent-primary)]/25">
                             {previewableImages.length + feasibilityDetails.referenceLinks.length}
                           </span>
                         )}
@@ -691,6 +734,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                     savingRemarkId={savingRemarkId}
                     savedRemarkId={savedRemarkId}
                     isAddingRow={isAddingRow}
+                    readOnly={readOnly}
                     isSavingNewRow={isSavingNewRow}
                     newRowData={newRowData}
                     addRowFeedback={addRowFeedback}
@@ -739,6 +783,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                     decisionRemark={decisionRemark}
                     isSubmitting={isSubmitting}
                     isConverting={isConverting}
+                    readOnly={readOnly}
                     onDecisionRemarkChange={setDecisionRemark}
                     onMarketingFinalApprove={handleMarketingFinalApprove}
                     onConvertToSampling={handleConvertToSampling}
@@ -779,6 +824,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
         images={previewableImages}
         onClose={() => setSelectedPreviewImage(null)}
         onNavigate={movePreview}
+        imageSourceFor={imageSourceFor}
+        imageStatusFor={imageStatusFor}
       />
     </div>,
     document.body

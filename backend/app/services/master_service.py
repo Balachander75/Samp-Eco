@@ -96,20 +96,26 @@ class MasterService:
             )
         password_hash = hash_password(payload.password)
         is_active = payload.is_active if payload.is_active is not None else True
-        is_head = payload.is_team_head if payload.is_team_head is not None else False
+        role = self._canonical_account_role(payload.role)
+        is_head = bool(payload.is_team_head) and role != "admin"
+        if is_head and not (payload.team or "").strip():
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="A team head must be assigned to a team.")
+        requested_plants = payload.plant_codes or ([payload.plant_code] if payload.plant_code else [])
+        plant_codes = self.repo.validate_plant_codes(requested_plants)
 
-        return self.repo.create_user(
+        user = self.repo.create_user(
             name=payload.name,
             userid=payload.userid,
             email=payload.email,
             password_hash=password_hash,
-            role=payload.role,
+            role=role,
             sub_role=payload.sub_role,
             team=payload.team,
             is_team_head=is_head,
-            plant_code=payload.plant_code,
+            plant_code=plant_codes[0] if plant_codes else None,
             is_active=is_active,
         )
+        return self.repo.replace_user_plant_assignments(user, plant_codes)
 
     def update_user(self, user_id: int, payload: UserUpdate) -> User:
         """Update existing user record."""
@@ -118,6 +124,14 @@ class MasterService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
         updates: Dict[str, Any] = {}
+        next_role = self._canonical_account_role(payload.role if payload.role is not None else user.role)
+        next_is_head = (
+            bool(payload.is_team_head) if payload.is_team_head is not None else bool(user.is_team_head)
+        ) and next_role != "admin"
+        if next_is_head:
+            next_team = payload.team if payload.team is not None else user.team
+            if not (next_team or "").strip():
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="A team head must be assigned to a team.")
         if payload.name is not None:
             updates["name"] = payload.name.strip()
         if payload.userid is not None:
@@ -135,19 +149,39 @@ class MasterService:
         if payload.password is not None and payload.password.strip():
             updates["password_hash"] = hash_password(payload.password.strip())
         if payload.role is not None:
-            updates["role"] = payload.role
+            updates["role"] = next_role
+        elif user.role.strip().lower() in {"head", "team head", "department lead"}:
+            updates["role"] = "user"
         if payload.sub_role is not None:
             updates["sub_role"] = payload.sub_role
         if payload.team is not None:
             updates["team"] = payload.team
         if payload.is_team_head is not None:
-            updates["is_team_head"] = payload.is_team_head
-        if payload.plant_code is not None:
-            updates["plant_code"] = payload.plant_code
+            updates["is_team_head"] = next_is_head
+        elif next_role == "admin" and user.is_team_head:
+            updates["is_team_head"] = False
+        plant_codes_to_set = None
+        if payload.plant_codes is not None:
+            plant_codes_to_set = self.repo.validate_plant_codes(payload.plant_codes)
+        elif payload.plant_code is not None:
+            plant_codes_to_set = self.repo.validate_plant_codes([payload.plant_code] if payload.plant_code else [])
         if payload.is_active is not None:
             updates["is_active"] = payload.is_active
 
-        return self.repo.update_user(user, updates)
+        updated_user = self.repo.update_user(user, updates)
+        if plant_codes_to_set is not None:
+            return self.repo.replace_user_plant_assignments(updated_user, plant_codes_to_set)
+        return updated_user
+
+    @staticmethod
+    def _canonical_account_role(role: str) -> str:
+        """Keep global account privilege separate from team-head designation."""
+        normalized = (role or "user").strip().lower()
+        if normalized in {"head", "team head", "department lead"}:
+            return "user"
+        if normalized in {"administrator", "admin"}:
+            return "admin"
+        return "user"
 
     def delete_user(self, user_id: int) -> bool:
         """Delete user account."""

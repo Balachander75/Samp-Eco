@@ -8,7 +8,15 @@ import {
   X,
   Send,
 } from "lucide-react";
-import { CreativeDesignOutputRow } from "@/features/creative/types";
+import { Select } from "@/components/ui/Select";
+
+interface CreativeOutputInputRow {
+  designNumber: string;
+  shutterstockNo: string;
+  remarks: string;
+}
+
+const isHttpLink = (value: string) => /^https?:\/\//i.test(value);
 
 export interface CreativeOutputSubmissionModalProps {
   isOpen: boolean;
@@ -19,7 +27,7 @@ export interface CreativeOutputSubmissionModalProps {
   batchNumber: number;
   onSubmitBatch: (payload: {
     designFileUrl: string;
-    rows: CreativeDesignOutputRow[];
+    rows: CreativeOutputInputRow[];
   }) => Promise<void> | void;
 }
 
@@ -34,7 +42,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
 }) => {
   const [designFileUrl, setDesignFileUrl] = useState("");
   const [outputCount, setOutputCount] = useState<number>(Math.max(1, remainingCount));
-  const [outputRows, setOutputRows] = useState<CreativeDesignOutputRow[]>([]);
+  const [outputRows, setOutputRows] = useState<CreativeOutputInputRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -51,7 +59,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
         }
         return {
           designNumber: `D${deliveredCount + index + 1}`,
-          description: "",
+          shutterstockNo: "",
           remarks: "",
         };
       })
@@ -62,7 +70,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
 
   const handleUpdateRow = (
     index: number,
-    field: "description" | "remarks",
+    field: "shutterstockNo" | "remarks",
     value: string
   ) => {
     setOutputRows((curr) =>
@@ -76,9 +84,9 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
       setError("Please provide a valid link where design files are available (Drive, Figma, etc.).");
       return;
     }
-    const emptyDescIndex = outputRows.findIndex((r) => !r.description.trim());
-    if (emptyDescIndex >= 0) {
-      setError(`Artwork row D${deliveredCount + emptyDescIndex + 1} requires a description.`);
+    const emptyInfoIndex = outputRows.findIndex((r) => !r.shutterstockNo.trim() && !r.remarks.trim());
+    if (emptyInfoIndex >= 0) {
+      setError(`Artwork row D${deliveredCount + emptyInfoIndex + 1} needs a Shutterstock No. or remark.`);
       return;
     }
 
@@ -98,11 +106,11 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
   };
 
   return (
-    <div className="rounded-2xl border-2 border-[#714B67]/30 dark:border-purple-800/40 bg-white dark:bg-[#161822] shadow-xl overflow-hidden animate-smooth-modal">
+    <div className="rounded-2xl border-2 border-purple-300 dark:border-purple-800/40 bg-white dark:bg-zinc-900 shadow-xl overflow-hidden animate-smooth-modal">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-50/80 to-white dark:from-purple-950/30 dark:to-[#161822] border-b border-purple-100 dark:border-white/[0.06]">
+      <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-50/80 to-white dark:from-purple-950/30 dark:to-zinc-900 border-b border-purple-100 dark:border-white/[0.06]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-[#714B67] text-white flex items-center justify-center shrink-0 shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
             <FolderOpen className="w-4 h-4 stroke-[2.2]" />
           </div>
           <div>
@@ -110,7 +118,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
               <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight font-display">
                 Submit Creative Artwork Output (Batch #{batchNumber})
               </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-100 text-[#714B67] dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                 OUTPUT MATRIX
               </span>
             </div>
@@ -140,26 +148,27 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
         {/* Section 1: Design File Repository Link */}
         <div className="space-y-1.5">
           <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 font-sans">
-            1. Design Artwork Shareable URL <span className="text-rose-500">*</span>
+            1. Artwork folder or design file link/path <span className="text-rose-500">*</span>
           </label>
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
-                type="url"
+                type="text"
                 required
+                maxLength={2048}
                 value={designFileUrl}
                 onChange={(e) => setDesignFileUrl(e.target.value)}
-                placeholder="https://drive.google.com/drive/folders/... or Figma / SharePoint share link"
-                className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-[#714B67] focus:ring-2 focus:ring-[#714B67]/15 transition font-mono"
+                placeholder="Paste a share link or file/folder path"
+                className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/15 transition font-mono"
               />
             </div>
-            {designFileUrl.trim() && (
+            {isHttpLink(designFileUrl.trim()) && (
               <a
                 href={designFileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="h-10 px-3.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#714B67] dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-semibold flex items-center gap-1.5 shrink-0 transition"
+                className="h-10 px-3.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-semibold flex items-center gap-1.5 shrink-0 transition"
                 title="Verify link"
               >
                 <span>Open</span>
@@ -168,7 +177,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
             )}
           </div>
           <p className="text-[10.5px] text-slate-400 dark:text-zinc-500">
-            Ensure public or organization view access is enabled so Marketing can inspect design files.
+            Paste any reference text that helps the team locate the artwork files. URLs and paths also work.
           </p>
         </div>
 
@@ -181,7 +190,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
               </span>
               <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
                 Marketing requested <strong className="text-slate-800 dark:text-zinc-200">{totalRequested} designs</strong> total.{" "}
-                <span className="font-mono text-[#006d32] dark:text-emerald-400 font-bold">
+                <span className="font-mono text-[var(--accent-primary)] dark:text-emerald-400 font-bold">
                   {remainingCount} artwork(s) remaining.
                 </span>
               </p>
@@ -191,17 +200,17 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
               <span className="text-xs font-semibold text-slate-600 dark:text-zinc-400">
                 Number of Designs:
               </span>
-              <select
+              <Select
                 value={outputCount}
                 onChange={(e) => setOutputCount(Number(e.target.value))}
-                className="h-9 px-3 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-bold font-mono text-[#714B67] dark:text-purple-300 outline-none focus:border-[#714B67] cursor-pointer"
+                selectClassName="h-9 px-3 text-xs font-bold font-mono text-purple-700 dark:text-purple-300"
               >
                 {Array.from({ length: Math.max(1, remainingCount) }, (_, i) => i + 1).map((num) => (
                   <option key={num} value={num}>
                     {num} Design{num > 1 ? "s" : ""}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
         </div>
@@ -218,8 +227,8 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
             {/* Table Header: 3 Columns */}
             <div className="grid grid-cols-[80px_minmax(0,1.5fr)_minmax(0,1fr)] gap-3 bg-slate-100/90 dark:bg-zinc-800/80 px-4 py-2.5 text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-zinc-300 border-b border-slate-200 dark:border-zinc-800">
               <span>Code</span>
-              <span>1. Artwork Description</span>
-              <span>2. Remarks / Finishes</span>
+              <span>Shutterstock No. (optional)</span>
+              <span>Creative Remark (optional)</span>
             </div>
 
             {/* Dynamic Rows */}
@@ -227,35 +236,36 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
               {outputRows.map((row, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-[80px_minmax(0,1.5fr)_minmax(0,1fr)] gap-3 px-4 py-2.5 items-center bg-white dark:bg-[#161822] hover:bg-slate-50/50 dark:hover:bg-zinc-850/40 transition"
+                  className="grid grid-cols-[80px_minmax(0,1.5fr)_minmax(0,1fr)] gap-3 px-4 py-2.5 items-center bg-white dark:bg-zinc-900 hover:bg-slate-50/50 dark:hover:bg-zinc-850/40 transition"
                 >
                   {/* Badge */}
                   <div>
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-purple-50 text-[#714B67] dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60">
                       {row.designNumber}
                     </span>
                   </div>
 
-                  {/* Column 1: Description */}
+                  {/* Column 1: Shutterstock No. */}
                   <div>
                     <input
                       type="text"
-                      required
-                      value={row.description}
-                      onChange={(e) => handleUpdateRow(idx, "description", e.target.value)}
-                      placeholder="Artwork description"
-                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 outline-none focus:border-[#714B67] focus:ring-1 focus:ring-[#714B67]/20"
+                      maxLength={100}
+                      value={row.shutterstockNo}
+                      onChange={(e) => handleUpdateRow(idx, "shutterstockNo", e.target.value)}
+                      placeholder="Shutterstock No. (optional)"
+                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20"
                     />
                   </div>
 
-                  {/* Column 2: Remarks */}
+                  {/* Column 2: Optional remark */}
                   <div>
                     <input
                       type="text"
                       value={row.remarks}
                       onChange={(e) => handleUpdateRow(idx, "remarks", e.target.value)}
-                      placeholder="Remarks (optional)"
-                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 outline-none focus:border-[#714B67] focus:ring-1 focus:ring-[#714B67]/20"
+                      placeholder="Optional remark"
+                      maxLength={1000}
+                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20"
                     />
                   </div>
                 </div>
@@ -278,7 +288,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
           <button
             type="submit"
             disabled={isSubmitting || !designFileUrl.trim()}
-            className="h-10 px-6 rounded-xl bg-gradient-to-r from-[#006d32] to-[#00d166] hover:from-[#005324] hover:to-[#00b054] text-white text-xs font-bold shadow-md transition active:scale-98 cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-purple-600 hover:bg-purple-700 h-10 px-6 rounded-xl text-white text-xs font-bold shadow-md transition active:scale-98 cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Send className="w-3.5 h-3.5" />
             <span>{isSubmitting ? "Submitting Output..." : `Submit ${outputRows.length} Artwork(s) to Marketing`}</span>

@@ -11,6 +11,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -29,22 +30,33 @@ class CreateSampleRequest(Base):
     """
 
     __tablename__ = "create_sample_requests"
+    __table_args__ = (
+        Index(
+            "ix_create_sample_requests_request_types_gin",
+            "request_types",
+            postgresql_using="gin",
+            postgresql_ops={"request_types": "jsonb_path_ops"},
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     sr_number = Column(String(50), nullable=False, unique=True, index=True)
-    year = Column(String(50), nullable=False)
+    # Stable client key used to make Marketing draft autosaves safe to retry.
+    client_draft_key = Column(String(160), nullable=True, unique=True, index=True)
+    year = Column(String(50), nullable=False, index=True)
     product_description = Column(Text, nullable=False)
     customer = Column(String(150), nullable=False, index=True)
-    target_plant = Column(String(100), nullable=True)
+    target_plant = Column(String(100), nullable=True, index=True)
     date_request_created = Column(String(50), nullable=False)
     created_by = Column(String(100), nullable=False)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     material_code = Column(String(100), nullable=False, index=True)
     status = Column(String(50), nullable=False)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc))
 
-    program_year = Column(String(50), nullable=True)
+    program_year = Column(String(50), nullable=True, index=True)
     program_name = Column(String(150), nullable=True)
     source_sample_code = Column(String(100), nullable=True, index=True)
     creation_mode = Column(String(30), nullable=False, default="material_code", server_default="material_code")
@@ -83,7 +95,14 @@ class CreateSampleRequest(Base):
         "ProductDetail",
         back_populates="sample_request",
         cascade="all, delete-orphan",
+        passive_deletes=True,
         order_by="ProductDetail.id",
+    )
+    activity_logs = relationship(
+        "SampleRequestActivityLog",
+        back_populates="sample_request",
+        passive_deletes=True,
+        order_by="SampleRequestActivityLog.id",
     )
 
     # Relationship to normalized request types & selection timestamps audit
@@ -133,7 +152,7 @@ class ProductDetail(Base):
     value = Column(Text, nullable=True)
     uom = Column(String(50), nullable=True)
 
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc))
 
     sample_request = relationship("CreateSampleRequest", back_populates="product_details")
@@ -161,6 +180,7 @@ class DesignRequest(Base):
     product_description = Column(Text, nullable=False, default="")
     design_required_date = Column(String(50), nullable=True)
     created_by = Column(String(100), nullable=False, default="")
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     design_remarks = Column(Text, nullable=True)
     reference_images = Column(JSONB, nullable=False, default=list, server_default="[]")
     reference_links = Column(JSONB, nullable=False, default=list, server_default="[]")
@@ -203,3 +223,31 @@ class SampleRequestType(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc))
 
     sample_request = relationship("CreateSampleRequest", back_populates="request_type_audit")
+
+
+class SampleRequestActivityLog(Base):
+    """Durable, queryable history for request creation and workflow changes."""
+
+    __tablename__ = "sample_request_activity_logs"
+    __table_args__ = (
+        Index("ix_sample_request_activity_request_created", "sample_request_id", "created_at"),
+        Index("ix_sample_request_activity_action_created", "action", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    sample_request_id = Column(
+        Integer,
+        ForeignKey("create_sample_requests.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    request_sr_number = Column(String(50), nullable=True, index=True)
+    actor_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    actor_name = Column(String(255), nullable=False)
+    actor_department = Column(String(100), nullable=True)
+    action = Column(String(64), nullable=False)
+    from_status = Column(String(64), nullable=True)
+    to_status = Column(String(64), nullable=True)
+    payload = Column(JSONB, nullable=False, default=dict, server_default="{}")
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
+
+    sample_request = relationship("CreateSampleRequest", back_populates="activity_logs")

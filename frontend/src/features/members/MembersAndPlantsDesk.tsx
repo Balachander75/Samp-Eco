@@ -61,6 +61,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
     team: "marketing",
     is_team_head: false,
     plant_code: "",
+    plant_codes: [],
     is_active: true,
   });
 
@@ -82,7 +83,13 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
     setTimeout(() => setFeedbackMsg(null), 3500);
   };
 
+  const isAdmin = ["admin", "administrator"].includes(user.role.trim().toLowerCase());
+
   const loadData = useCallback(async () => {
+    if (!isAdmin) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const [uData, pData] = await Promise.all([
@@ -97,7 +104,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     loadData();
@@ -112,11 +119,12 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
         userid: userToEdit.userid,
         email: userToEdit.email,
         password: "",
-        role: userToEdit.role,
+        role: ["head", "team head", "department lead"].includes(userToEdit.role.trim().toLowerCase()) ? "user" : userToEdit.role,
         sub_role: userToEdit.subRole || "",
         team: userToEdit.team || "marketing",
         is_team_head: userToEdit.isTeamHead,
         plant_code: userToEdit.plantCode || "",
+        plant_codes: userToEdit.plantCodes || (userToEdit.plantCode ? [userToEdit.plantCode] : []),
         is_active: userToEdit.isActive,
       });
     } else {
@@ -131,6 +139,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
         team: "marketing",
         is_team_head: false,
         plant_code: "",
+        plant_codes: [],
         is_active: true,
       });
     }
@@ -160,7 +169,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
           sub_role: userFormData.sub_role?.trim() || undefined,
           team: userFormData.team,
           is_team_head: userFormData.is_team_head,
-          plant_code: userFormData.plant_code?.trim() || undefined,
+          plant_codes: userFormData.plant_codes || [],
           is_active: userFormData.is_active,
         };
         if (userFormData.password.trim()) {
@@ -177,6 +186,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
           password: userFormData.password.trim(),
           sub_role: userFormData.sub_role?.trim() || undefined,
           plant_code: userFormData.plant_code?.trim() || undefined,
+          plant_codes: userFormData.plant_codes || [],
         });
         showToast(`User ${userFormData.name} created successfully`);
       }
@@ -189,6 +199,20 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
       setIsSubmitting(false);
     }
   };
+
+  if (!isAdmin) {
+    return (
+      <main className="min-h-[60vh] flex items-center justify-center px-6 py-12">
+        <section className="max-w-lg rounded-2xl bg-white dark:bg-zinc-900 p-7 text-center shadow-sm">
+          <ShieldCheck className="mx-auto mb-4 h-9 w-9 text-emerald-600" aria-hidden="true" />
+          <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Admin access required</h1>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            Member, role and plant assignments are managed by an Admin.
+          </p>
+        </section>
+      </main>
+    );
+  }
 
   // Delete User
   const handleDeleteUser = async (userId: number, name: string) => {
@@ -282,7 +306,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
   };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-[#fafafa] dark:bg-[#08090d] text-zinc-900 dark:text-zinc-100 overflow-hidden select-none">
+    <div className="flex-1 min-h-0 flex flex-col bg-slate-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden select-none">
       {/* Toast Feedback */}
       {feedbackMsg && (
         <div
@@ -298,7 +322,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
       )}
 
       {/* SaaS Top Header */}
-      <header className="border-b border-zinc-200/80 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] px-6 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <header className="border-b border-zinc-200/80 dark:border-white/[0.08] bg-white dark:bg-zinc-900 px-6 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
             Enterprise Directory & Infrastructure
@@ -329,7 +353,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
       </header>
 
       {/* SaaS Sub-Navigation Tabs (URL-Synced Routes) */}
-      <div className="border-b border-zinc-200/80 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] px-6 flex items-center justify-between gap-4">
+      <div className="border-b border-zinc-200/80 dark:border-white/[0.08] bg-white dark:bg-zinc-900 px-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -410,8 +434,8 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
 
       {/* Modern SaaS User Modal (Add / Edit) */}
       {isUserModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-[#0f1118] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-smooth-backdrop p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-smooth-modal">
             <div className="px-6 py-4.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-zinc-950 dark:text-zinc-50">
@@ -528,14 +552,26 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Assigned Plant Facility
+                    Assigned plant facilities
                   </label>
+                  <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    Select every plant this user is allowed to see. Plant team access is limited to these facilities.
+                  </p>
                   <select
-                    value={userFormData.plant_code || ""}
-                    onChange={(e) => setUserFormData({ ...userFormData, plant_code: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    multiple
+                    size={Math.min(Math.max(plantsList.length, 3), 6)}
+                    value={userFormData.plant_codes || []}
+                    onChange={(e) => {
+                      const plant_codes = Array.from(e.currentTarget.selectedOptions, (option) => option.value);
+                      setUserFormData({
+                        ...userFormData,
+                        plant_codes,
+                        plant_code: plant_codes[0] || "",
+                      });
+                    }}
+                    aria-label="Assigned plant facilities"
+                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:text-zinc-100"
                   >
-                    <option value="">None / Corporate HQ</option>
                     {plantsList.map((p) => (
                       <option key={p.id} value={p.code}>
                         {p.code} - {p.name}
@@ -550,27 +586,31 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
                   </label>
                   <select
                     value={userFormData.role}
-                    onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value })}
+                    onChange={(e) => setUserFormData({
+                      ...userFormData,
+                      role: e.target.value,
+                      is_team_head: e.target.value === "admin" ? false : userFormData.is_team_head,
+                    })}
                     className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   >
-                    <option value="user">Team Specialist (Personal Queue)</option>
-                    <option value="head">Department Lead (Supervisory Queue)</option>
-                    <option value="admin">System Administrator (Global)</option>
+                    <option value="user">Team Member</option>
+                    <option value="admin">Root Admin (Global)</option>
                   </select>
                 </div>
               </div>
 
               {/* Toggles */}
               <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-2.5">
-                <label className="flex items-center gap-2.5 cursor-pointer">
+                <label className={`flex items-center gap-2.5 ${userFormData.role === "admin" ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
                   <input
                     type="checkbox"
                     checked={userFormData.is_team_head}
+                    disabled={userFormData.role === "admin"}
                     onChange={(e) =>
                       setUserFormData({
                         ...userFormData,
                         is_team_head: e.target.checked,
-                        role: e.target.checked && userFormData.role !== "admin" ? "head" : userFormData.role,
+                        role: userFormData.role === "head" ? "user" : userFormData.role,
                       })
                     }
                     className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
@@ -581,7 +621,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
                       Designate as Department Team Head
                     </span>
                     <span className="text-[11px] text-zinc-500 block">
-                      Enables full oversight of all department requests with personal queue toggle.
+                      Team heads can view their team’s requests and queues but cannot edit workflow data.
                     </span>
                   </div>
                 </label>
@@ -622,8 +662,8 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
 
       {/* Modern SaaS Plant Modal (Add / Edit) */}
       {isPlantModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md bg-white dark:bg-[#0f1118] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-smooth-backdrop p-4">
+          <div className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-smooth-modal">
             <div className="px-6 py-4.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-zinc-950 dark:text-zinc-50">

@@ -92,11 +92,11 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
   const totalAttachments = uploadedImages.length + webLinks.length;
 
   return (
-    <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl animate-smooth-modal dark:border-white/[0.08] dark:bg-[#161822]">
+    <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl animate-smooth-modal dark:border-white/[0.08] dark:bg-zinc-900">
       {/* Luminous Engine Modal Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-[#161822] text-slate-900 dark:text-white shrink-0 border-b border-slate-100 dark:border-white/[0.06]">
+      <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shrink-0 border-b border-slate-100 dark:border-white/[0.06]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-[#006d32]/10 text-[#006d32] dark:text-emerald-400 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 flex items-center justify-center shrink-0">
             <ImageIcon className="w-4 h-4 stroke-[2.2]" />
           </div>
           <div>
@@ -104,7 +104,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
               <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight font-display">
                 {isEditing ? "Edit Creative Design Brief" : "Creative Design Brief"}
               </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#006d32]/10 text-[#006d32] dark:text-emerald-400 border border-[#006d32]/20 tracking-wider uppercase">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/20 tracking-wider uppercase">
                 {isEditing ? "EDIT SPEC" : "DESIGN SPEC"}
               </span>
             </div>
@@ -153,7 +153,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
               <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400">
                 Customer Account &amp; Program
               </label>
-              <div className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-[#f8f9ff]/70 px-3.5 py-2 text-[13px] font-medium text-slate-900 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-zinc-100">
+              <div className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-[var(--surface-low)]/70 px-3.5 py-2 text-[13px] font-medium text-slate-900 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-zinc-100">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="truncate font-semibold text-slate-900 dark:text-zinc-100">
                     {programContext.customer || ""}
@@ -162,7 +162,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                     {[programContext.programName, programContext.programYear].filter(Boolean).join(" · ")}
                   </span>
                 </div>
-                <span className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200/80 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-white/[0.08] dark:bg-[#161822] dark:text-zinc-400">
+                <span className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200/80 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-400">
                   <Lock className="h-3 w-3" /> Locked
                 </span>
               </div>
@@ -179,7 +179,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                 placeholder="Provide detailed product description, cover specifications, ruling/page requirements, finish accents (foil, deboss, spot UV), and creative direction..."
                 value={designDesc}
                 onChange={(e) => onSetDesignDesc(e.target.value)}
-                className="w-full resize-none rounded-xl border border-slate-200/80 bg-white p-3 text-xs leading-relaxed text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-white/[0.08] dark:bg-[#12141d] dark:text-zinc-100"
+                className="w-full resize-none rounded-xl border border-slate-200/80 bg-white p-3 text-xs leading-relaxed text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-100"
               />
             </div>
 
@@ -197,7 +197,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                   placeholder="e.g. Botanical Floral, Geometric Minimalist"
                   value={designTrend}
                   onChange={(e) => onSetDesignTrend(e.target.value)}
-                  className="h-10 w-full rounded-xl border border-slate-200/80 bg-white px-3.5 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-white/[0.08] dark:bg-[#12141d] dark:text-zinc-100"
+                  className="h-10 w-full rounded-xl border border-slate-200/80 bg-white px-3.5 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-100"
                 />
               </div>
 
@@ -213,7 +213,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                   placeholder="e.g. College Students, Kids (6-12)"
                   value={designAudience}
                   onChange={(e) => onSetDesignAudience(e.target.value)}
-                  className="h-10 w-full rounded-xl border border-slate-200/80 bg-white px-3.5 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-white/[0.08] dark:bg-[#12141d] dark:text-zinc-100"
+                  className="h-10 w-full rounded-xl border border-slate-200/80 bg-white px-3.5 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-100"
                 />
               </div>
             </div>
@@ -231,13 +231,13 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                 placeholder="Specific instructions, special packaging requirements, or design notes..."
                 value={designRemarks}
                 onChange={(e) => onSetDesignRemarks(e.target.value)}
-                className="w-full resize-none rounded-xl border border-slate-200/80 bg-white p-3 text-xs leading-relaxed text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 dark:border-white/[0.08] dark:bg-[#12141d] dark:text-zinc-100"
+                className="w-full resize-none rounded-xl border border-slate-200/80 bg-white p-3 text-xs leading-relaxed text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-100"
               />
             </div>
           </div>
 
           {/* RIGHT COLUMN: Number of Designs, Design Required Date, Reference Attachments */}
-            <div className="space-y-4 rounded-md border border-zinc-200 bg-[#F8F7F8] p-4 dark:border-white/[0.08] dark:bg-white/[0.025] lg:col-span-5">
+            <div className="space-y-4 rounded-md border border-zinc-200 bg-slate-50 dark:bg-zinc-900 p-4 dark:border-white/[0.08] dark:bg-white/[0.025] lg:col-span-5">
             {/* Number of Designs */}
             <div>
               <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
@@ -260,7 +260,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                       onSetDesignCount(isNaN(parsed) ? "" : Math.max(1, parsed));
                     }
                   }}
-                  className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 font-mono text-sm font-semibold text-zinc-900 outline-none placeholder:font-sans placeholder:font-normal placeholder:text-zinc-400 focus:border-[#006d32]/60 focus:ring-2 focus:ring-[#006d32]/15 dark:border-zinc-700 dark:bg-[#171923] dark:text-zinc-100"
+                  className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 font-mono text-sm font-semibold text-zinc-900 outline-none placeholder:font-sans placeholder:font-normal placeholder:text-zinc-400 focus:border-[var(--accent-primary)]/60 focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 />
                 {designCount !== "" && (
                   <span className="absolute right-2.5 top-1.5 text-[10px] font-mono text-zinc-400 pointer-events-none">
@@ -296,7 +296,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                     uploadedImages.length >= 2 && webLinks.length >= 1
                       ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/40"
                       : totalAttachments > 0
-                      ? "border border-[#006d32]/20 bg-emerald-50 text-[#006d32] dark:border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300"
+                      ? "border border-[var(--accent-primary)]/20 bg-emerald-50 text-[var(--accent-primary)] dark:border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300"
                       : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
                   }`}
                 >
@@ -306,20 +306,20 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
 
               {/* Segmented Mode Control */}
               <div className="space-y-2">
-                <div className="inline-flex w-full rounded-md border border-zinc-200 bg-zinc-100/80 p-1 text-[11px] dark:border-zinc-700 dark:bg-[#171923]">
+                <div className="inline-flex w-full rounded-md border border-zinc-200 bg-zinc-100/80 p-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-950">
                   <button
                     type="button"
                     onClick={() => onSetMediaTab("files")}
                     className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded px-2 text-xs transition-all ${
                       mediaTab === "files"
-                        ? "bg-white font-semibold text-[#006d32] shadow-sm dark:bg-[#1f2233] dark:text-emerald-400"
+                        ? "bg-white font-semibold text-[var(--accent-primary)] shadow-sm dark:bg-zinc-900 dark:text-emerald-400"
                         : "font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                     }`}
                   >
                     <ImageIcon className="w-3 h-3" />
                     <span>Upload Image</span>
                     {uploadedImages.length > 0 && (
-                      <span className="ml-1 rounded bg-emerald-100/70 px-1 text-[10px] font-mono text-[#006d32] dark:bg-emerald-900/60 dark:text-emerald-300">
+                      <span className="ml-1 rounded bg-emerald-100/70 px-1 text-[10px] font-mono text-[var(--accent-primary)] dark:bg-emerald-900/60 dark:text-emerald-300">
                         {uploadedImages.length}
                       </span>
                     )}
@@ -329,14 +329,14 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                     onClick={() => onSetMediaTab("links")}
                     className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded px-2 text-xs transition-all ${
                       mediaTab === "links"
-                        ? "bg-white font-semibold text-[#006d32] shadow-sm dark:bg-[#1f2233] dark:text-emerald-400"
+                        ? "bg-white font-semibold text-[var(--accent-primary)] shadow-sm dark:bg-zinc-900 dark:text-emerald-400"
                         : "font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                     }`}
                   >
                     <Link2 className="w-3 h-3" />
                     <span>Paste Web Link</span>
                     {webLinks.length > 0 && (
-                      <span className="ml-1 rounded bg-emerald-100/70 px-1 text-[10px] font-mono text-[#006d32] dark:bg-emerald-900/60 dark:text-emerald-300">
+                      <span className="ml-1 rounded bg-emerald-100/70 px-1 text-[10px] font-mono text-[var(--accent-primary)] dark:bg-emerald-900/60 dark:text-emerald-300">
                         {webLinks.length}
                       </span>
                     )}
@@ -358,10 +358,10 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="group flex min-h-10 w-full items-center justify-between gap-3 rounded-md border border-dashed border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:border-[#006d32]/50 hover:bg-emerald-50/40 hover:text-[#006d32] dark:border-zinc-700 dark:bg-[#12141d] dark:text-zinc-400 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-950/20 dark:hover:text-emerald-300"
+                        className="group flex min-h-10 w-full items-center justify-between gap-3 rounded-md border border-dashed border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:border-[var(--accent-primary)]/50 hover:bg-emerald-50/40 hover:text-[var(--accent-primary)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-950/20 dark:hover:text-emerald-300"
                       >
                         <div className="flex items-center gap-2">
-                          <UploadCloud className="h-4 w-4 text-zinc-400 transition-colors group-hover:text-[#006d32] dark:group-hover:text-emerald-400" />
+                          <UploadCloud className="h-4 w-4 text-zinc-400 transition-colors group-hover:text-[var(--accent-primary)] dark:group-hover:text-emerald-400" />
                           <span>Choose photos (PNG, JPG, WEBP)</span>
                         </div>
                         <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500">
@@ -395,13 +395,13 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                           onAddWebLink(e);
                         }
                       }}
-                      className="h-10 min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-3 text-xs text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-[#006d32]/60 focus:ring-2 focus:ring-[#006d32]/15 disabled:opacity-50 dark:border-zinc-700 dark:bg-[#171923] dark:text-zinc-100"
+                      className="h-10 min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-3 text-xs text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-[var(--accent-primary)]/60 focus:ring-2 focus:ring-[var(--accent-primary)]/15 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                     />
                     <button
                       type="button"
                       onClick={onAddWebLink}
                       disabled={webLinks.length >= 1 || !linkInput.trim()}
-                      className="inline-flex h-10 shrink-0 items-center gap-1 rounded-md bg-[#006d32] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#005a28] disabled:cursor-not-allowed disabled:opacity-45"
+                      className="inline-flex h-10 shrink-0 items-center gap-1 rounded-md bg-[var(--accent-primary)] px-3 text-xs font-semibold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Add</span>
@@ -424,7 +424,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                             alt={img.name}
                             className="w-6 h-6 rounded object-cover border border-zinc-200 dark:border-zinc-800 shrink-0"
                           />
-                          <span className="shrink-0 rounded border border-[#006d32]/20 bg-emerald-50 px-1 py-0.5 text-[10px] font-bold text-[#006d32] dark:border-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300">
+                          <span className="shrink-0 rounded border border-[var(--accent-primary)]/20 bg-emerald-50 px-1 py-0.5 text-[10px] font-bold text-[var(--accent-primary)] dark:border-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300">
                             IMG
                           </span>
                           <span className="truncate font-medium text-zinc-800 dark:text-zinc-200" title={img.name}>
@@ -455,14 +455,14 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                         className="flex items-center justify-between gap-2 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/90 text-[11px] shadow-2xs group"
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="shrink-0 rounded border border-[#017E84]/15 bg-[#E7F4F4] px-1 py-0.5 text-[10px] font-bold text-[#017E84] dark:border-teal-300/15 dark:bg-[#173638] dark:text-teal-200">
+                          <span className="shrink-0 rounded border border-teal-500/20 bg-teal-50 dark:bg-teal-950/40 px-1 py-0.5 text-[10px] font-bold text-teal-700 dark:text-teal-400 dark:border-teal-300/15 dark:bg-teal-950/40 dark:text-teal-200">
                             URL
                           </span>
                           <a
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex min-w-0 items-center gap-1 truncate font-mono text-[11px] text-[#006d32] hover:underline dark:text-emerald-400"
+                            className="flex min-w-0 items-center gap-1 truncate font-mono text-[11px] text-[var(--accent-primary)] hover:underline dark:text-emerald-400"
                             title={url}
                           >
                             <span className="truncate">{url}</span>
@@ -494,7 +494,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
         </div>
 
         {/* Footer Controls */}
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-white px-6 py-4 dark:border-white/[0.06] dark:bg-[#161822]">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-white px-6 py-4 dark:border-white/[0.06] dark:bg-zinc-900">
           <button
             type="button"
             onClick={onBackToScopes}
@@ -511,8 +511,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl px-5 text-xs font-bold text-white shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] transition-all cursor-pointer disabled:cursor-wait disabled:opacity-60 active:scale-98"
-            style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl px-5 text-xs font-bold text-white shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] transition-all cursor-pointer disabled:cursor-wait disabled:opacity-60 active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
           >
             {selectedScopes.includes("mockup") ? (
               <>

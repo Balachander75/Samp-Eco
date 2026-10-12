@@ -55,7 +55,7 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
   const summary = useMemo(() => {
     const total = users.length;
     const heads = users.filter((u) => u.isTeamHead).length;
-    const plantLinked = users.filter((u) => u.plantCode).length;
+    const plantLinked = users.filter((u) => (u.plantCodes?.length || u.plantCode)).length;
     const active = users.filter((u) => u.isActive).length;
     return { total, heads, plantLinked, active };
   }, [users]);
@@ -104,17 +104,17 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
   }, [filteredUsers]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#fafafa] dark:bg-[#08090d] overflow-y-auto">
+    <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-zinc-950 overflow-y-auto">
       {/* SaaS Metric Highlights Bar */}
       <div className="p-6 pb-2">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-[#0f1118] p-4 shadow-2xs">
+          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-zinc-900 p-4 shadow-2xs">
             <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Total Personnel</span>
               <Users className="w-4 h-4 text-zinc-400" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono">
+              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono tabular-nums">
                 {summary.total}
               </span>
               <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -123,13 +123,13 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-[#0f1118] p-4 shadow-2xs">
+          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-zinc-900 p-4 shadow-2xs">
             <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Department Heads</span>
               <Crown className="w-4 h-4 text-amber-500" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono">
+              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono tabular-nums">
                 {summary.heads}
               </span>
               <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -138,13 +138,13 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-[#0f1118] p-4 shadow-2xs">
+          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-zinc-900 p-4 shadow-2xs">
             <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Plant Assigned</span>
               <Building2 className="w-4 h-4 text-blue-500" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono">
+              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono tabular-nums">
                 {summary.plantLinked}
               </span>
               <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -153,13 +153,13 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-[#0f1118] p-4 shadow-2xs">
+          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-zinc-900 p-4 shadow-2xs">
             <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Directory Scope</span>
               <Shield className="w-4 h-4 text-emerald-500" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono">
+              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono tabular-nums">
                 7
               </span>
               <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -263,7 +263,7 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
               return (
                 <div
                   key={deptKey}
-                  className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] overflow-hidden shadow-2xs"
+                  className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-zinc-900 overflow-hidden shadow-2xs"
                 >
                   {/* Department Unit Header */}
                   <div className="px-6 py-3.5 border-b border-zinc-100 dark:border-white/[0.06] bg-zinc-50/70 dark:bg-zinc-900/40 flex items-center justify-between">
@@ -329,12 +329,12 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
                               <Mail className="w-3 h-3 text-zinc-400" />
                               {head.email}
                             </span>
-                            {head.plantCode && (
+                            {(head.plantCodes?.length ? head.plantCodes : head.plantCode ? [head.plantCode] : []).length > 0 && (
                               <>
                                 <span className="text-zinc-300 dark:text-zinc-700">•</span>
                                 <span className="flex items-center gap-1 text-zinc-800 dark:text-zinc-200 font-medium">
                                   <Building2 className="w-3 h-3 text-zinc-400" />
-                                  Plant {head.plantCode}
+                                  Plant {(head.plantCodes?.length ? head.plantCodes : [head.plantCode]).filter(Boolean).join(", ")}
                                 </span>
                               </>
                             )}
@@ -389,10 +389,10 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
                                 </span>
                                 <span>•</span>
                                 <span>{member.email}</span>
-                                {member.plantCode && (
+                                {(member.plantCodes?.length ? member.plantCodes : member.plantCode ? [member.plantCode] : []).length > 0 && (
                                   <>
                                     <span>•</span>
-                                    <span>Plant {member.plantCode}</span>
+                                    <span>Plant {(member.plantCodes?.length ? member.plantCodes : [member.plantCode]).filter(Boolean).join(", ")}</span>
                                   </>
                                 )}
                               </div>
@@ -414,7 +414,7 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
                             <button
                               type="button"
                               onClick={() => onDeleteUser(member.id, member.name)}
-                              className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-red-50 dark:hover:bg-red-950/30 text-zinc-400 hover:text-red-600 transition-colors"
+                              className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-700 dark:text-red-400 hover:text-red-600 transition-colors"
                               title="Remove Member"
                             >
                               <Trash2 className="w-3.5 h-3.5" />

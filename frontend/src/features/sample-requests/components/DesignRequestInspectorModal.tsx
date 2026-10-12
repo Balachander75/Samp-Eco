@@ -36,6 +36,7 @@ import { SampleRequestItem } from "../types";
 import {
   submitCreativeDesignOutputApi,
   recordMarketingDesignDecisionApi,
+  requestPostDesignDeliverablesApi,
   claimDesignRequestApi,
   proposeDesignCounterDateApi,
   decideDesignCounterDateApi,
@@ -64,7 +65,7 @@ export interface DesignRequestInspectorModalProps {
   showToast?: (message: string) => void;
 }
 
-type TabType = "specs" | "deliverables" | "signoff";
+type TabType = "specs" | "deliverables" | "signoff" | "next_work";
 
 interface ChatterMessage {
   id: string;
@@ -108,6 +109,15 @@ function resolveReferenceLinkUrl(url: string): string {
   return `https://${url.replace(/^\/\//, "")}`;
 }
 
+function isHttpLink(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const DesignReferenceImage: React.FC<{
   reference: DesignReferenceAsset;
   onPreview: (url: string) => void;
@@ -127,7 +137,7 @@ const DesignReferenceImage: React.FC<{
             href={imageUrl}
             target="_blank"
             rel="noreferrer"
-            className="font-semibold text-[#714B67] underline underline-offset-2 dark:text-purple-300"
+            className="font-semibold text-[var(--accent-primary)] underline underline-offset-2 dark:text-emerald-300"
           >
             Open original image
           </a>
@@ -187,14 +197,14 @@ const DesignReferencePanel: React.FC<{
             {reference.kind === "image" ? (
               <DesignReferenceImage reference={reference} onPreview={onPreview} />
             ) : (
-              <div className="flex min-h-36 flex-col items-start justify-center gap-2 bg-purple-50/60 p-4 dark:bg-purple-950/20">
-                <Link2 className="h-5 w-5 text-[#714B67] dark:text-purple-300" />
+              <div className="flex min-h-36 flex-col items-start justify-center gap-2 bg-emerald-50/60 p-4 dark:bg-emerald-950/20">
+                <Link2 className="h-5 w-5 text-[var(--accent-primary)] dark:text-emerald-300" />
                 <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{reference.label}</span>
                 <a
                   href={resolveReferenceLinkUrl(reference.url)}
                   target="_blank"
                   rel="noreferrer"
-                  className="max-w-full break-all text-xs text-[#714B67] underline underline-offset-2 dark:text-purple-300"
+                  className="max-w-full break-all text-xs text-[var(--accent-primary)] underline underline-offset-2 dark:text-emerald-300"
                   title={reference.url}
                 >
                   {reference.url}
@@ -203,7 +213,7 @@ const DesignReferencePanel: React.FC<{
                   href={resolveReferenceLinkUrl(reference.url)}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#714B67] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#5B3C53]"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[var(--accent-primary-hover)]"
                 >
                   Open link <ExternalLink className="h-3.5 w-3.5" />
                 </a>
@@ -276,12 +286,25 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const [isCounterDateModalOpen, setIsCounterDateModalOpen] = useState(false);
   const [localOverride, setLocalOverride] = useState<SampleRequestItem | null>(null);
   const [slaClockNow, setSlaClockNow] = useState(() => Date.now());
+  const requestUpdatedAtRef = useRef(request?.updatedAt);
 
   useEffect(() => {
     setLocalOverride(null);
     setActiveTab("specs");
     setIsCounterDateModalOpen(false);
+    setSelectedFollowups([]);
+    setFollowupError(null);
+    requestUpdatedAtRef.current = request?.updatedAt;
   }, [request?.id]);
+
+  useEffect(() => {
+    const previousUpdatedAt = requestUpdatedAtRef.current;
+    const nextUpdatedAt = request?.updatedAt;
+    if (previousUpdatedAt && nextUpdatedAt && previousUpdatedAt !== nextUpdatedAt) {
+      setLocalOverride(null);
+    }
+    requestUpdatedAtRef.current = nextUpdatedAt;
+  }, [request?.updatedAt]);
 
   useEffect(() => {
     if (!isOpen || mode !== "creative") return;
@@ -352,7 +375,12 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   // Marketing Decision State
   const [isDeciding, setIsDeciding] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [selectedFollowups, setSelectedFollowups] = useState<Array<"mockup" | "sample">>([]);
+  const [isAddingFollowups, setIsAddingFollowups] = useState(false);
+  const [followupError, setFollowupError] = useState<string | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [isPostingNote, setIsPostingNote] = useState(false);
 
   // Chatter State
   const [noteInput, setNoteInput] = useState("");
@@ -363,26 +391,48 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   // Creative deliverable matrix state lives in this inspector workspace.
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [designFileUrl, setDesignFileUrl] = useState("");
+  const [copiedArtworkPath, setCopiedArtworkPath] = useState("");
   const [outputCount, setOutputCount] = useState(1);
-  const [outputRows, setOutputRows] = useState<Array<{ description: string; remarks: string }>>([]);
+  const [outputRows, setOutputRows] = useState<Array<{ shutterstockNo: string; remarks: string }>>([]);
   const [isSubmittingOutput, setIsSubmittingOutput] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (isCounterDateModalOpen) return;
+      if (!isSubmittingOutput && !isDeciding && !isPostingNote && !isAddingFollowups) onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isCounterDateModalOpen, isSubmittingOutput, isDeciding, isPostingNote, isAddingFollowups, onClose]);
 
   // Computed Values
   const effectiveDesignId = useMemo(() => {
     if (!activeRequest) return null;
-    if (typeof activeRequest.designRequestId === "number" && activeRequest.designRequestId > 0) {
-      return activeRequest.designRequestId;
+    if (activeRequest.designRequestId != null) {
+      const num = Number(activeRequest.designRequestId);
+      if (Number.isInteger(num) && num > 0) return num;
     }
     const idStr = String(activeRequest.id || "");
     if (idStr.startsWith("design-")) {
       const num = parseInt(idStr.replace("design-", ""), 10);
       if (!isNaN(num) && num > 0) return num;
     }
+    const numDirect = Number(activeRequest.id);
+    if (Number.isInteger(numDirect) && numDirect > 0) {
+      return numDirect;
+    }
     return null;
   }, [activeRequest]);
 
   const activeStage = useMemo(() => getDesignStageIndex(activeRequest), [activeRequest]);
+  const isRemainingRequested = Boolean(
+    activeRequest?.marketingDesignDecision === "remaining_requested" ||
+    String(activeRequest?.designRequestStatus || activeRequest?.status || "").toLowerCase().includes("remaining requested")
+  );
 
   const refCode = useMemo(() => {
     if (!activeRequest) return "";
@@ -416,7 +466,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     setOutputCount(1);
     setOutputRows([
       {
-        description: "",
+        shutterstockNo: "",
         remarks: "",
       },
     ]);
@@ -695,10 +745,21 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     }
   };
 
+  const handleCopyArtworkPath = async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(path);
+      setCopiedArtworkPath(path);
+      setTimeout(() => setCopiedArtworkPath(""), 1500);
+    } catch {
+      setCopiedArtworkPath("");
+    }
+  };
+
   // Add Internal Chatter Note
   const handlePostNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!noteInput.trim() || !effectiveDesignId) return;
+    if (isPostingNote || !noteInput.trim() || !effectiveDesignId) return;
+    setIsPostingNote(true);
     setWorkflowError(null);
     try {
       const saved = await addDesignWorkflowNoteApi(
@@ -711,13 +772,16 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       if (onRefresh) await onRefresh();
     } catch (err: any) {
       setWorkflowError(err?.message || "Could not save the note. Please retry.");
+    } finally {
+      setIsPostingNote(false);
     }
   };
 
   // ── TASK CLAIMING HANDLERS ──
   const handleClaim = async () => {
-    if (!activeRequest || !effectiveDesignId) return;
+    if (isClaiming || !activeRequest || !effectiveDesignId) return;
     const name = "Creative Designer (Studio)";
+    setIsClaiming(true);
     setWorkflowError(null);
     try {
       const saved = await claimDesignRequestApi(effectiveDesignId, name);
@@ -726,6 +790,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       if (onRefresh) await onRefresh();
     } catch (err: any) {
       setWorkflowError(err?.message || "Could not claim this task.");
+    } finally {
+      setIsClaiming(false);
     }
   };
 
@@ -775,7 +841,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     const safeCount = Math.max(1, Math.min(remainingCount, requestedRows));
     setOutputCount(safeCount);
     setOutputRows((current) =>
-      Array.from({ length: safeCount }, (_, index) => current[index] || ({ description: "", remarks: "" }))
+      Array.from({ length: safeCount }, (_, index) => current[index] || ({ shutterstockNo: "", remarks: "" }))
     );
   };
 
@@ -791,14 +857,12 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       return;
     }
     if (!designFileUrl.trim()) {
-      setSubmitError("Add a shareable design file link before submitting.");
+      setSubmitError("Add an artwork folder/file link or path before submitting.");
       return;
     }
-    const incompleteIndex = outputRows.findIndex(
-      (row) => !row.description.trim()
-    );
+    const incompleteIndex = outputRows.findIndex((row) => !row.shutterstockNo.trim() && !row.remarks.trim());
     if (incompleteIndex >= 0) {
-      setSubmitError(`Artwork D${deliveredCount + incompleteIndex + 1} needs a description.`);
+      setSubmitError(`Artwork D${deliveredCount + incompleteIndex + 1} needs a Shutterstock No. or remark.`);
       return;
     }
 
@@ -810,7 +874,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
         {
           designFileUrl: designFileUrl.trim(),
           rows: outputRows.map((row) => ({
-            description: row.description.trim(),
+            shutterstockNo: row.shutterstockNo.trim(),
             remarks: row.remarks.trim(),
           })),
         },
@@ -819,7 +883,11 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       applyWorkflowResponse(saved);
       setShowSubmitForm(false);
       setDesignFileUrl("");
-      if (showToast) showToast("Artwork submitted to Marketing for review.");
+      if (showToast) {
+        showToast(isRemainingRequested && remainingCount > outputRows.length
+          ? "Batch added. You can continue submitting the requested artwork in more batches."
+          : "Artwork submitted to Marketing for review.");
+      }
       if (onRefresh) {
         try {
           await onRefresh();
@@ -850,12 +918,12 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       if (showToast) {
         showToast(
           decision === "accept"
-            ? "Artwork approved & closed! Design ready for production."
-            : `Returned ${remainingCount} remaining design(s) to Creative Studio.`
+            ? "Artwork accepted. Choose Mockup or Sampling from the Next Work stage."
+            : `Creative can now submit the ${remainingCount} remaining design(s) in as many batches as needed.`
         );
       }
       if (onRefresh) await onRefresh();
-      onClose();
+      if (decision === "request_remaining") setActiveTab("deliverables");
     } catch (err: any) {
       console.error("Marketing decision failed:", err);
       setDecisionError(err?.message || "Could not record design decision. Please try again.");
@@ -871,64 +939,94 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     activeRequest.marketingDesignDecision === "awaiting_marketing_review" ||
     activeStage === 2;
   const isClosed = activeStage === 3;
+  const isAcceptedByMarketing = mode === "marketing" && activeRequest.marketingDesignDecision === "accepted";
+  const includedFollowups = activeRequest.requestTypes || [];
   const isCounterDatePending = Boolean(
     activeRequest.isCounterDateActive || activeRequest.counterDateDecision === "pending"
   );
   const requestStageLabel = String(activeRequest.designRequestStatus || activeRequest.status || "").toLowerCase();
   const isCreativeWorkStage = activeStage === 1 || requestStageLabel.includes("target date counter proposed");
   const canSubmitCreativeOutput = mode === "creative" && isCreativeWorkStage && !isAwaitingReview && !isClosed && remainingCount > 0;
+  const canCloseInspector = !isSubmittingOutput && !isDeciding && !isPostingNote && !isAddingFollowups;
+
+  const handleAddFollowups = async () => {
+    if (!effectiveDesignId || selectedFollowups.length === 0 || isAddingFollowups) return;
+    setIsAddingFollowups(true);
+    setFollowupError(null);
+    try {
+      const saved = await requestPostDesignDeliverablesApi(effectiveDesignId, selectedFollowups);
+      const addedTypes = selectedFollowups.filter((scope) => !(includedFollowups as string[]).includes(scope));
+      setLocalOverride({ ...activeRequest, ...saved, id: activeRequest.id, requestKind: activeRequest.requestKind || "sample" });
+      setSelectedFollowups([]);
+      if (showToast) {
+        showToast(addedTypes.length
+          ? `${addedTypes.map((scope) => scope === "mockup" ? "Mockup" : "Sampling").join(" and ")} added to this request.`
+          : "Those deliverables are already part of this request.");
+      }
+      if (onRefresh) {
+        try {
+          await onRefresh();
+        } catch {
+          setWorkflowError("The follow-up work was saved, but the request list could not refresh. Refresh the page to sync it.");
+        }
+      }
+    } catch (error: any) {
+      setFollowupError(error?.message || "Could not add the follow-up work. Please try again.");
+    } finally {
+      setIsAddingFollowups(false);
+    }
+  };
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-xs animate-smooth-backdrop sm:p-4"
       role="presentation"
-      onClick={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && canCloseInspector) onClose();
+      }}
     >
+      <>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="design-inspector-title"
-        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[#f8f9ff] dark:bg-[#0f121d] border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
+        className="relative flex h-[92vh] max-h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] select-text xl:max-w-7xl animate-smooth-modal"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── 1. TOP CONTROL PANEL (MODERN ERP STYLE) ── */}
-        <div className="bg-white dark:bg-[#161928] border-b border-slate-100 dark:border-white/10 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xs">
-          {/* Workspace tools */}
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              className="text-slate-500 hover:text-[#714B67] dark:hover:text-purple-300 font-semibold px-2.5 py-1.5 text-xs flex items-center gap-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition cursor-pointer"
-              title="Copy request code"
-            >
-              {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-4 py-2.5 shadow-2xs sm:px-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => canCloseInspector && onClose()} disabled={!canCloseInspector} className="inline-flex items-center rounded-xl bg-[var(--accent-primary)] px-4 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-[var(--accent-primary-hover)] disabled:cursor-wait disabled:opacity-60">
+              Save &amp; Close
+            </button>
+            <button type="button" onClick={() => canCloseInspector && onClose()} disabled={!canCloseInspector} className="rounded-xl bg-[var(--surface-low)] px-3.5 py-1.5 text-xs font-medium text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-container)] disabled:cursor-wait disabled:opacity-60">
+              Discard
+            </button>
+            <span className="mx-1 hidden h-4 w-px bg-[var(--border-subtle)] sm:block" />
+            <button type="button" onClick={handleCopyCode} className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)]" title="Copy request code">
+              {copiedCode ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-[var(--on-surface-subtle)]" />}
               <span>{copiedCode ? "Copied" : "Copy Code"}</span>
             </button>
           </div>
-
-          {/* Right: Authentic Odoo Statusbar Polygon Stepper (Chevrons) */}
-          <div className="flex items-center gap-2">
-            <div className="o_statusbar_status select-none">
-              <div className="o_arrow_button done">1. Brief Intake</div>
-              <div className={`o_arrow_button ${activeStage >= 1 ? (activeStage > 1 ? "done" : "active") : ""}`}>
-                2. Creative Studio
-              </div>
-              <div className={`o_arrow_button ${activeStage >= 2 ? (activeStage > 2 ? "done" : "active") : ""}`}>
-                3. Marketing Review
-              </div>
-              <div className={`o_arrow_button ${activeStage >= 3 ? "done active" : ""}`}>
-                4. Approved &amp; Closed
-              </div>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="hidden min-w-0 items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-1 sm:flex">
+              {[
+                { label: "1. Intake", state: "done" as const },
+                { label: "2. Creative Studio", state: activeStage > 1 ? "done" as const : activeStage === 1 ? "active" as const : "pending" as const },
+                { label: "3. Marketing Review", state: activeStage > 2 ? "done" as const : activeStage === 2 ? "active" as const : "pending" as const },
+                { label: "4. Next Work", state: activeStage >= 3 ? ((includedFollowups as string[]).some((value) => value === "mockup" || value === "sample") ? "done" as const : "active" as const) : "pending" as const },
+              ].map((step, index, steps) => (
+                <React.Fragment key={step.label}>
+                  <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] ${step.state === "done" ? "bg-[var(--surface-lowest)] font-bold text-[var(--accent-primary)] shadow-2xs" : step.state === "active" ? "border border-[var(--accent-primary)] bg-[var(--surface-lowest)] font-bold text-[var(--on-surface)] shadow-2xs" : "font-medium text-[var(--on-surface-subtle)]"}`}>
+                    {step.state === "done" ? <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent-primary)]" /> : step.state === "active" ? <span className="h-2 w-2 rounded-full bg-[var(--accent-primary)]" /> : <span className="h-1.5 w-1.5 rounded-full bg-[var(--border-strong)]" />}
+                    {step.label}
+                  </span>
+                  {index < steps.length - 1 && <ChevronRight className="h-3 w-3 shrink-0 text-[var(--border-strong)]" />}
+                </React.Fragment>
+              ))}
             </div>
-
-            {/* Modal Close [X] */}
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer ml-1"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
+            <button type="button" onClick={() => canCloseInspector && onClose()} disabled={!canCloseInspector} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] disabled:cursor-wait disabled:opacity-60" aria-label="Close">
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -957,16 +1055,16 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
           </div>
         )}
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* ── LEFT: FORM SHEET (DOCUMENT BODY) ── */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[#f8f9ff] dark:bg-[#0f121d]">
-            <div className="max-w-4xl mx-auto rounded-2xl bg-white dark:bg-[#161928] border border-slate-100 dark:border-white/5 shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
+          <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto bg-[var(--bg-app)] p-4 md:p-6">
+            <div className="max-w-4xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
               {/* Sheet Header */}
-              <div className="border-b border-slate-100 dark:border-white/10 bg-white dark:bg-[#161822]">
-                {/* Reference & Mini Progress */}
-                <div className="flex flex-wrap items-center justify-between gap-3 px-8 py-3 bg-slate-50/70 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/5">
+              <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-base)]">
+                {/* Request reference */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 sm:px-8">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-[#714B67] dark:text-purple-300">
+                    <span className="font-mono text-xs font-bold text-[var(--accent-primary)] dark:text-emerald-300">
                       {refCode}
                     </span>
                     <span className="text-zinc-300 dark:text-zinc-700">/</span>
@@ -975,90 +1073,10 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                     </span>
                   </div>
 
-                  {/* 4-Step Linear Pipeline Progression */}
-                  <div className="flex items-center gap-1 sm:gap-2 text-[10.5px] font-mono select-none">
-                    <div className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-bold">
-                      <span className="w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-[9px]">
-                        <Check className="w-2.5 h-2.5" />
-                      </span>
-                      <span>Intake</span>
-                    </div>
-
-                    <span className="text-zinc-300 dark:text-zinc-700 font-sans">→</span>
-
-                    <div
-                      className={`flex items-center gap-1 ${
-                        activeStage >= 1
-                          ? activeStage > 1
-                            ? "text-emerald-700 dark:text-emerald-400 font-bold"
-                            : "text-[#714B67] dark:text-purple-300 font-bold"
-                          : "text-zinc-400 dark:text-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
-                          activeStage > 1
-                            ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700"
-                            : activeStage === 1
-                            ? "bg-purple-100 dark:bg-purple-950 text-[#714B67]"
-                            : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500"
-                        }`}
-                      >
-                        {activeStage > 1 ? <Check className="w-2.5 h-2.5" /> : "2"}
-                      </span>
-                      <span>Creative Studio</span>
-                    </div>
-
-                    <span className="text-zinc-300 dark:text-zinc-700 font-sans">→</span>
-
-                    <div
-                      className={`flex items-center gap-1 ${
-                        activeStage >= 2
-                          ? activeStage > 2
-                            ? "text-emerald-700 dark:text-emerald-400 font-bold"
-                            : "text-amber-700 dark:text-amber-400 font-bold"
-                          : "text-zinc-400 dark:text-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
-                          activeStage > 2
-                            ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700"
-                            : activeStage === 2
-                            ? "bg-amber-100 dark:bg-amber-950 text-amber-700"
-                            : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500"
-                        }`}
-                      >
-                        {activeStage > 2 ? <Check className="w-2.5 h-2.5" /> : "3"}
-                      </span>
-                      <span>Marketing Review</span>
-                    </div>
-
-                    <span className="text-zinc-300 dark:text-zinc-700 font-sans">→</span>
-
-                    <div
-                      className={`flex items-center gap-1 ${
-                        activeStage >= 3
-                          ? "text-purple-700 dark:text-purple-300 font-bold"
-                          : "text-zinc-400 dark:text-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
-                          activeStage >= 3
-                            ? "bg-purple-100 dark:bg-purple-950 text-purple-700"
-                            : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500"
-                        }`}
-                      >
-                        {activeStage >= 3 ? <Check className="w-2.5 h-2.5" /> : "4"}
-                      </span>
-                      <span>Closed</span>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Document Hero & Primary Details */}
-                <div className="px-8 py-4.5">
+                <div className="px-4 py-4 sm:px-8">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-zinc-50 font-display">
@@ -1073,7 +1091,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
                     {/* Context Badges */}
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-purple-50 text-[#714B67] dark:bg-purple-950/50 dark:text-purple-300 border border-[#714B67]/20">
+                      <span className="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-[var(--accent-primary)] dark:bg-emerald-950/50 dark:text-emerald-300 border border-[var(--accent-primary)]/20">
                         Design Request
                       </span>
                       <StatusPill
@@ -1090,7 +1108,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         Current Deadline
                       </span>
                       <div className="flex items-center gap-1.5 mt-1 font-bold text-slate-900 dark:text-zinc-100">
-                        <Calendar className="w-3.5 h-3.5 text-[#017E84]" />
+                        <Calendar className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                         <span>
                           {formatDate(activeRequest.targetArtworkDateCreative || activeRequest.sampleRequiredDate)}
                         </span>
@@ -1120,7 +1138,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                                   setWorkflowError(null);
                                   setIsCounterDateModalOpen(true);
                                 }}
-                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#714B67] hover:text-[#5B3C53] dark:text-purple-300 hover:underline disabled:opacity-40 disabled:no-underline cursor-pointer"
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] dark:text-emerald-300 hover:underline disabled:opacity-40 disabled:no-underline cursor-pointer"
                                 title={
                                   !activeRequest.claimedBy
                                     ? slaStatus.isEligible
@@ -1129,8 +1147,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                                     : !slaStatus.isEligible
                                     ? slaStatus.label === "Counter proposal already used"
                                       ? "Only one counter-date proposal is allowed for this request"
-                                      : "The 48-hour counter-date window from Marketing's request has expired"
-                                    : "Propose a revised completion date within 48 hours of Marketing's request"
+                                      : "The 48-hour counter-date window from Marketing's release has expired"
+                                    : "Propose a revised completion date within 48 hours of Marketing's release"
                                 }
                               >
                                 <Clock className="w-3 h-3" />
@@ -1158,8 +1176,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                       <span className="text-[11px] text-slate-500 font-medium block">
                         Artworks Required
                       </span>
-                      <div className="flex items-center gap-1.5 mt-1 font-bold text-[#714B67] dark:text-[#d5bdd0]">
-                        <Palette className="w-3.5 h-3.5 text-[#714B67]" />
+                      <div className="flex items-center gap-1.5 mt-1 font-bold text-[var(--accent-primary)] dark:text-emerald-300">
+                        <Palette className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
                         <span>{requestedCount} Artworks</span>
                       </div>
                     </div>
@@ -1207,6 +1225,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                     claimedBy={activeRequest.claimedBy}
                     claimedAt={activeRequest.claimedAt}
                     isCreativeMode={mode === "creative"}
+                    isClaiming={isClaiming}
                     canClaim={isCreativeWorkStage && slaStatus.isEligible}
                     claimDisabledReason={
                       isCreativeWorkStage
@@ -1226,14 +1245,14 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                       onClick={() => setActiveTab("specs")}
                       className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-1.5 whitespace-nowrap ${
                         activeTab === "specs"
-                          ? "border-[#714B67] text-[#714B67] dark:text-purple-300 font-bold"
+                          ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-300 font-bold"
                           : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                       }`}
                     >
                       <FileText className="w-3.5 h-3.5" />
                       <span>Scope &amp; Design Brief</span>
                       {references.length > 0 && (
-                        <span className="rounded-full border border-[#714B67]/20 bg-purple-50 px-2 py-0.5 text-[10px] font-mono font-bold text-[#714B67] dark:bg-purple-950/40 dark:text-purple-300">
+                        <span className="rounded-full border border-[var(--accent-primary)]/20 bg-emerald-50 px-2 py-0.5 text-[10px] font-mono font-bold text-[var(--accent-primary)] dark:bg-emerald-950/40 dark:text-emerald-300">
                           {references.length}
                         </span>
                       )}
@@ -1244,7 +1263,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                       onClick={() => setActiveTab("deliverables")}
                       className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-1.5 whitespace-nowrap ${
                         activeTab === "deliverables"
-                          ? "border-[#714B67] text-[#714B67] dark:text-purple-300 font-bold"
+                          ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-300 font-bold"
                           : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                       }`}
                     >
@@ -1254,7 +1273,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         {deliveredCount}/{requestedCount}
                       </span>
                       {isAwaitingReview && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-white animate-pulse font-bold">
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-white  font-bold">
                           Pending
                         </span>
                       )}
@@ -1265,13 +1284,28 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                       onClick={() => setActiveTab("signoff")}
                       className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-1.5 whitespace-nowrap ${
                         activeTab === "signoff"
-                          ? "border-[#714B67] text-[#714B67] dark:text-purple-300 font-bold"
+                          ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-300 font-bold"
                           : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
                       }`}
                     >
                       <ShieldCheck className="w-3.5 h-3.5" />
                       <span>Commercial Sign-Off</span>
                     </button>
+
+                    {mode === "marketing" && isAcceptedByMarketing && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("next_work")}
+                        className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-1.5 whitespace-nowrap ${
+                          activeTab === "next_work"
+                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-300 font-bold"
+                            : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
+                        }`}
+                      >
+                        <span>4. Next Work</span>
+                        <span className="rounded-full bg-[var(--accent-primary-subtle)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--accent-primary)]">Optional</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1297,8 +1331,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         Art Direction &amp; Aesthetic Theme
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-3.5 rounded-xl border border-purple-200/80 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-1.5">
-                          <div className="text-xs text-[#714B67] dark:text-purple-300 font-bold flex items-center gap-1.5">
+                        <div className="space-y-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3.5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                          <div className="text-xs text-[var(--accent-primary)] dark:text-emerald-300 font-bold flex items-center gap-1.5">
                             <Sparkles className="w-3.5 h-3.5" />
                             <span>Theme / Trend</span>
                           </div>
@@ -1372,7 +1406,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                               disabled={!activeRequest.claimedBy || isSubmittingOutput}
                               aria-expanded={showSubmitForm}
                               aria-controls="creative-output-matrix"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#714B67] hover:bg-[#5B3C53] text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                               title={!activeRequest.claimedBy ? "Claim the task before submitting artwork" : "Open the artwork submission matrix in this inspector"}
                             >
                               {showSubmitForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
@@ -1392,7 +1426,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         aria-valuenow={deliveredCount}
                       >
                         <div
-                          className="h-full bg-[#017E84] rounded-full transition-all duration-500"
+                          className="h-full bg-teal-600 dark:bg-teal-500 rounded-full transition-all duration-500"
                           style={{
                             width: `${Math.min(100, Math.round((deliveredCount / Math.max(1, requestedCount)) * 100))}%`,
                           }}
@@ -1412,14 +1446,14 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
                             <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-zinc-100">
-                              <FolderOpen className="h-4 w-4 text-[#714B67] dark:text-purple-300" />
+                              <FolderOpen className="h-4 w-4 text-[var(--accent-primary)] dark:text-emerald-300" />
                               <h3 id="creative-output-matrix-title">Artwork submission matrix</h3>
-                              <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-[#714B67] dark:bg-purple-950/50 dark:text-purple-300">
+                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-primary)] dark:bg-emerald-950/50 dark:text-emerald-300">
                                 Batch #{submissions.length + 1}
                               </span>
                             </div>
                             <p className="mt-1 text-xs text-slate-600 dark:text-zinc-400">
-                              Add artwork details and a shareable file link. Marketing will review this batch in the same request.
+                              Shutterstock No. and remark are optional individually; enter at least one for each artwork.
                             </p>
                           </div>
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-white/5 dark:text-zinc-300">
@@ -1430,18 +1464,20 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
                           <div>
                             <label htmlFor="creative-output-file-link" className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                              Artwork folder or design file link <span className="text-rose-500">*</span>
+                              Artwork folder or design file link/path <span className="text-rose-500">*</span>
                             </label>
                             <input
                               id="creative-output-file-link"
-                              type="url"
+                              type="text"
                               required
                               disabled={isSubmittingOutput}
+                              maxLength={2048}
                               value={designFileUrl}
                               onChange={(e) => setDesignFileUrl(e.target.value)}
-                              placeholder="https://drive.google.com/... or Figma link"
-                              className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[#714B67] focus:ring-2 focus:ring-[#714B67]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                              placeholder="Paste a share link or file/folder path"
+                              className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                             />
+                            <p className="mt-1 text-[10px] text-slate-500 dark:text-zinc-400">Paste any reference text that helps the team locate the artwork files. URLs and paths also work.</p>
                           </div>
                           <div>
                             <label htmlFor="creative-output-count" className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
@@ -1455,7 +1491,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                               disabled={isSubmittingOutput}
                               value={outputCount}
                               onChange={(e) => handleOutputCountChange(Number(e.target.value))}
-                              className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-mono text-slate-900 outline-none focus:border-[#714B67] focus:ring-2 focus:ring-[#714B67]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                              className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-mono text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                             />
                           </div>
                         </div>
@@ -1463,45 +1499,50 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         {/* Dynamic Rows */}
                         <div className="overflow-x-auto rounded-lg ring-1 ring-slate-200 dark:ring-zinc-800">
                           <div className="min-w-[520px]">
-                            <div className="grid grid-cols-[64px_minmax(220px,1fr)_minmax(160px,0.8fr)] gap-2 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+                            <div className="grid grid-cols-[52px_minmax(180px,1.2fr)_minmax(170px,0.9fr)_minmax(150px,0.8fr)] gap-2 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
                               <span>Code</span>
-                              <span>Description</span>
-                              <span>Remarks</span>
+                              <span>Marketing Description</span>
+                              <span>Shutterstock No. (optional)</span>
+                              <span>Creative Remark (optional)</span>
                             </div>
                             {outputRows.map((row, index) => (
                               <div
                                 key={index}
-                                className="grid grid-cols-[64px_minmax(220px,1fr)_minmax(160px,0.8fr)] items-center gap-2 border-t border-slate-100 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/70"
+                                className="grid grid-cols-[52px_minmax(180px,1.2fr)_minmax(170px,0.9fr)_minmax(150px,0.8fr)] items-center gap-2 border-t border-slate-100 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/70"
                               >
-                                <span className="font-mono text-xs font-bold text-[#714B67] dark:text-purple-300">
+                                <span className="font-mono text-xs font-bold text-[var(--accent-primary)] dark:text-emerald-300">
                                   D{deliveredCount + index + 1}
+                                </span>
+                                <span className="min-w-0 text-xs font-medium text-slate-700 dark:text-zinc-200">
+                                  {activeRequest.productDescription.trim()} - D{deliveredCount + index + 1}
                                 </span>
                                 <input
                                   type="text"
-                                  required
                                   disabled={isSubmittingOutput}
-                                  aria-label={`Artwork D${deliveredCount + index + 1} description`}
-                                  placeholder="Artwork description"
-                                  value={row.description}
+                                  maxLength={100}
+                                  aria-label={`Artwork D${deliveredCount + index + 1} Shutterstock number`}
+                                  placeholder="Enter Shutterstock No."
+                                  value={row.shutterstockNo}
                                   onChange={(e) =>
                                     setOutputRows((curr) =>
-                                      curr.map((r, i) => (i === index ? { ...r, description: e.target.value } : r))
+                                      curr.map((r, i) => (i === index ? { ...r, shutterstockNo: e.target.value } : r))
                                     )
                                   }
-                                  className="h-9 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-900 outline-none focus:border-[#714B67] focus:ring-2 focus:ring-[#714B67]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                                  className="h-9 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                                 />
                                 <input
                                   type="text"
                                   disabled={isSubmittingOutput}
-                                  aria-label={`Artwork D${deliveredCount + index + 1} remarks`}
-                                  placeholder="Finishes or notes"
+                                  maxLength={1000}
+                                  aria-label={`Artwork D${deliveredCount + index + 1} creative remark`}
+                                  placeholder="Optional remark"
                                   value={row.remarks}
                                   onChange={(e) =>
                                     setOutputRows((curr) =>
                                       curr.map((r, i) => (i === index ? { ...r, remarks: e.target.value } : r))
                                     )
                                   }
-                                  className="h-9 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-900 outline-none focus:border-[#714B67] focus:ring-2 focus:ring-[#714B67]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                                  className="h-9 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                                 />
                               </div>
                             ))}
@@ -1526,8 +1567,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                           </button>
                           <button
                             type="submit"
-                            disabled={isSubmittingOutput || !designFileUrl.trim()}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#714B67] px-4 text-xs font-semibold text-white transition hover:bg-[#5B3C53] disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={isSubmittingOutput || !designFileUrl.trim() || outputRows.some((row) => !row.shutterstockNo.trim() && !row.remarks.trim())}
+                            className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-4 text-xs font-semibold text-white transition hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <Send className="w-3.5 h-3.5" />
                             <span>{isSubmittingOutput ? "Submitting…" : "Submit batch to Marketing"}</span>
@@ -1536,22 +1577,34 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                       </form>
                     )}
 
-                    {mode === "creative" && isAwaitingReview && (
+                    {mode === "creative" && (isAwaitingReview || isRemainingRequested) && (
                       <div role="status" className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-950 ring-1 ring-amber-200/80 dark:bg-amber-950/25 dark:text-amber-200 dark:ring-amber-900/50">
-                        <strong className="font-semibold">Waiting for Marketing review.</strong>{" "}
-                        The submitted batch is saved in this request. Creative can send another batch if Marketing asks for the remaining artwork.
+                        {isRemainingRequested ? (
+                          <>
+                            <strong className="font-semibold">Marketing requested the remaining artwork.</strong>{" "}
+                            Submit the next batch whenever it is ready; this request stays with Creative until Marketing accepts it. {remainingCount} remaining.
+                          </>
+                        ) : (
+                          <>
+                            <strong className="font-semibold">Waiting for Marketing review.</strong>{" "}
+                            The submitted batch is saved in this request. Marketing can accept it or request the remaining artwork.
+                          </>
+                        )}
                       </div>
                     )}
 
                     {/* Marketing Review Verdict Spotlight */}
-                    {mode === "marketing" && isAwaitingReview && (
-                      <div className="p-4 rounded-lg border border-[#714B67]/30 bg-[#714B67]/[0.03] dark:border-[#714B67]/40 dark:bg-[#714B67]/10 space-y-3">
-                        <div className="flex items-center gap-2 text-xs font-bold text-[#714B67] dark:text-[#d5bdd0]">
+                    {mode === "marketing" && (isAwaitingReview || isRemainingRequested) && (
+                      <div className="p-4 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/[0.03] dark:border-[var(--accent-primary)]/40 dark:bg-[var(--accent-primary)]/10 space-y-3">
+                        <div className="flex items-center gap-2 text-xs font-bold text-[var(--accent-primary)] dark:text-emerald-300">
                           <ShieldCheck className="w-4 h-4" />
                           <span>Marketing Review &amp; Commercial Sign-Off</span>
                         </div>
                         <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                          Creative Studio submitted <strong>{deliveredCount} of {requestedCount}</strong> requested artworks. Please review the deliverables and select your verdict.
+                          Creative Studio has submitted <strong>{deliveredCount} of {requestedCount}</strong> requested artworks.
+                          {isRemainingRequested && remainingCount > 0
+                            ? <> Creative is continuing the remaining work ({remainingCount} left); you can accept the delivered set whenever it is ready.</>
+                            : " Review the deliverables and select your verdict."}
                         </p>
 
                         {decisionError && (
@@ -1566,22 +1619,33 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                             type="button"
                             disabled={isDeciding}
                             onClick={() => handleMarketingDecision("accept")}
-                            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded bg-[#714B67] hover:bg-[#5B3C53] text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold shadow-xs transition cursor-pointer"
                           >
                             <Check className="w-3.5 h-3.5" />
-                            <span>{isDeciding ? "Processing..." : "Accept & Close Request"}</span>
+                            <span>{isDeciding ? "Processing..." : isRemainingRequested ? "Accept Delivered Designs & Close" : "Accept & Continue"}</span>
                           </button>
 
-                          <button
-                            type="button"
-                            disabled={isDeciding || remainingCount === 0}
-                            onClick={() => handleMarketingDecision("request_remaining")}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-[#714B67]/40 bg-white text-[#714B67] hover:bg-neutral-50 text-xs font-bold transition cursor-pointer"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Request Remaining Artworks ({remainingCount})</span>
-                          </button>
+                          {!isRemainingRequested && remainingCount > 0 && (
+                            <button
+                              type="button"
+                              disabled={isDeciding}
+                              onClick={() => handleMarketingDecision("request_remaining")}
+                              className="inline-flex items-center gap-1.5 rounded border border-[var(--accent-primary)]/40 bg-white px-3 py-1.5 text-xs font-bold text-[var(--accent-primary)] transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              <span>Request Remaining Artworks ({remainingCount})</span>
+                            </button>
+                          )}
                         </div>
+                      </div>
+                    )}
+
+                    {mode === "marketing" && isAcceptedByMarketing && (
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-3">
+                        <p className="text-xs text-[var(--on-surface-muted)]">Artwork accepted. Mockup or Sampling can be added from the Next Work stage.</p>
+                        <button type="button" onClick={() => setActiveTab("next_work")} className="rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--accent-primary-hover)]">
+                          Open Next Work
+                        </button>
                       </div>
                     )}
 
@@ -1609,40 +1673,54 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                                 <span className="text-zinc-500 font-mono">
                                   {formatDate(batch.submittedAt)}
                                 </span>
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#017E84]/10 text-[#017E84]">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300">
                                   {batch.rows.length} Artworks
                                 </span>
                               </div>
 
-                              {batch.designFileUrl && (
+                              {batch.designFileUrl && (isHttpLink(batch.designFileUrl) ? (
                                 <a
                                   href={batch.designFileUrl}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#714B67] hover:bg-[#5B3C53] text-white text-[11px] font-semibold transition"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-[11px] font-semibold transition"
                                 >
                                   <span>Open Artwork Files</span>
                                   <ExternalLink className="w-3 h-3" />
                                 </a>
-                              )}
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCopyArtworkPath(batch.designFileUrl)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-[11px] font-semibold transition"
+                                  title={batch.designFileUrl}
+                                >
+                                  <Copy className="w-3 h-3" />
+                                  <span>{copiedArtworkPath === batch.designFileUrl ? "Path Copied" : "Copy Artwork Path"}</span>
+                                </button>
+                              ))}
                             </div>
 
                             <table className="w-full text-left text-xs">
                               <thead className="bg-zinc-50 dark:bg-zinc-900/40 text-[10.5px] uppercase font-mono text-zinc-500 border-b border-zinc-100 dark:border-zinc-800">
                                 <tr>
                                   <th className="px-3.5 py-2 w-16">Code</th>
-                                  <th className="px-3.5 py-2">Artwork Description</th>
-                                  <th className="px-3.5 py-2">Remarks</th>
+                                  <th className="px-3.5 py-2">Marketing Description</th>
+                                  <th className="px-3.5 py-2">Shutterstock No.</th>
+                                  <th className="px-3.5 py-2">Creative Remark</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                                 {batch.rows.map((row: any) => (
                                   <tr key={row.designNumber}>
-                                    <td className="px-3.5 py-2.5 font-mono font-bold text-[#714B67] dark:text-[#d5bdd0]">
+                                    <td className="px-3.5 py-2.5 font-mono font-bold text-[var(--accent-primary)] dark:text-emerald-300">
                                       {row.designNumber}
                                     </td>
                                     <td className="px-3.5 py-2.5 font-medium text-zinc-900 dark:text-zinc-100">
                                       {row.description}
+                                    </td>
+                                    <td className="px-3.5 py-2.5 font-mono font-medium text-zinc-800 dark:text-zinc-200">
+                                      {row.shutterstockNo || "—"}
                                     </td>
                                     <td className="px-3.5 py-2.5 text-zinc-600 dark:text-zinc-400">
                                       {row.remarks || ""}
@@ -1665,41 +1743,114 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                       <div className="p-6 rounded-lg border border-emerald-200 bg-emerald-50/70 text-center dark:border-emerald-900/50 dark:bg-emerald-950/20">
                         <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600 mb-2" />
                         <h4 className="text-base font-bold text-emerald-900 dark:text-emerald-200">
-                          Design Package Approved &amp; Released
+                          Design request approved
                         </h4>
                         <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 max-w-md mx-auto">
-                          Marketing has finalized and closed this design request. All graphic assets are confirmed ready for prepress production.
+                          Marketing accepted the submitted artwork. This design request is now closed.
                         </p>
                       </div>
                     ) : (
                       <div className="p-6 rounded-lg border border-zinc-200 bg-zinc-50 text-center dark:border-zinc-800 dark:bg-zinc-900/40">
                         <Clock className="mx-auto h-8 w-8 text-zinc-400 mb-2" />
                         <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                          Awaiting Production Sign-Off
+                          Awaiting Marketing decision
                         </h4>
                         <p className="text-xs text-zinc-500 mt-1">
-                          Commercial sign-off will take effect once Marketing accepts the submitted creative outputs.
+                          Marketing has not accepted the submitted artwork yet.
                         </p>
                       </div>
                     )}
                   </div>
+                )}
+
+                {activeTab === "next_work" && mode === "marketing" && isAcceptedByMarketing && (
+                  <section className="space-y-4" aria-labelledby="design-followup-title">
+                    <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--border-subtle)] pb-3">
+                      <div>
+                        <h3 id="design-followup-title" className="text-sm font-semibold text-[var(--on-surface)]">
+                          Next Work
+                        </h3>
+                        <p className="mt-1 text-xs text-[var(--on-surface-muted)]">
+                          Artwork is accepted. Add Mockup, Sampling, or both to this same request.
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1 text-[11px] font-medium text-[var(--on-surface-muted)]">
+                        {refCode}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {([
+                        { value: "mockup" as const, title: "Mockup", detail: "Route the accepted artwork into the Creative mockup workflow.", icon: Package },
+                        { value: "sample" as const, title: "Sampling", detail: "Add the request to the existing SAMP review workflow.", icon: Factory },
+                      ]).map((option) => {
+                        const Icon = option.icon;
+                        const included = (includedFollowups as string[]).includes(option.value);
+                        const selected = selectedFollowups.includes(option.value);
+                        return (
+                          <label key={option.value} className={`flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-4 transition ${included ? "opacity-75" : "hover:border-[var(--accent-primary)]/50"}`}>
+                            <input
+                              type="checkbox"
+                              checked={included || selected}
+                              disabled={included || isAddingFollowups}
+                              onChange={(event) => {
+                                setFollowupError(null);
+                                setSelectedFollowups((current) => event.target.checked
+                                  ? [...current, option.value]
+                                  : current.filter((value) => value !== option.value));
+                              }}
+                              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-primary)]"
+                              aria-label={`Add ${option.title} to this request`}
+                            />
+                            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-primary)]" aria-hidden="true" />
+                            <span className="min-w-0">
+                              <span className="flex items-center gap-2 text-xs font-semibold text-[var(--on-surface)]">
+                                {option.title}
+                                {included && <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300">Already added</span>}
+                              </span>
+                              <span className="mt-1 block text-[11px] leading-4 text-[var(--on-surface-muted)]">{option.detail}</span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {followupError && (
+                      <div role="alert" className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <span>{followupError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        disabled={!effectiveDesignId || selectedFollowups.length === 0 || isAddingFollowups}
+                        onClick={() => void handleAddFollowups()}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-4 text-xs font-semibold text-white transition hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        {isAddingFollowups ? "Adding…" : "Add to this request"}
+                      </button>
+                    </div>
+                  </section>
                 )}
               </div>
             </div>
           </div>
 
           {/* ── RIGHT: AUDIT TRAIL & CHATTER (IMAGE 1 EXACT DESIGN) ── */}
-          <div className="w-80 lg:w-[390px] border-l border-slate-100 dark:border-white/5 bg-[#f8f9ff] dark:bg-[#131622] flex flex-col h-full shrink-0 overflow-hidden select-text shadow-[-12px_0_36px_rgba(11,28,48,0.03)] relative z-10">
+          <div className="relative z-10 flex h-[34dvh] max-h-[300px] w-full shrink-0 flex-col overflow-hidden border-t border-slate-100 bg-[var(--surface-lowest)] select-text border-[var(--border-subtle)] lg:h-full lg:max-h-none lg:w-[390px] lg:border-l lg:border-t-0 lg:shadow-[-12px_0_36px_rgba(11,28,48,0.03)]">
             {/* Chatter Header with Indicator & Filter Tabs */}
-            <div className="px-4 py-3 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-white dark:bg-[#161826]">
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-white dark:bg-zinc-900">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 "></span>
                 <div>
                   <span className="block font-semibold text-xs text-zinc-800 dark:text-zinc-200">
-                    Activity &amp; Communication Log
+                    Activity
                   </span>
                   <span className="block text-[10px] text-zinc-500 dark:text-zinc-400">
-                    Marketing &amp; Creative handoff
+                    Marketing and Creative updates
                   </span>
                 </div>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
@@ -1755,26 +1906,28 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                   type="text"
                   value={noteInput}
                   onChange={(e) => setNoteInput(e.target.value)}
-                  placeholder="Log internal note or directive..."
-                  className="w-full pl-3 pr-8 py-2 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                  placeholder="Add a short note..."
+                  maxLength={2000}
+                  disabled={isPostingNote}
+                  className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-9 text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                 />
                 <button
                   type="submit"
-                  disabled={!noteInput.trim()}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-[#714B67] disabled:opacity-30 cursor-pointer transition"
+                  disabled={!noteInput.trim() || isPostingNote}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-zinc-400 transition hover:text-[var(--accent-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/30 disabled:cursor-not-allowed disabled:opacity-30"
                   title="Post note"
+                  aria-label={isPostingNote ? "Saving note" : "Post note"}
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  {isPostingNote ? <Clock className="h-3.5 w-3.5 " /> : <Send className="w-3.5 h-3.5" />}
                 </button>
               </div>
-              <div className="flex items-center justify-between mt-1 px-1 text-[10px] text-zinc-400 font-mono">
-                <span>Visible to Marketing &amp; Creative Studio</span>
-                <span>Press Enter to send</span>
+              <div className="mt-1 px-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+                Visible to Marketing and Creative Studio · {noteInput.length}/2000
               </div>
             </form>
 
             {/* Chronological Stream */}
-            <div className="flex-1 overflow-y-auto bg-[#f8f9ff] p-3.5 space-y-3 dark:bg-[#131622]">
+            <div className="flex-1 overflow-y-auto bg-[var(--surface-lowest)] p-3.5 space-y-3">
               {filteredChatter.length === 0 ? (
                 <div className="py-12 text-center text-zinc-400 font-mono text-[11px]">
                   No chatter entries found.
@@ -1815,19 +1968,19 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                   const bubbleTone = evt.isNote
                     ? "border-amber-200/80 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/25"
                     : isMarketing
-                    ? "border-emerald-200/70 bg-white dark:border-emerald-900/40 dark:bg-[#1a202c]"
-                    : "border-sky-200/70 bg-[#f4f8ff] dark:border-sky-900/40 dark:bg-[#152033]";
+                    ? "border-emerald-200/70 bg-white dark:border-emerald-900/40 dark:bg-zinc-900"
+                    : "border-sky-200/70 bg-sky-50 dark:border-sky-900/40 dark:bg-zinc-900";
                   const avatarTone = isMarketing
-                    ? "bg-[#006d32] text-white"
+                    ? "bg-[var(--accent-primary)] text-white"
                     : isCreative
-                    ? "bg-[#0070ff] text-white"
+                    ? "bg-purple-600 text-white"
                     : "bg-amber-500 text-white";
 
                   return (
                     <div key={evt.id} className={`flex max-w-[94%] flex-col text-xs select-text ${isMarketing ? "items-start" : "ml-auto items-end"}`}>
                       <article className={`w-full rounded-2xl ${isMarketing ? "rounded-tl-sm" : "rounded-tr-sm"} border p-3 shadow-[0_2px_8px_rgba(11,28,48,0.04)] ${bubbleTone}`}>
                         <div className="flex items-center justify-between gap-2 border-b border-slate-200/70 pb-1.5 dark:border-white/10">
-                          <div className="flex min-w-0 items-center gap-2">
+                          <div className="flex items-center gap-2">
                             <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-bold ${avatarTone}`}>
                               {initials}
                             </span>
@@ -1863,14 +2016,16 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       </div>
 
       {/* Counter Target Date Proposal Modal */}
-      <DesignCounterDateModal
-        isOpen={isCounterDateModalOpen}
-        onClose={() => setIsCounterDateModalOpen(false)}
-        originalDate={activeRequest.targetArtworkDateCreative || activeRequest.sampleRequiredDate || ""}
-        isSlaEligible={slaStatus.isEligible}
-        slaLabel={slaStatus.label}
-        onSubmitCounterDate={handleProposeCounterDate}
-      />
+      {isCounterDateModalOpen && (
+        <DesignCounterDateModal
+          isOpen={isCounterDateModalOpen}
+          onClose={() => setIsCounterDateModalOpen(false)}
+          originalDate={activeRequest.targetArtworkDateCreative || activeRequest.sampleRequiredDate || ""}
+          isSlaEligible={slaStatus.isEligible}
+          slaLabel={slaStatus.label}
+          onSubmitCounterDate={handleProposeCounterDate}
+        />
+      )}
 
       {/* Lightbox Image Preview Modal */}
       {lightboxImage && (
@@ -1894,6 +2049,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
           </div>
         </div>
       )}
+      </>
     </div>,
     document.body
   );

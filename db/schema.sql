@@ -48,6 +48,7 @@ CREATE TABLE public.create_sample_requests (
     target_plant character varying(100) DEFAULT '1505- Khaniwade'::character varying NOT NULL,
     date_request_created character varying(50) NOT NULL,
     created_by character varying(100) NOT NULL,
+    created_by_user_id integer,
     material_code character varying(100) NOT NULL,
     status character varying(50) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -191,6 +192,7 @@ CREATE TABLE public.design_requests (
     product_description text NOT NULL,
     design_required_date character varying(50),
     created_by character varying(100) NOT NULL,
+    created_by_user_id integer,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     folder_path text,
@@ -234,7 +236,8 @@ ALTER SEQUENCE public.design_requests_id_seq OWNED BY public.design_requests.id;
 
 CREATE TABLE public.feasibility_activity_logs (
     id integer NOT NULL,
-    feasibility_request_id integer NOT NULL,
+    feasibility_request_id integer,
+    request_code character varying(32),
     actor_id integer,
     actor_name character varying(255) NOT NULL,
     actor_department character varying(100) NOT NULL,
@@ -597,6 +600,23 @@ CREATE TABLE public.program_requests (
     program_year character varying(50) DEFAULT '2026-2027'::character varying NOT NULL,
     status character varying(64) DEFAULT 'Pending SAMP Review'::character varying NOT NULL,
     created_by character varying(255),
+    created_by_user_id integer,
+    sampling_seen_at timestamp with time zone,
+    sampling_seen_by character varying(255),
+    sampling_verdict character varying(64),
+    sampling_remark text,
+    sampling_signed_at timestamp with time zone,
+    sampling_signed_by character varying(255),
+    sampling_claimed_by_user_id integer,
+    sampling_claimed_by character varying(255),
+    plant_seen_at timestamp with time zone,
+    plant_seen_by character varying(255),
+    plant_verdict character varying(64),
+    plant_remark text,
+    plant_signed_at timestamp with time zone,
+    plant_signed_by character varying(255),
+    plant_claimed_by_user_id integer,
+    plant_claimed_by character varying(255),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -706,8 +726,12 @@ CREATE TABLE public.users (
     userid character varying(100) NOT NULL,
     email character varying(255) NOT NULL,
     password_hash character varying(255) NOT NULL,
-    role character varying(50) NOT NULL,
+    role character varying(50) DEFAULT 'user'::character varying NOT NULL,
     sub_role character varying(100),
+    team character varying(100),
+    is_team_head boolean DEFAULT false NOT NULL,
+    plant_code character varying(50),
+    theme_id character varying(20) DEFAULT 'emerald'::character varying NOT NULL,
     is_active boolean NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone
@@ -996,6 +1020,9 @@ ALTER TABLE ONLY public.sample_request_types
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT ck_users_team_head_requires_team CHECK ((NOT is_team_head) OR (NULLIF(btrim(team::text), ''::text) IS NOT NULL));
+
 
 --
 -- Name: ix_create_sample_requests_customer; Type: INDEX; Schema: public; Owner: -
@@ -1100,20 +1127,6 @@ CREATE UNIQUE INDEX ix_design_requests_request_code ON public.design_requests US
 --
 
 CREATE INDEX ix_design_requests_sr_number ON public.design_requests USING btree (sr_number);
-
-
---
--- Name: ix_feasibility_activity_logs_feasibility_request_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX ix_feasibility_activity_logs_feasibility_request_id ON public.feasibility_activity_logs USING btree (feasibility_request_id);
-
-
---
--- Name: ix_feasibility_activity_logs_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX ix_feasibility_activity_logs_id ON public.feasibility_activity_logs USING btree (id);
 
 
 --
@@ -1397,6 +1410,20 @@ CREATE UNIQUE INDEX ix_users_userid ON public.users USING btree (userid);
 
 
 --
+-- Name: ix_users_team; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_users_team ON public.users USING btree (team);
+
+
+--
+-- Name: ix_users_team_head; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_users_team_head ON public.users USING btree (team, is_team_head);
+
+
+--
 -- Name: uq_pc_class_char; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1445,7 +1472,7 @@ ALTER TABLE ONLY public.design_request_activity_logs
 --
 
 ALTER TABLE ONLY public.feasibility_activity_logs
-    ADD CONSTRAINT feasibility_activity_logs_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES public.users(id);
+    ADD CONSTRAINT feasibility_activity_logs_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -1453,7 +1480,7 @@ ALTER TABLE ONLY public.feasibility_activity_logs
 --
 
 ALTER TABLE ONLY public.feasibility_activity_logs
-    ADD CONSTRAINT feasibility_activity_logs_feasibility_request_id_fkey FOREIGN KEY (feasibility_request_id) REFERENCES public.feasibility_requests(id) ON DELETE CASCADE;
+    ADD CONSTRAINT feasibility_activity_logs_feasibility_request_id_fkey FOREIGN KEY (feasibility_request_id) REFERENCES public.feasibility_requests(id) ON DELETE SET NULL;
 
 
 --
@@ -1518,6 +1545,78 @@ ALTER TABLE ONLY public.program_material_specifications
 
 ALTER TABLE ONLY public.sample_request_types
     ADD CONSTRAINT sample_request_types_sample_request_id_fkey FOREIGN KEY (sample_request_id) REFERENCES public.create_sample_requests(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sample_request_activity_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sample_request_activity_logs (
+    id integer NOT NULL,
+    sample_request_id integer,
+    request_sr_number character varying(50),
+    actor_user_id integer,
+    actor_name character varying(255) NOT NULL,
+    actor_department character varying(100),
+    action character varying(64) NOT NULL,
+    from_status character varying(64),
+    to_status character varying(64),
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE public.sample_request_activity_logs_id_seq
+    AS integer START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;
+
+ALTER SEQUENCE public.sample_request_activity_logs_id_seq
+    OWNED BY public.sample_request_activity_logs.id;
+
+ALTER TABLE ONLY public.sample_request_activity_logs
+    ALTER COLUMN id SET DEFAULT nextval('public.sample_request_activity_logs_id_seq'::regclass);
+
+ALTER TABLE ONLY public.sample_request_activity_logs
+    ADD CONSTRAINT sample_request_activity_logs_pkey PRIMARY KEY (id);
+
+CREATE INDEX ix_sample_request_activity_logs_request_sr_number
+    ON public.sample_request_activity_logs USING btree (request_sr_number);
+CREATE INDEX ix_sample_request_activity_logs_actor_user_id
+    ON public.sample_request_activity_logs USING btree (actor_user_id);
+CREATE INDEX ix_sample_request_activity_logs_created_at
+    ON public.sample_request_activity_logs USING btree (created_at);
+CREATE INDEX ix_sample_request_activity_request_created
+    ON public.sample_request_activity_logs USING btree (sample_request_id, created_at);
+CREATE INDEX ix_sample_request_activity_action_created
+    ON public.sample_request_activity_logs USING btree (action, created_at);
+
+ALTER TABLE ONLY public.sample_request_activity_logs
+    ADD CONSTRAINT sample_request_activity_logs_sample_request_id_fkey
+    FOREIGN KEY (sample_request_id) REFERENCES public.create_sample_requests(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.sample_request_activity_logs
+    ADD CONSTRAINT sample_request_activity_logs_actor_user_id_fkey
+    FOREIGN KEY (actor_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.feasibility_requests
+    ADD CONSTRAINT fk_feasibility_requests_converted_sample_request
+    FOREIGN KEY (converted_sample_request_id) REFERENCES public.create_sample_requests(id) ON DELETE RESTRICT;
+CREATE UNIQUE INDEX uq_feasibility_requests_converted_sample_request_id
+    ON public.feasibility_requests USING btree (converted_sample_request_id)
+    WHERE (converted_sample_request_id IS NOT NULL);
+
+CREATE INDEX ix_create_sample_requests_request_types_gin
+    ON public.create_sample_requests USING gin (request_types jsonb_path_ops);
+CREATE INDEX ix_feasibility_requests_created_by_user_id
+    ON public.feasibility_requests USING btree (created_by_user_id);
+CREATE INDEX ix_feasibility_activity_request_id_id
+    ON public.feasibility_activity_logs USING btree (feasibility_request_id, id);
+CREATE INDEX ix_feasibility_activity_request_code_created
+    ON public.feasibility_activity_logs USING btree (request_code, created_at, id);
+
+CREATE TABLE public.schema_migrations (
+    version character varying(100) NOT NULL,
+    description character varying(255) NOT NULL,
+    applied_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT schema_migrations_pkey PRIMARY KEY (version)
+);
 
 
 --

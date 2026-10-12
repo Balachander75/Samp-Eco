@@ -57,7 +57,7 @@ export const MarketingCounterDateBanner: React.FC<MarketingCounterDateBannerProp
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-            <Clock className="w-4 h-4 stroke-[2.5] animate-pulse" />
+            <Clock className="w-4 h-4 stroke-[2.5] " />
           </div>
 
           <div className="min-w-0 space-y-1">
@@ -129,7 +129,7 @@ export const MarketingCounterDateBanner: React.FC<MarketingCounterDateBannerProp
               type="button"
               disabled={isProcessing}
               onClick={handleConfirmAccept}
-              className="h-8.5 px-4 rounded-xl bg-[#006d32] hover:bg-[#005324] text-white text-xs font-bold cursor-pointer transition shadow-sm flex items-center gap-1.5 active:scale-98"
+              className="h-8.5 px-4 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)] text-white text-xs font-bold cursor-pointer transition shadow-sm flex items-center gap-1.5 active:scale-98"
             >
               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>{isProcessing ? "Accepting..." : "Accept New Date"}</span>

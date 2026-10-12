@@ -46,6 +46,8 @@ class FeasibilitySampVerdictPayload(BaseModel):
 
     response: Literal["Yes", "No", "Maybe"]
     remark: Optional[str] = None
+    conditions: Optional[str] = None
+    lead_time_note: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_remarks_rule(self):
@@ -64,6 +66,16 @@ class FeasibilityMarketingDecisionPayload(BaseModel):
     decision_remark: Optional[str] = None
 
 
+class FeasibilityCounterDateProposalPayload(BaseModel):
+    proposed_date: date
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class FeasibilityCounterDateDecisionPayload(BaseModel):
+    decision: Literal["accepted", "rejected"]
+    decision_remark: Optional[str] = Field(default=None, max_length=2000)
+
+
 class FeasibilityNoteCreate(BaseModel):
     """Payload for adding a note/comment to the feasibility audit chatter."""
 
@@ -72,7 +84,8 @@ class FeasibilityNoteCreate(BaseModel):
 
 class FeasibilityActivityLogOut(BaseModel):
     id: int
-    feasibility_request_id: int
+    feasibility_request_id: Optional[int] = None
+    request_code: Optional[str] = None
     actor_id: Optional[int] = None
     actor_name: str
     actor_department: str
@@ -86,8 +99,8 @@ class FeasibilityActivityLogOut(BaseModel):
 class FeasibilityRequestOut(BaseModel):
     id: int
     request_code: str
-    sr_number: str
     customer: str
+    target_plant: Optional[str] = None
     feasibility_type: str
     custom_feasibility_type: Optional[str] = None
     description_notes: str
@@ -105,13 +118,28 @@ class FeasibilityRequestOut(BaseModel):
 
     # SAMP Team response fields
     taken_by_samp: Optional[str] = None
+    taken_by_samp_user_id: Optional[int] = None
     taken_at_samp: Optional[datetime] = None
     sampling_feasibility_response: Optional[str] = None
     sampling_feasibility_remark: Optional[str] = None
+    feasibility_conditions: Optional[str] = None
+    lead_time_note: Optional[str] = None
     sampling_feasibility_approved_by: Optional[str] = None
     feasibility_closed_at: Optional[datetime] = None
     feasibility_closed_by: Optional[str] = None
     is_responded_on_time: Optional[bool] = None
+
+    samp_counter_date: Optional[date] = None
+    samp_counter_date_reason: Optional[str] = None
+    samp_counter_date_proposed_at: Optional[datetime] = None
+    samp_counter_date_proposed_by: Optional[str] = None
+    counter_date_decision: Optional[str] = None
+    counter_date_decision_at: Optional[datetime] = None
+    counter_date_decision_by: Optional[str] = None
+    counter_date_decision_remark: Optional[str] = None
+    counter_date_decision_due_at: Optional[datetime] = None
+    counter_date_wait_workdays: Optional[int] = None
+    samp_sla_paused_workdays: int = 0
 
     # Marketing final decision fields
     marketing_decision: Optional[str] = None
@@ -122,6 +150,7 @@ class FeasibilityRequestOut(BaseModel):
     # Sampling request conversion fields
     converted_sample_request_id: Optional[int] = None
     converted_sr_number: Optional[str] = None
+    converted_request_types: List[str] = Field(default_factory=list)
     converted_at: Optional[datetime] = None
     converted_by: Optional[str] = None
 

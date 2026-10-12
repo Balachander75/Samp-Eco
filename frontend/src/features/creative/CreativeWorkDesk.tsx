@@ -2,14 +2,17 @@ import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
 import { fetchCreativeBriefsApi } from "@/infrastructure/api/downstreamApi";
-import { fetchAllMarketingRequestsApi } from "@/infrastructure/api/sampleRequestsApi";
+import { claimMockupRequestApi, fetchAllMarketingRequestsApi } from "@/infrastructure/api/sampleRequestsApi";
 import { useBusinessYear } from "@/context/BusinessYearContext";
 import { CreativeBriefItem, SampleRequestItem } from "@/features/sample-requests/types";
 import { CreativeOverviewPage } from "./CreativeOverviewPage";
 import { CreativeDesignPage } from "./CreativeDesignPage";
-import { MockupWorkflowQueuePage } from "@/features/sample-requests/components/staging/MockupWorkflowQueuePage";
+import { CreativeSamplingMockupPage } from "./CreativeSamplingMockupPage";
 import { MockupWorkflowInspectorModal } from "@/features/sample-requests/components/staging/MockupWorkflowInspectorModal";
 import { getRequestTrackType } from "@/features/sample-requests/utils/trackTypes";
+import { TeamHeadReadOnlyNotice } from "@/components/ui/TeamHeadReadOnlyNotice";
+import { isReadOnlyTeamHead, isAdmin as isAdminUser } from "@/features/auth/permissions";
+import { Palette, Sparkles, Box } from "lucide-react";
 
 const DesignRequestInspectorModal = React.lazy(() =>
   import("@/features/sample-requests/components/DesignRequestInspectorModal").then((m) => ({
@@ -25,6 +28,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { selectedYear } = useBusinessYear();
+  const isAdmin = isAdminUser(user);
 
   // Active sub-view: "overview" | "design" | "sampling"
   const activeView: "overview" | "design" | "sampling" = useMemo(() => {
@@ -126,7 +130,14 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
     return allRequests.filter((r) => {
       const srCode = String(r.srNumber || "").toUpperCase();
       const materialCode = String(r.materialCode || "").toUpperCase();
-      if (getRequestTrackType(r) === "program_planning" || r.requestKind === "program" || srCode.startsWith("PG-") || materialCode.startsWith("PG-")) return false;
+      if (
+        getRequestTrackType(r) === "program_planning" ||
+        r.requestKind === "program" ||
+        srCode.startsWith("PG-") ||
+        materialCode.startsWith("PG-")
+      ) {
+        return false;
+      }
       const scopes = r.requestTypes || [];
       const s = String(r.status || "").toLowerCase();
       // Exclude unreleased drafts - only show once released to Creative
@@ -134,10 +145,18 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
 
       const code = String(r.materialCode || "");
       const designState = String(r.designRequestStatus || r.status || "").toLowerCase();
-      if (r.marketingDesignDecision === "awaiting_marketing_review" || r.marketingDesignDecision === "accepted" || designState.includes("approved / closed")) return false;
+      if (
+        r.marketingDesignDecision === "awaiting_marketing_review" ||
+        r.marketingDesignDecision === "accepted" ||
+        designState.includes("approved / closed")
+      ) {
+        return false;
+      }
       return (
         scopes.includes("design") ||
         s.includes("creative") ||
+        s.includes("counter proposed") ||
+        Boolean(r.isCounterDateActive) ||
         code.startsWith("DSG-") ||
         r.requestKind === "design"
       );
@@ -165,7 +184,8 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
 
       const scopes = r.requestTypes || [];
       const hasMockup = scopes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes";
-      return hasMockup && r.mockupWorkflowState?.stage === "creative";
+      const hasSample = scopes.includes("sample");
+      return hasMockup || hasSample;
     });
   }, [allRequests]);
 
@@ -207,11 +227,37 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
     setIsDesignInspectorOpen(true);
   };
 
+  const handleInspectSamplingMockup = async (req: SampleRequestItem) => {
+    try {
+      const hasMockup =
+        (req.requestTypes || []).includes("mockup") || String(req.mockupRequired || "").toLowerCase() === "yes";
+      const isCreativeStage = !req.mockupWorkflowState || req.mockupWorkflowState.stage === "creative";
+
+      if (hasMockup && isCreativeStage && !isReadOnlyTeamHead(user)) {
+        try {
+          const task = await claimMockupRequestApi(req.id);
+          setSelectedRequest(task);
+        } catch {
+          setSelectedRequest(req);
+        }
+      } else {
+        setSelectedRequest(req);
+      }
+      setIsMockupInspectorOpen(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not inspect deliverable.");
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-full bg-white text-slate-800 overflow-hidden select-none relative">
+    <div className="flex-1 flex flex-col h-full bg-[var(--bg-app)] text-[var(--on-surface)] overflow-hidden select-text relative">
+      <TeamHeadReadOnlyNotice user={user} />
+
+
+
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[100] bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-[12px] font-semibold px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700/50 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="fixed bottom-6 right-6 z-[100] bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-[12px] font-semibold px-4 py-2.5 rounded-xl shadow-2xl border border-zinc-700/50 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <span>{toastMessage}</span>
         </div>
       )}
@@ -225,12 +271,15 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
           isLoading={isLoading}
           selectedYear={selectedYear}
           selectedPlant={selectedPlant}
+          user={user}
+          isAdmin={isAdmin}
           onNavigateToTab={(tab) => handleSelectTab(tab)}
           onInspectBrief={handleInspectBrief}
           onInspectRequest={(req) => {
             setSelectedRequest(req);
             setIsMockupInspectorOpen(true);
           }}
+          onRefresh={loadData}
         />
       )}
 
@@ -239,21 +288,24 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
           briefs={briefs}
           designRequests={designRequests}
           selectedYear={selectedYear}
+          selectedPlant={selectedPlant}
+          user={user}
+          isAdmin={isAdmin}
           onInspectBrief={handleInspectBrief}
           onInspectRequest={handleInspectDesignRequest}
+          onRefresh={loadData}
         />
       )}
 
       {activeView === "sampling" && (
-        <MockupWorkflowQueuePage
+        <CreativeSamplingMockupPage
           requests={samplingMockupRequests}
-          role="creative"
+          selectedYear={selectedYear}
+          selectedPlant={selectedPlant}
           isLoading={isLoading}
+          readOnly={isReadOnlyTeamHead(user)}
+          onInspectRequest={handleInspectSamplingMockup}
           onRefresh={loadData}
-          onInspect={(req: SampleRequestItem) => {
-            setSelectedRequest(req);
-            setIsMockupInspectorOpen(true);
-          }}
         />
       )}
 
@@ -263,6 +315,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
           <MockupWorkflowInspectorModal
             request={selectedRequest}
             role="creative"
+            readOnly={isReadOnlyTeamHead(user)}
             actorName={user?.name || user?.userid}
             onClose={() => setIsMockupInspectorOpen(false)}
             onRefresh={loadData}

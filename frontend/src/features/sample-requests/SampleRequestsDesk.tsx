@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
+import { isAdmin as isAdminUser } from "@/features/auth/permissions";
 import { SampleRequestItem, ProgramMaterialItem } from "./types";
 import {
   fetchAllMarketingRequestsApi,
+  fetchMarketingSamplingRequestsApi,
+  fetchDraftMarketingRequestsApi,
+  fetchFeasibilityRequestsApi,
+  fetchProgramRequestsApi,
   createSampleRequestApi,
   createFeasibilityRequestApi,
   recordFeasibilityMarketingDecisionApi,
@@ -18,12 +23,14 @@ import {
   getRequestTrackType,
   getRequestTrackBadge,
   getStageIdForRequest,
+  getDraftReleaseStatus,
   isOpenFeasibilityReview,
   isDesignRequest,
 } from "./utils/trackTypes";
 import { useBusinessYear } from "@/context/BusinessYearContext";
 import { exportRecordsToCsv } from "@/lib/csvExport";
-import { Crown, Users, UserCheck } from "lucide-react";
+import { Building2 } from "lucide-react";
+import { TeamHeadReadOnlyNotice } from "@/components/ui/TeamHeadReadOnlyNotice";
 
 // Modular Sub-Desks
 import { MarketingOverviewPage } from "./overview/MarketingOverviewPage";
@@ -70,15 +77,8 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const isAdmin =
-    String(user?.role || "").toLowerCase() === "admin" ||
-    user?.userid === "admin" ||
-    user?.role === "Administrator";
-
-  const isTeamHead = Boolean(user?.is_team_head || (user as any)?.isTeamHead || user?.role === "head");
-
-  // For Team Heads: toggle between viewing all team requests vs only their own submissions
-  const [headScopeFilter, setHeadScopeFilter] = useState<"all" | "mine">("all");
+  const isAdmin = isAdminUser(user);
+  const isReadOnly = Boolean(user?.is_team_head) && !isAdmin;
 
   const { selectedYear } = useBusinessYear();
 
@@ -105,30 +105,10 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
   // Primary Data State
   const [requests, setRequests] = useState<SampleRequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [samplingDraftOnly, setSamplingDraftOnly] = useState(false);
 
-  // Filter requests based on user hierarchy & permissions
-  const visibleRequests = useMemo(() => {
-    if (isAdmin) return requests;
-
-    const uName = (user?.name || "").toLowerCase().trim();
-    const uId = (user?.userid || "").toLowerCase().trim();
-
-    if (isTeamHead) {
-      if (headScopeFilter === "mine") {
-        return requests.filter((r) => {
-          const creator = (r.createdBy || "").toLowerCase().trim();
-          return (uName && creator.includes(uName)) || (uId && creator.includes(uId));
-        });
-      }
-      return requests;
-    }
-
-    // Regular team member: ONLY requests they raised themselves
-    return requests.filter((r) => {
-      const creator = (r.createdBy || "").toLowerCase().trim();
-      return (uName && creator.includes(uName)) || (uId && creator.includes(uId));
-    });
-  }, [requests, isAdmin, isTeamHead, headScopeFilter, user]);
+  // The Marketing team shares its workflow queue; the API applies role ownership.
+  const visibleRequests = requests;
 
   // Inspector & Modal State
   const [selectedRequest, setSelectedRequest] = useState<SampleRequestItem | null>(null);
@@ -178,7 +158,15 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
     try {
-      const merged = await fetchAllMarketingRequestsApi(selectedYear);
+      const merged = activeView === "sampling"
+        ? samplingDraftOnly
+          ? await fetchDraftMarketingRequestsApi(selectedYear)
+          : await fetchMarketingSamplingRequestsApi(selectedYear)
+        : activeView === "feasibility"
+          ? await fetchFeasibilityRequestsApi(selectedYear)
+          : activeView === "programs"
+            ? await fetchProgramRequestsApi(selectedYear)
+            : await fetchAllMarketingRequestsApi(selectedYear);
       setRequests(merged);
     } catch (err) {
       console.error("Failed to load sample requests:", err);
@@ -186,7 +174,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, showToast]);
+  }, [activeView, samplingDraftOnly, selectedYear, showToast]);
 
   useEffect(() => {
     loadRequests();
@@ -213,6 +201,24 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
     };
     window.addEventListener("app:refresh-requested", handleRefresh);
     return () => window.removeEventListener("app:refresh-requested", handleRefresh);
+  }, [loadRequests]);
+
+  useEffect(() => {
+    const handleProgramUpdate = (event: Event) => {
+      const updated = (event as CustomEvent<SampleRequestItem | undefined>).detail;
+      if (!updated || getRequestTrackType(updated) !== "program_planning") {
+        void loadRequests();
+        return;
+      }
+      setRequests((current) => current.map((item) =>
+        String(item.id) === String(updated.id) ? updated : item,
+      ));
+      setSelectedRequest((current) =>
+        current && String(current.id) === String(updated.id) ? updated : current,
+      );
+    };
+    window.addEventListener("samp:requests-changed", handleProgramUpdate);
+    return () => window.removeEventListener("samp:requests-changed", handleProgramUpdate);
   }, [loadRequests]);
 
   // Unique plants and customers dynamically derived from active DB records
@@ -243,6 +249,9 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
         targetPlant: req.targetPlant || "",
         parentRequestId: req.id,
         parentSrNumber: req.srNumber || `SR-${req.id}`,
+        parentRequestTypes: req.requestTypes || [],
+        parentMockupWorkflowState: req.mockupWorkflowState,
+        parentCreationMode: req.creationMode,
       };
       sessionStorage.setItem("samp_active_program_form", JSON.stringify(stagingContext));
       navigate("/sample-requests/product-staging", { state: stagingContext });
@@ -260,6 +269,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
   const handleOpenNewModal = (
     track: "marketing_request" | "feasibility_check" | "program_planning" = "feasibility_check"
   ) => {
+    if (isReadOnly) return;
     if (track === "program_planning") {
       setIsNewProgramModalOpen(true);
       return;
@@ -409,15 +419,10 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
       return;
     }
 
-    const isDesign =
-      (requestItem.requestTypes || []).includes("design") ||
-      String(requestItem.materialCode || "").startsWith("DSG-") ||
-      String(requestItem.srNumber || "").includes("-DSG-");
-
-    const newStatus = isDesign ? "Creative" : "Sampling Review (PMT)";
+    const newStatus = getDraftReleaseStatus(requestItem);
 
     try {
-      await updateAnyRequestStatusApi(requestItem, newStatus);
+      await releaseDraftRequestsApi([requestItem], newStatus);
 
       setRequests((prev) =>
         prev.map((r) =>
@@ -452,7 +457,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
     try {
       const groups = new Map<string, SampleRequestItem[]>();
       for (const item of draftItems) {
-        const newStatus = isDesignRequest(item) ? "Creative" : "Sampling Review (PMT)";
+        const newStatus = getDraftReleaseStatus(item);
         groups.set(newStatus, [...(groups.get(newStatus) || []), item]);
       }
       for (const [newStatus, items] of groups) {
@@ -486,7 +491,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
           referenceLinks: newForm.referenceLinks || [],
         });
         setRequests((prev) => [mapFeasibilityRequestToSampleRequest(created), ...prev]);
-        showToast(`Feasibility ${created.requestCode} registered with ${created.srNumber}.`);
+        showToast(`Feasibility request ${created.requestCode} registered.`);
         return true;
       } catch (err) {
         console.error("Error creating feasibility request:", err);
@@ -568,7 +573,8 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#fafafa] dark:bg-[#08090d] overflow-hidden select-none relative">
+    <div className="flex-1 flex flex-col h-full bg-[var(--bg-app)] text-[var(--on-surface)] overflow-hidden select-none relative">
+      <TeamHeadReadOnlyNotice user={user} />
       {/* Toast Notification Popup */}
       {toastMessage && (
         <div
@@ -580,57 +586,16 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
         </div>
       )}
 
-      {/* Role-Based Hierarchy Status Ribbon */}
-      {isTeamHead ? (
-        <div className="bg-emerald-50/70 dark:bg-emerald-950/30 border-b border-emerald-200/60 dark:border-emerald-900/40 px-6 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+      {/* Shared Marketing workflow scope */}
+      {!isAdmin && user ? (
+        <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] px-6 py-2 flex items-center justify-between text-xs text-[var(--on-surface-muted)]">
           <div className="flex items-center gap-2">
-            <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <span className="font-semibold text-emerald-900 dark:text-emerald-200 uppercase tracking-tight">
-              {user?.team ? `${user.team} Team Head` : "Department Head Workspace"}
-            </span>
-            <span className="text-zinc-500 dark:text-zinc-400">({user?.name || user?.userid})</span>
-          </div>
-          <div className="flex items-center gap-1 bg-white dark:bg-zinc-900 p-0.5 rounded-lg border border-emerald-200/80 dark:border-emerald-800/80 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setHeadScopeFilter("all")}
-              className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                headScopeFilter === "all"
-                  ? "bg-emerald-600 text-white shadow-2xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-              }`}
-            >
-              All Team Requests ({requests.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setHeadScopeFilter("mine")}
-              className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                headScopeFilter === "mine"
-                  ? "bg-emerald-600 text-white shadow-2xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-              }`}
-            >
-              My Submissions Only ({
-                requests.filter((r) => {
-                  const uName = (user?.name || "").toLowerCase().trim();
-                  const uId = (user?.userid || "").toLowerCase().trim();
-                  const creator = (r.createdBy || "").toLowerCase().trim();
-                  return (uName && creator.includes(uName)) || (uId && creator.includes(uId));
-                }).length
-              })
-            </button>
-          </div>
-        </div>
-      ) : !isAdmin && user ? (
-        <div className="bg-zinc-100/80 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-zinc-800 px-6 py-2 flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <Building2 className="w-3.5 h-3.5 text-[var(--accent-primary)]" aria-hidden="true" />
             <span>
-              Personal Workspace: Showing requests created exclusively by <strong>{user.name || user.userid}</strong>
+              Marketing team queue <span className="text-[var(--on-surface-subtle)]">·</span> Shared request ownership
             </span>
           </div>
-          <span className="text-[11px] font-mono text-zinc-500">
+          <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">
             {visibleRequests.length} request{visibleRequests.length === 1 ? "" : "s"} visible
           </span>
         </div>
@@ -643,6 +608,8 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
           isLoading={isLoading}
           selectedYear={selectedYear}
           selectedPlant={selectedPlant}
+          user={user}
+          isAdmin={isAdmin}
           onOpenNewModal={handleOpenNewModal}
           onInspectRequest={handleInspectRequest}
           onExportCSV={handleExportCSV}
@@ -653,12 +620,14 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
         <SamplingRequestsPage
           requests={visibleRequests}
           isLoading={isLoading}
+          onDraftModeChange={setSamplingDraftOnly}
           selectedYear={selectedYear}
           selectedPlant={selectedPlant}
           uniquePlants={uniquePlants}
           uniqueCustomers={uniqueCustomers}
           user={user}
           isAdmin={isAdmin}
+          isReadOnly={isReadOnly}
           onOpenNewModal={() => handleOpenNewModal("marketing_request")}
           onInspectRequest={handleInspectRequest}
           onReleaseDraft={handleReleaseDraft}
@@ -668,7 +637,6 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
           onRefresh={loadRequests}
           onExportCSV={handleExportCSV}
           onUpdateStatus={handleUpdateStatus}
-          showToast={showToast}
         />
       )}
 
@@ -682,6 +650,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
           uniqueCustomers={uniqueCustomers}
           user={user}
           isAdmin={isAdmin}
+          isReadOnly={isReadOnly}
           onOpenNewModal={() => handleOpenNewModal("feasibility_check")}
           onInspectRequest={handleInspectRequest}
           onMarketingApproveFeasibility={handleMarketingApproveFeasibility}
@@ -703,6 +672,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
           uniqueCustomers={uniqueCustomers}
           user={user}
           isAdmin={isAdmin}
+          isReadOnly={isReadOnly}
           onOpenNewModal={() => handleOpenNewModal("program_planning")}
           onInspectRequest={handleInspectRequest}
           onDeleteRequest={handleDeleteRequest}
@@ -720,7 +690,6 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
               setIsDesignRequestInspectorOpen(false);
               setIsDesignReviewOpen(false);
             }}
-            onRefresh={loadRequests}
             mode="marketing"
             showToast={showToast}
           />
@@ -729,7 +698,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
             request={selectedRequest}
             isOpen={isInspectorOpen}
             onClose={() => setIsInspectorOpen(false)}
-            onMarketingApprove={handleMarketingApproveFeasibility}
+            onRefresh={loadRequests}
             onDeleteRequest={(req) => handleDeleteRequest(req)}
             user={user}
             isAdmin={isAdmin}
@@ -740,10 +709,10 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
             request={selectedRequest}
             isOpen={isInspectorOpen}
             onClose={() => setIsInspectorOpen(false)}
-            onRefresh={loadRequests}
             mode="marketing"
             userRole="Marketing Specialist"
             currentUser={user}
+            readOnly={isReadOnly}
           />
         ) : (
           <SampleRequestInspector
@@ -755,12 +724,13 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
             onDeleteRequest={(req) => handleDeleteRequest(req)}
             onReleaseDraft={handleReleaseDraft}
             isAdmin={isAdmin}
+            readOnly={isReadOnly}
           />
         )}
 
         {/* New Sample Request Modal */}
         <NewSampleRequestModal
-          isOpen={isNewModalOpen}
+          isOpen={isNewModalOpen && !isReadOnly}
           onClose={() => {
             setIsNewModalOpen(false);
             setModalInitialTrack("feasibility_check");
@@ -773,7 +743,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
 
         {/* New Seasonal Program Planning Modal */}
         <NewProgramPlanningModal
-          isOpen={isNewProgramModalOpen}
+          isOpen={isNewProgramModalOpen && !isReadOnly}
           onClose={() => setIsNewProgramModalOpen(false)}
           onProceed={(params) => {
             setIsNewProgramModalOpen(false);

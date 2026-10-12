@@ -1,5 +1,6 @@
 """Reference and identity data models for the Navneet SAMP ERP."""
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, Integer, String, Boolean, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -14,27 +15,49 @@ class User(Base):
         userid        - Unique login handle / username (e.g. "Admin")
         email         - Unique corporate email
         password_hash - Bcrypt-hashed password (never plaintext)
-        role          - Top-level role: "admin" | "user" | "manager"
+        role          - Root account role: "admin" or "user"
         sub_role      - Department-level role label (e.g. "Sampling Lead")
+        team          - The department whose queue this account can access
+        is_team_head  - Read-only team-head designation within that department
         is_active     - Soft-delete / account enabled flag
         created_at    - UTC timestamp of account creation
         updated_at    - UTC timestamp of last modification
     """
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "NOT is_team_head OR NULLIF(trim(team), '') IS NOT NULL",
+            name="ck_users_team_head_requires_team",
+        ),
+        Index("ix_users_team_head", "team", "is_team_head"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     userid = Column(String(100), nullable=False, unique=True, index=True)
     email = Column(String(255), nullable=False, unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(50), default="user", nullable=False)
+    role = Column(String(50), default="user", server_default="user", nullable=False)
     sub_role = Column(String(100), nullable=True)
     team = Column(String(100), nullable=True, index=True)
     is_team_head = Column(Boolean, default=False, nullable=False)
     plant_code = Column(String(50), nullable=True)
+    theme_id = Column(String(20), nullable=False, default="emerald", server_default="emerald")
     is_active = Column(Boolean, default=True, nullable=False)
+    plant_assignments = relationship(
+        "UserPlantAssignment",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    @property
+    def plant_codes(self):
+        codes = sorted({assignment.plant.code for assignment in self.plant_assignments})
+        if not codes and self.plant_code:
+            return [self.plant_code]
+        return codes
 
 
 class Customer(Base):
@@ -62,6 +85,22 @@ class Plant(Base):
     created_by = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    user_assignments = relationship(
+        "UserPlantAssignment",
+        back_populates="plant",
+        cascade="all, delete-orphan",
+    )
+
+
+class UserPlantAssignment(Base):
+    """Many-to-many plant visibility assignments for enterprise users."""
+
+    __tablename__ = "user_plant_assignments"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    plant_id = Column(Integer, ForeignKey("plants.id", ondelete="CASCADE"), primary_key=True)
+    user = relationship("User", back_populates="plant_assignments")
+    plant = relationship("Plant", back_populates="user_assignments")
 
 
 class RefreshToken(Base):

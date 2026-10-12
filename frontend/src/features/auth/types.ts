@@ -1,3 +1,5 @@
+import type { ThemeId } from "@/context/ThemeContext";
+
 export interface UserProfile {
   id: number;
   name: string;
@@ -8,6 +10,8 @@ export interface UserProfile {
   team?: string;
   is_team_head?: boolean;
   plant_code?: string;
+  plant_codes?: string[];
+  theme_id?: ThemeId;
   is_active: boolean;
   created_at?: string;
 }

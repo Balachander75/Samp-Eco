@@ -89,7 +89,7 @@ export const NewProgramPlanningModal: React.FC<NewProgramPlanningModalProps> = (
                 <h3 className="text-base font-bold text-slate-900 tracking-tight font-display">
                   New Seasonal Program Planning
                 </h3>
-                <span className="inline-flex items-center text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#006d32]/10 text-[#006d32] border border-[#006d32]/25">
+                <span className="inline-flex items-center text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30">
                   Step 1 of 2
                 </span>
               </div>
@@ -144,7 +144,7 @@ export const NewProgramPlanningModal: React.FC<NewProgramPlanningModalProps> = (
                 value={programName}
                 onChange={(e) => setProgramName(e.target.value)}
                 placeholder="e.g. Back to School 2026, Hardcover Notebooks Line, Corporate Diaries"
-                className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#006d32] focus:ring-4 focus:ring-[#006d32]/[0.08] transition-all shadow-2xs"
+                className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-primary)]/20 transition-all shadow-2xs"
               />
             </div>
 
@@ -169,7 +169,7 @@ export const NewProgramPlanningModal: React.FC<NewProgramPlanningModalProps> = (
                       onClick={() => setProgramYear(yr)}
                       className={`h-11 px-4 rounded-xl text-sm font-mono font-bold transition-all flex items-center justify-center cursor-pointer select-none ${
                         isSelected
-                          ? "bg-[#006d32] text-white shadow-[0_4px_14px_rgba(0,109,50,0.25)] border-transparent"
+                          ? "bg-[var(--accent-primary)] text-white shadow-[0_4px_14px_rgba(0,109,50,0.25)] border-transparent"
                           : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border border-slate-200/80"
                       }`}
                     >
@@ -192,8 +192,7 @@ export const NewProgramPlanningModal: React.FC<NewProgramPlanningModalProps> = (
 
               <button
                 type="submit"
-                className="h-10 px-6 rounded-xl text-white text-xs font-semibold transition-all shadow-[0_4px_14px_rgba(0,109,50,0.25)] hover:shadow-[0_6px_20px_rgba(0,109,50,0.35)] cursor-pointer active:scale-98 tracking-tight"
-                style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
+                className="h-10 px-6 rounded-xl text-white text-xs font-semibold transition-all shadow-[0_4px_14px_rgba(0,109,50,0.25)] hover:shadow-[0_6px_20px_rgba(0,109,50,0.35)] cursor-pointer active:scale-98 tracking-tight bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
               >
                 Proceed to Material Matrix
               </button>

@@ -74,3 +74,11 @@ export function formatOdooDate(dateInput?: string | Date | null): string {
     return String(dateInput || "—");
   }
 }
+
+export function isMaterialAddedRecently(createdAt?: string | Date | null): boolean {
+  if (!createdAt) return false;
+  const date = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
+  if (Number.isNaN(date.getTime())) return false;
+  const ageMs = Date.now() - date.getTime();
+  return ageMs >= -60_000 && ageMs <= 36 * 60 * 60 * 1000;
+}

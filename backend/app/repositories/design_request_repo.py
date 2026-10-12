@@ -5,10 +5,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
-from sqlalchemy import text
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.orm import Session
 from app.repositories.base import BaseRepository
-from app.models.sample_request import DesignRequest
+from app.models.sample_request import CreateSampleRequest, DesignRequest, SampleRequestActivityLog
+from app.utils.business_year import get_business_year_date_range
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -83,6 +84,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
                     product_description=record.get("product_description") or "",
                     design_required_date=record.get("design_required_date"),
                     created_by=record.get("created_by") or "",
+                    created_by_user_id=record.get("created_by_user_id"),
                     design_remarks=record.get("design_remarks"),
                     reference_images=record.get("reference_images") or [],
                     reference_links=record.get("reference_links") or [],
@@ -112,9 +114,33 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             logger.exception("Could not import the design request JSON backup into PostgreSQL: %s", e)
             raise
 
-    def list_all_records(self) -> List[Dict[str, Any]]:
-        """List design requests from PostgreSQL, the workflow source of truth."""
-        items = self.db.query(DesignRequest).order_by(DesignRequest.id.desc()).all()
+    def list_all_records(self, year: Optional[str] = None, draft_only: bool = False) -> List[Dict[str, Any]]:
+        """List design requests, restricting FY views in PostgreSQL before serialization."""
+        query = self.db.query(DesignRequest)
+        if year and year.strip().upper() != "ALL":
+            date_range = get_business_year_date_range(year)
+            if date_range:
+                start, end = date_range
+                start_dt = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
+                end_dt = datetime.combine(end, datetime.min.time(), tzinfo=timezone.utc)
+                query = query.filter(or_(
+                    DesignRequest.program_year == year.strip(),
+                    and_(
+                        or_(
+                            DesignRequest.program_year.is_(None),
+                            ~DesignRequest.program_year.like("%-%"),
+                        ),
+                        DesignRequest.created_at >= start_dt,
+                        DesignRequest.created_at < end_dt,
+                    ),
+                ))
+        if draft_only:
+            normalized_status = func.lower(func.coalesce(DesignRequest.status, ""))
+            query = query.filter(or_(
+                normalized_status.like("%draft%"),
+                normalized_status.like("%smt%"),
+            ))
+        items = query.order_by(DesignRequest.id.desc()).all()
         return [self.to_dict(item) for item in items]
 
     def get_record_by_id(self, item_id: int) -> Optional[Dict[str, Any]]:
@@ -173,6 +199,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             product_description=data.get("product_description") or "",
             design_required_date=data.get("design_required_date") or None,
             created_by=data.get("created_by") or "",
+            created_by_user_id=data.get("created_by_user_id"),
             design_remarks=data.get("design_remarks") or None,
             reference_images=data.get("reference_images") if isinstance(data.get("reference_images"), list) else [],
             reference_links=data.get("reference_links") if isinstance(data.get("reference_links"), list) else [],
@@ -257,13 +284,87 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             self.db.query(DesignRequest)
             .filter(DesignRequest.id == item_id)
             .with_for_update()
+            .populate_existing()
             .first()
         )
         if not item:
             return None
         try:
+            linked_sample = self.db.query(CreateSampleRequest).filter(
+                CreateSampleRequest.sr_number == item.sr_number
+            ).with_for_update().populate_existing().first() if item.sr_number else None
+            previous_sample_status = linked_sample.status if linked_sample else None
+            previous_state = item.workflow_state if isinstance(item.workflow_state, dict) else {}
+            previous_events = previous_state.get("events") if isinstance(previous_state.get("events"), list) else []
+            previous_event_ids = {str(event.get("id")) for event in previous_events if isinstance(event, dict) and event.get("id")}
+            previous_mockup_state = linked_sample.mockup_workflow_state if linked_sample and isinstance(linked_sample.mockup_workflow_state, dict) else {}
+            previous_mockup_events = previous_mockup_state.get("events") if isinstance(previous_mockup_state.get("events"), list) else []
+            previous_mockup_event_keys = {
+                (str(event.get("action") or ""), str(event.get("timestamp") or ""), str(event.get("title") or ""))
+                for event in previous_mockup_events
+                if isinstance(event, dict)
+            }
             mutator(item)
             item.updated_at = datetime.now(timezone.utc)
+            next_state = item.workflow_state if isinstance(item.workflow_state, dict) else {}
+            next_events = next_state.get("events") if isinstance(next_state.get("events"), list) else []
+            new_events = [
+                event for event in next_events
+                if isinstance(event, dict) and event.get("id") and str(event.get("id")) not in previous_event_ids
+            ]
+            sample_request_id = linked_sample.id if linked_sample else None
+            for event in new_events:
+                timestamp = str(event.get("timestamp") or "")
+                try:
+                    created_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00")) if timestamp else datetime.now(timezone.utc)
+                except ValueError:
+                    created_at = datetime.now(timezone.utc)
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                self.db.add(SampleRequestActivityLog(
+                    sample_request_id=sample_request_id,
+                    request_sr_number=item.sr_number,
+                    actor_user_id=None,
+                    actor_name=str(event.get("actorName") or item.created_by or "System")[:255],
+                    actor_department=str(event.get("actorDepartment") or "Creative Studio")[:100],
+                    action=str(event.get("action") or "DESIGN_EVENT")[:64],
+                    from_status=previous_sample_status,
+                    to_status=linked_sample.status if linked_sample else None,
+                    payload=event,
+                    created_at=created_at,
+                ))
+            if linked_sample:
+                next_mockup_state = linked_sample.mockup_workflow_state if isinstance(linked_sample.mockup_workflow_state, dict) else {}
+                next_mockup_events = next_mockup_state.get("events") if isinstance(next_mockup_state.get("events"), list) else []
+                for event in next_mockup_events:
+                    if not isinstance(event, dict):
+                        continue
+                    event_key = (
+                        str(event.get("action") or ""),
+                        str(event.get("timestamp") or ""),
+                        str(event.get("title") or ""),
+                    )
+                    if event_key in previous_mockup_event_keys:
+                        continue
+                    timestamp = str(event.get("timestamp") or "")
+                    try:
+                        created_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00")) if timestamp else datetime.now(timezone.utc)
+                    except ValueError:
+                        created_at = datetime.now(timezone.utc)
+                    if created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=timezone.utc)
+                    self.db.add(SampleRequestActivityLog(
+                        sample_request_id=linked_sample.id,
+                        request_sr_number=item.sr_number,
+                        actor_user_id=None,
+                        actor_name=str(event.get("actorName") or item.created_by or "System")[:255],
+                        actor_department=str(event.get("actorDepartment") or "Creative Studio")[:100],
+                        action=str(event.get("action") or "MOCKUP_EVENT")[:64],
+                        from_status=previous_sample_status,
+                        to_status=linked_sample.status,
+                        payload=event,
+                        created_at=created_at,
+                    ))
             self.db.commit()
             self.db.refresh(item)
             return self.to_dict(item)
@@ -347,6 +448,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
                 "reference_links": ref_links,
                 "design_remarks": design_remarks,
                 "created_by": sample_req.get("created_by") or "",
+                "created_by_user_id": sample_req.get("created_by_user_id"),
                 "workflow_state": {},
             })
         updates: Dict[str, Any] = {}
@@ -400,6 +502,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
                 clean_rows.append({
                     "design_number": row.get("design_number") or row.get("designNumber") or "",
                     "description": row.get("description") or "",
+                    "shutterstock_no": row.get("shutterstock_no") or row.get("shutterstockNo") or "",
                     "remarks": row.get("remarks") or "",
                 })
             clean_batch["rows"] = clean_rows
@@ -419,6 +522,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             "product_description": item.product_description,
             "design_required_date": item.design_required_date,
             "created_by": item.created_by,
+            "created_by_user_id": item.created_by_user_id,
             "design_remarks": item.design_remarks,
             "reference_images": item.reference_images or [],
             "reference_links": item.reference_links or [],

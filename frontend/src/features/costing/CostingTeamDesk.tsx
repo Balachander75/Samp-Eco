@@ -84,7 +84,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
     try {
       const [live, requests] = await Promise.all([
         fetchCostingEstimationsApi().catch(() => []),
-        fetchSampleRequestsApi().catch(() => []),
+        fetchSampleRequestsApi(undefined, false, "costing").catch(() => []),
       ]);
       if (Array.isArray(live)) {
         setCostings(live);
@@ -93,7 +93,8 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         setCostingRequests(requests.filter((request) => {
           const status = String(request.status || "").toLowerCase();
           return request.requestTypes?.includes("costing") &&
-            status.includes("costing") && !status.includes("complete") && !status.includes("marketing");
+            !status.includes("complete") && !status.includes("marketing") &&
+            !status.includes("closed") && !status.includes("cancel") && !status.includes("reject");
         }));
       }
     } catch {
@@ -516,7 +517,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         sortable: true,
         width: "w-[125px]",
         cell: (row) => (
-          <span className="font-mono text-[12px] font-semibold text-zinc-800 dark:text-zinc-200 tnum">
+          <span className="font-mono tabular-nums text-[12px] font-semibold text-zinc-800 dark:text-zinc-200">
             {row.targetVolume.toLocaleString()} pcs
           </span>
         ),
@@ -527,7 +528,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         sortable: true,
         width: "w-[120px]",
         cell: (row) => (
-          <div className="flex flex-col font-mono text-[11px]">
+          <div className="flex flex-col font-mono tabular-nums text-[11px]">
             <span className="font-semibold text-zinc-800 dark:text-zinc-200">
               ₹ {row.netUnitCost.toFixed(2)}
             </span>
@@ -543,7 +544,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         sortable: true,
         width: "w-[95px]",
         cell: (row) => (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono tabular-nums font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60">
             <TrendingUp className="w-3 h-3 text-emerald-600" />
             {row.marginPct.toFixed(1)}%
           </span>
@@ -555,7 +556,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         sortable: true,
         width: "w-[130px]",
         cell: (row) => (
-          <div className="flex flex-col font-mono">
+          <div className="flex flex-col font-mono tabular-nums">
             <span className="font-bold text-xs text-brand-600 dark:text-brand-400">
               ₹ {row.quotedUnitPrice.toFixed(2)}
             </span>
@@ -595,7 +596,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
   );
 
   return (
-    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-white dark:bg-[#0b0c10] select-text">
+    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-white dark:bg-zinc-950 select-text">
       {/* Toast */}
       {toastMessage && (
         <div className="fixed top-16 right-5 z-[60] flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xl text-[12px] font-semibold border border-zinc-800 dark:border-zinc-200/80 max-w-sm animate-smooth-toast">
@@ -615,7 +616,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
           </div>
           <div className="grid max-h-[30vh] grid-cols-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
             {costingRequests.map((request) => (
-              <button key={request.id} type="button" onClick={() => setSelectedCostingRequest(request)} className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-white p-3 text-left transition hover:bg-teal-50 dark:bg-[#151922] dark:hover:bg-teal-950/25">
+              <button key={request.id} type="button" onClick={() => setSelectedCostingRequest(request)} className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-white p-3 text-left transition hover:bg-teal-50 dark:bg-zinc-900 dark:hover:bg-teal-950/25">
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-bold text-slate-900 dark:text-zinc-100">{request.productDescription}</span>
                   <span className="mt-1 block truncate text-[11px] text-slate-600 dark:text-zinc-400">{request.customer} · {request.srNumber} · Qty {Number(request.qtyDesignCosting || 0).toLocaleString()} {request.unitPcPack || "PC"}{request.unitPcPack === "Pack" ? ` (${request.qtyPerPack || 1} pc/pack)` : ""}</span>
@@ -652,7 +653,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search Costing ID, Customer, Substrate… (Ctrl+K)"
-              className="h-9 w-60 sm:w-72 pl-9 pr-8 rounded-md border border-zinc-300 dark:border-white/15 bg-white dark:bg-[#111318] text-[13px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 transition-colors font-sans"
+              className="h-9 w-60 sm:w-72 pl-9 pr-8 rounded-md border border-zinc-300 dark:border-white/15 bg-white dark:bg-zinc-900 text-[13px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 transition-colors font-sans"
             />
             {searchTerm && (
               <button

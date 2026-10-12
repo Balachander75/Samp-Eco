@@ -8,48 +8,102 @@ import {
 } from "@/infrastructure/api";
 import { SampleRequestItem } from "@/features/sample-requests/types";
 import { UserProfile } from "@/features/auth";
+import { isAdmin } from "@/features/auth/permissions";
 import { useBusinessYear } from "@/context/BusinessYearContext";
-import { MetricRibbon, MetricTileItem } from "@/components/erp/MetricRibbon";
+import { isDesignRequest } from "@/features/sample-requests/utils/trackTypes";
 import {
-  ArrowRight,
+  TrendingUp,
   Clock,
   Layers,
   Palette,
   Box,
   FlaskConical,
   Calculator,
-  Factory,
-  BarChart3,
-  CheckCircle2,
-  AlertTriangle,
   RefreshCw,
-  Plus,
-  ShieldCheck,
+  ArrowRight,
   ChevronRight,
-  TrendingUp,
-  Cpu,
-  PackageCheck,
-  Sliders,
-  Sparkles,
+  AlertTriangle,
+  CheckCircle2,
+  Calendar,
+  Search,
+  ExternalLink,
+  Target,
+  Zap,
+  BarChart3,
+  Hourglass,
+  Building2,
+  Package,
+  PieChart,
 } from "lucide-react";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export interface OperationsOverviewProps {
   user?: UserProfile;
 }
 
+// 12-Month Business Year sequence (October to September)
+const BY_MONTHS = [
+  { key: "10", label: "Oct", full: "October" },
+  { key: "11", label: "Nov", full: "November" },
+  { key: "12", label: "Dec", full: "December" },
+  { key: "01", label: "Jan", full: "January" },
+  { key: "02", label: "Feb", full: "February" },
+  { key: "03", label: "Mar", full: "March" },
+  { key: "04", label: "Apr", full: "April" },
+  { key: "05", label: "May", full: "May" },
+  { key: "06", label: "Jun", full: "June" },
+  { key: "07", label: "Jul", full: "July" },
+  { key: "08", label: "Aug", full: "August" },
+  { key: "09", label: "Sep", full: "September" },
+];
+
 export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user }) => {
   const navigate = useNavigate();
   const { selectedYear } = useBusinessYear();
+
   const [requests, setRequests] = useState<SampleRequestItem[]>([]);
   const [briefsCount, setBriefsCount] = useState<number>(0);
   const [dielinesCount, setDielinesCount] = useState<number>(0);
   const [costingsCount, setCostingsCount] = useState<number>(0);
-  const [lastRefreshed, setLastRefreshed] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [lastRefreshed, setLastRefreshed] = useState<string>("");
+  const [hoveredMonthIndex, setHoveredMonthIndex] = useState<number | null>(null);
 
-  // Capacity Matrix state
-  const [rebalancedNov, setRebalancedNov] = useState(false);
+  // View Mode Filters
+  const [watchlistFilter, setWatchlistFilter] = useState<
+    "all" | "delayed" | "urgent" | "ontime" | "samp" | "creative" | "costing"
+  >("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [showMonthlyTable, setShowMonthlyTable] = useState<boolean>(false);
 
+  // Returning user greeting check
+  const isReturningUser = useMemo(() => {
+    try {
+      const stored = localStorage.getItem("samp_session_visited");
+      if (stored) return true;
+      localStorage.setItem("samp_session_visited", "true");
+      return false;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Time-based greeting
+  const greetingText = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour >= 4 && hour < 12) return "Good morning";
+    if (hour >= 12 && hour < 17) return "Good afternoon";
+    return "Good evening";
+  }, []);
+
+  const firstName = useMemo(() => {
+    if (!user?.name) return "Executive";
+    return user.name.split(" ")[0];
+  }, [user?.name]);
+
+  // Load telemetry data from database APIs
   const loadData = useCallback(async () => {
     setIsRefreshing(true);
     try {
@@ -64,9 +118,11 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user }) 
       setDielinesCount(dielinesData.length);
       setCostingsCount(costingsData.length);
       const now = new Date();
-      setLastRefreshed(now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }));
+      setLastRefreshed(
+        now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+      );
     } catch (err) {
-      console.error("Failed to load operations telemetry:", err);
+      console.error("Operations telemetry sync error:", err);
     } finally {
       setIsRefreshing(false);
     }
@@ -76,557 +132,1768 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user }) 
     loadData();
   }, [loadData]);
 
+  // Synchronize on focus or refresh event
   useEffect(() => {
-    const handleRefresh = (event: Event) => {
-      event.preventDefault();
-      void loadData().finally(() => window.dispatchEvent(new Event("app:refresh-complete")));
+    const handleRefresh = (e: Event) => {
+      e.preventDefault();
+      void loadData();
     };
     window.addEventListener("app:refresh-requested", handleRefresh);
     return () => window.removeEventListener("app:refresh-requested", handleRefresh);
   }, [loadData]);
 
-  // User visibility: regular team member only sees requests they raised
-  const isRegularUser = Boolean(
-    user &&
-    user.role !== "admin" &&
-    user.userid !== "admin" &&
-    !user.is_team_head
-  );
-
-  const visibleRequests = useMemo(() => {
-    if (!isRegularUser || !user) return requests;
-    const uName = (user.name || "").toLowerCase().trim();
-    const uId = (user.userid || "").toLowerCase().trim();
-    return requests.filter((r) => {
-      const creator = (r.createdBy || "").toLowerCase().trim();
-      return (uName && creator.includes(uName)) || (uId && creator.includes(uId));
-    });
-  }, [requests, isRegularUser, user]);
-
-  // Compute live pipeline metrics
-  const telemetry = useMemo(() => {
-    const total = visibleRequests.length;
-
-    // Pending Feasibility
-    const pendingFeasibility = visibleRequests.filter((r) => {
-      const mode = String(r.creationMode || "").toLowerCase();
-      const kind = String(r.requestKind || "").toLowerCase();
-      const isFeas = mode === "feasibility_check" || kind === "feasibility";
-      if (!isFeas) return false;
-      if (r.samplingFeasibilityResponse) return false;
-      const status = String(r.status || "").toLowerCase();
-      return !["completed", "closed", "approved", "rejected"].some((term) => status.includes(term));
-    }).length;
-
-    // Urgent SLA (<72h)
+  // =========================================================================
+  // 1. SLA, AGING & DELAY COMPUTATION
+  // =========================================================================
+  const slaMetrics = useMemo(() => {
     const now = new Date();
-    const threeDaysLater = new Date(now.getTime() + 3 * 86400000);
-    const urgentCount = visibleRequests.filter((r) => {
-      if (!r.sampleRequiredDate) return false;
-      const d = new Date(r.sampleRequiredDate);
-      const s = (r.status || "").toLowerCase();
-      const isClosed = s.includes("dispatch") || s.includes("deal");
-      return d <= threeDaysLater && !isClosed;
-    }).length;
+    let totalCompleted = 0;
+    let totalOnTime = 0;
+    let totalDelayed = 0;
+    let urgentCount = 0;
 
-    // Prototyping in progress
-    const inFabrication = visibleRequests.filter((r) => {
-      const s = (r.status || "").toLowerCase();
-      return (
-        s.includes("samp") ||
-        s.includes("studio") ||
-        s.includes("machine") ||
-        s.includes("prep") ||
-        s.includes("plant") ||
-        s.includes("review")
-      );
-    }).length;
+    // Aging Buckets
+    let age0to3 = 0;
+    let age4to7 = 0;
+    let age8to14 = 0;
+    let age15Plus = 0;
 
-    // Commercial ready / dispatched
-    const closedCount = visibleRequests.filter((r) => {
-      const s = (r.status || "").toLowerCase();
-      return s.includes("dispatch") || s.includes("deal") || s.includes("approved") || s.includes("closed");
-    }).length;
+    // Delay Severity
+    let delay1to3d = 0;
+    let delay4to7d = 0;
+    let delay7Plus = 0;
+
+    const classified = requests.map((r) => {
+      const statusStr = String(r.status || "").toLowerCase();
+      const isClosed =
+        statusStr.includes("dispatch") ||
+        statusStr.includes("deal") ||
+        statusStr.includes("closed") ||
+        statusStr.includes("approved");
+
+      let isDelayed = false;
+      let isUrgent = false;
+      let overdueDays = 0;
+
+      // Age calculation
+      const createdDate = new Date(r.dateRequestCreated || r.createdAt || Date.now());
+      const ageDays = Math.max(0, Math.floor((now.getTime() - createdDate.getTime()) / 86400000));
+
+      if (!isClosed) {
+        if (ageDays <= 3) age0to3++;
+        else if (ageDays <= 7) age4to7++;
+        else if (ageDays <= 14) age8to14++;
+        else age15Plus++;
+      }
+
+      // Target SLA calculation
+      if (r.sampleRequiredDate) {
+        const targetDate = new Date(r.sampleRequiredDate);
+        if (!isNaN(targetDate.getTime())) {
+          if (!isClosed && targetDate < now) {
+            isDelayed = true;
+            overdueDays = Math.max(1, Math.floor((now.getTime() - targetDate.getTime()) / 86400000));
+            if (overdueDays <= 3) delay1to3d++;
+            else if (overdueDays <= 7) delay4to7d++;
+            else delay7Plus++;
+          } else if (!isClosed) {
+            const diffDays = (targetDate.getTime() - now.getTime()) / (1000 * 3600 * 24);
+            if (diffDays <= 3) {
+              isUrgent = true;
+            }
+          }
+        }
+      }
+
+      if (isDelayed) totalDelayed++;
+      else totalOnTime++;
+
+      if (isClosed) totalCompleted++;
+      if (isUrgent) urgentCount++;
+
+      // Department Stage Resolution
+      let departmentKey = "marketing";
+      if (statusStr.includes("creative") || isDesignRequest(r)) departmentKey = "creative";
+      else if (statusStr.includes("studio") || r.mockupRequired === "yes") departmentKey = "studio";
+      else if (statusStr.includes("cost")) departmentKey = "costing";
+      else if (statusStr.includes("samp") || statusStr.includes("pmt") || statusStr.includes("qc"))
+        departmentKey = "samp";
+
+      return {
+        ...r,
+        _ageDays: ageDays,
+        _isDelayed: isDelayed,
+        _overdueDays: overdueDays,
+        _isUrgent: isUrgent,
+        _isClosed: isClosed,
+        _departmentKey: departmentKey,
+      };
+    });
+
+    const total = requests.length;
+    const onTimeRate = total > 0 ? Math.round((totalOnTime / total) * 100) : 100;
+    const inFlightCount = Math.max(0, total - totalCompleted);
 
     return {
       total,
-      pendingFeasibility,
+      totalCompleted,
+      inFlightCount,
+      totalOnTime,
+      totalDelayed,
       urgentCount,
-      inFabrication,
-      closedCount,
+      onTimeRate,
+      aging: { age0to3, age4to7, age8to14, age15Plus },
+      delaySeverity: { delay1to3d, delay4to7d, delay7Plus },
+      classified,
     };
-  }, [visibleRequests]);
-
-  // Metric Ribbon items
-  const metrics: MetricTileItem[] = useMemo(
-    () => [
-      {
-        id: "total_pipeline",
-        label: "Marketing Requests",
-        value: telemetry.total,
-        deltaText: selectedYear === "ALL" ? "All Business Years" : `BY ${selectedYear}`,
-        deltaTone: "neutral",
-        onClick: () => navigate("/sample-requests"),
-      },
-      {
-        id: "pending_feas",
-        label: "Pending Feasibility",
-        value: telemetry.pendingFeasibility,
-        deltaText: "Awaiting Lab review",
-        deltaTone: telemetry.pendingFeasibility > 0 ? "warning" : "positive",
-        onClick: () => navigate("/sample-requests"),
-      },
-      {
-        id: "urgent_sla",
-        label: "Critical SLA (<72h)",
-        value: telemetry.urgentCount,
-        deltaText: "Due within 3 working days",
-        deltaTone: telemetry.urgentCount > 0 ? "critical" : "positive",
-        onClick: () => navigate("/sample-requests"),
-      },
-      {
-        id: "in_lab",
-        label: "Prototyping & CAD",
-        value: telemetry.inFabrication,
-        deltaText: "Active in SAMP Team & Studio",
-        deltaTone: "positive",
-        onClick: () => navigate("/samp-team-work"),
-      },
-      {
-        id: "dispatched",
-        label: "Dispatched / Closed",
-        value: telemetry.closedCount,
-        deltaText: "Completed or actual deals",
-        deltaTone: "positive",
-        onClick: () => navigate("/sample-requests"),
-      },
-      {
-        id: "capacity_load",
-        label: "Plant SCU Load",
-        value: "1.90 SCU",
-        deltaText: "Average plant effort index",
-        deltaTone: "neutral",
-        onClick: () => navigate("/analytics"),
-      },
-    ],
-    [telemetry, selectedYear, navigate]
-  );
-
-  // Department workspaces with ALL teams and sub-teams
-  const DEPARTMENT_DESKS = [
-    {
-      id: "marketing",
-      title: "Marketing Work Desk",
-      shortCode: "MK",
-      icon: <Layers className="w-4 h-4 text-[#714b67] dark:text-purple-300" />,
-      tag: "Requests & Intake",
-      description: "Manage sample requests, customer feasibility checks, and seasonal programs.",
-      route: "/sample-requests",
-      badgeText: `${telemetry.total} Requests`,
-      badgeTone: "bg-[#714b67]/10 text-[#714b67] dark:bg-purple-950/40 dark:text-purple-300 border-[#714b67]/20",
-      subItems: ["Sample Requests", "Feasibility Checks", "Program Planning Matrix"],
-    },
-    {
-      id: "creative",
-      title: "Creative Work Desk",
-      shortCode: "CR",
-      icon: <Palette className="w-4 h-4 text-pink-600 dark:text-pink-400" />,
-      tag: "Graphics & Artwork",
-      description: "Review artwork briefs, concept variants, and prepress certifications.",
-      route: "/creative-work",
-      badgeText: `${briefsCount} Briefs`,
-      badgeTone: "bg-pink-50 text-pink-700 dark:bg-pink-950/30 dark:text-pink-300 border-pink-200 dark:border-pink-900/50",
-      subItems: ["Artwork Briefs", "Design Variants", "Prepress Proofing"],
-    },
-    {
-      id: "studio",
-      title: "Studio Work Desk",
-      shortCode: "ST",
-      icon: <Box className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />,
-      tag: "Structural CAD",
-      description: "Structural engineering, dieline packaging construction, and 3D simulation.",
-      route: "/studio-work",
-      badgeText: `${dielinesCount} Dielines`,
-      badgeTone: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900/50",
-      subItems: ["CAD Intake", "Dielines & Flute Grades", "Plotter Sample Cleared"],
-    },
-    {
-      id: "samp",
-      title: "SAMP Team Work Desk",
-      shortCode: "SM",
-      icon: <FlaskConical className="w-4 h-4 text-teal-600 dark:text-teal-400" />,
-      tag: "Sampling Lab",
-      description: "Physical sample fabrication, PMT specification reviews, and QC sign-off.",
-      route: "/samp-team-work",
-      badgeText: `${telemetry.inFabrication} In Lab`,
-      badgeTone: "bg-teal-50 text-teal-700 dark:bg-teal-950/30 dark:text-teal-300 border-teal-200 dark:border-teal-900/50",
-      subItems: ["PMT Reviews", "Physical Prototypes", "Machine Compatibility"],
-    },
-    {
-      id: "costing",
-      title: "Costing Team Desk",
-      shortCode: "CO",
-      icon: <Calculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />,
-      tag: "BOM & Pricing",
-      description: "Raw material substrate calculations, conversion costs, and margin quotes.",
-      route: "/costing-team",
-      badgeText: `${costingsCount} Estimates`,
-      badgeTone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/50",
-      subItems: ["Substrate Pricing", "Tooling & Labor", "Parallel Quote Released"],
-    },
-    {
-      id: "plant",
-      title: "Plant Execution Desk",
-      shortCode: "PL",
-      icon: <Factory className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
-      tag: "Floor Execution & QC",
-      description: "Shop-floor workcentre operations, tooling, quality control, and dispatch.",
-      route: "/plant",
-      badgeText: "Shopfloor Ready",
-      badgeTone: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900/50",
-      subItems: [
-        "Production Floor (WC-10, WC-20, WC-30)",
-        "Quality Control (QC / 100% Protocol)",
-        "Tooling & Die Prep",
-        "Dispatch & Freight Tracking",
-      ],
-    },
-    {
-      id: "analytics",
-      title: "Capacity & SLA Analytics",
-      shortCode: "AN",
-      icon: <BarChart3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
-      tag: "Planning Matrix",
-      description: "Annual plant capacity balancing matrix (Oct-Sep) and SLA turnaround radar.",
-      route: "/analytics",
-      badgeText: "FY26-27 Active",
-      badgeTone: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border-blue-200 dark:border-blue-900/50",
-      subItems: ["Annual SCU Capacity", "Plant Load Rebalance", "SLA Turnaround Radar"],
-    },
-  ];
-
-  // Cross-department operational timeline
-  const recentActivities = useMemo(() => {
-    return requests.slice(0, 5).map((request) => ({
-      id: request.id,
-      time: request.createdAt ? new Date(request.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "Today",
-      stage: request.status || "Pipeline Intake",
-      code: request.srNumber || "SR-2026",
-      desc: request.productDescription || "Sample specification initialized",
-      customer: request.customer || "Staples Global",
-    }));
   }, [requests]);
 
-  const handleRebalanceQuota = () => {
-    setRebalancedNov(true);
-    window.dispatchEvent(
-      new CustomEvent("app:show-toast", {
-        detail: {
-          message: "✓ Rebalanced: 4.8 SCU workload transferred from Plant 01 (Pune) to Plant 02 (Vapi).",
-          tone: "success",
-        },
-      })
+  // =========================================================================
+  // 2. LIFECYCLE FUNNEL DISTRIBUTION (VIEW MODE PIPELINE GAUGE)
+  // =========================================================================
+  const lifecycleFunnel = useMemo(() => {
+    let draftCount = 0;
+    let creativeCount = 0;
+    let studioCount = 0;
+    let sampCount = 0;
+    let costingCount = 0;
+    let dispatchedCount = 0;
+
+    slaMetrics.classified.forEach((r) => {
+      const s = String(r.status || "").toLowerCase();
+      if (r._isClosed) {
+        dispatchedCount++;
+      } else if (s.includes("draft") || s.includes("smt") || s.includes("intake")) {
+        draftCount++;
+      } else if (r._departmentKey === "creative") {
+        creativeCount++;
+      } else if (r._departmentKey === "studio") {
+        studioCount++;
+      } else if (r._departmentKey === "costing") {
+        costingCount++;
+      } else {
+        sampCount++;
+      }
+    });
+
+    const total = requests.length || 1;
+    return {
+      draft: { count: draftCount, pct: Math.round((draftCount / total) * 100) },
+      creative: { count: creativeCount, pct: Math.round((creativeCount / total) * 100) },
+      studio: { count: studioCount, pct: Math.round((studioCount / total) * 100) },
+      samp: { count: sampCount, pct: Math.round((sampCount / total) * 100) },
+      costing: { count: costingCount, pct: Math.round((costingCount / total) * 100) },
+      dispatched: { count: dispatchedCount, pct: Math.round((dispatchedCount / total) * 100) },
+    };
+  }, [slaMetrics.classified, requests.length]);
+
+  // =========================================================================
+  // 3. MARKETING DECOMPOSITION & CHANNELS
+  // =========================================================================
+  const marketingDecomposition = useMemo(() => {
+    const total = requests.length;
+
+    const designRequests = requests.filter(
+      (r) =>
+        isDesignRequest(r) ||
+        r.requestKind === "design" ||
+        Number(r.numberOfDesigns || 0) > 0 ||
+        (r.requestTypes || []).includes("design")
     );
-  };
+
+    const mockupRequests = requests.filter(
+      (r) =>
+        r.mockupRequired === "yes" ||
+        r.mockupRequired === "true" ||
+        Boolean(r.mockupWorkflowState) ||
+        (r.requestTypes || []).includes("mockup")
+    );
+
+    const samplingRequests = requests.filter(
+      (r) =>
+        (!isDesignRequest(r) && r.requestKind !== "feasibility") ||
+        (r.requestTypes || []).includes("sample") ||
+        Number(r.qtyForSampling || 0) > 0 ||
+        r.creationMode === "binding" ||
+        r.creationMode === "material_code"
+    );
+
+    const costingRequests = requests.filter(
+      (r) =>
+        Boolean(r.costingRequiredDate) ||
+        Number(r.qtyDesignCosting || 0) > 0 ||
+        (r.requestTypes || []).includes("costing")
+    );
+
+    const designCount = Math.max(designRequests.length, briefsCount);
+    const mockupCount = Math.max(mockupRequests.length, dielinesCount);
+    const samplingCount = samplingRequests.length;
+    const costingCount = Math.max(costingRequests.length, costingsCount);
+
+    const sumCategories = designCount + mockupCount + samplingCount + costingCount || 1;
+
+    // Intake Channels
+    let materialCodeCount = 0;
+    let bindingCount = 0;
+    let feasibilityCount = 0;
+    let programCount = 0;
+
+    requests.forEach((r) => {
+      const mode = String(r.creationMode || "").toLowerCase();
+      const kind = String(r.requestKind || "").toLowerCase();
+      if (mode === "feasibility_check" || kind === "feasibility") feasibilityCount++;
+      else if (mode === "program_planning" || kind === "program") programCount++;
+      else if (mode === "binding") bindingCount++;
+      else materialCodeCount++;
+    });
+
+    return {
+      total,
+      design: { count: designCount, pct: Math.round((designCount / sumCategories) * 100) },
+      mockup: { count: mockupCount, pct: Math.round((mockupCount / sumCategories) * 100) },
+      sampling: { count: samplingCount, pct: Math.round((samplingCount / sumCategories) * 100) },
+      costing: { count: costingCount, pct: Math.round((costingCount / sumCategories) * 100) },
+      channels: {
+        materialCodeCount,
+        bindingCount,
+        feasibilityCount,
+        programCount,
+        materialPct: Math.round((materialCodeCount / (total || 1)) * 100),
+        bindingPct: Math.round((bindingCount / (total || 1)) * 100),
+        feasibilityPct: Math.round((feasibilityCount / (total || 1)) * 100),
+        programPct: Math.round((programCount / (total || 1)) * 100),
+      },
+    };
+  }, [requests, briefsCount, dielinesCount, costingsCount]);
+
+  // =========================================================================
+  // 4. DEPARTMENTAL COMPARATIVE HEALTH MATRIX (EXCLUDING PLANT)
+  // =========================================================================
+  const departmentHealth = useMemo(() => {
+    const totalRequests = requests.length || 1;
+
+    // 1. Marketing Team
+    const mktTotal = requests.length;
+    const mktDelayed = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "marketing" && r._isDelayed
+    ).length;
+    const mktActive = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "marketing" && !r._isClosed
+    ).length;
+    const mktOnTime = Math.max(0, mktTotal - mktDelayed);
+    const mktSla = mktTotal > 0 ? Math.round((mktOnTime / mktTotal) * 100) : 100;
+
+    // 2. Creative Studio
+    const crTotal = Math.max(briefsCount, marketingDecomposition.design.count);
+    const crDelayed = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "creative" && r._isDelayed
+    ).length;
+    const crActive = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "creative" && !r._isClosed
+    ).length;
+    const crOnTime = Math.max(0, crTotal - crDelayed);
+    const crSla = crTotal > 0 ? Math.round((crOnTime / crTotal) * 100) : 100;
+
+    // 3. Structural CAD
+    const stTotal = Math.max(dielinesCount, marketingDecomposition.mockup.count);
+    const stDelayed = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "studio" && r._isDelayed
+    ).length;
+    const stActive = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "studio" && !r._isClosed
+    ).length;
+    const stOnTime = Math.max(0, stTotal - stDelayed);
+    const stSla = stTotal > 0 ? Math.round((stOnTime / stTotal) * 100) : 100;
+
+    // 4. SAMP Lab
+    const smTotal = marketingDecomposition.sampling.count;
+    const smDelayed = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "samp" && r._isDelayed
+    ).length;
+    const smActive = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "samp" && !r._isClosed
+    ).length;
+    const smOnTime = Math.max(0, smTotal - smDelayed);
+    const smSla = smTotal > 0 ? Math.round((smOnTime / smTotal) * 100) : 100;
+
+    // 5. Costing Team
+    const coTotal = Math.max(costingsCount, marketingDecomposition.costing.count);
+    const coDelayed = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "costing" && r._isDelayed
+    ).length;
+    const coActive = slaMetrics.classified.filter(
+      (r) => r._departmentKey === "costing" && !r._isClosed
+    ).length;
+    const coOnTime = Math.max(0, coTotal - coDelayed);
+    const coSla = coTotal > 0 ? Math.round((coOnTime / coTotal) * 100) : 100;
+
+    return [
+      {
+        id: "marketing",
+        name: "Marketing Intake",
+        scope: "Client Accounts & Intake",
+        icon: Layers,
+        route: "/sample-requests",
+        total: mktTotal,
+        active: mktActive,
+        delayed: mktDelayed,
+        onTime: mktOnTime,
+        slaRate: mktSla,
+        sharePct: Math.round((mktTotal / totalRequests) * 100),
+        statusTone:
+          mktSla >= 90
+            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+            : "text-amber-600 bg-amber-50 dark:bg-amber-950/40",
+      },
+      {
+        id: "creative",
+        name: "Creative Studio",
+        scope: "Artwork & Prepress Proofs",
+        icon: Palette,
+        route: "/creative-work",
+        total: crTotal,
+        active: crActive,
+        delayed: crDelayed,
+        onTime: crOnTime,
+        slaRate: crSla,
+        sharePct: Math.round((crTotal / totalRequests) * 100),
+        statusTone:
+          crSla >= 90
+            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+            : crSla >= 75
+              ? "text-amber-600 bg-amber-50 dark:bg-amber-950/40"
+              : "text-rose-600 bg-rose-50 dark:bg-rose-950/40",
+      },
+      {
+        id: "studio",
+        name: "Structural CAD",
+        scope: "Dielines & 3D Packaging",
+        icon: Box,
+        route: "/studio-work",
+        total: stTotal,
+        active: stActive,
+        delayed: stDelayed,
+        onTime: stOnTime,
+        slaRate: stSla,
+        sharePct: Math.round((stTotal / totalRequests) * 100),
+        statusTone:
+          stSla >= 90
+            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+            : "text-amber-600 bg-amber-50 dark:bg-amber-950/40",
+      },
+      {
+        id: "samp",
+        name: "SAMP Lab",
+        scope: "Physical Fabrication & QC",
+        icon: FlaskConical,
+        route: "/samp-team-work",
+        total: smTotal,
+        active: smActive,
+        delayed: smDelayed,
+        onTime: smOnTime,
+        slaRate: smSla,
+        sharePct: Math.round((smTotal / totalRequests) * 100),
+        statusTone:
+          smSla >= 90
+            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+            : smSla >= 75
+              ? "text-amber-600 bg-amber-50 dark:bg-amber-950/40"
+              : "text-rose-600 bg-rose-50 dark:bg-rose-950/40",
+      },
+      {
+        id: "costing",
+        name: "Costing & BOM",
+        scope: "Commercial Pricing & Margin",
+        icon: Calculator,
+        route: "/costing-team",
+        total: coTotal,
+        active: coActive,
+        delayed: coDelayed,
+        onTime: coOnTime,
+        slaRate: coSla,
+        sharePct: Math.round((coTotal / totalRequests) * 100),
+        statusTone:
+          coSla >= 90
+            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+            : "text-amber-600 bg-amber-50 dark:bg-amber-950/40",
+      },
+    ];
+  }, [
+    requests,
+    briefsCount,
+    dielinesCount,
+    costingsCount,
+    marketingDecomposition,
+    slaMetrics.classified,
+  ]);
+
+  // =========================================================================
+  // 5. TOP CUSTOMER ACCOUNTS CONCENTRATION (PORTFOLIO HEALTH)
+  // =========================================================================
+  const topCustomers = useMemo(() => {
+    const map: Record<
+      string,
+      { total: number; active: number; delayed: number; completed: number }
+    > = {};
+
+    slaMetrics.classified.forEach((r) => {
+      const c = (r.customer || "").trim() || "Unassigned Customer";
+      if (!map[c]) map[c] = { total: 0, active: 0, delayed: 0, completed: 0 };
+      map[c].total++;
+      if (r._isClosed) map[c].completed++;
+      else map[c].active++;
+      if (r._isDelayed) map[c].delayed++;
+    });
+
+    return Object.entries(map)
+      .map(([name, stat]) => ({
+        name,
+        total: stat.total,
+        active: stat.active,
+        delayed: stat.delayed,
+        completed: stat.completed,
+        onTimeRate:
+          stat.total > 0 ? Math.round(((stat.total - stat.delayed) / stat.total) * 100) : 100,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+  }, [slaMetrics.classified]);
+
+  // =========================================================================
+  // 6. PACKAGING CATEGORY MIX (VOLUME SHARE)
+  // =========================================================================
+  const categoryMix = useMemo(() => {
+    const map: Record<string, number> = {};
+    requests.forEach((r) => {
+      const cat = (r.productCategory || r.productType || "").trim() || "Other";
+      map[cat] = (map[cat] || 0) + 1;
+    });
+
+    const total = requests.length || 1;
+    return Object.entries(map)
+      .map(([name, count]) => ({
+        name,
+        count,
+        pct: Math.round((count / total) * 100),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [requests]);
+
+  // =========================================================================
+  // 7. 12-MONTH TIMELINE & MATRIX (CURVE + NUMERICAL TABLE)
+  // =========================================================================
+  const monthlyTimeline = useMemo(() => {
+    const monthCounts: Record<
+      string,
+      {
+        intake: number;
+        design: number;
+        mockup: number;
+        sampling: number;
+        costing: number;
+        onTime: number;
+        delayed: number;
+      }
+    > = {};
+
+    BY_MONTHS.forEach((m) => {
+      monthCounts[m.key] = {
+        intake: 0,
+        design: 0,
+        mockup: 0,
+        sampling: 0,
+        costing: 0,
+        onTime: 0,
+        delayed: 0,
+      };
+    });
+
+    slaMetrics.classified.forEach((r) => {
+      const dateStr = r.dateRequestCreated || r.createdAt;
+      if (dateStr) {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          const monthKey = String(d.getMonth() + 1).padStart(2, "0");
+          if (monthCounts[monthKey]) {
+            monthCounts[monthKey].intake++;
+            if (isDesignRequest(r)) monthCounts[monthKey].design++;
+            if (r.mockupRequired === "yes") monthCounts[monthKey].mockup++;
+            if (!isDesignRequest(r)) monthCounts[monthKey].sampling++;
+            if (r.costingRequiredDate) monthCounts[monthKey].costing++;
+
+            if (r._isDelayed) monthCounts[monthKey].delayed++;
+            else monthCounts[monthKey].onTime++;
+          }
+        }
+      }
+    });
+
+    const maxVal = Math.max(...BY_MONTHS.map((m) => monthCounts[m.key].intake), 1);
+
+    return {
+      points: BY_MONTHS.map((m, idx) => ({
+        index: idx,
+        key: m.key,
+        label: m.label,
+        full: m.full,
+        intake: monthCounts[m.key].intake,
+        design: monthCounts[m.key].design,
+        mockup: monthCounts[m.key].mockup,
+        sampling: monthCounts[m.key].sampling,
+        costing: monthCounts[m.key].costing,
+        onTime: monthCounts[m.key].onTime,
+        delayed: monthCounts[m.key].delayed,
+        slaRate:
+          monthCounts[m.key].intake > 0
+            ? Math.round((monthCounts[m.key].onTime / monthCounts[m.key].intake) * 100)
+            : 100,
+      })),
+      maxVal,
+    };
+  }, [slaMetrics.classified]);
+
+  // Clean Catmull-Rom Bezier Spline
+  const svgCurve = useMemo(() => {
+    const width = 800;
+    const height = 180;
+    const paddingX = 30;
+    const paddingY = 24;
+    const chartW = width - paddingX * 2;
+    const chartH = height - paddingY * 2;
+
+    const dataPoints = monthlyTimeline.points.map((p, i) => {
+      const x = paddingX + (i / (monthlyTimeline.points.length - 1)) * chartW;
+      const normalizedY = p.intake / (monthlyTimeline.maxVal || 1);
+      const y = height - paddingY - normalizedY * chartH;
+      return { x, y, ...p };
+    });
+
+    if (dataPoints.length === 0) return { linePath: "", areaPath: "", points: [], width, height };
+
+    let d = `M ${dataPoints[0].x.toFixed(1)} ${dataPoints[0].y.toFixed(1)}`;
+    for (let i = 0; i < dataPoints.length - 1; i++) {
+      const p0 = dataPoints[i === 0 ? 0 : i - 1];
+      const p1 = dataPoints[i];
+      const p2 = dataPoints[i + 1];
+      const p3 = dataPoints[i + 2 < dataPoints.length ? i + 2 : i + 1];
+
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    }
+
+    const lastX = dataPoints[dataPoints.length - 1].x;
+    const firstX = dataPoints[0].x;
+    const bottomY = height - paddingY;
+    const area = `${d} L ${lastX.toFixed(1)} ${bottomY.toFixed(1)} L ${firstX.toFixed(1)} ${bottomY.toFixed(1)} Z`;
+
+    return { linePath: d, areaPath: area, points: dataPoints, width, height };
+  }, [monthlyTimeline]);
+
+  // =========================================================================
+  // 8. WATCHLIST FILTERING
+  // =========================================================================
+  const filteredWatchlist = useMemo(() => {
+    return slaMetrics.classified.filter((r) => {
+      if (watchlistFilter === "delayed" && !r._isDelayed) return false;
+      if (watchlistFilter === "urgent" && !r._isUrgent) return false;
+      if (watchlistFilter === "ontime" && r._isDelayed) return false;
+      if (watchlistFilter === "samp" && r._departmentKey !== "samp") return false;
+      if (watchlistFilter === "creative" && r._departmentKey !== "creative") return false;
+      if (watchlistFilter === "costing" && r._departmentKey !== "costing") return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matches =
+          String(r.srNumber || "").toLowerCase().includes(q) ||
+          String(r.customer || "").toLowerCase().includes(q) ||
+          String(r.productDescription || "").toLowerCase().includes(q) ||
+          String(r.materialCode || "").toLowerCase().includes(q) ||
+          String(r.status || "").toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [slaMetrics.classified, watchlistFilter, searchQuery]);
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto bg-[#f1f3f5] dark:bg-[#07090e] text-[#1e293b] dark:text-zinc-100 select-text font-sans">
-      
-      {/* ========================================================================= */}
-      {/* 1. CONTROL PANEL SUB-BAR (Breadcrumbs, Quick Actions, Status)             */}
-      {/* ========================================================================= */}
-      <div className="px-4 sm:px-6 py-2.5 bg-white dark:bg-[#090c14] border-b border-slate-200/80 dark:border-white/[0.06] flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center text-xs font-semibold">
-            <span className="text-zinc-400 dark:text-zinc-500">Workspace</span>
-            <span className="mx-1.5 text-zinc-300 dark:text-zinc-600">/</span>
-            <span className="text-[#1e293b] dark:text-zinc-100 font-bold">Operations Overview</span>
+    <div className="flex-1 flex flex-col h-full min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] font-sans select-text overflow-y-auto">
+
+      {/* ── 1. CLEAN EXECUTIVE VIEW-MODE HEADER (NO ACTION BUTTONS) ── */}
+      <header className="px-5 sm:px-8 py-3.5 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] shrink-0">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+
+          {/* Left Greeting & Context */}
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)] shrink-0" />
+              <h1 className="font-display font-bold text-lg sm:text-xl tracking-tight text-[var(--on-surface)]">
+                {greetingText}, {firstName}! {isReturningUser && <span className="text-[var(--on-surface-muted)] font-normal text-sm sm:text-base">Nice to see you.</span>}
+              </h1>
+            </div>
+            <p className="text-xs text-[var(--on-surface-muted)] flex items-center gap-2">
+              <span>Executive Multi-Team Telemetry & Operational SLA Governance</span>
+              <span className="text-[var(--border-strong)]">·</span>
+              <span className="font-mono text-[11px] text-[var(--on-surface-subtle)]">
+                Business Year {selectedYear}
+              </span>
+            </p>
           </div>
 
-          <span className="h-4 w-px bg-zinc-200 dark:bg-white/10 hidden sm:inline-block" />
+          {/* Right: Clean View Controls Only */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface-muted)] font-mono">
+              <Calendar className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+              <span>BY {selectedYear}</span>
+              <span className="text-[var(--border-strong)]">·</span>
+              <span className="text-[11px] text-[var(--on-surface-subtle)]">
+                {lastRefreshed ? `Updated ${lastRefreshed}` : "Syncing..."}
+              </span>
+            </div>
 
-          <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
-            <Clock className="w-3 h-3 text-[#006d32] dark:text-[#00d166]" />
-            <span>Updated {lastRefreshed || "Just now"}</span>
+            <button
+              type="button"
+              onClick={loadData}
+              disabled={isRefreshing}
+              title="Refresh telemetry data"
+              className="h-8 w-8 rounded-lg bg-[var(--surface-low)] text-[var(--on-surface)] border border-[var(--border-subtle)] flex items-center justify-center cursor-pointer shadow-2xs hover:bg-[var(--surface-container)] transition-colors"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${
+                  isRefreshing ? "text-[var(--accent-primary)] animate-spin" : ""
+                }`}
+              />
+            </button>
           </div>
+
         </div>
+      </header>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate("/sample-requests", { state: { openMarketingSetup: true } })}
-            className="h-8 px-3 rounded-lg bg-white hover:bg-zinc-50 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-[#ced4da] dark:border-white/10 text-xs font-semibold text-[#1e293b] dark:text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-          >
-            <Plus className="w-3.5 h-3.5 text-[#006d32] dark:text-[#00d166]" />
-            <span>New Request</span>
-          </button>
+      {/* ── MAIN DASHBOARD BODY ── */}
+      <main className="max-w-7xl w-full mx-auto p-5 sm:p-8 space-y-6">
 
-          <button
-            type="button"
+        {/* ── 2. EXECUTIVE MULTI-FACTOR KPI STRIP (CLEAN VIEW-MODE METRICS) ── */}
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+
+          {/* Tile 1: Annual Inflow */}
+          <div
             onClick={() => navigate("/sample-requests")}
-            className="h-8 px-3.5 rounded-lg bg-[#006d32] hover:bg-[#005a28] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs dark:shadow-[0_0_12px_rgba(0,209,102,0.3)] active:scale-95"
+            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] cursor-pointer shadow-2xs transition-colors"
           >
-            <span>Open Marketing Work</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+                Annual Inflow
+              </span>
+              <Layers className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+            </div>
+            <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
+              {slaMetrics.total.toLocaleString()}
+            </div>
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
+              100% total intake
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={loadData}
-            title="Refresh Metrics"
-            className="h-8 w-8 rounded-lg border border-[#ced4da] dark:border-white/10 bg-white dark:bg-white/[0.06] hover:bg-zinc-50 dark:hover:bg-white/[0.1] flex items-center justify-center text-zinc-600 dark:text-zinc-300 transition cursor-pointer"
+          {/* Tile 2: Global SLA Rate */}
+          <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+                On-Time SLA
+              </span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
+              {slaMetrics.onTimeRate}%
+            </div>
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+              {slaMetrics.totalOnTime} on-track tasks
+            </div>
+          </div>
+
+          {/* Tile 3: Breached / Overdue SLA */}
+          <div
+            onClick={() => setWatchlistFilter("delayed")}
+            className={`p-3.5 rounded-xl bg-[var(--surface-lowest)] border cursor-pointer shadow-2xs transition-colors ${slaMetrics.totalDelayed > 0 ? "border-rose-300 dark:border-rose-900/60" : "border-[var(--border-subtle)]"
+              }`}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#006d32] dark:text-[#00d166]" : ""}`} />
-          </button>
-        </div>
-      </div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                Overdue Tasks
+              </span>
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+            </div>
+            <div className="text-2xl font-display font-bold tracking-tight text-rose-600 dark:text-rose-400 tabular-nums">
+              {slaMetrics.totalDelayed}
+            </div>
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
+              {slaMetrics.delaySeverity.delay7Plus > 0 ? `${slaMetrics.delaySeverity.delay7Plus} critical (>7d)` : "SLA past target"}
+            </div>
+          </div>
 
-      {/* ========================================================================= */}
-      {/* 2. UNIFIED METRIC KPI RIBBON                                              */}
-      {/* ========================================================================= */}
-      <MetricRibbon metrics={metrics} />
+          {/* Tile 4: Urgent SLA (<72h) */}
+          <div
+            onClick={() => setWatchlistFilter("urgent")}
+            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-amber-400 cursor-pointer shadow-2xs transition-colors"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                Imminent SLA
+              </span>
+              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="text-2xl font-display font-bold tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
+              {slaMetrics.urgentCount}
+            </div>
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
+              Due within 72 hours
+            </div>
+          </div>
 
-      {/* ========================================================================= */}
-      {/* 3. MAIN DASHBOARD CONTENT AREA                                            */}
-      {/* ========================================================================= */}
-      <div className="p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
-        
-        {/* Department Launchpad Grid */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
+          {/* Tile 5: In-Flight Backlog */}
+          <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+                Active In-Flight
+              </span>
+              <Hourglass className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+            </div>
+            <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
+              {slaMetrics.inFlightCount}
+            </div>
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
+              Pending release
+            </div>
+          </div>
+
+          {/* Tile 6: Dispatched / Completed Deals */}
+          <div
+            onClick={() => navigate("/sample-requests")}
+            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-400 cursor-pointer shadow-2xs transition-colors"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+                Dispatched / Won
+              </span>
+              <Zap className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
+              {slaMetrics.totalCompleted}
+            </div>
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
+              Released to client
+            </div>
+          </div>
+
+        </section>
+
+        {/* ── 3. GRAPHICAL PIPELINE LIFECYCLE FUNNEL (PROPORTIONAL DISTRIBUTION STRIP) ── */}
+        <section className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 font-mono">
-                Department Workspaces & Operational Units
-              </h2>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Coordinated workflow spanning intake, artwork, CAD dielines, sampling lab, costing, and plant floor.
+              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight">
+                Enterprise Pipeline Distribution & Workload Allocation
+              </h3>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Visual proportional allocation of all requests across execution stages.
               </p>
             </div>
-            <span className="text-[11px] font-mono text-zinc-400 font-semibold">
-              {DEPARTMENT_DESKS.length} Workspaces Active
+            <span className="text-xs font-mono font-semibold text-[var(--on-surface-subtle)]">
+              {slaMetrics.total} Total Units
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {DEPARTMENT_DESKS.map((desk) => (
-              <div
-                key={desk.id}
-                onClick={() => navigate(desk.route)}
-                role="link"
-                tabIndex={0}
-                className="group relative flex flex-col justify-between p-4 rounded-xl bg-white dark:bg-[#0d121c] border border-slate-200/80 dark:border-white/[0.07] hover:border-[#006d32] dark:hover:border-emerald-500/40 shadow-xs dark:shadow-none hover:shadow-md dark:hover:shadow-[0_4px_24px_rgba(0,209,102,0.08)] transition-all duration-200 cursor-pointer select-none card-hover-lift"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-zinc-50 dark:bg-white/[0.04] flex items-center justify-center border border-zinc-200/80 dark:border-white/10 shrink-0">
-                        {desk.icon}
-                      </div>
-                      <div>
-                        <h3 className="text-[13px] font-bold text-[#1e293b] dark:text-zinc-100 group-hover:text-[#006d32] dark:group-hover:text-emerald-400 transition-colors">
-                          {desk.title}
-                        </h3>
-                        <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tight">
-                          {desk.tag}
-                        </span>
-                      </div>
-                    </div>
+          {/* Graphical Proportional Stacked Segment Bar */}
+          <div className="w-full h-3 rounded-full overflow-hidden flex bg-[var(--surface-low)]">
+            <div
+              style={{ width: `${Math.max(lifecycleFunnel.draft.pct, 2)}%` }}
+              className="bg-slate-400"
+              title={`Intake / Draft: ${lifecycleFunnel.draft.count} (${lifecycleFunnel.draft.pct}%)`}
+            />
+            <div
+              style={{ width: `${Math.max(lifecycleFunnel.creative.pct, 2)}%` }}
+              className="bg-purple-500"
+              title={`Creative Artwork: ${lifecycleFunnel.creative.count} (${lifecycleFunnel.creative.pct}%)`}
+            />
+            <div
+              style={{ width: `${Math.max(lifecycleFunnel.studio.pct, 2)}%` }}
+              className="bg-indigo-500"
+              title={`Structural CAD: ${lifecycleFunnel.studio.count} (${lifecycleFunnel.studio.pct}%)`}
+            />
+            <div
+              style={{ width: `${Math.max(lifecycleFunnel.samp.pct, 2)}%` }}
+              className="bg-teal-500"
+              title={`SAMP Lab: ${lifecycleFunnel.samp.count} (${lifecycleFunnel.samp.pct}%)`}
+            />
+            <div
+              style={{ width: `${Math.max(lifecycleFunnel.costing.pct, 2)}%` }}
+              className="bg-amber-500"
+              title={`Costing & BOM: ${lifecycleFunnel.costing.count} (${lifecycleFunnel.costing.pct}%)`}
+            />
+            <div
+              style={{ width: `${Math.max(lifecycleFunnel.dispatched.pct, 2)}%` }}
+              className="bg-emerald-500"
+              title={`Dispatched / Won: ${lifecycleFunnel.dispatched.count} (${lifecycleFunnel.dispatched.pct}%)`}
+            />
+          </div>
 
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border ${desk.badgeTone}`}>
-                      {desk.badgeText}
+          {/* Segment Badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1 text-xs font-mono">
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Draft Intake</span>
+                <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.draft.count} ({lifecycleFunnel.draft.pct}%)</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Creative Artwork</span>
+                <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.creative.count} ({lifecycleFunnel.creative.pct}%)</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Studio CAD</span>
+                <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.studio.count} ({lifecycleFunnel.studio.pct}%)</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">SAMP Lab</span>
+                <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.samp.count} ({lifecycleFunnel.samp.pct}%)</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Costing BOM</span>
+                <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.costing.count} ({lifecycleFunnel.costing.pct}%)</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Dispatched</span>
+                <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.dispatched.count} ({lifecycleFunnel.dispatched.pct}%)</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 4. ANNUAL INFLOW CURVE + NUMERICAL MATRIX TABLE ── */}
+        <section className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
+
+          {/* Curve Header & Toggle */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <TrendingUp className="w-4 h-4 text-[var(--accent-primary)]" />
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                  Annual Inflow Velocity & Operational Curve
+                </h2>
+                <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] text-[10px] font-mono font-bold">
+                  BY {selectedYear}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                12-month trajectory of requests progressing from intake through creative design, structural dielines, and sampling fabrication.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs font-mono">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)]" />
+                <span className="text-[var(--on-surface)] font-semibold">Intake</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span className="text-[var(--on-surface-muted)]">On-Time</span>
+              </div>
+
+              {/* Toggle Monthly Data Table */}
+              <button
+                type="button"
+                onClick={() => setShowMonthlyTable((prev) => !prev)}
+                className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium text-xs flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>{showMonthlyTable ? "Hide Matrix" : "View Monthly Numbers"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Solid SVG Stock Spline Curve */}
+          <div className="relative w-full overflow-hidden pt-1">
+            <svg
+              viewBox={`0 0 ${svgCurve.width} ${svgCurve.height}`}
+              className="w-full h-40 sm:h-48 overflow-visible"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="solidCurveGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.22" />
+                  <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0.01" />
+                </linearGradient>
+              </defs>
+
+              {/* Grid Horizontal Guide Lines */}
+              <line x1="30" y1="30" x2="770" y2="30" stroke="var(--border-subtle)" strokeDasharray="3 3" />
+              <line x1="88" y1="88" x2="770" y2="88" stroke="var(--border-subtle)" strokeDasharray="3 3" />
+              <line x1="30" y1="146" x2="770" y2="146" stroke="var(--border-subtle)" />
+
+              {/* Filled Area */}
+              {svgCurve.areaPath && <path d={svgCurve.areaPath} fill="url(#solidCurveGrad)" />}
+
+              {/* Main Curve */}
+              {svgCurve.linePath && (
+                <path
+                  d={svgCurve.linePath}
+                  fill="none"
+                  stroke="var(--accent-primary)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+
+              {/* Data Nodes */}
+              {svgCurve.points.map((pt, idx) => {
+                const isHovered = hoveredMonthIndex === idx;
+                return (
+                  <g
+                    key={pt.key}
+                    onMouseEnter={() => setHoveredMonthIndex(idx)}
+                    onMouseLeave={() => setHoveredMonthIndex(null)}
+                    className="cursor-pointer"
+                  >
+                    <circle cx={pt.x} cy={pt.y} r={12} fill="transparent" />
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={isHovered ? 5 : 3.5}
+                      fill="var(--surface-lowest)"
+                      stroke="var(--accent-primary)"
+                      strokeWidth={isHovered ? 2.5 : 2}
+                    />
+                    <text
+                      x={pt.x}
+                      y={svgCurve.height - 4}
+                      textAnchor="middle"
+                      className={`text-[11px] font-mono ${isHovered ? "fill-[var(--accent-primary)] font-bold" : "fill-[var(--on-surface-subtle)]"
+                        }`}
+                    >
+                      {pt.label}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* Solid Hover Tooltip */}
+            {hoveredMonthIndex !== null && svgCurve.points[hoveredMonthIndex] && (
+              <div
+                className="absolute top-2 z-20 pointer-events-none p-2.5 rounded-lg bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-xl text-xs font-sans"
+                style={{
+                  left: `${Math.min(
+                    Math.max(svgCurve.points[hoveredMonthIndex].x / (svgCurve.width / 100), 10),
+                    82
+                  )}%`,
+                  transform: "translateX(-50%)",
+                }}
+              >
+                <div className="font-bold text-[var(--on-surface)] mb-1 font-display">
+                  {svgCurve.points[hoveredMonthIndex].full} (BY {selectedYear})
+                </div>
+                <div className="space-y-0.5 font-mono text-[11px]">
+                  <div className="flex items-center justify-between gap-4 text-[var(--on-surface-muted)]">
+                    <span>Intake:</span>
+                    <span className="font-bold text-[var(--on-surface)] tabular-nums">
+                      {svgCurve.points[hoveredMonthIndex].intake}
                     </span>
                   </div>
-
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
-                    {desk.description}
-                  </p>
-
-                  {/* Sub-teams list */}
-                  <div className="border-t border-zinc-100 dark:border-white/[0.06] pt-2 mb-2 space-y-1">
-                    {desk.subItems.map((sub, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                        <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />
-                        <span className="truncate">{sub}</span>
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400">
+                    <span>On-Time:</span>
+                    <span className="font-bold tabular-nums">
+                      {svgCurve.points[hoveredMonthIndex].onTime}
+                    </span>
                   </div>
+                  {svgCurve.points[hoveredMonthIndex].delayed > 0 && (
+                    <div className="flex items-center justify-between gap-4 text-rose-600 dark:text-rose-400">
+                      <span>Delayed:</span>
+                      <span className="font-bold tabular-nums">
+                        {svgCurve.points[hoveredMonthIndex].delayed}
+                      </span>
+                    </div>
+                  )}
                 </div>
+              </div>
+            )}
+          </div>
 
-                <div className="pt-2 border-t border-zinc-100 dark:border-white/[0.06] flex items-center justify-between text-xs font-semibold text-[#006d32] dark:text-emerald-400 group-hover:text-[#005a28] dark:group-hover:text-emerald-300 transition-colors">
-                  <span>Enter Console</span>
-                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+          {/* ── EXPANDABLE 12-MONTH DETAILED NUMERICAL AUDIT MATRIX ── */}
+          {showMonthlyTable && (
+            <div className="overflow-x-auto pt-2 border-t border-[var(--border-subtle)]">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
+                    <th className="py-2 px-3">Month</th>
+                    <th className="py-2 px-3 text-right">Inflow</th>
+                    <th className="py-2 px-3 text-right">Design</th>
+                    <th className="py-2 px-3 text-right">CAD</th>
+                    <th className="py-2 px-3 text-right">Sampling</th>
+                    <th className="py-2 px-3 text-right">Costing</th>
+                    <th className="py-2 px-3 text-right">On-Time</th>
+                    <th className="py-2 px-3 text-right">Delayed</th>
+                    <th className="py-2 px-3 text-right">SLA %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
+                  {monthlyTimeline.points.map((m) => (
+                    <tr key={m.key} className="hover:bg-[var(--surface-low)]">
+                      <td className="py-2 px-3 font-semibold text-[var(--on-surface)]">{m.full}</td>
+                      <td className="py-2 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{m.intake}</td>
+                      <td className="py-2 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{m.design}</td>
+                      <td className="py-2 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{m.mockup}</td>
+                      <td className="py-2 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{m.sampling}</td>
+                      <td className="py-2 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{m.costing}</td>
+                      <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
+                      <td className="py-2 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">
+                        <span className={`px-1.5 py-0.5 rounded font-bold ${m.slaRate >= 90 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : m.slaRate >= 75 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                          }`}>
+                          {m.slaRate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+        </section>
+
+        {/* ── 5. MARKETING DECOMPOSITION & CHANNELS (VIEW MODE) ── */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* Left: 4 Deliverables Cards with Visual Share Meters */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight">
+                  Marketing Requests Decomposition
+                </h3>
+                <p className="text-xs text-[var(--on-surface-muted)]">
+                  Decomposition into graphic artwork, structural CAD dielines, physical samples, and costing quotations.
+                </p>
+              </div>
+              <span className="text-xs font-mono text-[var(--on-surface-subtle)]">
+                Total {marketingDecomposition.total}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+              {/* Deliverable 1: Design Requests */}
+              <div
+                onClick={() => navigate("/creative-work")}
+                className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-purple-400 cursor-pointer shadow-2xs transition-colors"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                      <Palette className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[var(--on-surface)]">Design Briefs</h4>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Creative Artwork</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                    {marketingDecomposition.design.pct}%
+                  </span>
+                </div>
+                {/* Visual Share Bar */}
+                <div className="w-full bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden mb-2">
+                  <div className="bg-purple-500 h-full rounded-full" style={{ width: `${marketingDecomposition.design.pct}%` }} />
+                </div>
+                <div className="flex items-baseline justify-between pt-1 border-t border-[var(--border-subtle)]">
+                  <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
+                    {marketingDecomposition.design.count}
+                  </span>
+                  <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-0.5">
+                    Creative Desk <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+
+              {/* Deliverable 2: Mockup Requests */}
+              <div
+                onClick={() => navigate("/studio-work")}
+                className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-indigo-400 cursor-pointer shadow-2xs transition-colors"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                      <Box className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[var(--on-surface)]">CAD Mockups</h4>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Dielines & 3D Form</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                    {marketingDecomposition.mockup.pct}%
+                  </span>
+                </div>
+                {/* Visual Share Bar */}
+                <div className="w-full bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden mb-2">
+                  <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${marketingDecomposition.mockup.pct}%` }} />
+                </div>
+                <div className="flex items-baseline justify-between pt-1 border-t border-[var(--border-subtle)]">
+                  <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
+                    {marketingDecomposition.mockup.count}
+                  </span>
+                  <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-0.5">
+                    Studio Desk <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+
+              {/* Deliverable 3: Sampling Prototypes */}
+              <div
+                onClick={() => navigate("/samp-team-work")}
+                className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-400 cursor-pointer shadow-2xs transition-colors"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                      <FlaskConical className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[var(--on-surface)]">Sampling Lab</h4>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Physical Prototypes</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    {marketingDecomposition.sampling.pct}%
+                  </span>
+                </div>
+                {/* Visual Share Bar */}
+                <div className="w-full bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden mb-2">
+                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${marketingDecomposition.sampling.pct}%` }} />
+                </div>
+                <div className="flex items-baseline justify-between pt-1 border-t border-[var(--border-subtle)]">
+                  <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
+                    {marketingDecomposition.sampling.count}
+                  </span>
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                    SAMP Lab <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+
+              {/* Deliverable 4: Costing Quotes */}
+              <div
+                onClick={() => navigate("/costing-team")}
+                className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-amber-400 cursor-pointer shadow-2xs transition-colors"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                      <Calculator className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[var(--on-surface)]">Costing & BOM</h4>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Pricing & Margins</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                    {marketingDecomposition.costing.pct}%
+                  </span>
+                </div>
+                {/* Visual Share Bar */}
+                <div className="w-full bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden mb-2">
+                  <div className="bg-amber-500 h-full rounded-full" style={{ width: `${marketingDecomposition.costing.pct}%` }} />
+                </div>
+                <div className="flex items-baseline justify-between pt-1 border-t border-[var(--border-subtle)]">
+                  <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
+                    {marketingDecomposition.costing.count}
+                  </span>
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-0.5">
+                    Costing Desk <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Right: Intake Creation Mode / Channels Breakdown */}
+          <div className="p-4 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs flex flex-col justify-between">
+            <div>
+              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight mb-1">
+                Intake Channels & Track Origin
+              </h3>
+              <p className="text-xs text-[var(--on-surface-muted)] mb-3">
+                Distribution of how client requests enter the system before reaching production.
+              </p>
+
+              {/* Segmented Channel Visual Bar */}
+              <div className="w-full h-2 rounded-full overflow-hidden flex bg-[var(--surface-low)] mb-3">
+                <div style={{ width: `${marketingDecomposition.channels.materialPct}%` }} className="bg-blue-500" title="Material Catalog" />
+                <div style={{ width: `${marketingDecomposition.channels.bindingPct}%` }} className="bg-indigo-500" title="Binding Configurator" />
+                <div style={{ width: `${marketingDecomposition.channels.feasibilityPct}%` }} className="bg-purple-500" title="NPD Feasibility" />
+                <div style={{ width: `${marketingDecomposition.channels.programPct}%` }} className="bg-amber-500" title="Seasonal Programs" />
+              </div>
+
+              <div className="space-y-2 text-xs font-mono">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--surface-low)]">
+                  <span className="text-[var(--on-surface)] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span>Catalog Material Code</span>
+                  </span>
+                  <span className="font-bold tabular-nums text-[var(--on-surface)]">
+                    {marketingDecomposition.channels.materialCodeCount} ({marketingDecomposition.channels.materialPct}%)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--surface-low)]">
+                  <span className="text-[var(--on-surface)] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                    <span>Binding Configurator</span>
+                  </span>
+                  <span className="font-bold tabular-nums text-[var(--on-surface)]">
+                    {marketingDecomposition.channels.bindingCount} ({marketingDecomposition.channels.bindingPct}%)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--surface-low)]">
+                  <span className="text-[var(--on-surface)] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-purple-500" />
+                    <span>Feasibility NPD Check</span>
+                  </span>
+                  <span className="font-bold tabular-nums text-[var(--on-surface)]">
+                    {marketingDecomposition.channels.feasibilityCount} ({marketingDecomposition.channels.feasibilityPct}%)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--surface-low)]">
+                  <span className="text-[var(--on-surface)] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span>Seasonal Programs</span>
+                  </span>
+                  <span className="font-bold tabular-nums text-[var(--on-surface)]">
+                    {marketingDecomposition.channels.programCount} ({marketingDecomposition.channels.programPct}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs">
+              <span className="text-[var(--on-surface-muted)]">Active Pipeline</span>
+              <span className="font-bold font-mono text-[var(--accent-primary)]">
+                {slaMetrics.inFlightCount} Units Active
+              </span>
+            </div>
+          </div>
+
+        </section>
+
+        {/* ── 6. DEPARTMENTAL COMPARATIVE HEALTH MATRIX WITH VISUAL GAUGES ── */}
+        <section className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                Departmental SLA Health & Workload Comparative Matrix
+              </h2>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Real-time audit comparing workload load balance and SLA fulfillment across all execution teams.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
+                  <th className="py-2.5 px-3">Department</th>
+                  <th className="py-2.5 px-3">Scope</th>
+                  <th className="py-2.5 px-3 text-right">Workload</th>
+                  <th className="py-2.5 px-3">Workload Share</th>
+                  <th className="py-2.5 px-3 text-right">Active Queue</th>
+                  <th className="py-2.5 px-3 text-right">On-Time</th>
+                  <th className="py-2.5 px-3 text-right">Delayed</th>
+                  <th className="py-2.5 px-3">SLA Fulfillment Gauge</th>
+                  <th className="py-2.5 px-3 text-right">View</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-subtle)]">
+                {departmentHealth.map((dept) => {
+                  const Icon = dept.icon;
+                  return (
+                    <tr key={dept.id} className="hover:bg-[var(--surface-low)]">
+                      <td className="py-3 px-3 font-semibold text-[var(--on-surface)] flex items-center gap-2">
+                        <div className="w-6 h-6 rounded bg-[var(--surface-low)] flex items-center justify-center text-[var(--on-surface)]">
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+                        <span>{dept.name}</span>
+                      </td>
+                      <td className="py-3 px-3 text-[var(--on-surface-muted)]">{dept.scope}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-[var(--on-surface)] tabular-nums">{dept.total}</td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2 w-28">
+                          <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-[var(--accent-primary)] h-full rounded-full" style={{ width: `${dept.sharePct}%` }} />
+                          </div>
+                          <span className="font-mono text-[10px] text-[var(--on-surface-muted)] tabular-nums">{dept.sharePct}%</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-[var(--on-surface)] tabular-nums">{dept.active}</td>
+                      <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{dept.onTime}</td>
+                      <td className="py-3 px-3 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                        {dept.delayed > 0 ? (
+                          <span className="px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">
+                            {dept.delayed}
+                          </span>
+                        ) : (
+                          "0"
+                        )}
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2 w-36">
+                          <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${dept.slaRate >= 90 ? "bg-emerald-500" : dept.slaRate >= 75 ? "bg-amber-500" : "bg-rose-500"
+                                }`}
+                              style={{ width: `${dept.slaRate}%` }}
+                            />
+                          </div>
+                          <span className={`px-1.5 py-0.5 rounded font-mono font-bold text-[10px] ${dept.statusTone}`}>
+                            {dept.slaRate}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => navigate(dept.route)}
+                          className="px-2 py-1 rounded bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] text-[11px] font-medium cursor-pointer inline-flex items-center gap-1 transition-colors"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* ── 7. AGING BOTTLENECK ANALYSIS + TOP ACCOUNTS CONCENTRATION ── */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Bottleneck Aging Analysis with Graphical Ladder */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
+            <div>
+              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[var(--accent-primary)]" />
+                <span>Active Workload Aging Analysis</span>
+              </h3>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Aging distribution of in-flight requests since initial client logging.
+              </p>
+            </div>
+
+            {/* Visual Segmented Aging Bar */}
+            <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-[var(--surface-low)]">
+              <div
+                style={{
+                  width: `${slaMetrics.inFlightCount > 0
+                      ? Math.round((slaMetrics.aging.age0to3 / slaMetrics.inFlightCount) * 100)
+                      : 25
+                    }%`,
+                }}
+                className="bg-emerald-500"
+                title="0-3 Days"
+              />
+              <div
+                style={{
+                  width: `${slaMetrics.inFlightCount > 0
+                      ? Math.round((slaMetrics.aging.age4to7 / slaMetrics.inFlightCount) * 100)
+                      : 25
+                    }%`,
+                }}
+                className="bg-blue-500"
+                title="4-7 Days"
+              />
+              <div
+                style={{
+                  width: `${slaMetrics.inFlightCount > 0
+                      ? Math.round((slaMetrics.aging.age8to14 / slaMetrics.inFlightCount) * 100)
+                      : 25
+                    }%`,
+                }}
+                className="bg-amber-500"
+                title="8-14 Days"
+              />
+              <div
+                style={{
+                  width: `${slaMetrics.inFlightCount > 0
+                      ? Math.round((slaMetrics.aging.age15Plus / slaMetrics.inFlightCount) * 100)
+                      : 25
+                    }%`,
+                }}
+                className="bg-rose-500"
+                title=">14 Days"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-center font-mono">
+              <div className="p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+                <span className="text-[10px] uppercase text-[var(--on-surface-subtle)] block mb-1">0 - 3 Days</span>
+                <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {slaMetrics.aging.age0to3}
+                </span>
+                <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Fresh</span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+                <span className="text-[10px] uppercase text-[var(--on-surface-subtle)] block mb-1">4 - 7 Days</span>
+                <span className="text-xl font-bold text-blue-600 dark:text-blue-400 tabular-nums">
+                  {slaMetrics.aging.age4to7}
+                </span>
+                <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Standard</span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+                <span className="text-[10px] uppercase text-[var(--on-surface-subtle)] block mb-1">8 - 14 Days</span>
+                <span className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                  {slaMetrics.aging.age8to14}
+                </span>
+                <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Review</span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+                <span className="text-[10px] uppercase text-[var(--on-surface-subtle)] block mb-1">&gt;14 Days</span>
+                <span className="text-xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                  {slaMetrics.aging.age15Plus}
+                </span>
+                <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Stalled</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface-muted)] flex items-center justify-between">
+              <span>Overdue Breakdown:</span>
+              <span className="font-mono text-[11px] text-[var(--on-surface)]">
+                {slaMetrics.delaySeverity.delay1to3d} (1-3d) · {slaMetrics.delaySeverity.delay4to7d} (4-7d) · {slaMetrics.delaySeverity.delay7Plus} (&gt;7d)
+              </span>
+            </div>
+          </div>
+
+          {/* Top Customer Accounts Concentration with Visual Meters */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
+            <div>
+              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-[var(--accent-primary)]" />
+                <span>Top Customer Accounts Concentration</span>
+              </h3>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Key client portfolio request volume and on-time fulfillment rates.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
+                    <th className="py-2 px-2">Customer Account</th>
+                    <th className="py-2 px-2 text-right">Total</th>
+                    <th className="py-2 px-2 text-right">Active</th>
+                    <th className="py-2 px-2 text-right">Delayed</th>
+                    <th className="py-2 px-2">On-Time Fulfillment</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
+                  {topCustomers.map((cust) => (
+                    <tr key={cust.name} className="hover:bg-[var(--surface-low)]">
+                      <td className="py-2.5 px-2 font-semibold text-[var(--on-surface)] truncate max-w-[140px]">
+                        {cust.name}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-bold text-[var(--on-surface)] tabular-nums">{cust.total}</td>
+                      <td className="py-2.5 px-2 text-right text-[var(--on-surface-muted)] tabular-nums">{cust.active}</td>
+                      <td className="py-2.5 px-2 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{cust.delayed}</td>
+                      <td className="py-2.5 px-2">
+                        <div className="flex items-center gap-2 w-32">
+                          <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className="bg-emerald-500 h-full rounded-full"
+                              style={{ width: `${cust.onTimeRate}%` }}
+                            />
+                          </div>
+                          <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${cust.onTimeRate >= 90 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                            }`}>
+                            {cust.onTimeRate}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </section>
+
+        {/* ── 8. PACKAGING CATEGORY MIX (VOLUME SHARE BARS) ── */}
+        <section className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+                <Package className="w-4 h-4 text-[var(--accent-primary)]" />
+                <span>Packaging Product Category Mix</span>
+              </h3>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Distribution of client requests by substrate and packaging configuration.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+            {categoryMix.map((cat) => (
+              <div key={cat.name} className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-[var(--on-surface)] truncate" title={cat.name}>
+                    {cat.name}
+                  </span>
+                  <span className="font-mono font-bold text-[var(--accent-primary)] text-[11px]">{cat.pct}%</span>
+                </div>
+                <div className="w-full bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-[var(--accent-primary)] h-full rounded-full" style={{ width: `${cat.pct}%` }} />
+                </div>
+                <div className="text-[10px] font-mono text-[var(--on-surface-muted)] tabular-nums">
+                  {cat.count} units logged
                 </div>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ===================================================================== */}
-        {/* 4. ANNUAL PLANT CAPACITY BALANCING MATRIX (Oct -> Sep Model)          */}
-        {/* ===================================================================== */}
-        <section className="bg-white dark:bg-[#0d121c] border border-slate-200/80 dark:border-white/[0.07] rounded-xl shadow-xs p-4 sm:p-5 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-zinc-200 dark:border-white/[0.08] gap-2">
+        {/* ── 9. DETAILED OPERATIONAL AUDIT WATCHLIST TABLE (VIEW-MODE) ── */}
+        <section className="rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs overflow-hidden">
+
+          {/* Header with Search and Deep Filters */}
+          <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-[#1e293b] dark:text-zinc-50">
-                  Annual Plant Capacity Balancing Matrix (Oct 2026 → Sep 2027)
-                </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 dark:bg-emerald-500/15 text-[#006d32] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
-                  SCU Quotas
+              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+                <span>Executive Operations Detail Watchlist</span>
+                <span className="text-xs font-mono font-normal text-[var(--on-surface-subtle)]">
+                  ({filteredWatchlist.length} records shown)
                 </span>
-              </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Declared Capacity vs. Sales Demand Plan vs. Released Sampling Load in Sampling Capacity Units (SCU).
+              </h3>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Live line-by-line inspection of individual requests, active department ownership, and delay turnaround.
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={handleRebalanceQuota}
-              disabled={rebalancedNov}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 ${
-                rebalancedNov
-                  ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed border border-zinc-200 dark:border-zinc-700"
-                  : "bg-[#006d32] hover:bg-[#005a28] text-white dark:shadow-[0_0_12px_rgba(0,209,102,0.3)]"
-              }`}
-            >
-              {rebalancedNov ? "✓ Rebalanced" : "Revise Declared Quota"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search Box */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter SR, Customer, Item..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[var(--surface-low)] text-xs text-[var(--on-surface)] placeholder-[var(--on-surface-subtle)] border border-[var(--border-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] w-48 sm:w-56"
+                />
+              </div>
+
+              {/* Segmented Filter Pills */}
+              <div className="inline-flex rounded-lg bg-[var(--surface-low)] p-0.5 border border-[var(--border-subtle)] text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setWatchlistFilter("all")}
+                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "all"
+                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
+                      : "text-[var(--on-surface-muted)]"
+                    }`}
+                >
+                  All ({slaMetrics.total})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWatchlistFilter("delayed")}
+                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "delayed"
+                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs"
+                      : "text-[var(--on-surface-muted)] hover:text-rose-600"
+                    }`}
+                >
+                  Delayed ({slaMetrics.totalDelayed})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWatchlistFilter("urgent")}
+                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "urgent"
+                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs"
+                      : "text-[var(--on-surface-muted)] hover:text-amber-600"
+                    }`}
+                >
+                  &lt;72h ({slaMetrics.urgentCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWatchlistFilter("ontime")}
+                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "ontime"
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-bold shadow-2xs"
+                      : "text-[var(--on-surface-muted)] hover:text-emerald-600"
+                    }`}
+                >
+                  On-Time ({slaMetrics.totalOnTime})
+                </button>
+              </div>
+            </div>
           </div>
 
+          {/* Deep Data Table */}
           <div className="overflow-x-auto">
-            <table className="w-full text-center border-collapse text-xs">
-              <thead className="bg-[#f8f9fa] dark:bg-[#121724] text-zinc-600 dark:text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-200 dark:border-white/[0.08]">
-                <tr>
-                  <th className="p-2 text-left w-48">Measurement (SCU)</th>
-                  <th className="p-2">Oct</th><th className="p-2">Nov</th><th className="p-2">Dec</th>
-                  <th className="p-2">Jan</th><th className="p-2">Feb</th><th className="p-2">Mar</th>
-                  <th className="p-2">Apr</th><th className="p-2">May</th><th className="p-2">Jun</th>
-                  <th className="p-2">Jul</th><th className="p-2">Aug</th><th className="p-2">Sep</th>
-                  <th className="p-2 bg-zinc-100 dark:bg-white/[0.04] font-bold">Total</th>
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)] bg-[var(--surface-low)]">
+                  <th className="py-2.5 px-4">SR Number</th>
+                  <th className="py-2.5 px-3">Customer</th>
+                  <th className="py-2.5 px-3">Product Description</th>
+                  <th className="py-2.5 px-3">Active Department</th>
+                  <th className="py-2.5 px-3 text-center">Age (Days)</th>
+                  <th className="py-2.5 px-3">Required Target</th>
+                  <th className="py-2.5 px-3">SLA Status</th>
+                  <th className="py-2.5 px-4 text-right">Inspect</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-white/[0.05] font-mono">
-                <tr className="hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
-                  <td className="p-2 text-left font-sans font-bold text-zinc-800 dark:text-zinc-200">Declared Capacity</td>
-                  <td>40</td><td>40</td><td>35</td><td>40</td><td>40</td><td>45</td>
-                  <td>45</td><td>45</td><td>40</td><td>35</td><td>35</td><td>40</td>
-                  <td className="bg-zinc-50 dark:bg-white/[0.02] font-bold text-zinc-900 dark:text-zinc-100">480</td>
-                </tr>
-                <tr className="hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
-                  <td className="p-2 text-left font-sans font-medium text-zinc-600 dark:text-zinc-400">Sales Demand Plan</td>
-                  <td>38</td><td>42</td><td>30</td><td>35</td><td>48</td><td>52</td>
-                  <td>44</td><td>40</td><td>36</td><td>30</td><td>28</td><td>32</td>
-                  <td className="bg-zinc-50 dark:bg-white/[0.02] font-bold text-zinc-900 dark:text-zinc-100">455</td>
-                </tr>
-                <tr className="hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
-                  <td className="p-2 text-left font-sans font-bold text-[#006d32] dark:text-emerald-400">Released Workload</td>
-                  <td className="text-emerald-700 dark:text-emerald-400 font-bold">34.2</td>
-                  <td className={`font-bold ${rebalancedNov ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40"}`}>
-                    {rebalancedNov ? "40.0" : "44.8 *"}
-                  </td>
-                  <td className="text-emerald-700 dark:text-emerald-400 font-bold">28.0</td>
-                  <td className="text-emerald-700 dark:text-emerald-400 font-bold">31.5</td>
-                  <td className="text-zinc-400 dark:text-zinc-600">-</td><td className="text-zinc-400 dark:text-zinc-600">-</td>
-                  <td className="text-zinc-400 dark:text-zinc-600">-</td><td className="text-zinc-400 dark:text-zinc-600">-</td>
-                  <td className="text-zinc-400 dark:text-zinc-600">-</td><td className="text-zinc-400 dark:text-zinc-600">-</td>
-                  <td className="text-zinc-400 dark:text-zinc-600">-</td><td className="text-zinc-400 dark:text-zinc-600">-</td>
-                  <td className="bg-zinc-50 dark:bg-white/[0.02] font-bold text-zinc-800 dark:text-zinc-200">
-                    {rebalancedNov ? "133.7" : "138.5"}
-                  </td>
-                </tr>
+              <tbody className="divide-y divide-[var(--border-subtle)]">
+                {isRefreshing ? (
+                  <TableSkeletonRows rows={6} columns={8} />
+                ) : filteredWatchlist.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center">
+                      <EmptyState
+                        compact
+                        title="No matching operational records"
+                        description="Try clearing search filters or selecting another filter pill."
+                        onResetFilters={
+                          searchQuery || watchlistFilter !== "all"
+                            ? () => {
+                                setSearchQuery("");
+                                setWatchlistFilter("all");
+                              }
+                            : undefined
+                        }
+                        resetLabel="Reset Search & Filters"
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  filteredWatchlist.slice(0, 10).map((req) => {
+                    const deptTones: Record<string, string> = {
+                      marketing: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-900/60",
+                      creative: "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-900/60",
+                      studio: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900/60",
+                      samp: "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border-teal-200 dark:border-teal-900/60",
+                      costing: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/60",
+                      plant: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-900/60",
+                    };
+                    const deptTone = deptTones[req._departmentKey.toLowerCase()] || "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300";
+
+                    return (
+                      <tr
+                        key={req.id}
+                        onClick={() => navigate("/sample-requests")}
+                        className="hover:bg-[var(--surface-low)] cursor-pointer group transition-colors"
+                      >
+                        <td className="py-3 px-4 font-mono font-bold text-[var(--on-surface)] group-hover:text-[var(--accent-primary)]">
+                          {req.srNumber || "—"}
+                        </td>
+                        <td className="py-3 px-3 font-medium text-[var(--on-surface)] truncate max-w-[140px]">
+                          {req.customer || "—"}
+                        </td>
+                        <td className="py-3 px-3 text-[var(--on-surface-muted)] truncate max-w-[200px]">
+                          {req.productDescription || "—"}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border ${deptTone}`}>
+                            {req._departmentKey.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono tabular-nums text-[var(--on-surface)]">
+                          {req._ageDays}d
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[var(--on-surface)] tabular-nums">
+                          {req.sampleRequiredDate || "—"}
+                        </td>
+                        <td className="py-3 px-3">
+                          {req._isDelayed ? (
+                            <StatusPill
+                              status={`+${req._overdueDays}d Late`}
+                              tone="danger"
+                              icon={<AlertTriangle className="w-3 h-3" />}
+                              size="xs"
+                            />
+                          ) : req._isUrgent ? (
+                            <StatusPill
+                              status="Due <72h"
+                              tone="warning"
+                              icon={<Clock className="w-3 h-3" />}
+                              size="xs"
+                            />
+                          ) : (
+                            <StatusPill
+                              status="On-Time"
+                              tone="success"
+                              icon={<CheckCircle2 className="w-3 h-3" />}
+                              size="xs"
+                            />
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <ChevronRight className="w-4 h-4 text-[var(--on-surface-subtle)] group-hover:translate-x-0.5 inline transition-transform" />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
 
-          {/* Plant Load Notification banner */}
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/25 border border-amber-200 dark:border-amber-700/30 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span>
-                <strong>Plant 01 Load Balancing:</strong>{" "}
-                {rebalancedNov
-                  ? "Load balanced across Pune & Vapi. November capacity within safe operating limits."
-                  : "November released load (44.8 SCU) exceeds declared capacity (40 SCU) by 12%. Rebalance recommended."}
-              </span>
-            </div>
-
-            {!rebalancedNov && (
-              <button
-                type="button"
-                onClick={handleRebalanceQuota}
-                className="bg-amber-600 hover:bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition active:scale-95 cursor-pointer shadow-xs dark:shadow-[0_0_10px_rgba(245,158,11,0.35)]"
-              >
-                Rebalance to Plant 02 (Vapi)
-              </button>
-            )}
-          </div>
-        </section>
-
-        {/* ===================================================================== */}
-        {/* 5. CROSS-DEPARTMENT HANDOFF & RECENT ACTIVITY STREAM                  */}
-        {/* ===================================================================== */}
-        <section className="bg-white dark:bg-[#0d121c] border border-slate-200/80 dark:border-white/[0.07] rounded-xl shadow-xs p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-200 dark:border-white/[0.08]">
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 font-mono">
-                Recent Departmental Handoffs & Telemetry
-              </h3>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Chronological record of requests moving across Marketing, Creative, Studio, SAMP, and Plant.
-              </p>
-            </div>
+          {/* Footer note */}
+          <div className="p-3.5 px-5 bg-[var(--surface-low)] border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--on-surface-muted)]">
+            <span>Showing top operational records in executive view mode.</span>
             <button
               type="button"
               onClick={() => navigate("/sample-requests")}
-              className="text-xs font-semibold text-[#006d32] dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+              className="font-semibold text-[var(--on-surface)] hover:text-[var(--accent-primary)] flex items-center gap-1 cursor-pointer transition-colors"
             >
-              <span>View All Requests</span>
-              <ChevronRight className="w-3.5 h-3.5" />
+              <span>Open Full Console View</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="divide-y divide-zinc-100 dark:divide-white/[0.04]">
-            {recentActivities.length > 0 ? (
-              recentActivities.map((act) => (
-                <div
-                  key={act.id}
-                  onClick={() => navigate("/sample-requests")}
-                  className="py-2.5 flex items-center justify-between gap-3 hover:bg-zinc-50 dark:hover:bg-white/[0.02] px-2 rounded-lg cursor-pointer transition"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="font-mono text-xs font-bold text-[#006d32] dark:text-emerald-400 shrink-0">
-                      {act.code}
-                    </span>
-                    <span className="text-zinc-300 dark:text-zinc-600 font-light">|</span>
-                    <span className="text-xs text-zinc-800 dark:text-zinc-200 font-medium truncate">
-                      {act.desc}
-                    </span>
-                    <span className="text-[11px] text-zinc-400 truncate hidden md:inline">
-                      ({act.customer})
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-zinc-100 text-zinc-700 dark:bg-white/[0.06] dark:text-zinc-300">
-                      {act.stage}
-                    </span>
-                    <span className="text-[10px] font-mono text-zinc-400 hidden sm:inline">
-                      {act.time}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="py-6 text-center text-xs text-zinc-400 font-mono">
-                No recent activity records found in this cycle.
-              </div>
-            )}
-          </div>
         </section>
 
-      </div>
+      </main>
+
     </div>
   );
 };

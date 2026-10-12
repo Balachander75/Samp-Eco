@@ -1,6 +1,7 @@
 export interface CreativeDesignOutputRow {
   designNumber: string;
   description: string;
+  shutterstockNo: string;
   remarks: string;
 }
 

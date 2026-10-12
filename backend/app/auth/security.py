@@ -230,17 +230,12 @@ def get_current_user(
 ):
     """
     FastAPI dependency that validates the Bearer token and returns the active User ORM object.
-    Enforces strict 401 Unauthorized in production and on expired/invalid credentials.
+    Requires a valid bearer token in every environment. Development mode must not
+    silently attribute mutations to whichever active user happens to be first.
     """
     from app.models.master import User
 
-    is_prod = settings.APP_ENV.lower() in ("production", "prod")
-
     if credentials is None:
-        if not is_prod and settings.DEBUG:
-            fallback_user = db.query(User).filter(User.is_active == True).first()
-            if fallback_user:
-                return fallback_user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authorization header missing or invalid.",

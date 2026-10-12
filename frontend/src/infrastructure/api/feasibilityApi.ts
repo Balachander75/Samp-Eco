@@ -32,8 +32,8 @@ export function mapFeasibilityResponse(item: Record<string, unknown>): Feasibili
   return {
     id: Number(item.id),
     requestCode: String(item.request_code || ""),
-    srNumber: String(item.sr_number || ""),
     customer: String(item.customer || ""),
+    targetPlant: typeof item.target_plant === "string" ? item.target_plant : null,
     feasibilityType: String(item.feasibility_type || ""),
     customFeasibilityType: typeof item.custom_feasibility_type === "string" ? item.custom_feasibility_type : null,
     descriptionNotes: String(item.description_notes || ""),
@@ -51,18 +51,35 @@ export function mapFeasibilityResponse(item: Record<string, unknown>): Feasibili
     updatedAt: typeof item.updated_at === "string" ? item.updated_at : null,
     samplingFeasibilityResponse: (item.sampling_feasibility_response || null) as any,
     samplingFeasibilityRemark: typeof item.sampling_feasibility_remark === "string" ? item.sampling_feasibility_remark : null,
+    feasibilityConditions: typeof item.feasibility_conditions === "string" ? item.feasibility_conditions : null,
+    leadTimeNote: typeof item.lead_time_note === "string" ? item.lead_time_note : null,
     samplingFeasibilityApprovedBy: typeof item.sampling_feasibility_approved_by === "string" ? item.sampling_feasibility_approved_by : null,
     feasibilityClosedAt: typeof item.feasibility_closed_at === "string" ? item.feasibility_closed_at : null,
     feasibilityClosedBy: typeof item.feasibility_closed_by === "string" ? item.feasibility_closed_by : null,
     isRespondedOnTime: item.is_responded_on_time != null ? Boolean(item.is_responded_on_time) : null,
+    sampCounterDate: typeof item.samp_counter_date === "string" ? item.samp_counter_date : null,
+    sampCounterDateReason: typeof item.samp_counter_date_reason === "string" ? item.samp_counter_date_reason : null,
+    sampCounterDateProposedAt: typeof item.samp_counter_date_proposed_at === "string" ? item.samp_counter_date_proposed_at : null,
+    sampCounterDateProposedBy: typeof item.samp_counter_date_proposed_by === "string" ? item.samp_counter_date_proposed_by : null,
+    counterDateDecision: (item.counter_date_decision || null) as any,
+    counterDateDecisionAt: typeof item.counter_date_decision_at === "string" ? item.counter_date_decision_at : null,
+    counterDateDecisionBy: typeof item.counter_date_decision_by === "string" ? item.counter_date_decision_by : null,
+    counterDateDecisionRemark: typeof item.counter_date_decision_remark === "string" ? item.counter_date_decision_remark : null,
+    counterDateDecisionDueAt: typeof item.counter_date_decision_due_at === "string" ? item.counter_date_decision_due_at : null,
+    counterDateWaitWorkdays: item.counter_date_wait_workdays != null ? Number(item.counter_date_wait_workdays) : null,
+    sampSlaPausedWorkdays: Number(item.samp_sla_paused_workdays || 0),
     marketingDecision: (item.marketing_decision || null) as any,
     marketingDecisionBy: typeof item.marketing_decision_by === "string" ? item.marketing_decision_by : null,
     marketingDecisionAt: typeof item.marketing_decision_at === "string" ? item.marketing_decision_at : null,
     marketingDecisionRemark: typeof item.marketing_decision_remark === "string" ? item.marketing_decision_remark : null,
     takenBySamp: typeof item.taken_by_samp === "string" ? item.taken_by_samp : null,
+    takenBySampUserId: item.taken_by_samp_user_id != null ? Number(item.taken_by_samp_user_id) : null,
     takenAtSamp: typeof item.taken_at_samp === "string" ? item.taken_at_samp : null,
     convertedSampleRequestId: item.converted_sample_request_id != null ? Number(item.converted_sample_request_id) : null,
     convertedSrNumber: typeof item.converted_sr_number === "string" ? item.converted_sr_number : null,
+    convertedRequestTypes: Array.isArray(item.converted_request_types)
+      ? item.converted_request_types.filter((value): value is "sample" | "costing" => value === "sample" || value === "costing")
+      : [],
     convertedAt: typeof item.converted_at === "string" ? item.converted_at : null,
     convertedBy: typeof item.converted_by === "string" ? item.converted_by : null,
     activities,
@@ -87,11 +104,11 @@ export function mapFeasibilityRequestToSampleRequest(item: FeasibilityRequestRec
 
   return {
     id: `feasibility-${item.id}`,
-    srNumber: item.srNumber,
+    srNumber: "",
     year: getBusinessYearForDate(createdAt),
     productDescription: cleanDesc,
     customer: item.customer,
-    targetPlant: "",
+    targetPlant: item.targetPlant || "",
     dateRequestCreated: createdAt ? createdAt.split("T")[0] : "",
     createdBy: item.createdBy || "",
     materialCode: item.requestCode,
@@ -100,7 +117,7 @@ export function mapFeasibilityRequestToSampleRequest(item: FeasibilityRequestRec
     creationMode: "feasibility_check",
     programName: description,
     programYear: createdAt ? createdAt.slice(0, 4) : "",
-    requestTypes: [],
+    requestTypes: item.convertedRequestTypes || [],
     requestKind: "feasibility",
     createdAt,
     referenceImage: item.referenceImages?.[0] || null,
@@ -114,10 +131,23 @@ export function mapFeasibilityRequestToSampleRequest(item: FeasibilityRequestRec
     marketingRemarks: item.marketingRemarks,
     samplingFeasibilityResponse: item.samplingFeasibilityResponse,
     samplingFeasibilityRemark: item.samplingFeasibilityRemark,
+    feasibilityConditions: item.feasibilityConditions,
+    leadTimeNote: item.leadTimeNote,
     samplingFeasibilityApprovedBy: item.samplingFeasibilityApprovedBy,
     feasibilityClosedAt: item.feasibilityClosedAt,
     feasibilityClosedBy: item.feasibilityClosedBy as any,
     isRespondedOnTime: item.isRespondedOnTime,
+    sampCounterDate: item.sampCounterDate,
+    sampCounterDateReason: item.sampCounterDateReason,
+    sampCounterDateProposedAt: item.sampCounterDateProposedAt,
+    sampCounterDateProposedBy: item.sampCounterDateProposedBy,
+    counterDateDecision: item.counterDateDecision,
+    counterDateDecisionAt: item.counterDateDecisionAt,
+    counterDateDecisionBy: item.counterDateDecisionBy,
+    counterDateDecisionRemark: item.counterDateDecisionRemark,
+    counterDateDecisionDueAt: item.counterDateDecisionDueAt,
+    counterDateWaitWorkdays: item.counterDateWaitWorkdays,
+    sampSlaPausedWorkdays: item.sampSlaPausedWorkdays,
     marketingDecision: item.marketingDecision,
     marketingDecisionBy: item.marketingDecisionBy,
     marketingDecisionAt: item.marketingDecisionAt,
@@ -126,15 +156,23 @@ export function mapFeasibilityRequestToSampleRequest(item: FeasibilityRequestRec
     takenAtSamp: item.takenAtSamp,
     convertedSampleRequestId: item.convertedSampleRequestId,
     convertedSrNumber: item.convertedSrNumber,
+    convertedRequestTypes: item.convertedRequestTypes,
     convertedAt: item.convertedAt,
     convertedBy: item.convertedBy,
     activities: (item.activities || []) as any,
   };
 }
 
-export async function fetchFeasibilityRequestsApi(): Promise<SampleRequestItem[]> {
-  const data = await apiFetch<Record<string, unknown>[]>("/api/v1/feasibility-requests");
+export async function fetchFeasibilityRequestsApi(year?: string): Promise<SampleRequestItem[]> {
+  const query = year && year.toUpperCase() !== "ALL" ? `?year=${encodeURIComponent(year)}` : "";
+  const data = await apiFetch<Record<string, unknown>[]>(`/api/v1/feasibility-requests${query}`);
   return data.map((item) => mapFeasibilityRequestToSampleRequest(mapFeasibilityResponse(item)));
+}
+
+export async function fetchFeasibilityRequestApi(id: number | string): Promise<SampleRequestItem> {
+  const rawId = String(id).replace(/^feasibility-/, "");
+  const data = await apiFetch<Record<string, unknown>>(`/api/v1/feasibility-requests/${Number(rawId)}`);
+  return mapFeasibilityRequestToSampleRequest(mapFeasibilityResponse(data));
 }
 
 export async function createFeasibilityRequestApi(
@@ -174,6 +212,8 @@ export async function recordFeasibilitySampVerdictApi(
   payload: {
     response: "Yes" | "No" | "Maybe";
     remark?: string | null;
+    conditions?: string | null;
+    lead_time_note?: string | null;
   }
 ): Promise<SampleRequestItem> {
   const rawId = String(id).replace(/^feasibility-/, "");
@@ -199,6 +239,32 @@ export async function recordFeasibilityMarketingDecisionApi(
   return mapFeasibilityRequestToSampleRequest(mapFeasibilityResponse(data));
 }
 
+export async function proposeFeasibilityCounterDateApi(
+  id: number | string,
+  proposedDate: string,
+  reason: string
+): Promise<SampleRequestItem> {
+  const rawId = String(id).replace(/^feasibility-/, "");
+  const data = await apiFetch<Record<string, unknown>>(`/api/v1/feasibility-requests/${Number(rawId)}/counter-date`, {
+    method: "POST",
+    jsonBody: { proposed_date: proposedDate, reason },
+  });
+  return mapFeasibilityRequestToSampleRequest(mapFeasibilityResponse(data));
+}
+
+export async function decideFeasibilityCounterDateApi(
+  id: number | string,
+  decision: "accepted" | "rejected",
+  decisionRemark?: string
+): Promise<SampleRequestItem> {
+  const rawId = String(id).replace(/^feasibility-/, "");
+  const data = await apiFetch<Record<string, unknown>>(`/api/v1/feasibility-requests/${Number(rawId)}/counter-date-decision`, {
+    method: "POST",
+    jsonBody: { decision, decision_remark: decisionRemark || null },
+  });
+  return mapFeasibilityRequestToSampleRequest(mapFeasibilityResponse(data));
+}
+
 export async function claimFeasibilityTaskApi(
   id: number | string
 ): Promise<SampleRequestItem> {
@@ -214,13 +280,15 @@ export async function claimFeasibilityTaskApi(
 }
 
 export async function convertFeasibilityToSamplingApi(
-  id: number | string
-): Promise<{ feasibility: SampleRequestItem; sampleRequestId: number; sampleSrNumber: string }> {
+  id: number | string,
+  requestTypes: Array<"sample" | "costing"> = ["sample"]
+): Promise<{ feasibility: SampleRequestItem; sampleRequestId: number; sampleSrNumber: string; requestTypes: Array<"sample" | "costing"> }> {
   const rawId = String(id).replace(/^feasibility-/, "");
-  const data = await apiFetch<{ feasibility: Record<string, unknown>; sample_request_id: number; sample_sr_number: string }>(
+  const data = await apiFetch<{ feasibility: Record<string, unknown>; sample_request_id: number; sample_sr_number: string; request_types: Array<"sample" | "costing"> }>(
     `/api/v1/feasibility-requests/${Number(rawId)}/convert-to-sampling`,
     {
       method: "POST",
+      jsonBody: { request_types: requestTypes },
     }
   );
   const feasibility = mapFeasibilityRequestToSampleRequest(mapFeasibilityResponse(data.feasibility));
@@ -231,6 +299,7 @@ export async function convertFeasibilityToSamplingApi(
     feasibility,
     sampleRequestId: data.sample_request_id,
     sampleSrNumber: data.sample_sr_number,
+    requestTypes: data.request_types || requestTypes,
   };
 }
 

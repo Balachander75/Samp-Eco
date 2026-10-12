@@ -3,6 +3,8 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
+from app.auth.permissions import filter_plant_values, require_admin, require_smps_member
+from app.auth.security import get_current_user
 from app.database import get_db
 from app.schemas.master import (
     CustomerCreate,
@@ -31,7 +33,7 @@ def master_health():
 # ---------------------------------------------------------------------------
 # Customers
 # ---------------------------------------------------------------------------
-@router.get("/api/v1/customers", response_model=List[CustomerOut], summary="List customers")
+@router.get("/api/v1/customers", response_model=List[CustomerOut], summary="List customers", dependencies=[Depends(require_smps_member)])
 def list_customers(
     search: Optional[str] = Query(default=None),
     service: MasterService = Depends(get_master_service),
@@ -44,6 +46,7 @@ def list_customers(
     response_model=CustomerOut,
     status_code=status.HTTP_201_CREATED,
     summary="Create a customer",
+    dependencies=[Depends(require_admin)],
 )
 def create_customer(
     payload: CustomerCreate,
@@ -56,8 +59,14 @@ def create_customer(
 # Manufacturing Plants
 # ---------------------------------------------------------------------------
 @router.get("/api/v1/plants", response_model=List[PlantOut], summary="List plants")
-def list_plants(service: MasterService = Depends(get_master_service)):
-    return service.list_plants()
+def list_plants(
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(get_current_user),
+):
+    require_smps_member(current_user)
+    plants = service.list_plants()
+    visible_codes = set(filter_plant_values(current_user, (plant.code for plant in plants), service.repo.db))
+    return [plant for plant in plants if plant.code in visible_codes]
 
 
 @router.post(
@@ -65,6 +74,7 @@ def list_plants(service: MasterService = Depends(get_master_service)):
     response_model=PlantOut,
     status_code=status.HTTP_201_CREATED,
     summary="Create a plant",
+    dependencies=[Depends(require_admin)],
 )
 def create_plant(
     payload: PlantCreate,
@@ -77,6 +87,7 @@ def create_plant(
     "/api/v1/plants/{id}",
     response_model=PlantOut,
     summary="Update a plant",
+    dependencies=[Depends(require_admin)],
 )
 def update_plant(
     id: int,
@@ -90,6 +101,7 @@ def update_plant(
     "/api/v1/plants/{id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a plant",
+    dependencies=[Depends(require_admin)],
 )
 def delete_plant(
     id: int,
@@ -102,7 +114,7 @@ def delete_plant(
 # ---------------------------------------------------------------------------
 # Users & Team Hierarchy
 # ---------------------------------------------------------------------------
-@router.get("/api/v1/users", response_model=List[UserOut], summary="List enterprise users")
+@router.get("/api/v1/users", response_model=List[UserOut], summary="List enterprise users", dependencies=[Depends(require_admin)])
 def list_users(
     team: Optional[str] = Query(default=None, description="Filter by team department"),
     service: MasterService = Depends(get_master_service),
@@ -115,6 +127,7 @@ def list_users(
     response_model=UserOut,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new user with team and role",
+    dependencies=[Depends(require_admin)],
 )
 def create_user(
     payload: UserCreate,
@@ -127,6 +140,7 @@ def create_user(
     "/api/v1/users/{id}",
     response_model=UserOut,
     summary="Update a user",
+    dependencies=[Depends(require_admin)],
 )
 def update_user(
     id: int,
@@ -140,6 +154,7 @@ def update_user(
     "/api/v1/users/{id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a user",
+    dependencies=[Depends(require_admin)],
 )
 def delete_user(
     id: int,
@@ -152,8 +167,8 @@ def delete_user(
 # ---------------------------------------------------------------------------
 # Product Categories Merchandising Taxonomy
 # ---------------------------------------------------------------------------
-@router.get("/api/v1/master/product-categories", summary="List product categories hierarchy")
-@router.get("/api/master/product-categories", summary="List product categories hierarchy (legacy alias)")
+@router.get("/api/v1/master/product-categories", summary="List product categories hierarchy", dependencies=[Depends(require_smps_member)])
+@router.get("/api/master/product-categories", summary="List product categories hierarchy (legacy alias)", dependencies=[Depends(require_smps_member)])
 def get_product_categories(service: MasterService = Depends(get_master_service)):
     return service.get_product_categories()
 

@@ -13,7 +13,7 @@ import {
   Building2,
 } from "lucide-react";
 import { UserProfile } from "@/features/auth";
-import { createProgramRequestApi, createSampleRequestApi } from "@/infrastructure/api";
+import { createProgramRequestApi } from "@/infrastructure/api";
 import { CreateProgramRequestPayload } from "../types";
 import { useMasterData } from "../hooks/useMasterData";
 
@@ -200,46 +200,9 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
       });
       return;
     } catch (err: any) {
-      console.error("Failed to create program request in database, applying fallback:", err);
-      // Fallback: createSampleRequestApi
-      const matrixSection =
-        "\n\nMaterial Specification Matrix:\n" +
-        filledRows
-          .map(
-            (r, i) =>
-              `#${i + 1} | Type: ${r.materialType || "—"} | Supplier: ${r.supplierInfo || "—"} | Grade: ${r.grade || "—"} | Color: ${r.colorVariant || "—"} | Caliper: ${r.caliperWt || "—"} | Qty: ${r.qty || "0"} ${r.unit || ""} | Remark: ${r.remark || "—"}`
-          )
-          .join("\n");
-      const fallbackSrNum = `SR-26-${String(Math.floor(100 + Math.random() * 900))}`;
-      try {
-        await createSampleRequestApi({
-          srNumber: fallbackSrNum,
-          customer,
-          targetPlant,
-          productDescription: `[Seasonal Program: ${programPlanName.trim()}]\nProgram Year: ${programPlanYear}\nTarget Plant: ${targetPlant}${matrixSection}`,
-          materialCode: `PG-PL-${Math.floor(1000 + Math.random() * 9000)}`,
-          programName: programPlanName.trim(),
-          programYear: programPlanYear,
-          requestTypes: [],
-          requestKind: "program",
-          status: "Pending SAMP Review",
-          createdBy: user?.name || "Program Planner",
-          dateRequestCreated: new Date().toISOString().split("T")[0],
-          creationMode: "program_planning",
-        } as any);
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-        }
-        navigate("/sample-requests/programs", {
-          replace: true,
-          state: {
-            toastMessage: `✓ Program Request ${fallbackSrNum} submitted to Sampling Team!`,
-          },
-        });
-        return;
-      } catch (fallbackErr) {
-        setError("Could not register program request. Please verify backend connection.");
-      }
+      // Program records must have one durable source of truth. Do not silently
+      // create a sample-request fallback with a random code when this API fails.
+      setError(err instanceof Error ? err.message : "Could not register the program request. Please retry.");
     } finally {
       setIsSubmitting(false);
     }
@@ -264,7 +227,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
                 <span
                   onClick={() => navigate("/sample-requests/programs")}
-                  className="hover:text-[#006d32] cursor-pointer transition-colors"
+                  className="hover:text-[var(--accent-primary)] cursor-pointer transition-colors"
                 >
                   Marketing Work
                 </span>
@@ -282,8 +245,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
               type="button"
               onClick={handleSubmitProgramRequest}
               disabled={isSubmitting}
-              className="h-9 px-5 rounded-xl text-white text-xs font-semibold shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 tracking-tight shrink-0 active:scale-98"
-              style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
+              className="h-9 px-5 rounded-xl text-white text-xs font-semibold shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 tracking-tight shrink-0 active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
             >
               {isSubmitting ? (
                 <span className="animate-spin text-white font-mono">•</span>
@@ -316,7 +278,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
         <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-3.5 shadow-[0_2px_12px_rgba(11,28,48,0.02)]">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs">
             <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#006d32] text-white shadow-2xs">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[var(--accent-primary)] text-white shadow-2xs">
                 PLANNING FOR
               </span>
 
@@ -326,7 +288,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
 
               <span className="text-slate-300">•</span>
 
-              <span className="font-semibold text-[#006d32] text-sm">
+              <span className="font-semibold text-[var(--accent-primary)] text-sm">
                 &quot;{programPlanName}&quot;
               </span>
 
@@ -347,7 +309,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
             <button
               type="button"
               onClick={() => setIsEditingSetup((prev) => !prev)}
-              className="text-xs font-semibold text-slate-500 hover:text-[#006d32] flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors self-start md:self-auto px-2 py-1 rounded-lg hover:bg-slate-50"
+              className="text-xs font-semibold text-slate-500 hover:text-[var(--accent-primary)] flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors self-start md:self-auto px-2 py-1 rounded-lg hover:bg-slate-50"
             >
               <Pencil className="w-3.5 h-3.5" />
               <span>{isEditingSetup ? "Close Editor" : "Edit Parameters"}</span>
@@ -366,7 +328,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                   value={customer}
                   onChange={(e) => setCustomer(e.target.value)}
                   placeholder="Customer account"
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-semibold text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition"
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-semibold text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition"
                 />
               </div>
 
@@ -379,7 +341,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                   value={programPlanName}
                   onChange={(e) => setProgramPlanName(e.target.value)}
                   placeholder="Program campaign title"
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-semibold text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition"
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-semibold text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition"
                 />
               </div>
 
@@ -392,7 +354,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                   value={programPlanYear}
                   onChange={(e) => setProgramPlanYear(e.target.value)}
                   placeholder="e.g. 2026"
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-mono font-bold text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition"
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-mono font-bold text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition"
                 />
               </div>
 
@@ -405,7 +367,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                   value={targetPlant}
                   onChange={(e) => setTargetPlant(e.target.value)}
                   placeholder="Target plant/facility"
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-semibold text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition"
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-semibold text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition"
                 />
               </div>
             </div>
@@ -428,8 +390,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
             <button
               type="button"
               onClick={handleAddRow}
-              className="h-7.5 px-2.5 rounded-lg text-white text-xs font-semibold shadow-2xs hover:opacity-95 transition-all flex items-center gap-1 cursor-pointer shrink-0 active:scale-95"
-              style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
+              className="h-7.5 px-2.5 rounded-lg text-white text-xs font-semibold shadow-2xs hover:opacity-95 transition-all flex items-center gap-1 cursor-pointer shrink-0 active:scale-95 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Add Row</span>
@@ -471,7 +432,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                         placeholder="Material type"
                         value={row.materialType}
                         onChange={(e) => updateRow(row.id, "materialType", e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition font-semibold"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition font-semibold"
                       />
                     </td>
 
@@ -482,7 +443,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                         placeholder="Supplier"
                         value={row.supplierInfo}
                         onChange={(e) => updateRow(row.id, "supplierInfo", e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition"
                       />
                     </td>
 
@@ -493,7 +454,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                         placeholder="Grade"
                         value={row.grade}
                         onChange={(e) => updateRow(row.id, "grade", e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition"
                       />
                     </td>
 
@@ -504,7 +465,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                         placeholder="Color"
                         value={row.colorVariant}
                         onChange={(e) => updateRow(row.id, "colorVariant", e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition"
                       />
                     </td>
 
@@ -515,7 +476,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                         placeholder="Caliper / Wt"
                         value={row.caliperWt}
                         onChange={(e) => updateRow(row.id, "caliperWt", e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs font-mono text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs font-mono text-slate-900 placeholder:text-slate-400 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition"
                       />
                     </td>
 
@@ -526,7 +487,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                         placeholder=""
                         value={row.qty}
                         onChange={(e) => updateRow(row.id, "qty", e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs font-mono text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition font-bold text-right"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs font-mono text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition font-bold text-right"
                       />
                     </td>
 
@@ -537,7 +498,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                         placeholder=""
                         value={row.unit}
                         onChange={(e) => updateRow(row.id, "unit", e.target.value)}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs font-mono text-slate-900 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition text-center"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs font-mono text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition text-center"
                       />
                     </td>
 
@@ -554,7 +515,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
                             handleAddRow();
                           }
                         }}
-                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/10 transition"
+                        className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition"
                       />
                     </td>
 
@@ -589,7 +550,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
           {/* Matrix Footer Counts */}
           <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between text-xs text-slate-500 font-mono">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#006d32]" />
+              <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)]" />
               <span>
                 {summaryStats.totalConfigured} row{summaryStats.totalConfigured !== 1 ? "s" : ""} configured • {summaryStats.totalFilled} completed
               </span>

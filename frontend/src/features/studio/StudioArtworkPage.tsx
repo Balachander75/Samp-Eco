@@ -1,53 +1,216 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  FileCode2,
+  Scissors,
   Search,
   RefreshCw,
   Download,
   X,
-  ChevronLeft,
   ChevronRight,
-  Box,
-  Scissors,
-  Layers,
-  Sparkles,
+  ArrowRight,
   Building2,
+  Calendar,
+  Layers,
+  Clock,
+  CheckCircle2,
+  ExternalLink,
+  Activity,
+  Layers3,
 } from "lucide-react";
-import { StatusPill } from "@/components/ui/StatusPill";
+import type { SampleRequestItem } from "@/features/sample-requests/types";
 import { CopyBadge } from "@/components/ui/CopyBadge";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PaginationBar } from "@/components/erp/PaginationBar";
+import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
 import { exportRecordsToCsv } from "@/lib/csvExport";
+import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 import { DielineItem } from "./types";
 
 export interface StudioArtworkPageProps {
-  dielines: DielineItem[];
+  samplingRequests?: SampleRequestItem[];
+  dielines?: DielineItem[];
   selectedYear: string;
   selectedPlant: string;
   mode?: "all" | "mockup" | "sampling";
-  onInspectDieline: (dieline: DielineItem) => void;
+  isLoading?: boolean;
+  readOnly?: boolean;
+  onInspectRequest?: (req: SampleRequestItem) => void;
+  onInspectDieline?: (dieline: DielineItem) => void;
   onExportCSV?: () => void;
   onRefresh?: () => Promise<void>;
 }
 
 export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
-  dielines,
+  samplingRequests = [],
   selectedYear,
   selectedPlant,
-  mode = "all",
+  isLoading = false,
+  readOnly = false,
+  onInspectRequest,
   onInspectDieline,
   onExportCSV,
   onRefresh,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStage, setSelectedStage] = useState<string>("all");
-  const [formatFilter, setFormatFilter] = useState<string>("all");
-  const [plantFilter, setPlantFilter] = useState<string>("all");
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [customerFilter, setCustomerFilter] = useState("all");
+  const [plantFilter, setPlantFilter] = useState("all");
+  const [selectedKpiFilter, setSelectedKpiFilter] = useState<"all" | "pending" | "submitted">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 40;
 
-  const handleToggleSelectRow = (id: string | number, e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Filter requests based on target plant prop
+  const baseRequests = useMemo(() => {
+    if (selectedPlant === "ALL" || !selectedPlant) return samplingRequests;
+    return samplingRequests.filter((r) =>
+      (r.targetPlant || "").toLowerCase().includes(selectedPlant.toLowerCase())
+    );
+  }, [samplingRequests, selectedPlant]);
+
+  // Telemetry counts
+  const totalCount = baseRequests.length;
+
+  const pendingCount = useMemo(() => {
+    return baseRequests.filter((r) => !r.mockupWorkflowState?.mockupUrl).length;
+  }, [baseRequests]);
+
+  const submittedCount = useMemo(() => {
+    return baseRequests.filter((r) => Boolean(r.mockupWorkflowState?.mockupUrl)).length;
+  }, [baseRequests]);
+
+  // Unique categories
+  const uniqueCategories = useMemo(() => {
+    const set = new Set<string>();
+    baseRequests.forEach((r) => {
+      if (r.productCategory?.trim()) set.add(r.productCategory.trim());
+    });
+    return Array.from(set).sort();
+  }, [baseRequests]);
+
+  // Unique customers
+  const uniqueCustomers = useMemo(() => {
+    const set = new Set<string>();
+    baseRequests.forEach((r) => {
+      if (r.customer?.trim()) set.add(r.customer.trim());
+    });
+    return Array.from(set).sort();
+  }, [baseRequests]);
+
+  // Unique plants
+  const uniquePlants = useMemo(() => {
+    const set = new Set<string>();
+    baseRequests.forEach((r) => {
+      if (r.targetPlant?.trim()) set.add(r.targetPlant.trim());
+    });
+    return Array.from(set).sort();
+  }, [baseRequests]);
+
+  // Filtered requests
+  const filteredRequests = useMemo(() => {
+    return baseRequests.filter((r) => {
+      const hasOutput = Boolean(r.mockupWorkflowState?.mockupUrl);
+
+      // KPI filter
+      if (selectedKpiFilter === "pending" && hasOutput) return false;
+      if (selectedKpiFilter === "submitted" && !hasOutput) return false;
+
+      // Dropdown filters
+      if (categoryFilter !== "all" && (r.productCategory || "").trim() !== categoryFilter) return false;
+      if (customerFilter !== "all" && (r.customer || "").trim() !== customerFilter) return false;
+      if (plantFilter !== "all" && (r.targetPlant || "").trim() !== plantFilter) return false;
+
+      // Search term
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        const outputVal = (r.mockupWorkflowState?.mockupUrl || "").toLowerCase();
+        return (
+          (r.srNumber || "").toLowerCase().includes(q) ||
+          (r.materialCode || "").toLowerCase().includes(q) ||
+          (r.productDescription || "").toLowerCase().includes(q) ||
+          (r.customer || "").toLowerCase().includes(q) ||
+          (r.targetPlant || "").toLowerCase().includes(q) ||
+          (r.productCategory || "").toLowerCase().includes(q) ||
+          outputVal.includes(q)
+        );
+      }
+
+      return true;
+    });
+  }, [baseRequests, selectedKpiFilter, categoryFilter, customerFilter, plantFilter, searchTerm]);
+
+  // Paginated requests
+  const paginatedRequests = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRequests.slice(start, start + pageSize);
+  }, [filteredRequests, currentPage, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setCategoryFilter("all");
+    setCustomerFilter("all");
+    setPlantFilter("all");
+    setSelectedKpiFilter("all");
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+      categoryFilter !== "all" ||
+      customerFilter !== "all" ||
+      plantFilter !== "all" ||
+      selectedKpiFilter !== "all"
+  );
+
+  const handleRefreshClick = async () => {
+    if (!onRefresh || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleExportCSVClick = () => {
+    if (onExportCSV) {
+      onExportCSV();
+      return;
+    }
+    const dateStr = new Date().toISOString().split("T")[0];
+    exportRecordsToCsv({
+      filename: `studio_sampling_deliverables_${dateStr}.csv`,
+      columns: [
+        { header: "SR Code", accessor: (r) => r.srNumber || r.id },
+        { header: "Product Description", accessor: (r) => r.productDescription },
+        { header: "Customer / Brand", accessor: (r) => r.customer },
+        { header: "Material Code", accessor: (r) => r.materialCode },
+        { header: "Plant", accessor: (r) => r.targetPlant },
+        { header: "Due Date", accessor: (r) => r.sampleRequiredDate },
+        {
+          header: "Studio CAD Output (Link / Path)",
+          accessor: (r) => r.mockupWorkflowState?.mockupUrl || "Awaiting Link/Path",
+        },
+        { header: "Status", accessor: (r) => r.status },
+      ],
+      data: filteredRequests,
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedRequests.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedRequests.map((r) => r.id)));
+    }
+  };
+
+  const toggleSelectRow = (id: string | number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -56,499 +219,507 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
     });
   };
 
-  const handleToggleSelectAll = () => {
-    if (selectedIds.size === paginatedDielines.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(paginatedDielines.map((d) => d.id)));
+  const handleRowClick = (req: SampleRequestItem) => {
+    if (onInspectRequest) {
+      onInspectRequest(req);
     }
   };
-
-  // Base dielines matching current mode
-  const baseDielines = useMemo(() => {
-    return dielines;
-  }, [dielines]);
-
-  // Stage filters matching current mode
-  const stages = useMemo(() => {
-    if (mode === "mockup") {
-      return [
-        { id: "all", label: "All Mockups", count: baseDielines.length },
-        {
-          id: "intake",
-          label: "CAD Intake",
-          count: baseDielines.filter((d) => d.status === "CAD Intake").length,
-        },
-        {
-          id: "construction",
-          label: "Dieline Construction",
-          count: baseDielines.filter((d) => d.status === "Dieline Construction").length,
-        },
-        {
-          id: "simulation",
-          label: "3D Fold Simulation",
-          count: baseDielines.filter((d) => d.status === "3D Simulation").length,
-        },
-        {
-          id: "plotter",
-          label: "Plotter Sample Tested",
-          count: baseDielines.filter((d) => d.status === "Plotter Sample Tested").length,
-        },
-      ];
-    }
-
-    if (mode === "sampling") {
-      return [
-        { id: "all", label: "All Sampling CADs", count: baseDielines.length },
-        {
-          id: "plotter",
-          label: "Plotter Cut Verified",
-          count: baseDielines.filter((d) => d.status === "Plotter Sample Tested").length,
-        },
-        {
-          id: "cleared",
-          label: "Laser Die Cleared",
-          count: baseDielines.filter((d) => d.status === "Laser Die Cleared").length,
-        },
-        {
-          id: "construction",
-          label: "CAD Engineering",
-          count: baseDielines.filter((d) => d.status === "Dieline Construction").length,
-        },
-      ];
-    }
-
-    return [
-      { id: "all", label: "All Dielines", count: baseDielines.length },
-      {
-        id: "intake",
-        label: "CAD Intake",
-        count: baseDielines.filter((d) => d.status === "CAD Intake").length,
-      },
-      {
-        id: "construction",
-        label: "Dieline Construction",
-        count: baseDielines.filter((d) => d.status === "Dieline Construction").length,
-      },
-      {
-        id: "simulation",
-        label: "3D Fold Simulation",
-        count: baseDielines.filter((d) => d.status === "3D Simulation").length,
-      },
-      {
-        id: "plotter",
-        label: "Plotter Tested",
-        count: baseDielines.filter((d) => d.status === "Plotter Sample Tested").length,
-      },
-      {
-        id: "cleared",
-        label: "Laser Cleared",
-        count: baseDielines.filter((d) => d.status === "Laser Die Cleared").length,
-      },
-    ];
-  }, [baseDielines, mode]);
-
-  // Unique formats for dropdown
-  const uniqueFormats = useMemo(() => {
-    const set = new Set<string>();
-    baseDielines.forEach((d) => {
-      if (d.boxFormat) set.add(d.boxFormat);
-    });
-    return Array.from(set).sort();
-  }, [baseDielines]);
-
-  // Unique plants for dropdown
-  const uniquePlants = useMemo(() => {
-    const set = new Set<string>();
-    baseDielines.forEach((d) => {
-      if (d.targetPlant) set.add(d.targetPlant);
-    });
-    return Array.from(set).sort();
-  }, [baseDielines]);
-
-  // Filtered dielines
-  const filteredDielines = useMemo(() => {
-    return baseDielines.filter((d) => {
-      // Stage filter
-      if (selectedStage !== "all") {
-        if (selectedStage === "intake" && d.status !== "CAD Intake") return false;
-        if (selectedStage === "construction" && d.status !== "Dieline Construction") return false;
-        if (selectedStage === "simulation" && d.status !== "3D Simulation") return false;
-        if (selectedStage === "plotter" && d.status !== "Plotter Sample Tested") return false;
-        if (selectedStage === "cleared" && d.status !== "Laser Die Cleared") return false;
-      }
-
-      // Format filter
-      if (formatFilter !== "all" && d.boxFormat !== formatFilter) return false;
-
-      // Plant filter
-      if (plantFilter !== "all" && d.targetPlant !== plantFilter) return false;
-
-      // Search
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase().trim();
-        return (
-          d.dielineCode.toLowerCase().includes(q) ||
-          d.title.toLowerCase().includes(q) ||
-          d.client.toLowerCase().includes(q) ||
-          d.dimensions.toLowerCase().includes(q) ||
-          d.targetPlant.toLowerCase().includes(q) ||
-          d.boxFormat.toLowerCase().includes(q)
-        );
-      }
-
-      return true;
-    });
-  }, [baseDielines, selectedStage, formatFilter, plantFilter, searchTerm]);
-
-  // Paginated items
-  const paginatedDielines = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredDielines.slice(start, start + pageSize);
-  }, [filteredDielines, currentPage, pageSize]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredDielines.length / pageSize));
-
-  const handleExportClick = () => {
-    if (onExportCSV) {
-      onExportCSV();
-      return;
-    }
-    const dateStr = new Date().toISOString().split("T")[0];
-    exportRecordsToCsv({
-      filename: `studio_${mode}_dielines_${dateStr}.csv`,
-      columns: [
-        { header: "Dieline Code", accessor: (d) => d.dielineCode },
-        { header: "Title", accessor: (d) => d.title },
-        { header: "Client", accessor: (d) => d.client },
-        { header: "Box Format", accessor: (d) => d.boxFormat },
-        { header: "Dimensions", accessor: (d) => d.dimensions },
-        { header: "Substrate", accessor: (d) => d.substrate },
-        { header: "Caliper Microns", accessor: (d) => d.caliperMicrons },
-        { header: "Machine", accessor: (d) => d.machineCompatibility },
-        { header: "Status", accessor: (d) => d.status },
-        { header: "Due Date", accessor: (d) => d.dueDate },
-        { header: "Plant", accessor: (d) => d.targetPlant },
-      ],
-      data: filteredDielines,
-    });
-  };
-
-  const handleRefreshClick = async () => {
-    if (onRefresh) {
-      setIsRefreshing(true);
-      try {
-        await onRefresh();
-      } finally {
-        setIsRefreshing(false);
-      }
-    }
-  };
-
-  const deskTitle =
-    mode === "mockup"
-      ? "CAD Mockup & 3D Simulation Workbench"
-      : mode === "sampling"
-      ? "Sampling Tooling & Laser Clearance Workbench"
-      : "Artwork & Structural Dieline Engineering Workbench";
-
-  const alertCount =
-    mode === "mockup"
-      ? baseDielines.filter((d) => d.status === "3D Simulation").length
-      : mode === "sampling"
-      ? baseDielines.filter((d) => d.status === "Laser Die Cleared").length
-      : baseDielines.filter((d) => d.status === "Plotter Sample Tested").length;
-
-  const alertLabel =
-    mode === "mockup"
-      ? `${alertCount} Simulations In Progress`
-      : mode === "sampling"
-      ? `${alertCount} Tooling Cleared`
-      : `${alertCount} Plotter Tested`;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0c0d14] text-slate-800 dark:text-zinc-100 select-text overflow-hidden">
-      {/* ── 1. Compact Editorial Header (Maximized Space for Records) ── */}
-      <header className="bg-white dark:bg-[#121622] px-6 py-3 shrink-0 border-b border-slate-200/60 dark:border-white/[0.06] shadow-[0_1px_4px_rgba(11,28,48,0.02)]">
+    <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] select-text font-sans overflow-hidden">
+      {/* ── 1. Compact Editorial Header ── */}
+      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-zinc-100 font-display">
-              {deskTitle}
-            </h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-zinc-400">
-              {baseDielines.length} {mode === "mockup" ? "Mockups" : mode === "sampling" ? "Tooling Specs" : "Dielines"}
-            </span>
-            {alertCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 animate-pulse">
-                ⚡ {alertLabel}
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="p-1 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 shrink-0">
+                <Scissors className="w-3.5 h-3.5" />
               </span>
-            )}
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--on-surface)] font-display">
+                Studio Sampling &amp; CAD Deliverables
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
+                BY {selectedYear === "ALL" ? "Consolidated" : selectedYear}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                {totalCount} Deliverables
+              </span>
+              {pendingCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                  <Activity className="w-3 h-3 text-amber-500 animate-pulse" />
+                  <span>{pendingCount} Awaiting Link/Path</span>
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-xs text-[var(--on-surface-muted)]">
+              Inspect technical product dockets and provide CAD dieline or sampling output link or network file path to Marketing.
+            </p>
           </div>
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={handleRefreshClick}
-              disabled={isRefreshing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-xs font-semibold text-slate-700 dark:text-zinc-300 transition cursor-pointer disabled:opacity-50"
-              title="Refresh Records"
+              onClick={handleExportCSVClick}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-xs font-semibold text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors shadow-2xs cursor-pointer"
+              title="Export CSV"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#006d32]" : "text-slate-500 dark:text-zinc-400"}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Export CSV</span>
             </button>
-
-            <button
-              type="button"
-              onClick={handleExportClick}
-              disabled={filteredDielines.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-xs font-semibold text-slate-700 dark:text-zinc-300 transition cursor-pointer disabled:opacity-50"
-              title="Export Filtered CSV"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── 2. Floating Filter & Search Strip ── */}
-      <div className="px-6 py-2 bg-white dark:bg-[#0c0d14] shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/50 dark:border-white/[0.06]">
-        {/* Soft Segmented Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 select-none">
-          {stages.map((t) => {
-            const isActive = selectedStage === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  setSelectedStage(t.id);
-                  setCurrentPage(1);
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
-                  isActive
-                    ? "bg-[#006d32] text-white shadow-[0_2px_8px_rgba(0,109,50,0.25)]"
-                    : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100/80 dark:hover:bg-white/[0.06] bg-transparent"
-                }`}
-              >
-                <span>{t.label}</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full tabular-nums ${
-                    isActive ? "bg-white/25 text-white" : "bg-slate-200/70 dark:bg-white/[0.08] text-slate-600 dark:text-zinc-400"
-                  }`}
-                >
-                  {t.count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Right Search & Filter Dropdowns */}
-        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
-          {uniqueFormats.length > 0 && (
-            <select
-              value={formatFilter}
-              onChange={(e) => {
-                setFormatFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 dark:bg-white/[0.06] dark:hover:bg-white/[0.08] text-xs font-medium text-slate-700 dark:text-zinc-200 border border-slate-200/70 dark:border-white/[0.08] focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition"
-            >
-              <option value="all" className="dark:bg-[#121622] dark:text-zinc-200">All Box Formats</option>
-              {uniqueFormats.map((f) => (
-                <option key={f} value={f} className="dark:bg-[#121622] dark:text-zinc-200">
-                  {f}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {uniquePlants.length > 0 && (
-            <select
-              value={plantFilter}
-              onChange={(e) => {
-                setPlantFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 dark:bg-white/[0.06] dark:hover:bg-white/[0.08] text-xs font-medium text-slate-700 dark:text-zinc-200 border border-slate-200/70 dark:border-white/[0.08] focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition"
-            >
-              <option value="all" className="dark:bg-[#121622] dark:text-zinc-200">All Plants</option>
-              {uniquePlants.map((p) => (
-                <option key={p} value={p} className="dark:bg-[#121622] dark:text-zinc-200">
-                  {p}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <div className="relative w-60 sm:w-72 group">
-            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 group-focus-within:text-[#006d32] transition-colors pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search code, client, box format..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full h-9 pl-[34px] pr-8 rounded-lg bg-slate-100/80 hover:bg-slate-200/50 dark:bg-white/[0.06] dark:hover:bg-white/[0.08] focus:bg-white dark:focus:bg-[#121622] text-xs text-slate-800 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 border border-slate-200/70 dark:border-white/[0.08] focus:border-[#006d32]/40 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 shadow-2xs transition-all"
-            />
-            {searchTerm && (
+            {onRefresh && (
               <button
                 type="button"
-                onClick={() => {
-                  setSearchTerm("");
-                  setCurrentPage(1);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-4.5 h-4.5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-200/80 dark:hover:bg-white/[0.1] transition-colors cursor-pointer"
-                title="Clear search"
+                onClick={handleRefreshClick}
+                disabled={isRefreshing || isLoading}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-xs font-semibold text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+                title="Refresh Deliverables"
               >
-                <X className="w-3 h-3" />
+                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">Refresh</span>
               </button>
             )}
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* ── 3. Full-Bleed Table Workspace ── */}
-      <div className="flex-1 min-h-0 overflow-auto bg-white dark:bg-[#0c0d14] flex flex-col">
-        <table className="w-full text-left text-xs border-collapse">
-          <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-[#121622] border-b border-slate-200/70 dark:border-white/[0.08]">
-            <tr className="text-slate-600 dark:text-zinc-400 font-mono text-[11px] uppercase tracking-wider select-none">
-              <th className="py-3 pl-6 pr-3 w-8">
+      {/* ── 2. Interactive KPI Strip (3 Cards) ── */}
+      <section
+        aria-label="Studio sampling KPI summary"
+        className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-3 px-5 py-3 sm:px-8 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)]/50"
+      >
+        {/* Card 1: All Deliverables */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setSelectedKpiFilter("all");
+            setCurrentPage(1);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setSelectedKpiFilter("all");
+              setCurrentPage(1);
+            }
+          }}
+          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
+            selectedKpiFilter === "all"
+              ? "bg-indigo-500/10 border-indigo-500/40 shadow-xs"
+              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
+          }`}
+        >
+          <div>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+              All Sampling Deliverables
+            </span>
+            <div className="text-xl font-bold font-mono tracking-tight text-[var(--on-surface)] mt-0.5">
+              {totalCount}
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-700 dark:text-indigo-400">
+            <Layers className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Card 2: Awaiting Link / Path */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setSelectedKpiFilter("pending");
+            setCurrentPage(1);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setSelectedKpiFilter("pending");
+              setCurrentPage(1);
+            }
+          }}
+          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
+            selectedKpiFilter === "pending"
+              ? "bg-amber-500/10 border-amber-500/40 shadow-xs"
+              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
+          }`}
+        >
+          <div>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+              Awaiting Link / Path
+            </span>
+            <div className="text-xl font-bold font-mono tracking-tight text-amber-700 dark:text-amber-400 mt-0.5">
+              {pendingCount}
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-700 dark:text-amber-400">
+            <Clock className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Card 3: Output Submitted */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setSelectedKpiFilter("submitted");
+            setCurrentPage(1);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setSelectedKpiFilter("submitted");
+              setCurrentPage(1);
+            }
+          }}
+          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
+            selectedKpiFilter === "submitted"
+              ? "bg-emerald-500/10 border-emerald-500/40 shadow-xs"
+              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
+          }`}
+        >
+          <div>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+              Output Submitted
+            </span>
+            <div className="text-xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-0.5">
+              {submittedCount}
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+        </div>
+      </section>
+
+      {/* ── 3. Single Row Filter Toolbar (h-8) ── */}
+      <section
+        aria-label="Deliverable filter toolbar"
+        className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-2 sm:px-8 flex flex-wrap items-center gap-2 text-xs"
+      >
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Search SR, product, customer, link/path..."
+            className="w-full h-8 pl-8 pr-7 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] focus:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none transition"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm("");
+                setCurrentPage(1);
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Status / KPI Dropdown */}
+        <select
+          value={selectedKpiFilter}
+          aria-label="Filter deliverables by status"
+          onChange={(e) => {
+            setSelectedKpiFilter(e.target.value as "all" | "pending" | "submitted");
+            setCurrentPage(1);
+          }}
+          className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer"
+        >
+          <option value="all">Status: All Deliverables</option>
+          <option value="pending">Status: Awaiting Link / Path</option>
+          <option value="submitted">Status: Output Submitted</option>
+        </select>
+
+        {/* Category Dropdown */}
+        {uniqueCategories.length > 0 && (
+          <select
+            value={categoryFilter}
+            aria-label="Filter deliverables by category"
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer max-w-[170px] truncate"
+          >
+            <option value="all">Category: All</option>
+            {uniqueCategories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Customer Dropdown */}
+        {uniqueCustomers.length > 0 && (
+          <select
+            value={customerFilter}
+            aria-label="Filter deliverables by customer"
+            onChange={(e) => {
+              setCustomerFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer max-w-[170px] truncate"
+          >
+            <option value="all">Customer: All</option>
+            {uniqueCustomers.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Plant Dropdown */}
+        {uniquePlants.length > 1 && (
+          <select
+            value={plantFilter}
+            aria-label="Filter deliverables by plant"
+            onChange={(e) => {
+              setPlantFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer"
+          >
+            <option value="all">Plant: All Plants</option>
+            {uniquePlants.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Reset Filter Button */}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="h-8 px-2.5 rounded-lg border border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+            title="Reset All Filters"
+          >
+            <X className="w-3 h-3" />
+            <span>Reset</span>
+          </button>
+        )}
+      </section>
+
+      {/* ── 4. High-Density Full-Bleed Table ── */}
+      <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-lowest)]">
+        <table className="w-full border-collapse text-left text-xs text-[var(--on-surface)] font-normal">
+          <thead className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--surface-low)]/90 backdrop-blur-md text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)]">
+            <tr>
+              <th className="py-3 pl-6 pr-3 w-10">
                 <input
                   type="checkbox"
+                  aria-label="Select all deliverables"
                   checked={
-                    paginatedDielines.length > 0 &&
-                    paginatedDielines.every((d) => selectedIds.has(d.id))
+                    paginatedRequests.length > 0 &&
+                    selectedIds.size === paginatedRequests.length
                   }
-                  onChange={handleToggleSelectAll}
-                  className="rounded text-[#006d32] focus:ring-[#006d32] cursor-pointer"
+                  onChange={toggleSelectAll}
+                  className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--accent-primary)] cursor-pointer"
                 />
               </th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Dieline Code</th>
-              <th className="py-3 px-4 font-semibold">Structural Design Title</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Client / Brand</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Packaging Format</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Dimensions (L×W×D)</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Substrate &amp; Caliper</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Machine Profile</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Plant</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Status</th>
-              <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Action</th>
+              <th className="py-3 px-3 font-semibold whitespace-nowrap">SR Code / Date</th>
+              <th className="py-3 px-4 font-semibold">Product Description &amp; Category</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">Customer / Brand</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">Target Plant</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">Required SLA Date</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">Studio Output (Link / File Path)</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">Workflow Status</th>
+              <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-white/[0.04]">
-            {filteredDielines.length === 0 ? (
+
+          <tbody className="divide-y divide-[var(--border-subtle)]">
+            {isLoading ? (
+              <TableSkeletonRows rows={8} columns={9} />
+            ) : filteredRequests.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-16 text-center">
-                  <div className="max-w-sm mx-auto flex flex-col items-center">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/[0.06] text-slate-400 dark:text-zinc-500 flex items-center justify-center mb-3">
-                      {mode === "mockup" ? (
-                        <Box className="w-6 h-6" />
-                      ) : mode === "sampling" ? (
-                        <Scissors className="w-6 h-6" />
-                      ) : (
-                        <FileCode2 className="w-6 h-6" />
-                      )}
-                    </div>
-                    <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-200">
-                      No {mode === "mockup" ? "Mockup" : mode === "sampling" ? "Tooling Spec" : "Structural"} Dielines Found
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-                      {searchTerm || formatFilter !== "all" || plantFilter !== "all" || selectedStage !== "all"
-                        ? "No dielines match your search or active filter."
-                        : "There are currently no structural dielines registered."}
-                    </p>
-                    {(searchTerm || formatFilter !== "all" || plantFilter !== "all" || selectedStage !== "all") && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearchTerm("");
-                          setFormatFilter("all");
-                          setPlantFilter("all");
-                          setSelectedStage("all");
-                          setCurrentPage(1);
-                        }}
-                        className="mt-3 text-xs font-semibold text-[#006d32] hover:underline cursor-pointer"
-                      >
-                        Reset filters
-                      </button>
-                    )}
-                  </div>
+                <td colSpan={9} className="py-16 text-center">
+                  <EmptyState
+                    icon={Scissors}
+                    title="No Sampling Deliverables Found"
+                    description={
+                      hasActiveFilters
+                        ? "No sampling deliverables match your active filter."
+                        : "There are currently no sampling deliverables assigned to Studio."
+                    }
+                    onResetFilters={hasActiveFilters ? handleResetFilters : undefined}
+                    resetLabel="Reset filters"
+                  />
                 </td>
               </tr>
             ) : (
-              paginatedDielines.map((d) => {
-                const isSelected = selectedIds.has(d.id);
+              paginatedRequests.map((r) => {
+                const isSelected = selectedIds.has(r.id);
+                const state = r.mockupWorkflowState;
+                const outputUrl = state?.mockupUrl;
+                const isPending = !outputUrl;
+                const isSubmitted = Boolean(outputUrl);
+
+                const categoryHierarchy = [
+                  r.productCategory,
+                  r.productSubCategory,
+                  r.productThirdCategory,
+                ]
+                  .filter(Boolean)
+                  .join(" / ");
+
+                const isWebUrl =
+                  outputUrl && (outputUrl.startsWith("http://") || outputUrl.startsWith("https://"));
 
                 return (
                   <tr
-                    key={d.id}
-                    onClick={() => onInspectDieline(d)}
-                    className={`hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors cursor-pointer group ${
-                      isSelected ? "bg-emerald-50/40 dark:bg-emerald-950/20" : ""
+                    key={r.id}
+                    onClick={() => handleRowClick(r)}
+                    className={`hover:bg-[var(--surface-low)] transition-colors cursor-pointer group ${
+                      isSelected ? "bg-indigo-500/5 dark:bg-indigo-900/10" : ""
                     }`}
                   >
-                    <td
-                      className="py-3.5 pl-6 pr-3 w-8"
-                      onClick={(e) => handleToggleSelectRow(d.id, e)}
-                    >
+                    {/* Checkbox */}
+                    <td className="py-3.5 pl-6 pr-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
+                        aria-label={`Select deliverable ${r.srNumber || r.id}`}
                         checked={isSelected}
-                        onChange={() => {}}
-                        className="rounded text-[#006d32] focus:ring-[#006d32] cursor-pointer"
+                        onChange={() => toggleSelectRow(r.id)}
+                        className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--accent-primary)] cursor-pointer"
                       />
                     </td>
-                    <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
-                      <CopyBadge text={d.dielineCode} />
+
+                    {/* SR Code / Date */}
+                    <td className="py-3.5 px-3 font-mono font-bold whitespace-nowrap">
+                      <CopyBadge text={r.srNumber || `SR-${r.id}`} />
+                      <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                        Intake: {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
+                      </div>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-900 dark:text-zinc-100 font-medium max-w-xs">
-                      <span className="line-clamp-1">{d.title}</span>
+
+                    {/* Product Description & Category */}
+                    <td className="py-3.5 px-4 max-w-sm">
+                      <div
+                        className="font-semibold text-xs text-[var(--on-surface)] truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"
+                        title={r.productDescription || (r as any).opportunityName || "Sampling Deliverable"}
+                      >
+                        {r.productDescription || (r as any).opportunityName || "Sampling Deliverable"}
+                      </div>
+                      <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 truncate">
+                        {categoryHierarchy || r.materialCode || "Cartonboard Packaging"}
+                      </div>
                     </td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-zinc-100 whitespace-nowrap">
+
+                    {/* Customer / Brand */}
+                    <td className="py-3.5 px-4 font-semibold text-[var(--on-surface)] whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate max-w-[180px]" title={d.client}>
-                          {d.client}
+                        <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
+                        <span className="truncate max-w-[160px]" title={r.customer || ""}>
+                          {r.customer || "—"}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
+                        {r.brandName || "Commercial Account"}
+                      </div>
+                    </td>
+
+                    {/* Plant */}
+                    <td className="py-3.5 px-4 font-mono text-xs text-[var(--on-surface-muted)] whitespace-nowrap">
+                      {r.targetPlant || "Khaniwade"}
+                    </td>
+
+                    {/* Required SLA Date */}
+                    <td className="py-3.5 px-4 whitespace-nowrap font-mono text-[var(--on-surface-muted)]">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
+                        <span>
+                          {r.sampleRequiredDate
+                            ? formatOdooDate(r.sampleRequiredDate)
+                            : "Standard SLA"}
                         </span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 whitespace-nowrap font-mono">
-                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/[0.06] text-[10.5px] font-semibold text-slate-700 dark:text-zinc-300">
-                        {d.boxFormat}
-                      </span>
+
+                    {/* Studio Output (Link / File Path) */}
+                    <td className="py-3.5 px-4 max-w-xs" onClick={(e) => e.stopPropagation()}>
+                      {outputUrl ? (
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300 truncate max-w-[200px]"
+                            title={outputUrl}
+                          >
+                            {outputUrl}
+                          </span>
+                          <CopyBadge text={outputUrl} label="" />
+                          {isWebUrl && (
+                            <a
+                              href={outputUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1 rounded hover:bg-[var(--surface-container)] text-indigo-600 dark:text-indigo-400 transition"
+                              title="Open Link"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-mono font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>Awaiting Link / Path</span>
+                        </span>
+                      )}
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600 dark:text-zinc-400 whitespace-nowrap">
-                      {d.dimensions}
-                    </td>
-                    <td className="py-3.5 px-4 text-[11px] text-slate-500 dark:text-zinc-400 whitespace-nowrap">
-                      <span className="font-medium text-slate-700 dark:text-zinc-300">{d.substrate}</span>
-                      <span className="ml-1 font-mono text-slate-400 dark:text-zinc-500">({d.caliperMicrons}µm)</span>
-                    </td>
-                    <td className="py-3.5 px-4 text-[11px] text-slate-500 dark:text-zinc-400 whitespace-nowrap">
-                      {d.machineCompatibility}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-zinc-400 whitespace-nowrap">
-                      {d.targetPlant}
-                    </td>
+
+                    {/* Workflow Status */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <StatusPill status={d.status} size="sm" />
+                      <StatusPill
+                        status={
+                          isSubmitted
+                            ? "Output Submitted"
+                            : isPending
+                            ? "CAD Action"
+                            : r.status || "In Review"
+                        }
+                        size="sm"
+                        showDot
+                      />
                     </td>
-                    <td className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onInspectDieline(d);
-                        }}
-                        className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-slate-700 dark:text-zinc-300 text-xs font-medium font-mono transition cursor-pointer"
-                      >
-                        Inspect
-                      </button>
+
+                    {/* Actions */}
+                    <td
+                      className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {isPending && !readOnly ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRowClick(r)}
+                          className="inline-flex select-none items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold font-mono transition cursor-pointer shadow-2xs active:scale-98"
+                          title="Provide Output Link or File Path"
+                        >
+                          <span>Provide Link / Path</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRowClick(r)}
+                          className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
+                          title="Inspect Docket Details"
+                        >
+                          <span>Inspect</span>
+                          <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -558,42 +729,14 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
         </table>
       </div>
 
-      {/* ── 4. Compact Footer / Status Strip ── */}
-      <footer className="mt-auto px-6 py-2.5 bg-white dark:bg-[#121622] border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-mono shrink-0">
-        <span>
-          Showing {filteredDielines.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
-          {filteredDielines.length > 0 && <> – {Math.min(filteredDielines.length, currentPage * pageSize)}</>} of {filteredDielines.length} specifications
-        </span>
-        <div className="flex items-center gap-4">
-          <span className="hidden sm:flex items-center gap-1.5 text-slate-400 dark:text-zinc-500">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            Sorted by Latest Raised Intake
-          </span>
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-1 rounded-md border border-slate-200 dark:border-white/[0.08] text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="px-2 font-mono text-slate-600 dark:text-zinc-400">
-                {currentPage} / {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-1 rounded-md border border-slate-200 dark:border-white/[0.08] text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </div>
-      </footer>
+      {/* ── 5. Enterprise Pagination Footer ── */}
+      <PaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={filteredRequests.length}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };

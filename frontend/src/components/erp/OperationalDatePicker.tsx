@@ -1,23 +1,18 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
   X,
-  CheckCircle2,
-  CalendarDays,
 } from "lucide-react";
 import {
-  isSunday,
-  isEvenSaturday,
-  getSaturdayOccurrence,
   getHolidayInfo,
   formatYMD,
   parseYMD,
   formatDisplayDate,
   isDateRestricted,
-  getNextWorkingDate,
 } from "@/lib/holidayUtils";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +26,7 @@ export interface OperationalDatePickerProps {
   required?: boolean;
   className?: string;
   calendarAlign?: "left" | "right";
+  compact?: boolean;
   id?: string;
   name?: string;
   hasError?: boolean;
@@ -64,6 +60,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
   placeholder = "Select required target date...",
   disabled = false,
   calendarAlign = "left",
+  compact = false,
   required = false,
   className,
   id,
@@ -75,6 +72,9 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+  const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
   const [rejectedAttemptMessage, setRejectedAttemptMessage] = useState<string | null>(null);
 
   // Parse current selected date
@@ -99,7 +99,12 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
   // Dismiss dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !calendarRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
@@ -110,6 +115,40 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setPopoverPosition(null);
+      return;
+    }
+
+    const updatePopoverPosition = () => {
+      const triggerRect = triggerRef.current?.getBoundingClientRect();
+      if (!triggerRect) return;
+
+      const panelWidth = calendarRef.current?.offsetWidth || 310;
+      const panelHeight = calendarRef.current?.offsetHeight || 340;
+      const viewportPadding = 8;
+      let left = calendarAlign === "right" ? triggerRect.right - panelWidth : triggerRect.left;
+      left = Math.max(viewportPadding, Math.min(left, window.innerWidth - panelWidth - viewportPadding));
+
+      let top = triggerRect.bottom + 6;
+      if (top + panelHeight > window.innerHeight - viewportPadding) {
+        top = triggerRect.top - panelHeight - 6;
+      }
+      top = Math.max(viewportPadding, Math.min(top, window.innerHeight - panelHeight - viewportPadding));
+
+      setPopoverPosition({ top, left });
+    };
+
+    updatePopoverPosition();
+    window.addEventListener("resize", updatePopoverPosition);
+    window.addEventListener("scroll", updatePopoverPosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePopoverPosition);
+      window.removeEventListener("scroll", updatePopoverPosition, true);
+    };
+  }, [isOpen, calendarAlign, rejectedAttemptMessage, viewYear, viewMonth]);
 
   // Close on Escape key
   useEffect(() => {
@@ -139,9 +178,19 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
     return selectedDate ? getHolidayInfo(selectedDate) : null;
   }, [selectedDate]);
 
+  const minMonth = minDate ? parseYMD(minDate) : null;
+  const maxMonth = maxDate ? parseYMD(maxDate) : null;
+  const currentMonthStart = new Date(viewYear, viewMonth, 1);
+  const canNavigatePrevMonth =
+    !minMonth || currentMonthStart > new Date(minMonth.getFullYear(), minMonth.getMonth(), 1);
+  const nextMonthStart = new Date(viewYear, viewMonth + 1, 1);
+  const canNavigateNextMonth =
+    !maxMonth || nextMonthStart <= new Date(maxMonth.getFullYear(), maxMonth.getMonth(), 1);
+
   // Navigate months
   const handlePrevMonth = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!canNavigatePrevMonth) return;
     if (viewMonth === 0) {
       setViewMonth(11);
       setViewYear((y) => y - 1);
@@ -152,6 +201,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
 
   const handleNextMonth = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!canNavigateNextMonth) return;
     if (viewMonth === 11) {
       setViewMonth(0);
       setViewYear((y) => y + 1);
@@ -175,9 +225,6 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
       isSelected: boolean;
       isHoliday: boolean;
       holidayLabel?: string;
-      isSundayDay: boolean;
-      isEvenSaturdayDay: boolean;
-      saturdayOcc?: number;
       isDisabled: boolean;
       disabledReason?: string;
     }> = [];
@@ -204,9 +251,6 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
         isSelected: value === dStr,
         isHoliday: holiday.isHoliday,
         holidayLabel: holiday.label,
-        isSundayDay: isSunday(d),
-        isEvenSaturdayDay: isEvenSaturday(d),
-        saturdayOcc: getSaturdayOccurrence(d),
         isDisabled: true, // padding days disabled
         disabledReason: "Outside current month",
       });
@@ -241,9 +285,6 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
         isSelected: value === dStr,
         isHoliday: holiday.isHoliday,
         holidayLabel: holiday.label,
-        isSundayDay: isSunday(d),
-        isEvenSaturdayDay: isEvenSaturday(d),
-        saturdayOcc: getSaturdayOccurrence(d),
         isDisabled,
         disabledReason,
       });
@@ -268,9 +309,6 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
         isSelected: value === dStr,
         isHoliday: holiday.isHoliday,
         holidayLabel: holiday.label,
-        isSundayDay: isSunday(d),
-        isEvenSaturdayDay: isEvenSaturday(d),
-        saturdayOcc: getSaturdayOccurrence(d),
         isDisabled: true, // padding days disabled
         disabledReason: "Outside current month",
       });
@@ -295,19 +333,6 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
     setIsOpen(false);
   };
 
-  // Jump to Next Working Day action
-  const handleSelectNextWorkingDay = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const nextWorking = getNextWorkingDate(new Date(), 1);
-    onChange(nextWorking);
-    const parsed = parseYMD(nextWorking);
-    if (parsed) {
-      setViewYear(parsed.getFullYear());
-      setViewMonth(parsed.getMonth());
-    }
-    setIsOpen(false);
-  };
-
   // Clear date
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -319,7 +344,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
       {label && (
         <label
           htmlFor={id}
-          className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1"
+          className="mb-1 block text-[11px] font-semibold text-[var(--on-surface-muted)]"
         >
           {label} {required && <span className="text-rose-500">*</span>}
         </label>
@@ -328,39 +353,47 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
       {/* Main Interactive Trigger */}
       <div
         id={id}
+        ref={triggerRef}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
         className={cn(
-          "w-full h-9 px-3 rounded-xl border flex items-center justify-between text-xs transition-colors cursor-pointer select-none",
-          disabled && "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-800",
-          !disabled && "bg-white dark:bg-zinc-900/90 hover:border-zinc-400 dark:hover:border-zinc-600",
+          cn(
+            "group flex w-full cursor-pointer select-none items-center justify-between border transition-colors",
+            compact ? "h-8 rounded-lg px-2.5 text-xs" : "h-10 rounded-[var(--radius-control)] px-3 text-xs"
+          ),
+          disabled && "cursor-not-allowed bg-[var(--surface-low)] opacity-50",
+          !disabled && "bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)]",
           isSelectedValueHoliday || hasError
-            ? "border-rose-500 bg-rose-50/20 text-rose-900 dark:text-rose-200 focus:ring-1 focus:ring-rose-500"
-            : "border-zinc-200 dark:border-zinc-700/80 text-zinc-900 dark:text-zinc-100 focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15"
+            ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:ring-1 focus:ring-rose-500 dark:text-rose-200"
+            : "border-[var(--border-subtle)] text-[var(--on-surface)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15"
         )}
       >
         <div className="flex items-center gap-2 overflow-hidden">
-          <CalendarIcon
+          {!compact && <CalendarIcon
             className={cn(
               "w-4 h-4 shrink-0",
               isSelectedValueHoliday || hasError
                 ? "text-rose-500"
-                : "text-zinc-400 transition-colors dark:text-zinc-500 group-hover:text-[#006d32] dark:group-hover:text-emerald-400"
+                : "text-[var(--on-surface-subtle)] transition-colors group-hover:text-[var(--accent-primary)]"
             )}
-          />
+          />}
           {value ? (
-            <div className="flex items-center gap-2 truncate">
-              <span className="font-mono font-medium text-[12px]">{value}</span>
-              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
-                ({formatDisplayDate(value)})
-              </span>
-              {isSelectedValueHoliday && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0">
-                  ⚠️ HOLIDAY ({selectedValueHolidayInfo?.badge})
+            compact ? (
+              <span className="truncate font-mono font-medium text-[11px]">{value}</span>
+            ) : (
+              <div className="flex items-center gap-2 truncate">
+                <span className="font-mono font-medium text-[12px]">{value}</span>
+                <span className="truncate text-[11px] text-[var(--on-surface-muted)]">
+                  ({formatDisplayDate(value)})
                 </span>
-              )}
-            </div>
+                {isSelectedValueHoliday && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0">
+                    ⚠️ HOLIDAY ({selectedValueHolidayInfo?.badge})
+                  </span>
+                )}
+              </div>
+            )
           ) : (
-            <span className="text-zinc-400 dark:text-zinc-500 font-normal truncate">
+            <span className="truncate font-normal text-[var(--on-surface-subtle)]">
               {placeholder}
             </span>
           )}
@@ -372,12 +405,16 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
               type="button"
               onClick={handleClear}
               title="Clear date"
-              className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="rounded p-1 text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)]"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
-          <span className="text-[10px] text-zinc-400 font-mono">📅</span>
+          {compact ? (
+            <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-[var(--on-surface-subtle)]" />
+          ) : (
+            <span className="font-mono text-[10px] text-[var(--on-surface-subtle)]">📅</span>
+          )}
         </div>
       </div>
 
@@ -399,38 +436,45 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
       )}
 
       {helperText && !isSelectedValueHoliday && !errorMessage && (
-        <p className="text-[10px] text-zinc-400 font-mono mt-1">{helperText}</p>
+        <p className="mt-1 font-mono text-[10px] text-[var(--on-surface-subtle)]">{helperText}</p>
       )}
 
-      {/* Calendar Popover Modal */}
-      {isOpen && (
+      {/* Render the calendar outside scroll containers so it remains fully visible. */}
+      {isOpen && typeof document !== "undefined" && createPortal(
         <div
+          ref={calendarRef}
           className={cn(
-            "absolute z-50 mt-1 w-[310px] p-3 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-[#0f1118] shadow-xl text-zinc-900 dark:text-zinc-100 select-none animate-in fade-in zoom-in-95 duration-100",
-            calendarAlign === "right" ? "right-0" : "left-0"
+            "fixed z-[1000] w-[310px] select-none rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3 text-[var(--on-surface)] shadow-xl animate-in fade-in zoom-in-95 duration-100"
           )}
-          style={{ minWidth: "300px" }}
+          style={{
+            width: "min(310px, calc(100vw - 16px))",
+            top: popoverPosition?.top ?? 0,
+            left: popoverPosition?.left ?? 0,
+            visibility: popoverPosition ? "visible" : "hidden",
+          }}
         >
           {/* Calendar Header: Navigation & Month Selector */}
-          <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-zinc-100 dark:border-white/[0.06]">
+          <div className="mb-2 flex items-center justify-between border-b border-[var(--border-subtle)] pb-2.5">
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors"
+              disabled={!canNavigatePrevMonth}
+              className="rounded-md p-1.5 text-[var(--on-surface-muted)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] disabled:cursor-not-allowed disabled:opacity-30"
               title="Previous month"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-1 font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+            <div className="flex items-center gap-1 text-xs font-semibold text-[var(--on-surface)]">
               <span className="font-medium text-[13px]">{MONTH_NAMES[viewMonth]}</span>
-              <span className="font-mono text-zinc-500 dark:text-zinc-400">{viewYear}</span>
+              <span className="font-mono text-[var(--on-surface-muted)]">{viewYear}</span>
             </div>
 
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors"
+              disabled={!canNavigateNextMonth}
+              className="rounded-md p-1.5 text-[var(--on-surface-muted)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] disabled:cursor-not-allowed disabled:opacity-30"
               title="Next month"
             >
               <ChevronRight className="w-4 h-4" />
@@ -459,7 +503,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
                       ? "text-rose-600 dark:text-rose-400"
                       : isSaturdayCol
                       ? "text-amber-700 dark:text-amber-400"
-                      : "text-zinc-400 dark:text-zinc-500"
+                      : "text-[var(--on-surface-subtle)]"
                   )}
                   title={
                     isSundayCol
@@ -485,8 +529,6 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
                 isSelected,
                 isHoliday,
                 holidayLabel,
-                isSundayDay,
-                isEvenSaturdayDay,
                 isDisabled,
                 disabledReason,
                 dateStr,
@@ -496,7 +538,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
                 return (
                   <div
                     key={`pad-${idx}`}
-                    className="h-8 rounded flex items-center justify-center text-[11px] text-zinc-300 dark:text-zinc-700 font-mono opacity-40 cursor-not-allowed select-none"
+                    className="flex h-8 select-none items-center justify-center rounded font-mono text-[11px] text-[var(--on-surface-subtle)] opacity-40"
                   >
                     {dayNumber}
                   </div>
@@ -517,7 +559,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
                       "text-rose-600 dark:text-rose-400 hover:border-rose-400 active:scale-95"
                     )}
                   >
-                    <span className="text-[11px] font-mono font-bold line-through opacity-85 leading-none">
+                    <span className="text-[11px] font-mono font-bold leading-none">
                       {dayNumber}
                     </span>
                     <span className="text-[7.5px] font-mono font-black uppercase text-rose-700 dark:text-rose-300 bg-rose-200/80 dark:bg-rose-900/80 px-1 py-0.2 rounded-xs leading-none mt-0.5 tracking-tighter">
@@ -527,74 +569,35 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
                 );
               }
 
-              // Normal Working Day cell styling
-              const isWorkingSaturday = day.date.getDay() === 6;
-
               return (
                 <button
                   key={dateStr}
                   type="button"
                   onClick={() => handleDaySelect(day)}
                   disabled={isDisabled}
-                  title={
-                    isWorkingSaturday
-                      ? `Working Saturday (${day.saturdayOcc === 1 ? "1st" : day.saturdayOcc === 3 ? "3rd" : "5th"} Saturday of month)`
-                      : disabledReason || `Working Day (${dateStr})`
-                  }
+                  title={disabledReason || dateStr}
                   className={cn(
-                    "relative h-8 rounded flex flex-col items-center justify-center text-[11.5px] font-mono transition-colors",
+                    "relative flex h-8 items-center justify-center rounded font-mono text-[11.5px] transition-colors",
                     isDisabled &&
-                      "opacity-35 cursor-not-allowed text-zinc-400 dark:text-zinc-600 bg-zinc-50 dark:bg-zinc-900/30",
+                      "cursor-not-allowed bg-[var(--surface-low)] text-[var(--on-surface-subtle)] opacity-35",
                     !isDisabled && !isSelected && [
-                      "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 cursor-pointer",
-                      isToday && "border border-[#006d32]/70 font-semibold text-[#006d32] dark:text-emerald-400",
+                      "cursor-pointer text-[var(--on-surface)] hover:bg-[var(--surface-low)]",
+                      isToday && "border border-[var(--accent-primary)] font-semibold text-[var(--accent-primary-strong)]",
                     ],
                     isSelected &&
-                      "bg-[#006d32] text-white font-bold shadow-xs ring-2 ring-[#006d32]/30 cursor-pointer"
+                      "cursor-pointer bg-[var(--accent-primary)] font-bold text-[var(--on-accent-primary)] shadow-xs ring-2 ring-[var(--accent-primary)]/30"
                   )}
                 >
                   <span className="leading-none">{dayNumber}</span>
-                  {isWorkingSaturday && !isSelected && (
-                    <span className="text-[7px] font-sans text-emerald-600 dark:text-emerald-400 font-bold leading-none mt-0.5">
-                      WORK
-                    </span>
-                  )}
-                  {isToday && !isSelected && !isWorkingSaturday && (
-                    <span className="mt-0.5 h-1 w-1 rounded-full bg-[#006d32] dark:bg-emerald-400" />
+                  {isToday && !isSelected && (
+                    <span className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-primary)]" />
                   )}
                 </button>
               );
             })}
           </div>
-
-          {/* Operational Calendar Legend */}
-          <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-white/[0.06] space-y-1.5 text-[10px]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400">
-                <span className="inline-block px-1 py-0.2 rounded text-[7.5px] font-bold bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900">
-                  OFF
-                </span>
-                <span>Sundays & 2nd/4th Saturdays (Weekly Off)</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>1st, 3rd, 5th Sat & Mon–Fri (Open)</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSelectNextWorkingDay}
-                className="flex items-center gap-1 text-[10px] font-medium text-[#006d32] hover:underline dark:text-emerald-400"
-              >
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Next Working Day</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

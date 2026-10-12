@@ -29,14 +29,14 @@ export default {
         },
         // High-Performance Flow Accents: Energy & Water
         luminous: {
-          green: "#00d166",
-          greenDark: "#006d32",
+          green: "rgb(var(--accent-primary-rgb) / <alpha-value>)",
+          greenDark: "rgb(var(--accent-primary-strong-rgb) / <alpha-value>)",
           blue: "#0070ff",
           blueDark: "#004bb5",
           outline: "rgba(187, 203, 185, 0.25)",
         },
-        'luminous-green': "#00d166",
-        'luminous-green-dark': "#006d32",
+        'luminous-green': "rgb(var(--accent-primary-rgb) / <alpha-value>)",
+        'luminous-green-dark': "rgb(var(--accent-primary-strong-rgb) / <alpha-value>)",
         'luminous-blue': "#0070ff",
         'luminous-blue-dark': "#004bb5",
         brand: {
@@ -54,8 +54,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
-        display: ['"Space Grotesk"', 'Inter', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        display: ['"Space Grotesk"', '"Plus Jakarta Sans"', 'sans-serif'],
         mono: ['"JetBrains Mono"', '"Geist Mono"', 'monospace'],
       },
       boxShadow: {

@@ -51,17 +51,17 @@ export const CostingInspectorModal: React.FC<CostingInspectorModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-smooth-backdrop"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-5xl max-h-[94vh] flex flex-col bg-white dark:bg-[#0f1118] border border-zinc-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-5xl max-h-[94vh] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden animate-smooth-modal"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Bar */}
-        <div className="px-5 py-3.5 border-b border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] flex items-center justify-between gap-3 shrink-0">
+        <div className="px-5 py-3.5 border-b border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center flex-wrap gap-2">
             <span className="inline-flex items-center gap-1 bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100">
               {item.costingCode}
@@ -85,7 +85,7 @@ export const CostingInspectorModal: React.FC<CostingInspectorModalProps> = ({
         </div>
 
         {/* Context Strip */}
-        <div className="grid grid-cols-3 border-b border-zinc-200 dark:border-white/[0.08] bg-zinc-50/40 dark:bg-[#161822] divide-x divide-zinc-200 dark:divide-white/[0.08] shrink-0 text-xs p-2.5">
+        <div className="grid grid-cols-3 border-b border-zinc-200 dark:border-white/[0.08] bg-zinc-50/40 dark:bg-zinc-900 divide-x divide-zinc-200 dark:divide-white/[0.08] shrink-0 text-xs p-2.5">
           <div>
             <span className="block text-[10px] uppercase font-bold text-zinc-400">Order Run Volume</span>
             <span className="font-mono font-semibold text-zinc-900 dark:text-zinc-100 truncate block tabular-nums">
@@ -107,7 +107,7 @@ export const CostingInspectorModal: React.FC<CostingInspectorModalProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] px-3 shrink-0 gap-1">
+        <div className="flex border-b border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 px-3 shrink-0 gap-1">
           <button
             type="button"
             onClick={() => setInspectorTab("simulator")}
@@ -182,25 +182,25 @@ export const CostingInspectorModal: React.FC<CostingInspectorModalProps> = ({
               </div>
 
               {/* Real-time Dynamic Financial Metrics */}
-              <div className="rounded-md border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] p-4 space-y-3 shadow-xs">
+              <div className="rounded-md border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 p-4 space-y-3 shadow-xs">
                 <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
                   Calculated Project Financials ({item.targetVolume.toLocaleString()} pcs):
                 </h4>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded bg-zinc-50 dark:bg-[#161822] border border-zinc-200/60 dark:border-white/[0.08]">
+                  <div className="p-3 rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/60 dark:border-white/[0.08]">
                     <span className="block text-[10px] font-bold text-zinc-400 uppercase">Calculated Quoted Selling Price</span>
                     <span className="font-mono text-lg font-extrabold text-brand-600 dark:text-brand-400 mt-1 block tabular-nums">
                       ₹ {calculatedSellingPrice.toFixed(2)} <span className="text-xs font-normal text-zinc-400">/ pc</span>
                     </span>
                   </div>
-                  <div className="p-3 rounded bg-zinc-50 dark:bg-[#161822] border border-zinc-200/60 dark:border-white/[0.08]">
+                  <div className="p-3 rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/60 dark:border-white/[0.08]">
                     <span className="block text-[10px] font-bold text-zinc-400 uppercase">Total Contract Value</span>
                     <span className="font-mono text-lg font-extrabold text-zinc-900 dark:text-zinc-100 mt-1 block tabular-nums">
                       ₹ {calculatedTotalValue.toLocaleString()}
                     </span>
                   </div>
-                  <div className="p-3 rounded bg-zinc-50 dark:bg-[#161822] border border-zinc-200/60 dark:border-white/[0.08]">
+                  <div className="p-3 rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/60 dark:border-white/[0.08]">
                     <span className="block text-[10px] font-bold text-zinc-400 uppercase">Total Net Production Cost</span>
                     <span className="font-mono font-semibold text-zinc-700 dark:text-zinc-300 mt-1 block tabular-nums">
                       ₹ {(item.netUnitCost * item.targetVolume).toLocaleString()}
@@ -229,7 +229,7 @@ export const CostingInspectorModal: React.FC<CostingInspectorModalProps> = ({
           {/* TAB 2: BOM ITEMIZED BREAKDOWN */}
           {inspectorTab === "bom" && (
             <div className="space-y-4">
-              <div className="rounded-md border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] p-4 space-y-3">
+              <div className="rounded-md border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 p-4 space-y-3">
                 <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
                   <FileSpreadsheet className="w-4 h-4 text-brand-600" />
                   Detailed Bill of Materials (BOM) Cost Breakdown / Pc:
@@ -272,7 +272,7 @@ export const CostingInspectorModal: React.FC<CostingInspectorModalProps> = ({
           {/* TAB 3: FORMAL QUOTE SUMMARY */}
           {inspectorTab === "quote" && (
             <div className="space-y-4">
-              <div className="rounded-md border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] p-4 space-y-3.5 shadow-xs">
+              <div className="rounded-md border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 p-4 space-y-3.5 shadow-xs">
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
                     <Receipt className="w-4 h-4 text-brand-600" />
@@ -281,7 +281,7 @@ export const CostingInspectorModal: React.FC<CostingInspectorModalProps> = ({
                   <span className="font-mono text-[10px] text-zinc-400">{item.costingCode}</span>
                 </div>
 
-                <div className="p-3.5 rounded bg-zinc-50 dark:bg-[#161822] border border-zinc-200/80 dark:border-white/[0.08] space-y-2 text-xs">
+                <div className="p-3.5 rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-zinc-500">To Customer:</span>
                     <span className="font-bold text-zinc-900 dark:text-zinc-100">{item.customer}</span>
@@ -336,7 +336,7 @@ export const CostingInspectorModal: React.FC<CostingInspectorModalProps> = ({
         </div>
 
         {/* Footer Bar */}
-        <div className="px-5 py-3 border-t border-zinc-200 dark:border-white/[0.08] bg-zinc-50/50 dark:bg-[#161822] flex items-center justify-between gap-3 shrink-0">
+        <div className="px-5 py-3 border-t border-zinc-200 dark:border-white/[0.08] bg-zinc-50/50 dark:bg-zinc-900 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono">
             <span>Code: {item.costingCode}</span>
           </div>

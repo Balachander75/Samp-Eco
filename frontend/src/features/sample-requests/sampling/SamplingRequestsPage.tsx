@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
 import { SampleRequestItem } from "../types";
@@ -13,9 +13,13 @@ import {
   Send,
   RefreshCw,
   Package,
-  List as ListIcon,
+  Layers,
+  Palette,
+  Box,
+  Calculator,
+  ChevronRight,
+  Filter,
 } from "lucide-react";
-import { DraftPackagesView } from "../components/DraftPackagesView";
 import { SamplingRequestsTable } from "./components/SamplingRequestsTable";
 import { getRequestTypes } from "./utils/requestTypeUtils";
 
@@ -28,6 +32,7 @@ export interface SamplingRequestsPageProps {
   uniqueCustomers: string[];
   user?: UserProfile | null;
   isAdmin: boolean;
+  isReadOnly?: boolean;
   onOpenNewModal: () => void;
   onInspectRequest: (req: SampleRequestItem) => void;
   onReleaseDraft: (req: SampleRequestItem) => Promise<void>;
@@ -37,12 +42,15 @@ export interface SamplingRequestsPageProps {
   onRefresh: () => Promise<void>;
   onExportCSV: () => void;
   onUpdateStatus?: (reqId: string | number, newStatus: string) => Promise<void>;
-  showToast?: (msg: string, type?: "success" | "error") => void;
+  onDraftModeChange?: (isDraftMode: boolean) => void;
 }
 
 export type SamplingFilterTab =
   | "all"
   | "draft"
+  | "creative_group"
+  | "production_group"
+  | "delivered_group"
   | "creative"
   | "studio"
   | "costing"
@@ -58,6 +66,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   selectedYear,
   selectedPlant,
   isAdmin,
+  isReadOnly = false,
   onOpenNewModal,
   onInspectRequest,
   onReleaseDraft,
@@ -66,12 +75,10 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   onBatchDelete,
   onRefresh,
   onExportCSV,
-  showToast,
+  onDraftModeChange,
 }) => {
-  const [draftSubMode, setDraftSubMode] = useState<"packages" | "flat">("packages");
   const [selectedStageTab, setSelectedStageTab] = useState<SamplingFilterTab>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>("all");
   const [selectedCustomerFilter, setSelectedCustomerFilter] = useState<string>("all");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
@@ -83,6 +90,10 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
 
   const navigate = useNavigate();
 
+  useEffect(() => {
+    onDraftModeChange?.(selectedStageTab === "draft");
+  }, [selectedStageTab, onDraftModeChange]);
+
   const handleOpenDraftInStaging = (row: SampleRequestItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const stagingContext = {
@@ -93,6 +104,9 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       targetPlant: row.targetPlant || "",
       parentRequestId: row.id,
       parentSrNumber: row.srNumber || `SR-${row.id}`,
+      parentRequestTypes: row.requestTypes || [],
+      parentMockupWorkflowState: row.mockupWorkflowState,
+      parentCreationMode: row.creationMode,
     };
     sessionStorage.setItem("samp_active_program_form", JSON.stringify(stagingContext));
 
@@ -183,15 +197,6 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
     return Array.from(set).sort();
   }, [samplingRequests]);
 
-  // Derived Plants List
-  const plantList = useMemo(() => {
-    const set = new Set<string>();
-    samplingRequests.forEach((r) => {
-      if (r.targetPlant && r.targetPlant.trim()) set.add(r.targetPlant.trim());
-    });
-    return Array.from(set).sort();
-  }, [samplingRequests]);
-
   // Derived Merchandising Product Categories List
   const categoryList = useMemo(() => {
     const set = new Set<string>();
@@ -203,7 +208,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
 
   // Stage counts
   const stageCounts = useMemo(() => {
-    const counts: Record<SamplingFilterTab, number> = {
+    const counts = {
       all: 0,
       draft: 0,
       creative: 0,
@@ -217,11 +222,10 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
     };
 
     samplingRequests.forEach((r) => {
-      const stage = getStageIdForRequest(r) as SamplingFilterTab;
+      const stage = getStageIdForRequest(r) as keyof typeof counts;
       if (counts[stage] !== undefined) {
         counts[stage]++;
       }
-      // "all" tab represents active / released requests
       if (stage !== "draft") {
         counts.all++;
       }
@@ -230,15 +234,43 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
     return counts;
   }, [samplingRequests]);
 
+
+  // Request Type counts
+  const typeCounts = useMemo(() => {
+    const counts = {
+      all: samplingRequests.length,
+      sample: 0,
+      design: 0,
+      mockup: 0,
+      costing: 0,
+    };
+    samplingRequests.forEach((r) => {
+      const types = getRequestTypes(r);
+      if (types.includes("sample")) counts.sample++;
+      if (types.includes("design")) counts.design++;
+      if (types.includes("mockup")) counts.mockup++;
+      if (types.includes("costing")) counts.costing++;
+    });
+    return counts;
+  }, [samplingRequests]);
+
   // Filtered requests
   const filteredRequests = useMemo(() => {
     return samplingRequests.filter((r) => {
-      if (selectedStageTab !== "all") {
-        const itemStage = getStageIdForRequest(r);
-        if (itemStage !== selectedStageTab) return false;
+      const itemStage = getStageIdForRequest(r);
+
+      if (selectedStageTab === "all") {
+        if (itemStage === "draft") return false;
+      } else if (selectedStageTab === "draft") {
+        if (itemStage !== "draft") return false;
+      } else if (selectedStageTab === "creative_group") {
+        if (itemStage !== "creative" && itemStage !== "studio") return false;
+      } else if (selectedStageTab === "production_group") {
+        if (itemStage !== "samp" && itemStage !== "plant" && itemStage !== "costing") return false;
+      } else if (selectedStageTab === "delivered_group") {
+        if (itemStage !== "dispatched" && itemStage !== "deal") return false;
       } else {
-        // Exclude drafts from active requests view
-        if (getStageIdForRequest(r) === "draft") return false;
+        if (itemStage !== selectedStageTab) return false;
       }
 
       if (selectedYear !== "ALL") {
@@ -249,11 +281,6 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       if (selectedPlant !== "ALL") {
         const p = (r.targetPlant || "").toLowerCase();
         if (!p.includes(selectedPlant.toLowerCase())) return false;
-      }
-
-      if (selectedPlantFilter !== "all") {
-        const p = (r.targetPlant || "").toLowerCase();
-        if (!p.includes(selectedPlantFilter.toLowerCase())) return false;
       }
 
       if (selectedCustomerFilter !== "all" && r.customer !== selectedCustomerFilter) {
@@ -275,6 +302,8 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
         const mat = (r.materialCode || "").toLowerCase();
         const desc = (r.productDescription || "").toLowerCase();
         const cust = (r.customer || "").toLowerCase();
+        const program = (r.programName || r.programCampaignTitle || "").toLowerCase();
+        const programYear = (r.programYear || "").toLowerCase();
         const plant = (r.targetPlant || "").toLowerCase();
         const brand = (r.brandName || "").toLowerCase();
         const cat = (r.productCategory || "").toLowerCase();
@@ -286,6 +315,8 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
           mat.includes(q) ||
           desc.includes(q) ||
           cust.includes(q) ||
+          program.includes(q) ||
+          programYear.includes(q) ||
           plant.includes(q) ||
           brand.includes(q) ||
           cat.includes(q) ||
@@ -301,7 +332,6 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
     selectedStageTab,
     selectedYear,
     selectedPlant,
-    selectedPlantFilter,
     selectedCustomerFilter,
     selectedCategoryFilter,
     selectedTypeFilter,
@@ -344,7 +374,6 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   const handleResetFilters = () => {
     setSearchTerm("");
     setSelectedCustomerFilter("all");
-    setSelectedPlantFilter("all");
     setSelectedCategoryFilter("all");
     setSelectedTypeFilter("all");
     setSelectedStageTab("all");
@@ -354,99 +383,57 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
       selectedCustomerFilter !== "all" ||
-      selectedPlantFilter !== "all" ||
       selectedCategoryFilter !== "all" ||
       selectedTypeFilter !== "all" ||
       selectedStageTab !== "all"
   );
 
-  const stageTabs: { id: SamplingFilterTab; label: string; count: number }[] = [
-    { id: "all", label: "Active Requests", count: stageCounts.all },
-    { id: "draft", label: "Pre-PMT Drafts", count: stageCounts.draft },
-    { id: "creative", label: "Creative & Design", count: stageCounts.creative },
-    { id: "studio", label: "Studio CAD", count: stageCounts.studio },
-    { id: "costing", label: "Costing", count: stageCounts.costing },
-    { id: "marketing", label: "Marketing Review", count: stageCounts.marketing },
-    { id: "samp", label: "SAMP Lab", count: stageCounts.samp },
-    { id: "plant", label: "Plant Floor", count: stageCounts.plant },
-    { id: "dispatched", label: "Dispatched", count: stageCounts.dispatched },
-    { id: "deal", label: "Won Deals", count: stageCounts.deal },
-  ];
-
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white text-slate-800 select-text overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] select-text font-sans overflow-hidden">
       {/* ── 1. Compact Editorial Header (Maximized Space for Requests) ── */}
-      <header className="bg-white px-6 py-3 shrink-0 border-b border-slate-200/60 shadow-[0_1px_4px_rgba(11,28,48,0.02)]">
+      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 font-display">
-              Commercial Sample Requests
-            </h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-slate-100 text-slate-600">
-              {samplingRequests.length} Requests
-            </span>
-            {stageCounts.draft > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-emerald-50 text-emerald-700 animate-pulse">
-                ⚡ {stageCounts.draft} Drafts to Release
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--on-surface)] font-display">
+                Commercial Sample Requests
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
+                BY {selectedYear}
               </span>
-            )}
+              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                {samplingRequests.length} Total
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-[var(--on-surface-muted)]">
+              Commercial production intake, PMT sampling pipelines, and dispatch tracking.
+            </p>
           </div>
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Draft Mode Sub-view Toggle */}
-            {selectedStageTab === "draft" && (
-              <div className="inline-flex rounded-xl bg-slate-100 p-0.5 mr-1">
-                <button
-                  type="button"
-                  onClick={() => setDraftSubMode("packages")}
-                  className={`px-2.5 py-1 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5 ${
-                    draftSubMode === "packages"
-                      ? "bg-white text-slate-900 shadow-2xs font-bold"
-                      : "text-slate-600 hover:text-slate-900 font-medium"
-                  }`}
-                  title="Grouped Program Packages"
-                >
-                  <Package className="w-3.5 h-3.5" />
-                  <span>Packages</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraftSubMode("flat")}
-                  className={`px-2.5 py-1 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5 ${
-                    draftSubMode === "flat"
-                      ? "bg-white text-slate-900 shadow-2xs font-bold"
-                      : "text-slate-600 hover:text-slate-900 font-medium"
-                  }`}
-                  title="Flat Items Table"
-                >
-                  <ListIcon className="w-3.5 h-3.5" />
-                  <span>Flat Table</span>
-                </button>
-              </div>
-            )}
-
             {/* Create New Request Button */}
-            <button
-              type="button"
-              onClick={onOpenNewModal}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] transition-all cursor-pointer active:scale-98"
-              style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
-              title="Create New Commercial Sample Request"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Sample Request</span>
-            </button>
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={onOpenNewModal}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] shadow-2xs cursor-pointer active:scale-98"
+                title="Create New Commercial Sample Request"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Sample Request</span>
+              </button>
+            )}
 
             {/* Refresh */}
             <button
               type="button"
               onClick={onRefresh}
               disabled={isLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-xs font-semibold text-slate-700 transition cursor-pointer disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
               title="Refresh Records"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-[#006d32]" : "text-slate-500"}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-[var(--accent-primary)]" : "text-[var(--on-surface-subtle)]"}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
 
@@ -455,202 +442,269 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
               type="button"
               onClick={onExportCSV}
               disabled={filteredRequests.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-xs font-semibold text-slate-700 transition cursor-pointer disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
               title="Export Filtered CSV"
             >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Export</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* ── 2. Floating Filter & Search Strip ── */}
-      <div className="px-6 py-2 bg-white shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200">
-        {/* Soft Segmented Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 select-none">
-          {stageTabs.map((t) => {
-            const isActive = selectedStageTab === t.id;
+      {/* ── 2. Interactive KPI Workflow Strip (Direct Queue Filters) ── */}
+      <section
+        aria-label="Sampling workflow summary"
+        className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2.5 sm:px-8"
+      >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+          {[
+            {
+              label: "All Active",
+              value: stageCounts.all,
+              detail: "Active workflow",
+              color: "bg-[var(--accent-primary)]",
+              filter: "all" as const,
+            },
+            {
+              label: "Drafts to Release",
+              value: stageCounts.draft,
+              detail: "Pre-PMT staging",
+              color: "bg-amber-500",
+              filter: "draft" as const,
+            },
+            {
+              label: "Creative & Design",
+              value: stageCounts.creative + stageCounts.studio,
+              detail: "Artworks & 3D mockups",
+              color: "bg-purple-500",
+              filter: "creative_group" as const,
+            },
+            {
+              label: "SAMP Lab & Plant",
+              value: stageCounts.samp + stageCounts.plant + stageCounts.costing,
+              detail: "Sampling, BOM & floor",
+              color: "bg-teal-500",
+              filter: "production_group" as const,
+            },
+            {
+              label: "Dispatched / Deals",
+              value: stageCounts.dispatched + stageCounts.deal,
+              detail: "Shipped & won deals",
+              color: "bg-emerald-500",
+              filter: "delivered_group" as const,
+            },
+          ].map((item) => {
+            const isSelected = selectedStageTab === item.filter;
+
             return (
               <button
-                key={t.id}
+                key={item.label}
                 type="button"
                 onClick={() => {
-                  setSelectedStageTab(t.id);
+                  setSelectedStageTab(item.filter);
                   setCurrentPage(1);
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
-                  isActive
-                    ? "bg-[#006d32] text-white shadow-[0_2px_8px_rgba(0,109,50,0.25)]"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 bg-transparent"
+                className={`min-w-0 rounded-xl border p-2.5 text-left shadow-2xs transition-all cursor-pointer ${
+                  isSelected
+                    ? "border-[var(--accent-primary)] bg-[var(--surface-lowest)] ring-2 ring-[var(--accent-primary)]/20"
+                    : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-low)]"
                 }`}
               >
-                <span>{t.label}</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full tabular-nums ${
-                    isActive ? "bg-white/25 text-white" : "bg-slate-200/70 text-slate-600"
-                  }`}
-                >
-                  {t.count}
-                </span>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${item.color}`} />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  {isSelected && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)]" />
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-lg font-display font-bold tabular-nums text-[var(--on-surface)]">
+                    {item.value}
+                  </span>
+                  <span className="truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                    {item.detail}
+                  </span>
+                </div>
               </button>
             );
           })}
         </div>
+      </section>
 
-        {/* Right Search & Controls */}
-        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
-          {selectedIds.size > 0 && (
-            <div className="flex items-center gap-1.5">
-              {selectedDraftsCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onBatchReleaseDraft(selectedIds)}
-                  className="h-9 px-3 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-                  style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
-                  title="Release selected drafts to PMT workflow"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Release ({selectedDraftsCount})</span>
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => onBatchDelete(selectedIds)}
-                  className="h-9 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition"
-                  title="Delete selected requests"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete ({selectedIds.size})</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setSelectedIds(new Set())}
-                className="text-slate-500 hover:text-slate-800 text-[11px] underline px-1 cursor-pointer"
-              >
-                Clear
-              </button>
-            </div>
-          )}
-
-          {/* Request Type Filter */}
-          <select
-            value={selectedTypeFilter}
-            onChange={(e) => {
-              setSelectedTypeFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 text-xs font-medium text-slate-700 border border-slate-200/70 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition"
-          >
-            <option value="all">All Request Types</option>
-            <option value="sample">Sampling</option>
-            <option value="design">Design</option>
-            <option value="mockup">Mockup</option>
-            <option value="costing">Costing</option>
-          </select>
-
-          {/* Product Category Filter */}
-          {categoryList.length > 0 && (
-            <select
-              value={selectedCategoryFilter}
-              onChange={(e) => {
-                setSelectedCategoryFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 text-xs font-medium text-slate-700 border border-slate-200/70 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition max-w-[170px] truncate"
-              title="Filter by Merchandising Product Category"
-            >
-              <option value="all">All Categories ({categoryList.length})</option>
-              {categoryList.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Customer Filter */}
-          {customerList.length > 0 && (
-            <select
-              value={selectedCustomerFilter}
-              onChange={(e) => {
-                setSelectedCustomerFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 text-xs font-medium text-slate-700 border border-slate-200/70 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition max-w-[160px] truncate"
-            >
-              <option value="all">All Customers</option>
-              {customerList.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Plant Filter */}
-          {plantList.length > 0 && (
-            <select
-              value={selectedPlantFilter}
-              onChange={(e) => {
-                setSelectedPlantFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 text-xs font-medium text-slate-700 border border-slate-200/70 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition"
-            >
-              <option value="all">All Plants</option>
-              {plantList.map((p) => (
-                <option key={p} value={p}>
-                  Plant {p}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Search Box */}
-          <div className="relative w-56 sm:w-64 group">
-            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#006d32] transition-colors pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search SR#, material, desc..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full h-9 pl-[34px] pr-8 rounded-lg bg-slate-100/80 hover:bg-slate-200/50 focus:bg-white text-xs text-slate-800 placeholder:text-slate-400 border border-slate-200/70 focus:border-[#006d32]/40 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 shadow-2xs transition-all"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm("");
+      {/* ── 3. Compact Filter Controls (Single h-8 Row) ── */}
+      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-2 sm:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {/* Search and relevant request filters */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {/* Search Box */}
+            <div className="relative w-52 sm:w-64 group">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] group-focus-within:text-[var(--accent-primary)] transition-colors pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search SR#, material, desc..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-4.5 h-4.5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/80 transition-colors cursor-pointer"
-                title="Clear search"
+                className="w-full h-8 pl-8 pr-7 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] shadow-2xs transition-all"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setCurrentPage(1);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Request Type Filter Tabs */}
+            <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5">
+              {[
+                { id: "all", label: "All Scopes", icon: Layers, count: typeCounts.all },
+                { id: "sample", label: "Sampling", icon: Package, count: typeCounts.sample },
+                { id: "design", label: "Design", icon: Palette, count: typeCounts.design },
+                { id: "mockup", label: "Mockup", icon: Box, count: typeCounts.mockup },
+                { id: "costing", label: "Costing", icon: Calculator, count: typeCounts.costing },
+              ].map((item) => {
+                const isSelected = selectedTypeFilter === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTypeFilter(item.id);
+                      setCurrentPage(1);
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer select-none ${
+                      isSelected
+                        ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
+                        : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
+                    }`}
+                  >
+                    <item.icon className="w-3.5 h-3.5" />
+                    <span>{item.label}</span>
+                    <span
+                      className={`text-[10px] font-mono px-1 py-0.2 rounded-full ${
+                        isSelected
+                          ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
+                          : "text-[var(--on-surface-subtle)]"
+                      }`}
+                    >
+                      {item.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Product Category Filter */}
+            {categoryList.length > 0 && (
+              <select
+                aria-label="Filter by product category"
+                value={selectedCategoryFilter}
+                onChange={(e) => {
+                  setSelectedCategoryFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="h-8 max-w-[170px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
+                title="Filter by Merchandising Product Category"
+              >
+                <option value="all">All Categories ({categoryList.length})</option>
+                {categoryList.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Customer Filter */}
+            {customerList.length > 0 && (
+              <select
+                aria-label="Filter by customer"
+                value={selectedCustomerFilter}
+                onChange={(e) => {
+                  setSelectedCustomerFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="h-8 max-w-[160px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
+              >
+                <option value="all">All Customers ({customerList.length})</option>
+                {customerList.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            )}
+
+
+          </div>
+
+          {/* Batch Controls */}
+          <div className="flex items-center gap-2 shrink-0 justify-end">
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-1.5 mr-1">
+                {selectedDraftsCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onBatchReleaseDraft(selectedIds)}
+                    className="h-8 px-3 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 shadow-2xs transition cursor-pointer bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
+                    title="Release selected drafts to their assigned workflow"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Release ({selectedDraftsCount})</span>
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => onBatchDelete(selectedIds)}
+                    className="h-8 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition"
+                    title="Delete selected requests"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete ({selectedIds.size})</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] text-[11px] underline px-1 cursor-pointer"
+                >
+                  Clear ({selectedIds.size})
+                </button>
+              </div>
+            )}
+
+            {/* Clear All Filters */}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-xs text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                title="Reset all search and dropdown filters"
               >
                 <X className="w-3 h-3" />
+                <span className="hidden sm:inline">Reset</span>
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── 3. Main Workspace: Draft Packages View or Table View ── */}
-      {selectedStageTab === "draft" && draftSubMode === "packages" ? (
-        <div className="flex-1 min-h-0 overflow-y-auto p-6 bg-white">
-          <DraftPackagesView
-            requests={samplingRequests}
-            isLoading={isLoading}
-            onRefresh={onRefresh}
-            showToast={showToast || (() => {})}
-          />
-        </div>
-      ) : (
-        <SamplingRequestsTable
+      {/* Main request table; draft rows use the compact program summary columns. */}
+      <SamplingRequestsTable
           paginatedRequests={paginatedRequests}
           filteredRequestsCount={filteredRequests.length}
           isLoading={isLoading}
@@ -659,7 +713,9 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
           pageSize={pageSize}
           totalPages={totalPages}
           isAdmin={isAdmin}
+          isDraftView={selectedStageTab === "draft"}
           hasActiveFilters={hasActiveFilters}
+          selectedTypeFilter={selectedTypeFilter}
           onToggleSelectAll={handleToggleSelectAll}
           onToggleSelectRow={handleToggleSelectRow}
           onOpenDraftInStaging={handleOpenDraftInStaging}
@@ -670,7 +726,6 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
           onOpenNewModal={onOpenNewModal}
           onResetFilters={handleResetFilters}
         />
-      )}
     </div>
   );
 };

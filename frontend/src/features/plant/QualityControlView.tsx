@@ -67,10 +67,10 @@ export const QualityControlView: React.FC<QualityControlViewProps> = ({ selected
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-[#0f1118]">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-zinc-950">
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#12141d] shadow-2xs">
+        <div className="p-4 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">
               QC Acceptance Rate
@@ -79,13 +79,13 @@ export const QualityControlView: React.FC<QualityControlViewProps> = ({ selected
               <CheckCircle2 className="w-4 h-4" />
             </span>
           </div>
-          <div className="text-2xl font-bold font-mono text-zinc-950 dark:text-zinc-50 mt-2">
+          <div className="text-2xl font-bold font-mono tabular-nums text-zinc-950 dark:text-zinc-50 mt-2">
             99.2%
           </div>
           <div className="text-xs text-zinc-500 mt-0.5">38 of 39 lots passed inspection</div>
         </div>
 
-        <div className="p-4 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#12141d] shadow-2xs">
+        <div className="p-4 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">
               Substrate Tolerances
@@ -94,13 +94,13 @@ export const QualityControlView: React.FC<QualityControlViewProps> = ({ selected
               <Scale className="w-4 h-4" />
             </span>
           </div>
-          <div className="text-2xl font-bold font-mono text-zinc-950 dark:text-zinc-50 mt-2">
+          <div className="text-2xl font-bold font-mono tabular-nums text-zinc-950 dark:text-zinc-50 mt-2">
             ±1.8%
           </div>
           <div className="text-xs text-zinc-500 mt-0.5">Strictly within ISO 12647-2 limits</div>
         </div>
 
-        <div className="p-4 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#12141d] shadow-2xs">
+        <div className="p-4 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">
               Active Lots on Hold
@@ -109,7 +109,7 @@ export const QualityControlView: React.FC<QualityControlViewProps> = ({ selected
               <AlertTriangle className="w-4 h-4" />
             </span>
           </div>
-          <div className="text-2xl font-bold font-mono text-zinc-950 dark:text-zinc-50 mt-2">
+          <div className="text-2xl font-bold font-mono tabular-nums text-zinc-950 dark:text-zinc-50 mt-2">
             1 Lot
           </div>
           <div className="text-xs text-zinc-500 mt-0.5">Scuff test revision under review</div>
@@ -117,7 +117,7 @@ export const QualityControlView: React.FC<QualityControlViewProps> = ({ selected
       </div>
 
       {/* QC Logs Table */}
-      <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#12141d] shadow-2xs overflow-hidden">
+      <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-zinc-100 dark:border-white/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Beaker className="w-4 h-4 text-teal-600" />

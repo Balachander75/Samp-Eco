@@ -590,7 +590,7 @@ export async function searchProductsByBindingApi(
     const results = await apiFetch<ProductSearchResult[]>(endpoint);
     return results || [];
   } catch (err) {
-    console.error("Error filtering products by binding / category:", err);
+    console.error("Error filtering products by binding:", err);
     return [];
   }
 }
@@ -609,6 +609,7 @@ export interface UserItem {
   team?: string;
   isTeamHead: boolean;
   plantCode?: string;
+  plantCodes?: string[];
   isActive: boolean;
   createdAt?: string;
 }
@@ -623,6 +624,7 @@ export interface CreateUserPayload {
   team?: string;
   is_team_head?: boolean;
   plant_code?: string;
+  plant_codes?: string[];
   is_active?: boolean;
 }
 
@@ -636,6 +638,7 @@ export interface UpdateUserPayload {
   team?: string;
   is_team_head?: boolean;
   plant_code?: string;
+  plant_codes?: string[];
   is_active?: boolean;
 }
 
@@ -653,6 +656,7 @@ export async function fetchUsersApi(team?: string): Promise<UserItem[]> {
       team: u.team || undefined,
       isTeamHead: Boolean(u.is_team_head),
       plantCode: u.plant_code || undefined,
+      plantCodes: u.plant_codes || (u.plant_code ? [u.plant_code] : []),
       isActive: Boolean(u.is_active),
       createdAt: u.created_at ? String(u.created_at).split("T")[0] : undefined,
     }));
@@ -677,6 +681,7 @@ export async function createUserApi(payload: CreateUserPayload): Promise<UserIte
     team: u.team || undefined,
     isTeamHead: Boolean(u.is_team_head),
     plantCode: u.plant_code || undefined,
+    plantCodes: u.plant_codes || (u.plant_code ? [u.plant_code] : []),
     isActive: Boolean(u.is_active),
     createdAt: u.created_at ? String(u.created_at).split("T")[0] : undefined,
   };
@@ -697,6 +702,7 @@ export async function updateUserApi(id: number, payload: UpdateUserPayload): Pro
     team: u.team || undefined,
     isTeamHead: Boolean(u.is_team_head),
     plantCode: u.plant_code || undefined,
+    plantCodes: u.plant_codes || (u.plant_code ? [u.plant_code] : []),
     isActive: Boolean(u.is_active),
     createdAt: u.created_at ? String(u.created_at).split("T")[0] : undefined,
   };

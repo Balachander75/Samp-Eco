@@ -16,13 +16,18 @@ class DesignRequestService:
         self.db = db
         self.repo = DesignRequestRepository(db)
 
-    def list_all(self) -> List[Dict[str, Any]]:
-        """List all design requests."""
-        return self.repo.list_all_records()
+    def list_all(self, year: Optional[str] = None, draft_only: bool = False) -> List[Dict[str, Any]]:
+        """List design requests for the selected business year."""
+        return self.repo.list_all_records(year=year, draft_only=draft_only)
 
     def get_by_id(self, item_id: int) -> Optional[Dict[str, Any]]:
         """Fetch design request by ID."""
         return self.repo.get_record_by_id(item_id)
+
+    def get_by_sr_number(self, sr_number: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Fetch the design workflow linked to one sample request without scanning the full queue."""
+        item = self.repo.get_model_by_sr_number(sr_number)
+        return self.repo.to_dict(item) if item else None
 
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new creative design request."""

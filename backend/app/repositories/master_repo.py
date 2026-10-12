@@ -5,7 +5,7 @@ Handles all database operations for `customers`, `plants`, and enterprise `users
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from app.repositories.base import BaseRepository
-from app.models.master import Customer, Plant, User
+from app.models.master import Customer, Plant, User, UserPlantAssignment
 
 
 class MasterRepository:
@@ -126,6 +126,47 @@ class MasterRepository:
             is_active=is_active,
         )
         return self.users.create(user)
+
+    def replace_user_plant_assignments(self, user: User, plant_codes: List[str]) -> User:
+        """Replace a user's plant assignments after validating every supplied code."""
+        cleaned = list(dict.fromkeys(code.strip() for code in plant_codes if code and code.strip()))
+        plants = []
+        for code in cleaned:
+            plant = self.db.query(Plant).filter(Plant.code.ilike(code)).first()
+            if not plant:
+                from fastapi import HTTPException, status
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Assigned plant '{code}' does not exist.",
+                )
+            plants.append(plant)
+        user.plant_assignments = []
+        user.plant_assignments.extend(
+            UserPlantAssignment(plant=plant) for plant in plants
+        )
+        user.plant_code = cleaned[0] if cleaned else None
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
+    def validate_plant_codes(self, plant_codes: List[str]) -> List[str]:
+        cleaned = []
+        seen = set()
+        for raw_code in plant_codes:
+            code = str(raw_code or "").strip()
+            if not code or code.casefold() in seen:
+                continue
+            plant = self.db.query(Plant).filter(Plant.code.ilike(code)).first()
+            if not plant:
+                from fastapi import HTTPException, status
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Assigned plant '{code}' does not exist.",
+                )
+            seen.add(plant.code.casefold())
+            cleaned.append(plant.code)
+        return cleaned
 
     def update_user(self, user: User, fields: Dict[str, Any]) -> User:
         """Update user record."""

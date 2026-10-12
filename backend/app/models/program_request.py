@@ -1,6 +1,6 @@
 """Database models for Seasonal Program Planning and Material Specification Matrix."""
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -23,10 +23,11 @@ class ProgramRequest(Base):
     customer_name = Column(String(255), nullable=False, index=True)
     target_plant = Column(String(255), nullable=False)
     program_campaign_title = Column(String(255), nullable=False)
-    program_year = Column(String(50), nullable=False, default="2026-2027", server_default="2026-2027")
+    program_year = Column(String(50), nullable=False, default="2026-2027", server_default="2026-2027", index=True)
 
     status = Column(String(64), nullable=False, default="Pending SAMP Review", server_default="Pending SAMP Review")
     created_by = Column(String(255), nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     # Sampling Team Review & Seen status
     sampling_seen_at = Column(DateTime(timezone=True), nullable=True)
@@ -35,6 +36,8 @@ class ProgramRequest(Base):
     sampling_remark = Column(Text, nullable=True)
     sampling_signed_at = Column(DateTime(timezone=True), nullable=True)
     sampling_signed_by = Column(String(255), nullable=True)
+    sampling_claimed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    sampling_claimed_by = Column(String(255), nullable=True)
 
     # Plant Team Review & Seen status
     plant_seen_at = Column(DateTime(timezone=True), nullable=True)
@@ -43,8 +46,10 @@ class ProgramRequest(Base):
     plant_remark = Column(Text, nullable=True)
     plant_signed_at = Column(DateTime(timezone=True), nullable=True)
     plant_signed_by = Column(String(255), nullable=True)
+    plant_claimed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    plant_claimed_by = Column(String(255), nullable=True)
 
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     # Material Specification Matrix rows
@@ -97,8 +102,6 @@ class ProgramMaterialSpecification(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     program_request = relationship("ProgramRequest", back_populates="materials")
-
-
 class ProgramActivityLog(Base):
     """Activity and chatter audit log entry for seasonal program requests."""
 
@@ -116,6 +119,9 @@ class ProgramActivityLog(Base):
     actor_department = Column(String(100), nullable=False)  # "Marketing", "SAMP Team", "System"
     action = Column(String(64), nullable=False)  # "CREATED", "NOTE_POSTED", "STATUS_UPDATED", "MATERIAL_ADDED", "MATERIAL_DELETED", "SAMP_REMARK_UPDATED"
     payload = Column(JSON, nullable=False, default=dict, server_default="{}")
+    pinned_by_marketing = Column(Boolean, nullable=False, default=False, server_default="false")
+    pinned_by = Column(String(255), nullable=True)
+    pinned_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     program_request = relationship("ProgramRequest", back_populates="activities")

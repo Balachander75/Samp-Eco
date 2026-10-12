@@ -174,8 +174,8 @@ class DesignBriefSubmitPayload(BaseModel):
 
 class CreativeDesignRow(BaseModel):
     design_number: Optional[str] = None
-    description: str
-    remarks: Optional[str] = ""
+    shutterstock_no: Optional[str] = None
+    remarks: Optional[str] = None
 
 
 class CreativeOutputPayload(BaseModel):
