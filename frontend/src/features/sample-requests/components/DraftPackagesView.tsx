@@ -16,13 +16,15 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { SampleRequestItem } from "../types";
-import { batchUpdateStatusApi, deleteSampleRequestApi } from "@/infrastructure/api";
+import { releaseDraftRequestsApi, deleteAnyRequestApi } from "@/infrastructure/api";
+import { getDraftReleaseStatus, getRequestTrackType, getStageIdForRequest, isDesignRequest } from "../utils/trackTypes";
 
 export interface DraftPackageGroup {
   id: string;
   customer: string;
   programName: string;
   programYear: string;
+  year: string;
   targetPlant: string;
   createdBy: string;
   dateRequestCreated: string;
@@ -36,6 +38,12 @@ export interface DraftPackagesViewProps {
   onRefresh: () => void;
   showToast: (msg: string, type?: "success" | "error") => void;
 }
+
+const isDesignPackageGroup = (group: DraftPackageGroup) =>
+  group.requestKind === "design" || (group.items.length > 0 && group.items.every(isDesignRequest));
+
+const getReleaseDestination = (group: DraftPackageGroup) =>
+  Array.from(new Set(group.items.map(getDraftReleaseStatus))).join(" and ");
 
 export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
   requests,
@@ -56,8 +64,8 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
   // Group requests where status contains 'draft' or 'smt'
   const packageGroups: DraftPackageGroup[] = useMemo(() => {
     const draftItems = requests.filter((r) => {
-      const s = String(r.status || "").toLowerCase();
-      return s.includes("draft") || s.includes("smt");
+      if (getRequestTrackType(r) !== "marketing_request") return false;
+      return getStageIdForRequest(r) === "draft";
     });
 
     const groupsMap = new Map<string, DraftPackageGroup>();
@@ -77,6 +85,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
           customer,
           programName,
           programYear,
+          year: item.year || "",
           targetPlant: item.targetPlant || "1505- Khaniwade",
           createdBy: item.createdBy || "Marketing",
           dateRequestCreated: item.dateRequestCreated || item.createdAt || "",
@@ -108,24 +117,25 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
     if (!quickReleaseGroup) return;
     setIsReleasing(true);
     try {
-      const sampleIds = quickReleaseGroup.items
-        .filter((i) => !String(i.id).startsWith("design-"))
-        .map((i) => (typeof i.id === "number" ? i.id : Number(String(i.id).replace(/^sample-/, ""))))
-        .filter((id) => !isNaN(id));
-
-      if (sampleIds.length > 0) {
-        await batchUpdateStatusApi(sampleIds, "Creative");
+      const itemsByStatus = new Map<string, SampleRequestItem[]>();
+      for (const item of quickReleaseGroup.items) {
+        const status = getDraftReleaseStatus(item);
+        itemsByStatus.set(status, [...(itemsByStatus.get(status) || []), item]);
+      }
+      for (const [status, items] of itemsByStatus) {
+        await releaseDraftRequestsApi(items, status);
       }
 
       showToast(
-        `✓ Released package "${quickReleaseGroup.programName}" (${quickReleaseGroup.items.length} items) to Creative!`,
+        `✓ Released package "${quickReleaseGroup.programName}" (${quickReleaseGroup.items.length} items) to ${getReleaseDestination(quickReleaseGroup)}.`,
         "success"
       );
       setQuickReleaseGroup(null);
-      onRefresh();
+      await onRefresh();
     } catch (err) {
       console.error("Failed to quick release package:", err);
-      showToast("Error releasing draft package to Creative.", "error");
+      await onRefresh();
+      showToast("Error releasing draft package to its workflow.", "error");
     } finally {
       setIsReleasing(false);
     }
@@ -137,13 +147,16 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
     setIsDeleting(true);
     try {
       for (const item of deleteGroup.items) {
-        await deleteSampleRequestApi(item.id);
+        const deleted = await deleteAnyRequestApi(item);
+        if (!deleted) throw new Error(`Could not delete request ${item.srNumber || item.id}.`);
       }
       showToast(`Deleted draft package "${deleteGroup.programName}".`, "success");
       setDeleteGroup(null);
       onRefresh();
     } catch (err) {
       console.error("Failed to delete draft package:", err);
+      await onRefresh();
+      setDeleteGroup(null);
       showToast("Error deleting package items.", "error");
     } finally {
       setIsDeleting(false);
@@ -169,7 +182,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
           No Draft Packages Found
         </h3>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
-          Create a new sample request program or stage products to review draft packages before releasing them to Creative.
+          Save a sample request or design brief as a draft, then review it here before sending it to the next team.
         </p>
       </div>
     );
@@ -180,11 +193,11 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-200 dark:border-white/[0.08]">
         <div>
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2">
-            <Package className="w-4 h-4 text-[#714B67]" />
+            <Package className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             Draft Packages Queue ({packageGroups.length})
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Pre-SMT programs grouped by customer and season. Review specifications, clone items, or release directly into Creative.
+            Sample products and design briefs grouped by customer and season. Review each draft, clone it, release it, or remove it.
           </p>
         </div>
       </div>
@@ -193,25 +206,26 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {packageGroups.map((group) => {
           const productCount = group.items.length;
+          const designPackage = isDesignPackageGroup(group);
           return (
             <div
               key={group.id}
-              className="bg-white dark:bg-[#12141d] rounded-xl border border-zinc-200 dark:border-white/[0.08] shadow-xs hover:shadow-md hover:border-[#714B67]/40 dark:hover:border-purple-400/30 transition-all flex flex-col justify-between overflow-hidden group"
+              className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-white/[0.08] shadow-xs hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700/50 transition-all flex flex-col justify-between overflow-hidden group"
             >
               {/* Card Top */}
               <div className="p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#714B67]/10 text-[#714B67] dark:bg-purple-900/30 dark:text-purple-300 border border-[#714B67]/20 mb-1.5">
+                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-600/10 text-purple-600 dark:text-purple-400 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 mb-1.5">
                       {group.customer}
                     </span>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate group-hover:text-[#714B67] dark:group-hover:text-purple-300 transition-colors">
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate group-hover:text-purple-600 dark:text-purple-400 dark:group-hover:text-purple-300 transition-colors">
                       {group.programName}
                     </h3>
                   </div>
 
                   <span className="shrink-0 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                    {productCount} {productCount === 1 ? "Product" : "Products"}
+                    {productCount} {designPackage ? (productCount === 1 ? "Brief" : "Briefs") : (productCount === 1 ? "Product" : "Products")}
                   </span>
                 </div>
 
@@ -257,7 +271,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setDeleteGroup(group)}
-                  className="p-1.5 rounded text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                  className="p-1.5 rounded text-rose-700 hover:text-rose-800 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
                   title="Delete Draft Package"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -277,7 +291,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
                   <button
                     type="button"
                     onClick={() => handleOpenWorkspace(group)}
-                    className="px-3 py-1.5 rounded text-xs font-semibold text-white bg-[#714B67] hover:bg-[#5B3C53] flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                    className="px-3 py-1.5 rounded text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                   >
                     <span>Open Workspace</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -292,7 +306,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       {/* Quick Release Confirmation Modal */}
       {quickReleaseGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70">
-          <div className="bg-white dark:bg-[#12141d] rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
@@ -300,9 +314,9 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                    Quick Release Draft Package
+                    {isDesignPackageGroup(quickReleaseGroup) ? "Release Design Briefs" : "Quick Release Draft Package"}
                   </h3>
-                  <span className="text-xs text-zinc-500">Destination: Creative / SMT</span>
+                  <span className="text-xs text-zinc-500">Destination: {getReleaseDestination(quickReleaseGroup)}</span>
                 </div>
               </div>
               <button
@@ -328,7 +342,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
                 </span>
               </div>
               <div>
-                <span className="text-zinc-400">Products to Release: </span>
+                <span className="text-zinc-400">{isDesignPackageGroup(quickReleaseGroup) ? "Briefs to Release: " : "Products to Release: "}</span>
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
                   {quickReleaseGroup.items.length} item(s)
                 </span>
@@ -336,9 +350,9 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
             </div>
 
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              Releasing will transition all {quickReleaseGroup.items.length} sample requests from{" "}
-              <strong className="text-zinc-900 dark:text-zinc-100">Draft (Pre-SMT)</strong> to{" "}
-              <strong className="text-emerald-600 dark:text-emerald-400">Creative</strong>, dispatching them to the creative and sampling desks.
+              Releasing will move {quickReleaseGroup.items.length} {isDesignPackageGroup(quickReleaseGroup) ? "design brief(s)" : "sample request(s)"} from{" "}
+              <strong className="text-zinc-900 dark:text-zinc-100">Draft</strong> to{" "}
+              <strong className="text-emerald-600 dark:text-emerald-400">{getReleaseDestination(quickReleaseGroup)}</strong>.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -376,7 +390,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       {/* Delete Package Modal */}
       {deleteGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70">
-          <div className="bg-white dark:bg-[#12141d] rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-white/[0.08] max-w-md w-full shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-2.5 text-rose-600">
               <div className="w-9 h-9 rounded-lg bg-rose-100 dark:bg-rose-950/60 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5" />
@@ -391,7 +405,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
 
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
               Are you sure you want to delete the package{" "}
-              <strong>"{deleteGroup.programName}"</strong>? All {deleteGroup.items.length} draft product(s) and their characteristic specifications will be removed from the database.
+              <strong>"{deleteGroup.programName}"</strong>? All {deleteGroup.items.length} {isDesignPackageGroup(deleteGroup) ? "draft design brief(s) and their workflow history" : "draft product(s) and their characteristic specifications"} will be removed from the database.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">

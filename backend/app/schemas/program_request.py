@@ -1,7 +1,7 @@
 """Pydantic schemas for Seasonal Program Planning and Material Specification Matrix."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -57,16 +57,22 @@ class ProgramRequestUpdate(BaseModel):
     plant_remark: Optional[str] = None
 
 
-class ProgramReviewSubmit(BaseModel):
-    department: str = Field(..., description="'sampling' or 'plant'")
-    verdict: str = Field(..., description="'Feasible', 'Revisions Required', 'Capacity Confrained', etc.")
-    remark: Optional[str] = None
-    actor_name: Optional[str] = None
+class ProgramOutputSubmit(BaseModel):
+    department: Literal["sampling", "plant"]
+    remark: str = Field(min_length=1, max_length=4000)
 
 
 class ProgramSeenSubmit(BaseModel):
     department: str = Field(..., description="'sampling' or 'plant'")
     actor_name: Optional[str] = None
+
+
+class ProgramActivityPinSubmit(BaseModel):
+    pinned: bool
+
+
+class ProgramActivityReplySubmit(BaseModel):
+    remark: str = Field(min_length=1, max_length=2000)
 
 
 class ProgramMaterialRemarkUpdate(BaseModel):
@@ -97,6 +103,9 @@ class ProgramActivityLogOut(BaseModel):
     action: str
     payload: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
+    pinned_by_marketing: bool = False
+    pinned_by: Optional[str] = None
+    pinned_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -119,6 +128,8 @@ class ProgramRequestOut(BaseModel):
     sampling_remark: Optional[str] = None
     sampling_signed_at: Optional[datetime] = None
     sampling_signed_by: Optional[str] = None
+    sampling_claimed_by_user_id: Optional[int] = None
+    sampling_claimed_by: Optional[str] = None
 
     # Plant Review & Seen
     plant_seen_at: Optional[datetime] = None
@@ -127,6 +138,8 @@ class ProgramRequestOut(BaseModel):
     plant_remark: Optional[str] = None
     plant_signed_at: Optional[datetime] = None
     plant_signed_by: Optional[str] = None
+    plant_claimed_by_user_id: Optional[int] = None
+    plant_claimed_by: Optional[str] = None
 
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

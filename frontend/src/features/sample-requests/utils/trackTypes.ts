@@ -62,10 +62,26 @@ export function isDesignRequest(r?: Partial<SampleRequestItem> | null): boolean 
   const mat = String(r.materialCode || "").toLowerCase();
   const sr = String(r.srNumber || "").toLowerCase();
   if (mat.startsWith("dsg-") || sr.startsWith("dsg-")) return true;
-  if (Boolean(r.numberOfDesigns) || Boolean(r.designsCustomerCreative)) {
-    if (!scopes.includes("sample") && !r.productType) return true;
-  }
   return false;
+}
+
+/** Choose the first owner for a Marketing draft when it is released. */
+export function getDraftReleaseStatus(r: Partial<SampleRequestItem>): string {
+  const requestTypes = r.requestTypes || [];
+  if (requestTypes.includes("design") || isDesignRequest(r)) return "Creative";
+
+  if (requestTypes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes") {
+    const state = r.mockupWorkflowState;
+    // New products always need a Design handoff. Legacy mockup drafts without an
+    // explicit choice also go through Creative so they cannot bypass review.
+    const needsDesign = String(r.creationMode || "").toLowerCase() === "new" || state?.designNeeded !== false;
+    // Sampling stays the primary workflow for combined requests; Mockup is
+    // routed independently through its saved workflow stage.
+    if (requestTypes.includes("sample")) return "Sampling Review (PMT)";
+    return needsDesign ? "Creative" : "Studio";
+  }
+
+  return "Sampling Review (PMT)";
 }
 
 export function getRequestTrackBadge(r: Partial<SampleRequestItem>): {
@@ -78,11 +94,11 @@ export function getRequestTrackBadge(r: Partial<SampleRequestItem>): {
   if (isDesignRequest(r)) {
     return {
       label: "Design Request",
-      bg: "bg-[#714B67]/10 dark:bg-[#714B67]/25",
-      text: "text-[#714B67] dark:text-[#d5bdd0]",
-      border: "border-[#714B67]/30 dark:border-[#714B67]/50",
+      bg: "bg-purple-50 dark:bg-purple-950/40",
+      text: "text-purple-700 dark:text-purple-300",
+      border: "border-purple-200 dark:border-purple-800/50",
       className:
-        "bg-[#714B67]/10 dark:bg-[#714B67]/25 text-[#714B67] dark:text-[#d5bdd0] border border-[#714B67]/30 dark:border-[#714B67]/50",
+        "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50",
     };
   }
   const track = getRequestTrackType(r);
@@ -144,10 +160,31 @@ export function getStageIdForRequest(r: SampleRequestItem): string {
     return "samp"; // SAMP Team Work / Seasonal Matrix Review
   }
 
+  const mockupStage = r.mockupWorkflowState?.stage;
+  // A combined request has independent Creative mockup work and SAMP sampling work.
+  // Keep its primary request stage with Sampling while the mockup desk reads its own stage.
+  const hasSamplingScope = (r.requestTypes || []).includes("sample");
+  if (!hasSamplingScope) {
+    if (mockupStage === "marketing" && r.mockupWorkflowState?.mockupUrl) return "marketing";
+    if (mockupStage === "studio") return "studio";
+    if (mockupStage === "creative") return "creative";
+    // Older released mockup requests may have the PMT status while their
+    // workflow state was left at Marketing. Resolve their owner from the saved
+    // design decision so they remain visible in the correct work queue.
+    if (
+      mockupStage === "marketing" &&
+      !s.includes("draft") && !s.includes("smt") && !s.includes("pending allocation") &&
+      ((r.requestTypes || []).includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes")
+    ) {
+      return r.mockupWorkflowState?.designNeeded === false ? "studio" : "creative";
+    }
+  }
+
   // 3. Marketing Request: Only Marketing requests can be in "draft"
   if (s.includes("draft") || s.includes("smt") || s.includes("pending allocation")) {
     return "draft";
   }
+  if (s.includes("marketing")) return "marketing";
   if (s.includes("creative")) return "creative";
   if (s.includes("studio")) return "studio";
   if (s.includes("cost") || s.includes("estimation")) return "costing";

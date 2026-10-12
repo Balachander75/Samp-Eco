@@ -79,7 +79,7 @@ export const ProductionFloorView: React.FC<ProductionFloorViewProps> = ({
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-[#0f1118]">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-zinc-950">
       {/* Top Banner Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -120,7 +120,7 @@ export const ProductionFloorView: React.FC<ProductionFloorViewProps> = ({
           return (
             <div
               key={i}
-              className={`p-4 rounded-xl border bg-white dark:bg-[#12141d] shadow-2xs flex flex-col justify-between`}
+              className={`p-4 rounded-xl border bg-white dark:bg-zinc-900 shadow-2xs flex flex-col justify-between`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
@@ -159,7 +159,7 @@ export const ProductionFloorView: React.FC<ProductionFloorViewProps> = ({
           {machineLines.map((line) => (
             <div
               key={line.id}
-              className="p-5 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#12141d] shadow-2xs space-y-4"
+              className="p-5 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 shadow-2xs space-y-4"
             >
               <div className="flex items-start justify-between">
                 <div>

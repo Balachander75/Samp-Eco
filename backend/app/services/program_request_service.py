@@ -15,7 +15,6 @@ from app.schemas.program_request import (
     ProgramBatchSampRemarksUpdate,
     SingleSampRemarkUpdate,
     ProgramMaterialCreate,
-    ProgramReviewSubmit,
     ProgramSeenSubmit,
 )
 from app.utils.business_year import get_current_business_year
@@ -38,15 +37,27 @@ class ProgramRequestService:
                 or "Unknown User"
             )
             dept = (
-                getattr(current_user, "department", None)
+                getattr(current_user, "team", None)
+                or getattr(current_user, "department", None)
                 or getattr(current_user, "role", None)
                 or "Marketing"
             )
+            normalized_dept = str(dept).strip().casefold()
+            if "marketing" in normalized_dept:
+                dept = "Marketing"
+            elif "samp" in normalized_dept or "sampling" in normalized_dept:
+                dept = "SAMP Team"
+            elif "plant" in normalized_dept:
+                dept = "Plant"
+            elif "creative" in normalized_dept or "studio" in normalized_dept:
+                dept = "Creative Studio"
+            elif normalized_dept == "admin":
+                dept = "Admin"
             uid = getattr(current_user, "id", None)
             return uid, name, dept
         return None, "System Operator", "System"
 
-    def serialize(self, item: ProgramRequest) -> Dict[str, Any]:
+    def serialize(self, item: ProgramRequest, include_activities: bool = True) -> Dict[str, Any]:
         """Serializes a ProgramRequest, material matrix, and activity audit logs."""
         return {
             "id": item.id,
@@ -58,18 +69,23 @@ class ProgramRequestService:
             "program_year": item.program_year,
             "status": item.status,
             "created_by": item.created_by,
+            "created_by_user_id": item.created_by_user_id,
             "sampling_seen_at": item.sampling_seen_at,
             "sampling_seen_by": item.sampling_seen_by,
             "sampling_verdict": item.sampling_verdict,
             "sampling_remark": item.sampling_remark,
             "sampling_signed_at": item.sampling_signed_at,
             "sampling_signed_by": item.sampling_signed_by,
+            "sampling_claimed_by_user_id": item.sampling_claimed_by_user_id,
+            "sampling_claimed_by": item.sampling_claimed_by,
             "plant_seen_at": item.plant_seen_at,
             "plant_seen_by": item.plant_seen_by,
             "plant_verdict": item.plant_verdict,
             "plant_remark": item.plant_remark,
             "plant_signed_at": item.plant_signed_at,
             "plant_signed_by": item.plant_signed_by,
+            "plant_claimed_by_user_id": item.plant_claimed_by_user_id,
+            "plant_claimed_by": item.plant_claimed_by,
             "created_at": item.created_at,
             "updated_at": item.updated_at,
             "materials": [
@@ -100,15 +116,27 @@ class ProgramRequestService:
                     "action": a.action,
                     "payload": a.payload or {},
                     "created_at": a.created_at,
+                    "pinned_by_marketing": a.pinned_by_marketing,
+                    "pinned_by": a.pinned_by,
+                    "pinned_at": a.pinned_at,
                 }
-                for a in sorted(item.activities or [], key=lambda x: x.created_at or datetime.min)
-            ],
+                for a in sorted(item.activities or [], key=lambda x: x.id)
+            ] if include_activities else [],
         }
 
-    def list_all(self) -> List[Dict[str, Any]]:
-        """List all program requests."""
-        items = self.repo.list_all_detailed()
-        return [self.serialize(i) for i in items]
+    def list_all(
+        self,
+        year: Optional[str] = None,
+        status_filter: Optional[str] = None,
+        plant_labels: Optional[set[str]] = None,
+        created_by_user_id: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """List program requests for the selected business year."""
+        items = self.repo.list_all_detailed(
+            year=year, status_filter=status_filter, plant_labels=plant_labels,
+            created_by_user_id=created_by_user_id,
+        )
+        return [self.serialize(i, include_activities=False) for i in items]
 
     def get_by_id(self, request_id: int) -> Optional[Dict[str, Any]]:
         """Fetch single program request by ID."""
@@ -120,7 +148,9 @@ class ProgramRequestService:
     def create(self, payload: ProgramRequestCreate, current_user: Optional[Any] = None) -> Dict[str, Any]:
         """Create program planning request and assign contiguous codes."""
         actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
-        creator_name = payload.created_by or actor_name or "Marketing Team"
+        # The authenticated identity is authoritative; never trust a creator
+        # name supplied in the request body for the audit record.
+        creator_name = actor_name or "Marketing Team"
 
         program_req = ProgramRequest(
             request_code="PENDING",
@@ -131,20 +161,27 @@ class ProgramRequestService:
             program_year=(payload.program_year or get_current_business_year()).strip(),
             status="Pending SAMP Review",
             created_by=creator_name,
+            created_by_user_id=actor_id,
         )
         self.db.add(program_req)
         self.db.flush()
 
-        existing_count = self.db.query(ProgramRequest).count()
         yr_suffix = datetime.now(timezone.utc).year % 100
-        program_req.request_code = f"PG-{existing_count:04d}"
-        program_req.sr_number = f"SR-{yr_suffix:02d}-PG-{existing_count:03d}"
+        # The database-generated primary key is unique under concurrency and
+        # keeps the public business code stable even when another row is removed.
+        program_req.request_code = f"PG-{program_req.id:04d}"
+        program_req.sr_number = f"SR-{yr_suffix:02d}-PG-{program_req.id:03d}"
+        if self.db.query(ProgramRequest.id).filter(ProgramRequest.request_code == program_req.request_code).first():
+            program_req.request_code = f"PG-{program_req.id:04d}-R"
+        if self.db.query(ProgramRequest.id).filter(ProgramRequest.sr_number == program_req.sr_number).first():
+            program_req.sr_number = f"SR-{yr_suffix:02d}-PG-{program_req.id:03d}-R"
 
         materials_count = 0
         if payload.materials:
             for mat_item in payload.materials:
                 self.repo.add_material(
                     program_request_id=program_req.id,
+                    commit=False,
                     material_data={
                         "material_type": (mat_item.material_type or "").strip() or None,
                         "supplier_name": (mat_item.supplier_name or "").strip() or None,
@@ -190,6 +227,11 @@ class ProgramRequestService:
 
         actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
         updates = payload.model_dump(exclude_unset=True)
+        if updates.get("status") is not None:
+            raise HTTPException(status_code=409, detail="Program plan status cannot be edited manually")
+        protected_fields = {"sampling_verdict", "sampling_remark", "plant_verdict", "plant_remark"}
+        if protected_fields.intersection(updates):
+            raise HTTPException(status_code=409, detail="Review fields must be changed through the team review workflow")
         old_status = item.status
 
         for field, value in updates.items():
@@ -227,10 +269,11 @@ class ProgramRequestService:
         current_user: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
         """Batch update SAMP remarks on materials."""
-        item = self.repo.get_with_materials(request_id)
+        item = self.repo.get_for_update(request_id)
         if not item:
             return None
 
+        self._claim_team_task(item, "sampling", current_user)
         actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
         mat_map = {mat.id: mat for mat in item.materials}
         updated_count = 0
@@ -262,9 +305,10 @@ class ProgramRequestService:
         current_user: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
         """Update single SAMP remark."""
-        item = self.repo.get_with_materials(request_id)
+        item = self.repo.get_for_update(request_id)
         if not item:
             return None
+        self._claim_team_task(item, "sampling", current_user)
         mat = next((m for m in item.materials if m.id == material_id), None)
         if not mat:
             return None
@@ -404,79 +448,129 @@ class ProgramRequestService:
         self.db.refresh(item)
         return self.serialize(item)
 
-    def submit_review(
+    def submit_output(
         self,
         request_id: int,
-        payload: ProgramReviewSubmit,
+        department: str,
+        remark: str,
         current_user: Optional[Any] = None,
-    ) -> Optional[Dict[str, Any]]:
-        """Submit sign-off review for either Sampling Team or Plant Team."""
-        item = self.repo.get_with_materials(request_id)
+    ) -> Dict[str, Any]:
+        """Save a SAMP or Plant planning observation as an auditable output."""
+        item = self.repo.get_for_update(request_id)
         if not item:
-            return None
+            raise HTTPException(status_code=404, detail="Program planning request was not found")
+        department = department.strip().casefold()
+        trimmed_remark = (remark or "").strip()
+        if department not in {"sampling", "plant"}:
+            raise HTTPException(status_code=422, detail="Department must be SAMP or Plant")
+        if not trimmed_remark:
+            raise HTTPException(status_code=422, detail="Enter an output remark before saving")
 
-        actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
-        reviewer_name = payload.actor_name or actor_name
+        actor_id, actor_name, _ = self._get_actor_info(current_user)
         now = datetime.now(timezone.utc)
-        dept = payload.department.lower()
-
-        if "samp" in dept:
-            item.sampling_verdict = payload.verdict
-            item.sampling_remark = (payload.remark or "").strip() or None
+        if department == "sampling":
+            self._claim_team_task(item, "sampling", current_user)
+            item.sampling_remark = trimmed_remark
             item.sampling_signed_at = now
-            item.sampling_signed_by = reviewer_name
-            if not item.sampling_seen_at:
-                item.sampling_seen_at = now
-                item.sampling_seen_by = reviewer_name
-            action = "SAMP_REVIEWED"
-            log_dept = "SAMP Team"
+            item.sampling_signed_by = actor_name
+            item.sampling_seen_at = item.sampling_seen_at or now
+            item.sampling_seen_by = item.sampling_seen_by or actor_name
+            action = "SAMP_OUTPUT"
+            actor_department = "SAMP Team"
         else:
-            item.plant_verdict = payload.verdict
-            item.plant_remark = (payload.remark or "").strip() or None
+            self._claim_team_task(item, "plant", current_user)
+            item.plant_remark = trimmed_remark
             item.plant_signed_at = now
-            item.plant_signed_by = reviewer_name
-            if not item.plant_seen_at:
-                item.plant_seen_at = now
-                item.plant_seen_by = reviewer_name
-            action = "PLANT_REVIEWED"
-            log_dept = f"Plant Desk ({item.target_plant or 'Fulfillment'})"
-
-        # Dynamically determine overall status based on dual reviews
-        samp_v = (item.sampling_verdict or "").lower()
-        plant_v = (item.plant_verdict or "").lower()
-
-        samp_ok = any(w in samp_v for w in ["feasible", "approved", "yes", "confirmed"])
-        plant_ok = any(w in plant_v for w in ["feasible", "approved", "capacity confirmed", "yes", "scheduled"])
-        has_revision = any("revision" in v or "constrained" in v for v in [samp_v, plant_v])
-
-        if samp_ok and plant_ok:
-            item.status = "Dual Sign-off Completed"
-        elif has_revision:
-            item.status = "Revisions Required"
-        elif samp_ok:
-            item.status = "Reviewed by SAMP Team"
-        elif plant_ok:
-            item.status = "Reviewed by Plant"
+            item.plant_signed_by = actor_name
+            item.plant_seen_at = item.plant_seen_at or now
+            item.plant_seen_by = item.plant_seen_by or actor_name
+            action = "PLANT_OUTPUT"
+            actor_department = f"Plant ({item.target_plant})"
 
         self.repo.add_activity_log(
             program_request_id=item.id,
-            actor_name=reviewer_name,
-            actor_department=log_dept,
+            actor_name=actor_name,
+            actor_department=actor_department,
             action=action,
-            payload={
-                "verdict": payload.verdict,
-                "remark": payload.remark,
-                "department": payload.department,
-                "reviewer": reviewer_name,
-                "signed_at": now.isoformat(),
-            },
+            payload={"remark": trimmed_remark},
             actor_id=actor_id,
         )
-
-        self.db.commit()
         self.db.refresh(item)
         return self.serialize(item)
 
+    @staticmethod
+    def _claim_team_task(item: ProgramRequest, department: str, current_user: Optional[Any]) -> None:
+        """Persist one owner per SAMP/Plant review lane while the request row is locked."""
+        if not current_user:
+            return
+        field_prefix = "sampling" if department == "sampling" else "plant"
+        id_field = f"{field_prefix}_claimed_by_user_id"
+        name_field = f"{field_prefix}_claimed_by"
+        actor_id, actor_name, _ = ProgramRequestService._actor_info_for_claim(current_user)
+        current_id = getattr(item, id_field)
+        current_name = getattr(item, name_field)
+        is_admin = str(getattr(current_user, "role", "")).strip().casefold() in {"admin", "administrator"}
+        if current_id and current_id != actor_id and not is_admin:
+            raise HTTPException(status_code=409, detail=f"This {department} review is already being handled by {current_name or 'another team member'}")
+        if current_name and not current_id and current_name.casefold() != actor_name.casefold() and not is_admin:
+            raise HTTPException(status_code=409, detail=f"This {department} review is already being handled by {current_name}")
+        if not current_id and not is_admin:
+            setattr(item, id_field, actor_id)
+            setattr(item, name_field, actor_name)
+
+    @staticmethod
+    def _actor_info_for_claim(current_user: Any) -> Tuple[Optional[int], str, str]:
+        user_id = getattr(current_user, "id", None)
+        name = getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Team member"
+        return user_id, str(name), ""
+
+    def pin_output(
+        self, request_id: int, activity_id: int, pinned: bool, current_user: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        item = self.repo.get_for_update(request_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Program planning request was not found")
+        activity = next((entry for entry in item.activities if entry.id == activity_id), None)
+        if not activity or activity.action not in {"SAMP_OUTPUT", "PLANT_OUTPUT"}:
+            raise HTTPException(status_code=404, detail="Team output was not found")
+        actor_id, actor_name, _ = self._get_actor_info(current_user)
+        activity.pinned_by_marketing = pinned
+        activity.pinned_by = actor_name if pinned else None
+        activity.pinned_at = datetime.now(timezone.utc) if pinned else None
+        self.repo.add_activity_log(
+            program_request_id=item.id,
+            actor_name=actor_name,
+            actor_department="Marketing",
+            action="OUTPUT_PINNED" if pinned else "OUTPUT_UNPINNED",
+            payload={"output_activity_id": activity_id},
+            actor_id=actor_id,
+        )
+        self.db.refresh(item)
+        return self.serialize(item)
+
+    def reply_to_output(
+        self, request_id: int, activity_id: int, remark: str, current_user: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        item = self.repo.get_for_update(request_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Program planning request was not found")
+        activity = next((entry for entry in item.activities if entry.id == activity_id), None)
+        if not activity or activity.action not in {"SAMP_OUTPUT", "PLANT_OUTPUT"} or not activity.pinned_by_marketing:
+            raise HTTPException(status_code=409, detail="Pin the SAMP or Plant output before adding a Marketing remark")
+        trimmed_remark = (remark or "").strip()
+        if not trimmed_remark:
+            raise HTTPException(status_code=422, detail="Enter a Marketing remark")
+        actor_id, actor_name, _ = self._get_actor_info(current_user)
+        self.repo.add_activity_log(
+            program_request_id=item.id,
+            actor_name=actor_name,
+            actor_department="Marketing",
+            action="MARKETING_OUTPUT_REPLY",
+            payload={"output_activity_id": activity_id, "remark": trimmed_remark},
+            actor_id=actor_id,
+        )
+        self.db.refresh(item)
+        return self.serialize(item)
     def mark_seen(
         self,
         request_id: int,
@@ -489,7 +583,7 @@ class ProgramRequestService:
             return None
 
         actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
-        viewer_name = payload.actor_name or actor_name
+        viewer_name = actor_name if current_user else (payload.actor_name or actor_name)
         now = datetime.now(timezone.utc)
         dept = payload.department.lower()
 
@@ -528,12 +622,10 @@ class ProgramRequestService:
         return self.serialize(item)
 
     def delete(self, request_id: int) -> bool:
-        """Delete program request and re-sequence remaining."""
+        """Delete a program request without changing any surviving business codes."""
         item = self.repo.get_by_id(request_id)
         if not item:
             return False
         self.db.delete(item)
         self.db.commit()
-        yr_suffix = datetime.now(timezone.utc).year % 100
-        self.repo.resequence_all(yr_suffix)
         return True

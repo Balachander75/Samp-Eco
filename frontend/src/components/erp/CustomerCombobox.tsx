@@ -194,7 +194,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
           }}
           className={`h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 ${
             value ? "pr-14" : "pr-8"
-          } text-xs font-semibold text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700/80 dark:bg-zinc-900/80 dark:text-zinc-100`}
+          } text-xs font-semibold text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700/80 dark:bg-zinc-900/80 dark:text-zinc-100`}
         />
         {value && (
           <button
@@ -224,7 +224,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
         >
           <ChevronDown
             className={`h-3.5 w-3.5 transition-transform duration-150 ${
-              isOpen ? "rotate-180 text-[#006d32]" : ""
+              isOpen ? "rotate-180 text-emerald-600" : ""
             }`}
           />
         </button>
@@ -259,7 +259,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
                     setQuery(query.trim());
                     setIsOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-[#006d32] dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border-b border-zinc-100 dark:border-zinc-800 mb-1 cursor-pointer transition-colors"
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border-b border-zinc-100 dark:border-zinc-800 mb-1 cursor-pointer transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5 shrink-0 stroke-[2.5]" />
                   <span className="truncate">
@@ -300,7 +300,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
                       )}
                     </span>
                     {isSelected && (
-                      <Check className="h-3.5 w-3.5 shrink-0 text-[#006d32] dark:text-emerald-400 stroke-[2.5]" />
+                      <Check className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400 stroke-[2.5]" />
                     )}
                   </button>
                 );

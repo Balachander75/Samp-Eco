@@ -96,10 +96,10 @@ function PageErrorFallback({
   onToggleDetails: () => void;
 }) {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#f8fafc] dark:bg-[#08090d] p-6">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[var(--surface-lowest, white)] dark:bg-[var(--surface-base, black)] p-6">
       <div className="w-full max-w-lg">
         {/* Card */}
-        <div className="rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] overflow-hidden">
+        <div className="rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[var(--surface-low, rgb(24, 24, 27))] overflow-hidden">
           {/* Top accent bar */}
           <div className="h-[3px] w-full bg-gradient-to-r from-red-500 via-rose-500 to-red-600" />
 
@@ -139,7 +139,7 @@ function PageErrorFallback({
           <div className="px-6 py-4 flex items-center gap-3 flex-wrap">
             <button
               onClick={onReload}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-[#1d4ed8] hover:bg-[#1a44c2] text-white text-[13px] font-semibold transition-colors cursor-pointer border border-[#1a44c2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-[var(--accent-primary, rgb(37, 99, 235))] hover:bg-[var(--accent-primary-hover, rgb(29, 78, 216))] text-white text-[13px] font-semibold transition-colors cursor-pointer border border-[var(--accent-primary-hover, rgb(29, 78, 216))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               Reload Page
@@ -173,7 +173,7 @@ function PageErrorFallback({
 
           {/* Collapsible stack trace */}
           {showDetails && (
-            <div className="border-t border-zinc-100 dark:border-white/[0.06] bg-zinc-50 dark:bg-[#09090e]">
+            <div className="border-t border-zinc-100 dark:border-white/[0.06] bg-zinc-50 dark:bg-[var(--surface-base, black)]">
               <div className="px-6 py-4">
                 <p className="text-[11px] font-mono font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">
                   Stack Trace
@@ -237,7 +237,7 @@ function PanelErrorFallback({
       </div>
       <button
         onClick={onRetry}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1d4ed8] hover:bg-[#1a44c2] text-white text-[12px] font-semibold transition-colors cursor-pointer border border-[#1a44c2]"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-primary, rgb(37, 99, 235))] hover:bg-[var(--accent-primary-hover, rgb(29, 78, 216))] text-white text-[12px] font-semibold transition-colors cursor-pointer border border-[var(--accent-primary-hover, rgb(29, 78, 216))]"
       >
         <RefreshCw className="w-3 h-3" />
         Retry

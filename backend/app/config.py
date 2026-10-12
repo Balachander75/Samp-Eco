@@ -1,4 +1,5 @@
 import os
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -6,6 +7,9 @@ DEFAULT_DEV_SECRET = "navneet-samp-erp-super-secret-key-2026-production-level"
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/navneet_samp"
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT_SECONDS: int = 15
     APP_NAME: str = "Navneet SAMP ERP API"
     APP_ENV: str = "development"
     DEBUG: bool = True
@@ -29,6 +33,18 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5175",
     ]
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug_setting(cls, value):
+        """Accept common deployment labels in DEBUG without failing startup."""
+        if isinstance(value, str):
+            normalized = value.strip().casefold()
+            if normalized in {"release", "prod", "production", "false", "0", "no", "off"}:
+                return False
+            if normalized in {"debug", "development", "dev", "true", "1", "yes", "on"}:
+                return True
+        return value
 
     def validate_runtime_security(self):
         """Enforce strict production invariants."""

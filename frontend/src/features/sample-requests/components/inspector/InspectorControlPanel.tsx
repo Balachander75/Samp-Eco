@@ -10,6 +10,7 @@ export interface InspectorControlPanelProps {
   isConverting: boolean;
   isReleasing: boolean;
   isSubmitting: boolean;
+  readOnly?: boolean;
   onClose: () => void;
   onCopyCode: () => void;
   onDeleteRequest?: (request: SampleRequestItem) => void;
@@ -26,6 +27,7 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
   copiedCode,
   isConverting,
   isReleasing,
+  readOnly = false,
   onClose,
   onCopyCode,
   onDeleteRequest,
@@ -137,27 +139,27 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
   }, [trackType, activeRequest, isDraft]);
 
   return (
-    <div className="bg-white dark:bg-[#151824] border-b border-slate-100/90 dark:border-white/5 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-[0_2px_12px_rgba(11,28,48,0.02)]">
+    <div className="bg-[var(--surface-base)] border-b border-[var(--border-subtle)] px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-[0_2px_12px_rgba(11,28,48,0.02)]">
       {/* Left Action Buttons */}
       <div className="flex items-center space-x-2 flex-wrap">
         <button
           type="button"
           onClick={onClose}
-          className="bg-[#006d32] hover:bg-[#00883e] text-white px-4 py-1.5 rounded-xl text-xs font-display font-semibold flex items-center space-x-1.5 shadow-[0_4px_14px_rgba(0,109,50,0.25)] transition-all active:scale-95 cursor-pointer"
+          className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-4 py-1.5 rounded-xl text-xs font-display font-semibold flex items-center space-x-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
         >
-          <span>Save &amp; Close</span>
+          <span>{readOnly ? "Close" : "Save & Close"}</span>
         </button>
 
-        <button
+        {!readOnly && <button
           type="button"
           onClick={onClose}
           className="bg-slate-100/70 hover:bg-slate-200/70 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/60 text-slate-700 dark:text-zinc-300 px-3.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer"
         >
           Discard
-        </button>
+        </button>}
 
         {/* Draft Release Action */}
-        {isDraft && onReleaseDraft && (
+        {!readOnly && isDraft && onReleaseDraft && (
           <button
             type="button"
             onClick={async () => {
@@ -169,23 +171,22 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
               }
             }}
             disabled={isReleasing}
-            className="text-white px-3.5 py-1.5 rounded-xl text-xs font-display font-semibold flex items-center space-x-1.5 shadow-[0_4px_14px_rgba(0,109,50,0.25)] transition-all cursor-pointer disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
+            className="text-white px-3.5 py-1.5 rounded-xl text-xs font-display font-semibold flex items-center space-x-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
           >
-            <Send className={`w-3.5 h-3.5 ${isReleasing ? "animate-pulse" : ""}`} />
+            <Send className={`w-3.5 h-3.5 ${isReleasing ? "" : ""}`} />
             <span>{isReleasing ? "Releasing..." : "Release to Workflow"}</span>
           </button>
         )}
 
         {/* Feasibility Conversion Shortcut */}
-        {trackType === "feasibility_check" &&
+        {!readOnly && trackType === "feasibility_check" &&
           activeRequest.marketingDecision === "Accepted" &&
           !activeRequest.convertedSrNumber && (
             <button
               type="button"
               onClick={onConvertToSampling}
               disabled={isConverting}
-              className="bg-[#006d32] hover:bg-[#00883e] text-white px-3.5 py-1.5 rounded-xl text-xs font-display font-semibold flex items-center space-x-1.5 shadow-[0_4px_14px_rgba(0,109,50,0.25)] transition active:scale-95 cursor-pointer disabled:opacity-50"
+              className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-1.5 rounded-xl text-xs font-display font-semibold flex items-center space-x-1.5 shadow-2xs transition active:scale-95 cursor-pointer disabled:opacity-50"
             >
               <span>{isConverting ? "Creating Sample..." : "Convert to Commercial Sample"}</span>
             </button>
@@ -196,7 +197,7 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
         <button
           type="button"
           onClick={onCopyCode}
-          className="text-slate-600 hover:text-[#006d32] dark:hover:text-[#00d166] hover:bg-[#eff4ff] dark:hover:bg-[#006d32]/10 font-medium px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition"
+          className="text-slate-600 hover:text-[var(--accent-primary)] hover:bg-[var(--accent-primary-subtle)] font-medium px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition"
           title="Copy reference code"
         >
           {copiedCode ? (
@@ -207,7 +208,7 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
           <span>{copiedCode ? "Copied" : "Copy Code"}</span>
         </button>
 
-        {onDeleteRequest && (
+        {!readOnly && onDeleteRequest && (
           <button
             type="button"
             onClick={() => onDeleteRequest(request)}
@@ -228,16 +229,16 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
               <div
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-display transition-all select-none ${
                   st.status === "done"
-                    ? "bg-[#eff4ff] dark:bg-[#006d32]/25 text-[#006d32] dark:text-[#00d166] font-bold"
+                    ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
                     : st.status === "active"
-                    ? "bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 font-bold shadow-xs ring-1 ring-[#006d32]/30"
+                    ? "bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 font-bold shadow-xs ring-1 ring-[var(--accent-primary)]/40"
                     : "text-slate-400 dark:text-zinc-500 font-medium"
                 }`}
               >
                 {st.status === "done" ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#006d32] dark:text-[#00d166]" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
                 ) : st.status === "active" ? (
-                  <span className="w-2 h-2 rounded-full bg-[#006d32] animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)]" />
                 ) : (
                   <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-zinc-700" />
                 )}

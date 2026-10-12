@@ -5,3 +5,4 @@ export * from "./OperationalDatePicker";
 export * from "./CustomerCombobox";
 export * from "./WorkflowTabStrip";
 export * from "./PaginationBar";
+export * from "./TableSkeletonRows";

@@ -13,40 +13,28 @@ export function getRequestTypes(row: Partial<SampleRequestItem>): RequestTypeSco
     }
   });
 
-  // Infer design if not present
-  if (!result.includes("design")) {
-    if (
-      isDesignRequest(row) ||
-      row.requestKind === "design" ||
-      Boolean(row.designsCustomerCreative && row.designsCustomerCreative !== "0") ||
-      Boolean(row.numberOfDesigns && Number(row.numberOfDesigns) > 0) ||
-      Boolean(row.productArtworkNos && String(row.productArtworkNos) !== "0")
-    ) {
-      result.push("design");
-    }
+  // If explicit scopes are already defined, respect them directly
+  if (result.length > 0) {
+    return result;
   }
 
-  // Infer mockup if not present
-  if (!result.includes("mockup")) {
-    const mockupVal = String(row.mockupRequired || "").trim().toLowerCase();
-    if (mockupVal === "yes" || mockupVal === "true" || mockupVal === "y") {
-      result.push("mockup");
-    }
+  // Only infer if no explicit scopes are set:
+  if (isDesignRequest(row) || row.requestKind === "design") {
+    result.push("design");
   }
 
-  // Infer costing if not present
-  if (!result.includes("costing")) {
-    if (row.qtyDesignCosting && Number(row.qtyDesignCosting) > 0) {
-      result.push("costing");
-    }
+  const mockupVal = String(row.mockupRequired || "").trim().toLowerCase();
+  if (mockupVal === "yes" || mockupVal === "true" || mockupVal === "y") {
+    result.push("mockup");
   }
 
-  // Infer sampling if not present
+  if (row.qtyDesignCosting && Number(row.qtyDesignCosting) > 0) {
+    result.push("costing");
+  }
+
+  // All commercial FY25-26 and standard sample requests are sampling requests by default
   if (!result.includes("sample")) {
-    const hasSamplingQty = row.qtyForSampling && Number(row.qtyForSampling) > 0;
-    if (hasSamplingQty || result.length === 0) {
-      result.push("sample");
-    }
+    result.push("sample");
   }
 
   return result;

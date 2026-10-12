@@ -7,7 +7,7 @@ brute-force rate limiting, refresh token rotation, and security telemetry.
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Literal
 from sqlalchemy.orm import Session
 from datetime import datetime
 
@@ -28,6 +28,21 @@ from app.auth.security import (
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 bearer_scheme = HTTPBearer(auto_error=False)
+ThemeId = Literal[
+    "emerald",
+    "ocean",
+    "violet",
+    "amber",
+    "rose",
+    "midnight",
+    "forest-night",
+    "nocturne",
+    "neo-brutalism",
+    "nordic-frost",
+    "terracotta",
+    "tokyo-neon",
+    "titanium",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +74,8 @@ class UserOut(BaseModel):
     team: Optional[str] = None
     is_team_head: bool = False
     plant_code: Optional[str] = None
+    plant_codes: List[str] = Field(default_factory=list)
+    theme_id: ThemeId = "emerald"
     is_active: bool
     created_at: Optional[str] = None
 
@@ -88,6 +105,14 @@ class RefreshTokenResponse(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: Optional[str] = None
+
+
+class ThemePreferenceUpdate(BaseModel):
+    theme_id: ThemeId
+
+
+class ThemePreferenceOut(BaseModel):
+    theme_id: ThemeId
 
 
 class AuditLogOut(BaseModel):
@@ -130,6 +155,8 @@ def _user_to_out(user: User) -> dict:
         "team": getattr(user, "team", None),
         "is_team_head": getattr(user, "is_team_head", False),
         "plant_code": getattr(user, "plant_code", None),
+        "plant_codes": getattr(user, "plant_codes", []),
+        "theme_id": getattr(user, "theme_id", "emerald"),
         "is_active": user.is_active,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
@@ -428,6 +455,33 @@ def get_me(
         )
 
     return _user_to_out(user)
+
+
+@router.get(
+    "/preferences/theme",
+    response_model=ThemePreferenceOut,
+    summary="Get the current user's workspace theme",
+)
+def get_theme_preference(current_user: User = Depends(get_current_user)):
+    return {"theme_id": current_user.theme_id or "emerald"}
+
+
+@router.put(
+    "/preferences/theme",
+    response_model=ThemePreferenceOut,
+    summary="Save the current user's workspace theme",
+)
+def update_theme_preference(
+    payload: ThemePreferenceUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.theme_id != payload.theme_id:
+        current_user.theme_id = payload.theme_id
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+    return {"theme_id": current_user.theme_id}
 
 
 @router.get(

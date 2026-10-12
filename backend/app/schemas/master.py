@@ -1,6 +1,6 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from pydantic import BaseModel, ConfigDict, Field
+from typing import List, Optional
 
 class CustomerBase(BaseModel):
     name: str
@@ -52,6 +52,7 @@ class UserCreate(BaseModel):
     team: Optional[str] = None
     is_team_head: Optional[bool] = False
     plant_code: Optional[str] = None
+    plant_codes: List[str] = Field(default_factory=list)
     is_active: Optional[bool] = True
 
 
@@ -65,6 +66,7 @@ class UserUpdate(BaseModel):
     team: Optional[str] = None
     is_team_head: Optional[bool] = None
     plant_code: Optional[str] = None
+    plant_codes: Optional[List[str]] = None
     is_active: Optional[bool] = None
 
 
@@ -78,6 +80,7 @@ class UserOut(BaseModel):
     team: Optional[str] = None
     is_team_head: bool = False
     plant_code: Optional[str] = None
+    plant_codes: List[str] = Field(default_factory=list)
     is_active: bool
     created_at: Optional[datetime] = None
 

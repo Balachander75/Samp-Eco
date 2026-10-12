@@ -44,8 +44,3 @@ __pycache__/
 *.tmp
 *.tmp.*
 
-# Local SQLite databases
-*.db
-*.sqlite3
-backend/samp.db
-

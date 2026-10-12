@@ -1,25 +1,16 @@
 import React, { useState, useMemo } from "react";
-import { UserProfile } from "@/features/auth";
 import { SampleRequestItem } from "@/features/sample-requests/types";
 import { getRequestTrackType } from "@/features/sample-requests/utils/trackTypes";
 import {
   Search,
   RefreshCw,
-  FolderGit2,
-  Building2,
-  CheckCircle2,
-  Clock,
   Download,
-  Calendar,
-  Layers,
-  ArrowRight,
-  ShieldCheck,
-  AlertTriangle,
-  Cog,
-  Sparkles,
+  X,
 } from "lucide-react";
-import { parseSampRemark } from "@/features/sample-requests/programs/utils/programRemarkUtils";
 import { CopyBadge } from "@/components/ui/CopyBadge";
+import { Select } from "@/components/ui/Select";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
 import { PaginationBar } from "@/components/erp/PaginationBar";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 
@@ -27,16 +18,15 @@ export interface PlantProgramPlanningViewProps {
   requests: SampleRequestItem[];
   isLoading: boolean;
   selectedPlant: string;
-  uniquePlants: string[];
-  user?: UserProfile | null;
-  isAdmin: boolean;
   onInspectRequest: (req: SampleRequestItem) => void;
   onRefresh: () => Promise<void>;
   showToast: (msg: string) => void;
-  onAdvancePlantStatus?: (req: SampleRequestItem, nextStatus: string) => Promise<void>;
 }
 
-export type PlantProgramTab = "all" | "awaiting_scheduling" | "ready_floor" | "in_production";
+export type PlantProgramTab = "all" | "awaiting_review" | "reviewed" | "samp_note_added";
+
+const hasSampNote = (request: SampleRequestItem) => Boolean(request.samplingRemark?.trim());
+const hasPlantNote = (request: SampleRequestItem) => Boolean(request.plantRemark?.trim());
 
 export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> = ({
   requests,
@@ -45,14 +35,12 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
   onInspectRequest,
   onRefresh,
   showToast,
-  onAdvancePlantStatus,
 }) => {
   const [filterTab, setFilterTab] = useState<PlantProgramTab>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [plantFilter, setPlantFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [isUpdatingId, setIsUpdatingId] = useState<string | null>(null);
   const PAGE_SIZE = 15;
 
   // Scoped strictly to program planning requests
@@ -102,54 +90,29 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
     return Array.from(set).sort();
   }, [programRequests]);
 
-  // Operational metrics for the Plant Desk
+  // Plant users review program feasibility; production operations are deferred.
   const metrics = useMemo(() => {
     const total = plantScopedRequests.length;
-    let awaitingScheduling = 0;
-    let readyForFloor = 0;
-    let inProduction = 0;
+    let awaitingReview = 0;
+    let reviewed = 0;
     let totalSKUs = 0;
 
     plantScopedRequests.forEach((r) => {
-      const st = (r.status || "").toLowerCase();
       const materials = r.programMaterials || [];
       totalSKUs += materials.length > 0 ? materials.length : 1;
-
-      if (st.includes("in prod") || st.includes("production")) {
-        inProduction++;
-      } else if (st.includes("reviewed") || st.includes("approved") || st.includes("ready")) {
-        readyForFloor++;
-      } else {
-        awaitingScheduling++;
-      }
+      if (hasPlantNote(r)) reviewed++;
+      else awaitingReview++;
     });
 
-    return { total, awaitingScheduling, readyForFloor, inProduction, totalSKUs };
+    return { total, awaitingReview, reviewed, totalSKUs };
   }, [plantScopedRequests]);
-
-  // Navigation tab definitions with live counters
-  const navTabs: { id: PlantProgramTab; label: string; count: number }[] = [
-    { id: "all", label: "All Assigned Programs", count: metrics.total },
-    { id: "awaiting_scheduling", label: "Awaiting Scheduling", count: metrics.awaitingScheduling },
-    { id: "ready_floor", label: "Ready for Floor", count: metrics.readyForFloor },
-    { id: "in_production", label: "In Production", count: metrics.inProduction },
-  ];
 
   // Filtered dataset
   const filteredRequests = useMemo(() => {
     return plantScopedRequests.filter((r) => {
-      const st = (r.status || "").toLowerCase();
-
-      if (filterTab === "awaiting_scheduling") {
-        if (st.includes("in prod") || st.includes("production") || st.includes("reviewed") || st.includes("ready") || st.includes("approved")) {
-          return false;
-        }
-      } else if (filterTab === "ready_floor") {
-        if (!st.includes("reviewed") && !st.includes("ready") && !st.includes("approved")) return false;
-        if (st.includes("in prod") || st.includes("production")) return false;
-      } else if (filterTab === "in_production") {
-        if (!st.includes("in prod") && !st.includes("production") && !st.includes("handoff")) return false;
-      }
+      if (filterTab === "awaiting_review" && hasPlantNote(r)) return false;
+      if (filterTab === "reviewed" && !hasPlantNote(r)) return false;
+      if (filterTab === "samp_note_added" && !hasSampNote(r)) return false;
 
       if (plantFilter !== "all" && r.targetPlant !== plantFilter) {
         return false;
@@ -180,6 +143,14 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
     return filteredRequests.slice(start, start + PAGE_SIZE);
   }, [filteredRequests, currentPage]);
 
+  const clearFilters = () => {
+    setFilterTab("all");
+    setSearchTerm("");
+    setPlantFilter("all");
+    setCustomerFilter("all");
+    setCurrentPage(1);
+  };
+
   const handleExportCsv = () => {
     const dateStr = new Date().toISOString().split("T")[0];
     exportRecordsToCsv({
@@ -191,7 +162,8 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
         { header: "Customer", accessor: (r) => r.customer || "" },
         { header: "Target Plant", accessor: (r) => r.targetPlant || "" },
         { header: "Program Year", accessor: (r) => r.programYear || "2026" },
-        { header: "Status", accessor: (r) => r.status || "Pending SAMP Review" },
+        { header: "SAMP Note", accessor: (r) => hasSampNote(r) ? "Added" : "Awaiting" },
+        { header: "Plant Note", accessor: (r) => hasPlantNote(r) ? "Added" : "Awaiting" },
         { header: "Total SKUs", accessor: (r) => (r.programMaterials || []).length || 1 },
         { header: "Created By", accessor: (r) => r.createdBy || "Marketing" },
         { header: "Created Date", accessor: (r) => r.dateRequestCreated || r.createdAt || "" },
@@ -201,234 +173,116 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
     showToast(`Exported ${filteredRequests.length} plant program records to CSV`);
   };
 
-  const handleQuickStatusClick = async (req: SampleRequestItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!onAdvancePlantStatus || isUpdatingId) return;
-
-    const st = (req.status || "").toLowerCase();
-    const nextStatus = st.includes("in prod")
-      ? "Production Completed"
-      : st.includes("reviewed") || st.includes("ready")
-      ? "In Production"
-      : "Ready for Production";
-
-    setIsUpdatingId(String(req.id));
-    try {
-      await onAdvancePlantStatus(req, nextStatus);
-      showToast(`Program updated to "${nextStatus}"`);
-    } catch {
-      showToast("Failed to update program status");
-    } finally {
-      setIsUpdatingId(null);
-    }
-  };
-
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white text-slate-800 select-text overflow-hidden">
-      {/* ── 1. Compact Editorial Header (Maximized Space, The Luminous Engine) ── */}
-      <header className="bg-white px-6 py-3 shrink-0 border-b border-slate-200/60 shadow-[0_1px_4px_rgba(11,28,48,0.02)]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 font-display">
-              Plant Seasonal Program Planning
-            </h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-slate-100 text-slate-600">
-              {metrics.total} Programs
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-[#006d32]/10 text-[#006d32] border border-[#006d32]/20">
-              {metrics.totalSKUs} Total SKUs
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-slate-100 text-slate-700">
-              Plant {selectedPlant || "ALL"}
-            </span>
-            {metrics.awaitingScheduling > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-amber-50 text-amber-700 animate-pulse">
-                ⚡ {metrics.awaitingScheduling} Awaiting Scheduling
-              </span>
-            )}
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-base)] text-[var(--text-primary)] select-text">
+      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-base font-bold tracking-tight text-[var(--text-primary)] sm:text-lg">Program Planning</h1>
+            <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Review the annual plan and add Plant remarks · {selectedPlant || "All plants"}</p>
           </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-xs font-semibold text-slate-700 transition cursor-pointer disabled:opacity-50"
-              title="Refresh Program Records"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-[#006d32]" : "text-slate-500"}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            {/* Export CSV */}
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              disabled={filteredRequests.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-xs font-semibold text-slate-700 transition cursor-pointer disabled:opacity-50"
-              title="Export To CSV"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={onRefresh} disabled={isLoading} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-low)] disabled:opacity-50" title="Refresh programs"><RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} /><span className="hidden sm:inline">Refresh</span></button>
+            <button type="button" onClick={handleExportCsv} disabled={filteredRequests.length === 0} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-low)] disabled:opacity-50" title="Export CSV"><Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Export</span></button>
           </div>
         </div>
       </header>
 
-      {/* ── 2. Floating Filter & Search Strip ── */}
-      <div className="px-6 py-2 bg-white shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200">
-        {/* Soft Segmented Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 select-none">
-          {navTabs.map((t) => {
-            const isActive = filterTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  setFilterTab(t.id);
-                  setCurrentPage(1);
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
-                  isActive
-                    ? "bg-[#006d32] text-white shadow-[0_2px_8px_rgba(0,109,50,0.25)]"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 bg-transparent"
-                }`}
-              >
-                <span>{t.label}</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full tabular-nums ${
-                    isActive ? "bg-white/25 text-white" : "bg-slate-200/70 text-slate-600"
-                  }`}
-                >
-                  {t.count}
-                </span>
-              </button>
-            );
+      <section aria-label="Plant program review summary" className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-2.5 sm:px-6">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            { label: "Programs", value: metrics.total, detail: "Assigned to this scope", color: "bg-[var(--accent-primary)]", filter: "all" as const },
+            { label: "Plant note needed", value: metrics.awaitingReview, detail: "Awaiting your input", color: "bg-amber-500", filter: "awaiting_review" as const },
+            { label: "Plant note added", value: metrics.reviewed, detail: "Your planning input", color: "bg-emerald-500", filter: "reviewed" as const },
+            { label: "SAMP note added", value: plantScopedRequests.filter(hasSampNote).length, detail: "Sampling planning input", color: "bg-sky-500", filter: "samp_note_added" as const },
+            { label: "Total SKUs", value: metrics.totalSKUs, detail: "Across assigned plans", color: "bg-sky-500" },
+          ].map((item) => {
+            const active = "filter" in item && item.filter
+              ? item.filter === "all"
+                ? filterTab === "all" && customerFilter === "all" && plantFilter === "all" && !searchTerm
+                : filterTab === item.filter
+              : false;
+            const content = <><span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.color}`} /><span className="truncate">{item.label}</span></span><span className="mt-1 flex items-baseline justify-between gap-2"><span className="text-lg font-bold leading-none tabular-nums text-[var(--text-primary)]">{item.value}</span><span className="truncate text-[10px] text-[var(--text-muted)]">{item.detail}</span></span></>;
+            return "filter" in item && item.filter ? <button key={item.label} type="button" onClick={() => { if (item.filter === "all") clearFilters(); else { setFilterTab(item.filter); setCurrentPage(1); } }} aria-pressed={active} className={`min-w-0 rounded-lg border px-3 py-2 text-left shadow-2xs transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--surface-low)] ${active ? "border-[var(--border-focus)] bg-[var(--accent-primary-subtle)]" : "border-[var(--border-subtle)] bg-[var(--surface-lowest)]"}`}>{content}</button> : <div key={item.label} className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2 shadow-2xs">{content}</div>;
           })}
         </div>
+      </section>
 
-        {/* Right Search, Customer, Plant Select */}
-        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-4 py-2.5 sm:px-6">
+        <div className="flex flex-wrap items-center gap-2">
           {customerList.length > 0 && (
-            <select
+            <Select
+              aria-label="Filter by customer"
               value={customerFilter}
               onChange={(e) => {
                 setCustomerFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 text-xs font-medium text-slate-700 border border-slate-200/70 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition"
-            >
-              <option value="all">All Customers</option>
-              {customerList.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+              className="min-w-[160px] max-w-[240px]"
+              options={[
+                { value: "all", label: "All customers" },
+                ...customerList.map((customer) => ({ value: customer, label: customer })),
+              ]}
+            />
           )}
-
           {(selectedPlant === "ALL" || !selectedPlant) && plantList.length > 0 && (
-            <select
+            <Select
+              aria-label="Filter by plant"
               value={plantFilter}
               onChange={(e) => {
                 setPlantFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 px-3 rounded-lg bg-slate-100/80 hover:bg-slate-200/60 text-xs font-medium text-slate-700 border border-slate-200/70 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 cursor-pointer transition font-mono"
-            >
-              <option value="all">All Plants</option>
-              {plantList.map((p) => (
-                <option key={p} value={p}>
-                  Plant {p}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Clean Search Input */}
-          <div className="relative w-48 sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search ref, campaign, SKU..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full h-9 pl-9 pr-8 rounded-xl bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white text-xs font-medium text-slate-800 placeholder:text-slate-400 border border-slate-200/80 focus:border-[#006d32]/40 focus:outline-none focus:ring-4 focus:ring-[#006d32]/[0.08] shadow-2xs transition-all"
+              className="min-w-[140px]"
+              options={[
+                { value: "all", label: "All plants" },
+                ...plantList.map((plant) => ({ value: plant, label: `Plant ${plant}` })),
+              ]}
             />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/80 transition-colors cursor-pointer"
-                title="Clear search"
-              >
-                ✕
-              </button>
-            )}
-          </div>
+          )}
+          <div className="group relative min-w-[220px] flex-1 sm:max-w-[360px]"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)] transition-colors group-focus-within:text-[var(--accent-primary)]" /><input type="text" placeholder="Search code, campaign, customer..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="h-9 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] pl-[34px] pr-8 text-xs text-[var(--text-primary)] outline-none transition-all placeholder:text-[var(--text-muted)] focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--accent-primary)]/15" />{searchTerm && <button type="button" onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-low)]" title="Clear search"><X className="h-3 w-3" /></button>}</div>
+          {(customerFilter !== "all" || plantFilter !== "all" || filterTab !== "all" || searchTerm) && <button type="button" onClick={clearFilters} className="h-9 rounded-lg px-2.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--text-primary)] cursor-pointer">Clear filters</button>}
         </div>
       </div>
 
-      {/* ── 3. Full-Bleed Table Workspace (Seamlessly Blended into Full UI) ── */}
-      <div className="flex-1 min-h-0 overflow-auto bg-white flex flex-col">
-        <table className="w-full text-left text-xs border-collapse">
-          <thead className="sticky top-0 z-10 bg-[#f8fafc] border-b border-slate-200 select-none">
-            <tr className="text-slate-600 font-mono text-[11px] uppercase tracking-wider select-none">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2 text-xs text-[var(--text-secondary)] sm:px-6"><span>Showing <span className="font-mono font-semibold tabular-nums text-[var(--text-primary)]">{filteredRequests.length}</span> of <span className="font-mono font-semibold tabular-nums text-[var(--text-primary)]">{plantScopedRequests.length}</span> assigned programs</span><span className="font-mono text-[10px] text-[var(--text-muted)]">Newest plans first</span></div>
+      <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col">
+        <table className="w-full min-w-[1160px] text-left text-xs border-collapse">
+          <thead className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] select-none">
+            <tr className="font-mono text-[11px] uppercase tracking-wider text-[var(--text-muted)] select-none">
               <th className="py-3 pl-6 pr-4 font-semibold whitespace-nowrap">Program ID</th>
               <th className="py-3 px-4 font-semibold">Campaign Title &amp; Product Scope</th>
               <th className="py-3 px-4 font-semibold whitespace-nowrap">Customer</th>
               <th className="py-3 px-4 font-semibold whitespace-nowrap">Assigned Plant</th>
               <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Year</th>
               <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Matrix SKUs</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">SAMP Technical Review</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Plant Readiness</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Target Date</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">SAMP Note</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">Plant Note</th>
               <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Plant Action</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[var(--border-subtle)]">
             {isLoading ? (
-              <tr>
-                <td colSpan={10} className="py-16 text-center text-slate-400 font-mono">
-                  <RefreshCw className="w-5 h-5 animate-spin mx-auto text-[#006d32] mb-2" />
-                  <span>Loading plant program planning matrix...</span>
-                </td>
-              </tr>
+              <TableSkeletonRows rows={6} columns={9} />
             ) : paginatedRequests.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-16 text-center">
-                  <div className="max-w-sm mx-auto flex flex-col items-center">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-                      <FolderGit2 className="w-6 h-6" />
-                    </div>
-                    <h3 className="text-sm font-bold text-slate-800">No Seasonal Programs Found</h3>
-                    <p className="text-xs text-slate-500 mt-1 text-center">
-                      {searchTerm || customerFilter !== "all" || filterTab !== "all" || plantFilter !== "all"
+                <td colSpan={9} className="py-16 text-center">
+                  <EmptyState
+                    compact
+                    title="No plant plans to review"
+                    description={
+                      searchTerm || customerFilter !== "all" || filterTab !== "all" || plantFilter !== "all"
                         ? "No programs match your search or active filter criteria."
-                        : `There are currently no seasonal program planning requests assigned to plant ${selectedPlant || "ALL"}.`}
-                    </p>
-                    {(searchTerm || customerFilter !== "all" || filterTab !== "all" || plantFilter !== "all") && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearchTerm("");
-                          setCustomerFilter("all");
-                          setPlantFilter("all");
-                          setFilterTab("all");
-                        }}
-                        className="mt-3 text-xs font-semibold text-[#006d32] hover:underline cursor-pointer"
-                      >
-                        Reset filters
-                      </button>
-                    )}
-                  </div>
+                        : `There are currently no seasonal program planning requests assigned to plant ${selectedPlant || "ALL"}.`
+                    }
+                    onResetFilters={
+                      searchTerm || customerFilter !== "all" || filterTab !== "all" || plantFilter !== "all"
+                        ? clearFilters
+                        : undefined
+                    }
+                    resetLabel="Reset filters"
+                  />
                 </td>
               </tr>
             ) : (
@@ -436,11 +290,8 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
                 const srCode = row.srNumber || row.materialCode || `PG-${row.id}`;
                 const materials = row.programMaterials || [];
                 const skuCount = materials.length > 0 ? materials.length : 1;
-                const statusStr = (row.status || "").toLowerCase();
-                const isReviewed = statusStr.includes("reviewed") || statusStr.includes("approved");
-                const isInProduction = statusStr.includes("in prod") || statusStr.includes("production");
-                const isReadyForFloor = isReviewed && !isInProduction;
-                const targetDate = (row as any).programTargetDate || (row as any).targetDate || row.dateRequestCreated || "—";
+                const sampNoteAdded = hasSampNote(row);
+                const plantNoteAdded = hasPlantNote(row);
 
                 // Unique substrates
                 const substrates = Array.from(
@@ -451,18 +302,11 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
                   )
                 ).slice(0, 2);
 
-                // Compute flagged columns by Sampling
-                let flaggedCount = 0;
-                materials.forEach((m) => {
-                  const parsed = parseSampRemark(m.sampRemark);
-                  flaggedCount += parsed.highlightedCols.length;
-                });
-
                 return (
                   <tr
                     key={row.id}
                     onClick={() => onInspectRequest(row)}
-                    className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                    className="group cursor-pointer transition-colors hover:bg-[var(--surface-low)]"
                   >
                     {/* 1. Program ID */}
                     <td className="py-3 pl-6 pr-4 font-mono font-bold whitespace-nowrap">
@@ -471,30 +315,29 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
 
                     {/* 2. Title & Description */}
                     <td className="py-3 px-4 max-w-sm">
-                      <div className="font-semibold text-slate-900 truncate">
+                      <div className="truncate font-semibold text-[var(--text-primary)]">
                         {row.programName || row.programCampaignTitle || "Seasonal Program"}
                       </div>
-                      <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                      <div className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
                         {row.productDescription || "Multi-SKU scholastic program range"}
                       </div>
                     </td>
 
                     {/* 3. Customer */}
-                    <td className="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-[var(--text-primary)]">
                       {row.customer || "—"}
                     </td>
 
                     {/* 4. Plant */}
-                    <td className="py-3 px-4 font-mono text-slate-600 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-[var(--text-secondary)]">
                       <div className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400" />
                         <span>Plant {row.targetPlant || "1505"}</span>
                       </div>
                     </td>
 
                     {/* 5. Program Year */}
                     <td className="py-3 px-4 text-center font-mono font-bold whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px]">
+                      <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
                         {row.programYear || "2026"}
                       </span>
                     </td>
@@ -502,67 +345,46 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
                     {/* 6. Matrix SKUs */}
                     <td className="py-3 px-4 text-center font-mono whitespace-nowrap">
                       <div className="flex flex-col items-center gap-0.5">
-                        <span className="px-2 py-0.5 rounded-full bg-[#006d32]/10 text-[#006d32] font-bold text-[11px]">
+                        <span className="rounded-full bg-[var(--accent-primary-subtle)] px-2 py-0.5 text-[11px] font-bold text-[var(--accent-primary-strong)]">
                           {skuCount} SKU{skuCount !== 1 ? "s" : ""}
                         </span>
                         {substrates.length > 0 && (
-                          <span className="text-[10px] text-slate-400 font-mono">
+                          <span className="font-mono text-[10px] text-[var(--text-muted)]">
                             {substrates.join(" · ")}
                           </span>
                         )}
                       </div>
                     </td>
 
-                    {/* 7. SAMP Technical Review Status */}
+                    {/* 7. SAMP planning note */}
                     <td className="py-3 px-4 whitespace-nowrap">
-                      {isReviewed ? (
+                      {sampNoteAdded ? (
                         <div className="space-y-0.5">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Reviewed by SAMP</span>
+                          <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            SAMP note added
                           </span>
-                          {flaggedCount > 0 && (
-                            <div className="text-[10px] font-mono font-bold text-amber-600 pl-1">
-                              ⚠️ {flaggedCount} Flagged Specs
-                            </div>
-                          )}
                         </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-50 text-amber-700">
-                          <Clock className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Pending SAMP Review</span>
+                        <span className="inline-flex rounded-full bg-[var(--surface-low)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--text-muted)]">
+                          Awaiting SAMP note
                         </span>
                       )}
                     </td>
 
-                    {/* 8. Plant Readiness */}
+                    {/* 8. Plant planning note */}
                     <td className="py-3 px-4 whitespace-nowrap">
-                      {isInProduction ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-purple-50 text-purple-700">
-                          <Cog className="w-3.5 h-3.5 text-purple-600 animate-spin" />
-                          <span>In Production</span>
-                        </span>
-                      ) : isReadyForFloor ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700">
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Ready for Floor</span>
+                      {plantNoteAdded ? (
+                        <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          Plant note added
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-slate-100 text-slate-600">
-                          <span>Material Staging</span>
+                        <span className="inline-flex rounded-full bg-[var(--surface-low)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--text-muted)]">
+                          Awaiting your note
                         </span>
                       )}
                     </td>
 
-                    {/* 9. Target Date */}
-                    <td className="py-3 px-4 font-mono text-slate-600 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{targetDate}</span>
-                      </div>
-                    </td>
-
-                    {/* 10. Plant Action */}
+                    {/* 9. Plant Action */}
                     <td className="py-3 pl-4 pr-6 text-right whitespace-nowrap">
                       <button
                         type="button"
@@ -570,12 +392,10 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
                           e.stopPropagation();
                           onInspectRequest(row);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-xs hover:shadow-[0_4px_12px_rgba(0,109,50,0.3)] transition-all cursor-pointer active:scale-95"
-                        style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
-                        title="Inspect Program Material Specification Matrix"
+                        className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-semibold text-white transition theme-primary-gradient cursor-pointer"
+                        title="Open the annual program plan and add a Plant note"
                       >
-                        <span>Inspect Matrix</span>
-                        <ArrowRight className="w-3 h-3" />
+                        <span>Inspect plan</span>
                       </button>
                     </td>
                   </tr>
@@ -586,7 +406,7 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
         </table>
 
         {/* Table Footer Pager */}
-        <div className="mt-auto px-6 py-2.5 bg-white border-t border-slate-100 shrink-0">
+        <div className="mt-auto shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-6 py-2.5">
           <PaginationBar
             currentPage={currentPage}
             totalPages={totalPages}

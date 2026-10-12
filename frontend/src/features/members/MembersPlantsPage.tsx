@@ -80,17 +80,17 @@ export const MembersPlantsPage: React.FC<MembersPlantsPageProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#fafafa] dark:bg-[#08090d] overflow-y-auto">
+    <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-zinc-950 overflow-y-auto">
       {/* SaaS Highlights Banner */}
       <div className="p-6 pb-2">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-[#0f1118] p-4 shadow-2xs">
+          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-zinc-900 p-4 shadow-2xs">
             <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Manufacturing Hubs</span>
               <Factory className="w-4 h-4 text-zinc-400" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono">
+              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono tabular-nums">
                 {stats.total}
               </span>
               <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -99,13 +99,13 @@ export const MembersPlantsPage: React.FC<MembersPlantsPageProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-[#0f1118] p-4 shadow-2xs">
+          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-zinc-900 p-4 shadow-2xs">
             <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Plant Managers</span>
               <Crown className="w-4 h-4 text-amber-500" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono">
+              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono tabular-nums">
                 {stats.assignedHeads}
               </span>
               <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -114,13 +114,13 @@ export const MembersPlantsPage: React.FC<MembersPlantsPageProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-[#0f1118] p-4 shadow-2xs">
+          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-zinc-900 p-4 shadow-2xs">
             <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Coverage Territory</span>
               <MapPin className="w-4 h-4 text-blue-500" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono">
+              <span className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-mono tabular-nums">
                 3
               </span>
               <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -129,7 +129,7 @@ export const MembersPlantsPage: React.FC<MembersPlantsPageProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-[#0f1118] p-4 shadow-2xs">
+          <div className="rounded-xl border border-zinc-200/80 dark:border-white/[0.07] bg-white dark:bg-zinc-900 p-4 shadow-2xs">
             <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>ERP Sync Status</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -228,14 +228,14 @@ export const MembersPlantsPage: React.FC<MembersPlantsPageProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredPlants.map((plant) => {
               const plantHead = users.find(
-                (u) => u.plantCode === plant.code && u.isTeamHead
+                (u) => (u.plantCodes?.length ? u.plantCodes : [u.plantCode]).includes(plant.code) && u.isTeamHead
               );
               const capabilities = getPlantCapabilities(plant.code);
 
               return (
                 <div
                   key={plant.id}
-                  className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] p-5.5 flex flex-col justify-between shadow-2xs hover:border-emerald-500/40 hover:shadow-xs transition-all"
+                  className="rounded-2xl border border-zinc-200/90 dark:border-white/[0.08] bg-white dark:bg-zinc-900 p-5.5 flex flex-col justify-between shadow-2xs hover:border-emerald-500/40 hover:shadow-xs transition-all"
                 >
                   <div>
                     {/* Facility Header */}

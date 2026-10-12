@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
@@ -26,9 +26,12 @@ import {
   Clock,
   Layers,
   BookOpen,
+  Search,
+  ChevronDown,
 } from "lucide-react";
 import { CustomerCombobox, OperationalDatePicker } from "@/components/erp";
-import { isDateRestricted } from "@/lib/holidayUtils";
+import { Select } from "@/components/ui";
+import { formatYMD, isDateRestricted } from "@/lib/holidayUtils";
 import { getBusinessYearInfo } from "@/lib/businessYear";
 import { SampleRequestItem } from "../types";
 import { useMasterData } from "../hooks/useMasterData";
@@ -44,6 +47,186 @@ export interface NewSampleRequestModalProps {
 }
 
 type TrackType = "marketing_request" | "feasibility_check" | "program_planning";
+
+interface ProgramPickerProps {
+  programs: SampleRequestItem[];
+  value: string;
+  onChange: (value: string) => void;
+  onYearChange: (value: string) => void;
+}
+
+const ProgramPicker: React.FC<ProgramPickerProps> = ({ programs, value, onChange, onYearChange }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [position, setPosition] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+
+  const filteredPrograms = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return programs;
+    return programs.filter((program) =>
+      `${program.programName || program.programCampaignTitle || ""} ${program.programYear || ""}`
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [programs, query]);
+
+  useEffect(() => setActiveIndex(0), [query]);
+
+  useEffect(() => {
+    const onOutsidePointer = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target) && !optionsRef.current?.contains(target)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", onOutsidePointer);
+    return () => document.removeEventListener("mousedown", onOutsidePointer);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setPosition(null);
+      return;
+    }
+    const updatePosition = () => {
+      const input = inputRef.current;
+      if (!input) return;
+      const rect = input.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom - 12;
+      const spaceAbove = rect.top - 12;
+      const opensAbove = spaceBelow < 200 && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(160, Math.min(260, opensAbove ? spaceAbove : spaceBelow));
+      const width = Math.max(rect.width, 280);
+      setPosition({
+        top: opensAbove ? rect.top - maxHeight - 4 : rect.bottom + 4,
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+        width,
+        maxHeight,
+      });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen, filteredPrograms.length]);
+
+  const openPicker = () => {
+    setQuery(value);
+    setIsOpen(true);
+  };
+
+  const selectProgram = (program: SampleRequestItem) => {
+    const title = (program.programName || program.programCampaignTitle || "").trim();
+    onChange(title);
+    if (program.programYear) onYearChange(String(program.programYear));
+    setQuery(title);
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+        <input
+          ref={inputRef}
+          type="text"
+          required
+          role="combobox"
+          aria-label="Program name"
+          aria-expanded={isOpen}
+          aria-controls="marketing-program-options"
+          aria-autocomplete="list"
+          placeholder="Select or enter a program..."
+          value={isOpen ? query : value}
+          onClick={openPicker}
+          onFocus={openPicker}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            onChange(event.target.value);
+            setIsOpen(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setIsOpen(true);
+              setActiveIndex((index) => Math.min(index + 1, Math.max(filteredPrograms.length - 1, 0)));
+            } else if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setIsOpen(true);
+              setActiveIndex((index) => Math.max(index - 1, 0));
+            } else if (event.key === "Escape") {
+              setIsOpen(false);
+            } else if (event.key === "Enter" && isOpen && filteredPrograms[activeIndex]) {
+              event.preventDefault();
+              selectProgram(filteredPrograms[activeIndex]);
+            }
+          }}
+          className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 pr-9 text-xs font-semibold text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700/80 dark:bg-zinc-900/80 dark:text-zinc-100"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Show matching programs"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            if (isOpen) setIsOpen(false);
+            else {
+              openPicker();
+              inputRef.current?.focus();
+            }
+          }}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer p-1 text-zinc-400 transition-colors hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${isOpen ? "rotate-180 text-[var(--accent-primary)]" : ""}`} />
+        </button>
+      </div>
+
+      {isOpen && position && createPortal(
+        <div
+          ref={optionsRef}
+          id="marketing-program-options"
+          role="listbox"
+          style={{ position: "fixed", top: position.top, left: position.left, width: position.width, maxHeight: position.maxHeight }}
+          className="z-[99999] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1.5 shadow-[0_12px_36px_rgba(15,23,42,0.2)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)]"
+        >
+          {filteredPrograms.length ? filteredPrograms.map((program, index) => {
+            const title = program.programName || program.programCampaignTitle || "Untitled program";
+            const isSelected = title.trim().toLowerCase() === value.trim().toLowerCase();
+            return (
+              <button
+                key={program.id || `${title}-${program.programYear}-${index}`}
+                type="button"
+                role="option"
+                aria-selected={index === activeIndex || isSelected}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseMove={() => setActiveIndex(index)}
+                onClick={() => selectProgram(program)}
+                className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left transition-colors cursor-pointer ${
+                  index === activeIndex || isSelected
+                    ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950/50 dark:text-emerald-200 font-semibold"
+                    : "text-zinc-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-zinc-800/60"
+                }`}
+              >
+                <span className="min-w-0 truncate text-xs font-semibold">{title}</span>
+                <span className="shrink-0 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">Season {program.programYear || "2026"}</span>
+              </button>
+            );
+          }) : (
+            <div className="px-2.5 py-3 text-center text-[11px] text-zinc-500 dark:text-zinc-400">
+              {query.trim() ? "No matching program. You can keep the name you entered." : "Select a customer to see its programs."}
+            </div>
+          )}
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+};
 
 export interface MarketingDeliverableType {
   id: "design" | "mockup" | "sample" | "costing";
@@ -188,6 +371,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
     isLoading: isMasterDataLoading,
     error: masterDataError,
   } = useMasterData(isOpen);
+  const marketingIntakePlant = plants.find((plant) => String(plant.code) === "1505")?.name || "Navneet - Khaniwade";
 
   // Common fields
   const [customer, setCustomer] = useState("");
@@ -252,7 +436,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
       setMarketingCustomer("");
       setMarketingProgramName("");
       setMarketingProgramYear(byInfo.seasonYearOptions[0]);
-      setMarketingTargetPlant(plants[0]?.name || "Navneet - Khaniwade");
+      setMarketingTargetPlant(marketingIntakePlant);
       setCustomer("");
       setTargetPlant("");
       setProgramPlanName("");
@@ -269,7 +453,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
   // Default plant selection once plants master data loads (if not already set)
   useEffect(() => {
     if (!isOpen || !plants.length) return;
-    const firstPlant = plants[0]?.name || "";
+    const firstPlant = plants.find((plant) => String(plant.code) === "1505")?.name || "Navneet - Khaniwade";
     setTargetPlant((current) => current || firstPlant);
     setMarketingTargetPlant((current) => current || firstPlant);
   }, [isOpen, plants]);
@@ -553,26 +737,17 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
     <div className="fixed inset-0 z-[100] overflow-y-auto" role="dialog" aria-modal="true">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/60 transition-opacity duration-200"
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs animate-smooth-backdrop transition-opacity duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
 
       <div className="flex min-h-full items-center justify-center p-3 sm:p-5">
-        <div className={`relative w-full ${selectedTrack === "feasibility_check" ? "max-w-4xl" : "max-w-3xl"} bg-[#f8f9ff] dark:bg-[#12141a] border border-slate-200/80 dark:border-white/[0.08] rounded-2xl shadow-2xl select-text overflow-hidden transition-all duration-200`}>
+        <div className={`relative w-full ${selectedTrack === "feasibility_check" ? "max-w-4xl" : "max-w-3xl"} bg-[var(--surface-low)] dark:bg-zinc-950 border border-slate-200/80 dark:border-white/[0.08] rounded-2xl shadow-2xl select-text overflow-hidden transition-all duration-200 animate-smooth-modal`}>
           
           {/* Luminous Engine Header Bar */}
-          <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-[#161822] shrink-0 border-b border-slate-200/70 dark:border-white/[0.06] shadow-[0_1px_4px_rgba(11,28,48,0.02)]">
+          <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-zinc-900 shrink-0 border-b border-slate-200/70 dark:border-white/[0.06] shadow-[0_1px_4px_rgba(11,28,48,0.02)]">
             <div className="flex items-center gap-3">
-              {selectedTrack !== "marketing_request" && (
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#006d32]/15 to-[#00d166]/15 text-[#006d32] dark:text-emerald-400 flex items-center justify-center border border-[#006d32]/25 shadow-xs shrink-0">
-                  {selectedTrack === "feasibility_check" ? (
-                    <ClipboardCheck className="w-4 h-4 stroke-[2.2]" />
-                  ) : (
-                    <Calendar className="w-4 h-4 stroke-[2.2]" />
-                  )}
-                </div>
-              )}
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight font-display">
@@ -580,8 +755,8 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                     {selectedTrack === "marketing_request" && "Commercial Sample Request"}
                     {selectedTrack === "program_planning" && "Seasonal Program Planning"}
                   </h3>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#006d32]/10 text-[#006d32] dark:text-emerald-400 border border-[#006d32]/20 tracking-wider uppercase">
-                    {selectedTrack === "feasibility_check" ? "FC-2026" : selectedTrack === "program_planning" ? "PLN-2026" : "SR-2026"}
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/20 tracking-wider uppercase">
+                    {selectedTrack === "feasibility_check" ? "FC-0001" : selectedTrack === "program_planning" ? "PLN-2026" : "SR-2026"}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-normal">
@@ -607,7 +782,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
 
           {/* Track Switcher Tabs (Only shown when not locked to a specific track) */}
           {!lockTrack && (
-            <div className="flex items-center gap-1 px-6 bg-slate-50/80 dark:bg-[#161822] border-b border-slate-200/60 dark:border-white/[0.08]">
+            <div className="flex items-center gap-1 px-6 bg-slate-50/80 dark:bg-zinc-900 border-b border-slate-200/60 dark:border-white/[0.08]">
               <button
                 type="button"
                 onClick={() => {
@@ -616,7 +791,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                 }}
                 className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all cursor-pointer select-none ${
                   selectedTrack === "feasibility_check"
-                    ? "border-[#006d32] text-[#006d32] dark:text-emerald-400 bg-white dark:bg-[#1f212a] font-bold shadow-2xs"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-400 bg-white dark:bg-zinc-800 font-bold shadow-2xs"
                     : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-black/[0.02]"
                 }`}
               >
@@ -631,7 +806,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                 }}
                 className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all cursor-pointer select-none ${
                   selectedTrack === "marketing_request"
-                    ? "border-[#006d32] text-[#006d32] dark:text-emerald-400 bg-white dark:bg-[#1f212a] font-bold shadow-2xs"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-400 bg-white dark:bg-zinc-800 font-bold shadow-2xs"
                     : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-black/[0.02]"
                 }`}
               >
@@ -646,7 +821,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                 }}
                 className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all cursor-pointer select-none ${
                   selectedTrack === "program_planning"
-                    ? "border-[#006d32] text-[#006d32] dark:text-emerald-400 bg-white dark:bg-[#1f212a] font-bold shadow-2xs"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-400 bg-white dark:bg-zinc-800 font-bold shadow-2xs"
                     : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-black/[0.02]"
                 }`}
               >
@@ -667,13 +842,11 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
             {/* TAB 1: FEASIBILITY CHECK FORM */}
             {selectedTrack === "feasibility_check" && (
               <form onSubmit={handleSubmitFeasibility} className="space-y-4">
-                <div className="bg-white dark:bg-[#1a1c24] border border-slate-200/80 dark:border-white/[0.08] rounded-2xl p-6 shadow-[0_2px_12px_rgba(11,28,48,0.03)] space-y-5">
-
-
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-white/[0.08] rounded-2xl p-5 shadow-[0_2px_12px_rgba(11,28,48,0.03)] space-y-4">
                   {/* Two-Column Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                     {/* Left Column (7 cols) */}
-                    <div className="lg:col-span-7 space-y-4">
+                    <div className="lg:col-span-7 space-y-3.5">
                       {/* Customer Account */}
                       <div>
                         <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
@@ -693,29 +866,47 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                           Feasibility Classification <span className="text-rose-500">*</span>
                         </label>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {FEASIBILITY_TYPES.map((type) => {
                             const isSelected = selectedFeasibilityType === type.id;
                             const isOther = type.id === "other";
-                            const IconComponent = type.icon || Layers;
+                            if (isOther && isSelected) {
+                              return (
+                                <div
+                                  key={type.id}
+                                  className="sm:col-span-2 flex min-h-12 items-center rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-primary)]/[0.035] px-3 ring-2 ring-[var(--accent-primary)]/20 shadow-2xs"
+                                >
+                                  <input
+                                    type="text"
+                                    required
+                                    autoFocus
+                                    aria-label="Describe the other custom feasibility requirement"
+                                    placeholder="Describe the custom requirement..."
+                                    value={customTypeOther}
+                                    onChange={(e) => setCustomTypeOther(e.target.value)}
+                                    className="w-full bg-transparent text-xs font-medium text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+                                  />
+                                </div>
+                              );
+                            }
                             return (
                               <button
                                 key={type.id}
                                 type="button"
                                 onClick={() => setSelectedFeasibilityType(type.id)}
-                                className={`text-left p-3.5 rounded-xl border transition-all cursor-pointer select-none flex flex-col justify-between gap-1.5 relative group ${
+                                className={`text-left min-h-12 px-3 py-2 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between gap-3 relative group ${
                                   isOther ? "sm:col-span-2" : ""
                                 } ${
                                   isSelected
-                                    ? "border-[#006d32] bg-[#006d32]/[0.035] ring-2 ring-[#006d32]/20 shadow-[0_2px_8px_rgba(0,109,50,0.08)]"
+                                    ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/[0.035] ring-2 ring-[var(--accent-primary)]/20 shadow-2xs"
                                     : "border-slate-200/90 dark:border-white/[0.08] hover:border-slate-300 bg-slate-50/60 dark:bg-zinc-900/40 hover:bg-white dark:hover:bg-zinc-850 text-slate-700 dark:text-zinc-300"
                                 }`}
                               >
-                                <div className="flex items-center justify-between w-full">
+                                <div className="flex min-w-0 items-center justify-between w-full gap-3">
                                   <span
                                     className={`text-xs tracking-tight ${
                                       isSelected
-                                        ? "text-[#006d32] dark:text-emerald-400 font-bold"
+                                        ? "text-[var(--accent-primary)] dark:text-emerald-400 font-bold"
                                         : "font-semibold text-slate-900 dark:text-zinc-100"
                                     }`}
                                   >
@@ -724,33 +915,18 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                   <span
                                     className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors ${
                                       isSelected
-                                        ? "bg-[#006d32] text-white"
+                                        ? "bg-[var(--accent-primary)] text-white"
                                         : "border border-slate-300 dark:border-zinc-600"
                                     }`}
                                   >
                                     {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                                   </span>
                                 </div>
-                                <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-snug">
-                                  {type.desc}
-                                </p>
                               </button>
                             );
                           })}
                         </div>
 
-                        {selectedFeasibilityType === "other" && (
-                          <div className="mt-2.5">
-                            <input
-                              type="text"
-                              required
-                              placeholder="Specify bespoke requirement (e.g., Embossed Metallic Foil Spine, Novel Die Cut)..."
-                              value={customTypeOther}
-                              onChange={(e) => setCustomTypeOther(e.target.value)}
-                              className="w-full h-9 px-3.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 shadow-2xs transition-all"
-                            />
-                          </div>
-                        )}
                       </div>
 
                       {/* Technical Description & Notes */}
@@ -760,17 +936,17 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                         </label>
                         <textarea
                           required
-                          rows={4}
+                          rows={3}
                           placeholder="Provide complete technical context, material GSM, binding dimensions, special coatings, machine tolerances, and manufacturing evaluation criteria..."
                           value={feasibilityDescription}
                           onChange={(e) => setFeasibilityDescription(e.target.value)}
-                          className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
+                          className="w-full p-3 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
                         />
                       </div>
                     </div>
 
                     {/* Right Column (5 cols) */}
-                    <div className="lg:col-span-5 space-y-4">
+                    <div className="lg:col-span-5 space-y-3.5">
                       {/* Required Target Date */}
                       <div>
                         <OperationalDatePicker
@@ -781,7 +957,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                             setFeasibilityTargetDate(val);
                             if (error) setError(null);
                           }}
-                          minDate={new Date().toISOString().split("T")[0]}
+                          minDate={formatYMD(new Date())}
                           placeholder="Select required target date..."
                         />
                       </div>
@@ -795,11 +971,11 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                           <span className="text-[10px] text-zinc-400 font-medium">Optional</span>
                         </div>
                         <textarea
-                          rows={3}
+                          rows={2}
                           placeholder="Enter any additional marketing remarks, client constraints, or special evaluation instructions..."
                           value={releaseRemarks}
                           onChange={(e) => setReleaseRemarks(e.target.value)}
-                          className="w-full p-3 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
+                          className="w-full p-3 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
                         />
                       </div>
 
@@ -814,7 +990,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               uploadedImages.length >= 2 && webLinks.length >= 1
                                 ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/40"
                                 : totalAttachments > 0
-                                ? "bg-[#006d32]/10 text-[#006d32] dark:bg-[#006d32]/20 dark:text-emerald-300 border border-[#006d32]/20"
+                                ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:bg-[var(--accent-primary)]/20 dark:text-emerald-300 border border-[var(--accent-primary)]/20"
                                 : "bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400"
                             }`}
                           >
@@ -829,14 +1005,14 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               onClick={() => setMediaTab("files")}
                               className={`flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                 mediaTab === "files"
-                                  ? "bg-white dark:bg-zinc-700 text-[#006d32] dark:text-emerald-400 shadow-xs font-bold"
+                                  ? "bg-white dark:bg-zinc-700 text-[var(--accent-primary)] dark:text-emerald-400 shadow-xs font-bold"
                                   : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 font-medium"
                               }`}
                             >
                               <ImageIcon className="w-3.5 h-3.5" />
                               <span>Image Upload</span>
                               {uploadedImages.length > 0 && (
-                                <span className="ml-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-[#006d32]/10 text-[#006d32] dark:bg-[#006d32]/30 dark:text-emerald-300">
+                                <span className="ml-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:bg-[var(--accent-primary)]/30 dark:text-emerald-300">
                                   {uploadedImages.length}
                                 </span>
                               )}
@@ -846,14 +1022,14 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               onClick={() => setMediaTab("links")}
                               className={`flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                 mediaTab === "links"
-                                  ? "bg-white dark:bg-zinc-700 text-[#006d32] dark:text-emerald-400 shadow-xs font-bold"
+                                  ? "bg-white dark:bg-zinc-700 text-[var(--accent-primary)] dark:text-emerald-400 shadow-xs font-bold"
                                   : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 font-medium"
                               }`}
                             >
                               <Link2 className="w-3.5 h-3.5" />
                               <span>Web URL Link</span>
                               {webLinks.length > 0 && (
-                                <span className="ml-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-[#006d32]/10 text-[#006d32] dark:bg-[#006d32]/30 dark:text-emerald-300">
+                                <span className="ml-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:bg-[var(--accent-primary)]/30 dark:text-emerald-300">
                                   {webLinks.length}
                                 </span>
                               )}
@@ -874,14 +1050,14 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => fileInputRef.current?.click()}
-                                  className="w-full py-3 px-3.5 rounded-xl border-2 border-dashed border-slate-200 dark:border-zinc-700 hover:border-[#006d32] bg-slate-50/60 dark:bg-zinc-900/40 hover:bg-[#006d32]/[0.03] text-slate-600 dark:text-zinc-400 hover:text-[#006d32] flex items-center justify-between text-xs font-medium transition-all cursor-pointer group shadow-2xs"
+                                  className="w-full py-3 px-3.5 rounded-xl border-2 border-dashed border-slate-200 dark:border-zinc-700 hover:border-[var(--accent-primary)] bg-slate-50/60 dark:bg-zinc-900/40 hover:bg-[var(--accent-primary)]/[0.03] text-slate-600 dark:text-zinc-400 hover:text-[var(--accent-primary)] flex items-center justify-between text-xs font-medium transition-all cursor-pointer group shadow-2xs"
                                 >
                                   <div className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 group-hover:bg-[#006d32]/10 text-slate-400 group-hover:text-[#006d32] flex items-center justify-center transition-colors border border-slate-200 dark:border-zinc-700 group-hover:border-[#006d32]/30">
+                                    <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 group-hover:bg-[var(--accent-primary)]/10 text-slate-400 group-hover:text-[var(--accent-primary)] flex items-center justify-center transition-colors border border-slate-200 dark:border-zinc-700 group-hover:border-[var(--accent-primary)]/30">
                                       <UploadCloud className="w-4 h-4" />
                                     </div>
                                     <div className="text-left">
-                                      <span className="block font-semibold text-slate-800 dark:text-zinc-200 group-hover:text-[#006d32] transition-colors">
+                                      <span className="block font-semibold text-slate-800 dark:text-zinc-200 group-hover:text-[var(--accent-primary)] transition-colors">
                                         Choose photos to upload
                                       </span>
                                       <span className="block text-[10px] text-slate-500">
@@ -889,7 +1065,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                       </span>
                                     </div>
                                   </div>
-                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-zinc-800 text-slate-600 border border-slate-200 dark:border-zinc-700 group-hover:bg-[#006d32]/10 group-hover:text-[#006d32] transition-colors font-mono">
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-zinc-800 text-slate-600 border border-slate-200 dark:border-zinc-700 group-hover:bg-[var(--accent-primary)]/10 group-hover:text-[var(--accent-primary)] transition-colors font-mono">
                                     {2 - uploadedImages.length} slot{2 - uploadedImages.length === 1 ? "" : "s"} left
                                   </span>
                                 </button>
@@ -919,13 +1095,13 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                     handleAddWebLink(e);
                                   }
                                 }}
-                                className="flex-1 h-9 px-3.5 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 outline-none disabled:opacity-50 transition-all shadow-2xs"
+                                className="flex-1 h-9 px-3.5 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none disabled:opacity-50 transition-all shadow-2xs"
                               />
                               <button
                                 type="button"
                                 onClick={handleAddWebLink}
                                 disabled={webLinks.length >= 1 || !linkInput.trim()}
-                                className="h-9 px-4 rounded-xl bg-[#006d32] hover:bg-[#005324] text-white text-xs font-semibold shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs flex items-center gap-1.5"
+                                className="h-9 px-4 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs flex items-center gap-1.5"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                                 <span>Add</span>
@@ -946,7 +1122,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                       alt={img.name}
                                       className="w-7 h-7 rounded-lg object-cover border border-slate-200 dark:border-zinc-800 shrink-0"
                                     />
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#006d32]/10 text-[#006d32] dark:bg-[#006d32]/25 dark:text-emerald-300 border border-[#006d32]/20 shrink-0 font-mono">
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:bg-[var(--accent-primary)]/25 dark:text-emerald-300 border border-[var(--accent-primary)]/20 shrink-0 font-mono">
                                       IMG
                                     </span>
                                     <span className="truncate font-medium text-slate-800 dark:text-zinc-200 text-xs" title={img.name}>
@@ -975,14 +1151,14 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                   className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-900 text-xs shadow-2xs group"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-[#006d32] dark:text-emerald-400 border border-[#006d32]/25 shrink-0 font-mono">
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/25 shrink-0 font-mono">
                                       URL
                                     </span>
                                     <a
                                       href={url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="truncate text-[#006d32] hover:underline flex items-center gap-1 text-xs font-medium"
+                                      className="truncate text-[var(--accent-primary)] hover:underline flex items-center gap-1 text-xs font-medium"
                                       title={url}
                                     >
                                       <span className="truncate">{url}</span>
@@ -1029,8 +1205,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="h-9 px-5 rounded-xl text-white text-xs font-bold cursor-pointer transition-all shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] flex items-center gap-2 disabled:opacity-60 disabled:cursor-wait active:scale-98"
-                      style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
+                      className="h-9 px-5 rounded-xl text-white text-xs font-bold cursor-pointer transition-all shadow-2xs hover:shadow-md flex items-center gap-2 disabled:opacity-60 disabled:cursor-wait active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
                     >
                       {isSubmitting ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -1048,7 +1223,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
             {selectedTrack === "marketing_request" && (
               <form onSubmit={handleSubmitSampling} className="space-y-4">
                 {/* Form Sheet Content */}
-                <div className="bg-white dark:bg-[#161822] border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-6 space-y-5 shadow-[0_4px_24px_rgba(11,28,48,0.03)]">
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-6 space-y-5 shadow-[0_4px_24px_rgba(11,28,48,0.03)]">
                   {/* Row 1: Customer Account & Program Name */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
@@ -1070,62 +1245,21 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                           Program Name <span className="text-rose-500">*</span>
                         </label>
                         {matchingPrograms.length > 0 && (
-                          <span className="text-[10.5px] font-mono text-[#006d32] dark:text-emerald-400 font-bold">
+                          <span className="text-[10.5px] font-mono text-[var(--accent-primary)] dark:text-emerald-400 font-bold">
                             {matchingPrograms.length} open program{matchingPrograms.length !== 1 ? "s" : ""} found
                           </span>
                         )}
                       </div>
-                      <input
-                        type="text"
-                        required
-                        list="open-programs-datalist"
-                        placeholder="e.g. Back to School 2026, Hardcover Diaries..."
+                      <ProgramPicker
+                        programs={matchingPrograms}
                         value={marketingProgramName}
-                        onChange={(e) => setMarketingProgramName(e.target.value)}
-                        className="w-full h-10 px-3.5 rounded-xl border border-slate-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs font-semibold text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 transition-all shadow-2xs"
+                        onChange={setMarketingProgramName}
+                        onYearChange={setMarketingProgramYear}
                       />
-
-                      <datalist id="open-programs-datalist">
-                        {matchingPrograms.map((p) => (
-                          <option key={p.id} value={p.programName || p.programCampaignTitle || ""}>
-                            {p.programName || p.programCampaignTitle} (Season {p.programYear || "2026"})
-                          </option>
-                        ))}
-                      </datalist>
-
-                      {/* Open Seasonal Program Picker Pills */}
-                      {matchingPrograms.length > 0 && (
-                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10.5px] font-mono text-slate-500 dark:text-zinc-400 font-semibold">
-                            Open Programs:
-                          </span>
-                          {matchingPrograms.map((prog) => {
-                            const progTitle = prog.programName || prog.programCampaignTitle || "";
-                            const isCurrent =
-                              marketingProgramName.trim().toLowerCase() === progTitle.trim().toLowerCase();
-                            return (
-                              <button
-                                key={prog.id}
-                                type="button"
-                                onClick={() => {
-                                  setMarketingProgramName(progTitle);
-                                  if (prog.programYear) {
-                                    setMarketingProgramYear(prog.programYear);
-                                  }
-                                }}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-mono transition cursor-pointer ${
-                                  isCurrent
-                                    ? "bg-[#006d32] text-white font-bold shadow-xs"
-                                    : "bg-[#eff4ff] dark:bg-white/[0.05] text-slate-700 dark:text-zinc-300 border border-slate-200/60 dark:border-white/10 hover:bg-[#e5eeff] dark:hover:bg-white/10"
-                                }`}
-                                title={`Select: ${progTitle} (${prog.programYear || "2026"})`}
-                              >
-                                <span>{progTitle}</span>
-                                <span className="text-[9.5px] opacity-75">({prog.programYear || "2026"})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                      {marketingCustomer.trim() && matchingPrograms.length === 0 && (
+                        <p className="mt-1.5 text-[10.5px] text-slate-500 dark:text-zinc-400">
+                          No saved programs for this customer. You can enter a program name.
+                        </p>
                       )}
                     </div>
                   </div>
@@ -1145,8 +1279,8 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                             onClick={() => setMarketingProgramYear(year)}
                             className={`h-11 px-4 rounded-xl border text-xs font-semibold transition-all flex items-center justify-center cursor-pointer select-none ${
                               isSelected
-                                ? "border-[#006d32] bg-[#eff4ff] dark:bg-[#006d32]/15 text-[#006d32] dark:text-[#00d166] font-bold ring-2 ring-[#006d32]/20 shadow-xs"
-                                : "border-slate-200/80 dark:border-zinc-800 bg-[#f8f9ff]/60 dark:bg-zinc-900/40 text-slate-600 dark:text-zinc-400 hover:border-slate-300 hover:bg-white dark:hover:bg-zinc-800/60"
+                                ? "border-[var(--accent-primary)] bg-[var(--accent-primary-subtle)] dark:bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] dark:text-[var(--accent-primary)] font-bold ring-2 ring-[var(--accent-primary)]/20 shadow-xs"
+                                : "border-slate-200/80 dark:border-zinc-800 bg-[var(--surface-low)]/60 dark:bg-zinc-900/40 text-slate-600 dark:text-zinc-400 hover:border-slate-300 hover:bg-white dark:hover:bg-zinc-800/60"
                             }`}
                           >
                             <span className="font-mono text-xs tracking-wide">{year}</span>
@@ -1170,8 +1304,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                     <button
                       type="submit"
                       disabled={isSubmitting || !marketingCustomer.trim() || !marketingProgramName.trim()}
-                      className="h-10 px-6 rounded-xl text-white text-xs font-bold cursor-pointer transition-all shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
-                      style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
+                      className="h-10 px-6 rounded-xl text-white text-xs font-bold cursor-pointer transition-all shadow-2xs hover:shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
                     >
                       {isSubmitting ? (
                         <>
@@ -1193,7 +1326,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
             {/* TAB 3: PROGRAM PLANNING FORM (Single-Page Setup) */}
             {selectedTrack === "program_planning" && (
               <form onSubmit={handleProceedToPlanning} className="space-y-4">
-                <div className="bg-white dark:bg-[#161822] border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-6 shadow-[0_4px_24px_rgba(11,28,48,0.03)] space-y-5">
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-6 shadow-[0_4px_24px_rgba(11,28,48,0.03)] space-y-5">
                   {/* Sheet Header Row */}
                   <div className="flex flex-wrap items-center justify-between pb-3 border-b border-slate-100 dark:border-white/[0.06] gap-2">
                     <div>
@@ -1201,7 +1334,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                         <h4 className="text-sm font-bold text-slate-900 dark:text-zinc-100 font-display">
                           Seasonal Program Planning Setup
                         </h4>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#006d32]/10 text-[#006d32] dark:text-emerald-400 border border-[#006d32]/20 font-bold uppercase tracking-wider">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/20 font-bold uppercase tracking-wider">
                           CAMPAIGN SETUP
                         </span>
                       </div>
@@ -1210,9 +1343,9 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                       </p>
                     </div>
 
-                    <div className="hidden sm:flex items-center gap-2 bg-[#eff4ff]/80 dark:bg-white/[0.04] border border-slate-200/50 dark:border-white/[0.05] px-3 py-1 rounded-xl">
+                    <div className="hidden sm:flex items-center gap-2 bg-[var(--accent-primary-subtle)]/80 dark:bg-white/[0.04] border border-slate-200/50 dark:border-white/[0.05] px-3 py-1 rounded-xl">
                       <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">PLANNING CYCLE</span>
-                      <span className="text-xs font-mono font-bold text-[#006d32] dark:text-emerald-400">{byInfo.businessYearStr}</span>
+                      <span className="text-xs font-mono font-bold text-[var(--accent-primary)] dark:text-emerald-400">{byInfo.businessYearStr}</span>
                     </div>
                   </div>
 
@@ -1235,16 +1368,17 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
                         Target Plant <span className="text-rose-500">*</span>
                       </label>
-                      <select
+                      <Select
                         value={targetPlant}
                         disabled={isMasterDataLoading || plants.length === 0}
                         onChange={(e) => setTargetPlant(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl border border-slate-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs font-semibold text-slate-900 dark:text-zinc-100 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 transition-all cursor-pointer shadow-2xs"
+                        className="w-full"
+                        selectClassName="h-10 text-xs font-semibold"
                       >
                         {plants.map((item) => (
                           <option key={item.id} value={item.name}>{item.name}</option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                   </div>
 
@@ -1259,7 +1393,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                       value={programPlanName}
                       onChange={(e) => setProgramPlanName(e.target.value)}
                       placeholder="e.g. Back-to-School 2026-2027 Hardcover Line"
-                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 transition-all shadow-2xs"
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 transition-all shadow-2xs"
                     />
                   </div>
 
@@ -1268,15 +1402,16 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
                       Program Business Year <span className="text-rose-500">*</span>
                     </label>
-                    <select
+                    <Select
                       value={programPlanYear}
                       onChange={(e) => setProgramPlanYear(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border border-slate-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs font-mono font-medium text-slate-900 dark:text-zinc-100 outline-none focus:border-[#006d32] focus:ring-2 focus:ring-[#006d32]/15 cursor-pointer transition-all shadow-2xs"
+                      className="w-full"
+                      selectClassName="h-10 text-xs font-mono font-medium"
                     >
                       {byInfo.businessYearOptions.map((by) => (
                         <option key={by} value={by}>{by}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
 
@@ -1291,8 +1426,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="h-10 px-6 rounded-xl text-white text-xs font-bold cursor-pointer transition-all shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] inline-flex items-center justify-center gap-1.5 select-none active:scale-98"
-                    style={{ background: "linear-gradient(135deg, #006d32 0%, #00d166 100%)" }}
+                    className="h-10 px-6 rounded-xl text-white text-xs font-bold cursor-pointer transition-all shadow-2xs hover:shadow-md inline-flex items-center justify-center gap-1.5 select-none active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
                   >
                     <span>Initialize Program Plan</span>
                     <ArrowRight className="w-4 h-4" />

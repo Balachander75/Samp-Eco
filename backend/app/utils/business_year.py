@@ -3,6 +3,7 @@ Navneet SAMP ERP Business Year & Season Year System.
 Business Year operates strictly on an October 1 – September 30 cycle (Oct–Sep).
 """
 from datetime import date, datetime, timezone
+import re
 from typing import List, Optional
 
 
@@ -37,3 +38,14 @@ def get_business_year_for_date_str(date_str: Optional[str]) -> str:
         return get_current_business_year(parsed)
     except Exception:
         return get_current_business_year()
+
+
+def get_business_year_date_range(year: Optional[str]) -> Optional[tuple[date, date]]:
+    """Return the inclusive start and exclusive end dates for an Oct–Sep business year."""
+    match = re.fullmatch(r"(\d{4})-(\d{4})", str(year or "").strip())
+    if not match:
+        return None
+    start_year, end_year = map(int, match.groups())
+    if end_year != start_year + 1:
+        return None
+    return date(start_year, 10, 1), date(end_year, 10, 1)

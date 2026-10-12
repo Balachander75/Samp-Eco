@@ -6,6 +6,7 @@ import {
   BindingHierarchyResponse,
   ProductSearchResult,
 } from "@/features/sample-requests/types";
+import { ProductCategoriesResponse } from "@/types/master";
 
 export interface BusinessYearOption {
   year: string;
@@ -13,7 +14,6 @@ export interface BusinessYearOption {
   is_current: boolean;
   count: number;
 }
-
 export interface BusinessYearsResponse {
   current_business_year: string;
   total_records: number;
@@ -336,6 +336,103 @@ export async function fetchProductDetailsApi(
   }
 }
 
+/** Load the full read-only specification catalog for one saved product record. */
+export async function fetchProductInspectionDetailsApi(
+  sampleRequestId: number | string
+): Promise<ProductDetailItem[]> {
+  const [rawDetails, characteristics] = await Promise.all([
+    apiFetch<any[]>(`/api/v1/product-characteristics/details/${sampleRequestId}`),
+    fetchAllProductCharacteristics(),
+  ]);
+  const savedDetails = Array.isArray(rawDetails) ? rawDetails : [];
+  const detailByCharKey = new Map<string, any>();
+  for (const detail of savedDetails) {
+    detailByCharKey.set(
+      `${detail.class_name || detail.className}::${detail.characteristic_name || detail.characteristicName}`.toLowerCase(),
+      detail
+    );
+  }
+
+  const merged: ProductDetailItem[] = characteristics.map((characteristic, index) => {
+    const key = `${characteristic.class_name}::${characteristic.characteristic_name}`.toLowerCase();
+    const saved = detailByCharKey.get(key);
+    if (saved) detailByCharKey.delete(key);
+    return {
+      id: saved?.id ?? -1 - index,
+      sampleRequestId: Number(sampleRequestId) || 0,
+      className: saved?.class_name || saved?.className || characteristic.class_name,
+      characteristicName: saved?.characteristic_name || saved?.characteristicName || characteristic.characteristic_name,
+      value: saved?.value === null || saved?.value === undefined ? null : String(saved.value),
+      uom: saved?.uom || characteristic.uom,
+      options: Array.isArray(characteristic.options) ? characteristic.options : [],
+    };
+  });
+
+  for (const [key, saved] of detailByCharKey) {
+    const [className = "", characteristicName = ""] = key.split("::");
+    merged.push({
+      id: saved.id,
+      sampleRequestId: Number(sampleRequestId) || 0,
+      className: saved.class_name || saved.className || className,
+      characteristicName: saved.characteristic_name || saved.characteristicName || characteristicName,
+      value: saved.value === null || saved.value === undefined ? null : String(saved.value),
+      uom: saved.uom || null,
+      options: [],
+    });
+  }
+
+  const sequenceByKey = new Map(
+    characteristics.map((item) => [`${item.class_name}::${item.characteristic_name}`.toLowerCase(), item.sequence])
+  );
+  merged.sort((a, b) => {
+    const aClass = PRODUCT_CLASS_ORDER.indexOf(a.className as typeof PRODUCT_CLASS_ORDER[number]);
+    const bClass = PRODUCT_CLASS_ORDER.indexOf(b.className as typeof PRODUCT_CLASS_ORDER[number]);
+    const classSort = (aClass === -1 ? PRODUCT_CLASS_ORDER.length : aClass) - (bClass === -1 ? PRODUCT_CLASS_ORDER.length : bClass);
+    if (classSort !== 0) return classSort;
+    const aSequence = sequenceByKey.get(`${a.className}::${a.characteristicName}`.toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+    const bSequence = sequenceByKey.get(`${b.className}::${b.characteristicName}`.toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+    return aSequence - bSequence || a.characteristicName.localeCompare(b.characteristicName);
+  });
+  return merged;
+}
+
+export interface ProductInspectionImage {
+  url: string;
+  label: string;
+}
+
+/** Load image references on demand so material search does not ship image payloads. */
+export async function fetchProductInspectionImagesApi(
+  sampleRequestId: number | string
+): Promise<ProductInspectionImage[]> {
+  const record = await apiFetch<any>(`/api/v1/sample-requests/${sampleRequestId}`);
+  const rawReferences: Array<{ value: unknown; fallbackLabel: string }> = [
+    ...(record?.product_image_path
+      ? [{ value: { url: record.product_image_path, name: "Product image" }, fallbackLabel: "Product image" }]
+      : []),
+    ...(Array.isArray(record?.reference_images)
+      ? record.reference_images.map((value: unknown, index: number) => ({ value, fallbackLabel: `Reference image ${index + 1}` }))
+      : []),
+  ];
+  const images = new Map<string, ProductInspectionImage>();
+  for (const { value: reference, fallbackLabel } of rawReferences) {
+    const url = typeof reference === "string"
+      ? reference.trim()
+      : reference && typeof reference === "object"
+        ? String((reference as any).url || (reference as any).path || (reference as any).image || "").trim()
+        : "";
+    if (!url || images.has(url)) continue;
+    const objectName = reference && typeof reference === "object"
+      ? String((reference as any).name || (reference as any).label || "").trim()
+      : "";
+    images.set(url, {
+      url,
+      label: objectName || fallbackLabel,
+    });
+  }
+  return [...images.values()];
+}
+
 export async function saveProductDetailsApi(
   sampleRequestId: number,
   details: { className: string; characteristicName: string; value: string | null; uom?: string | null }[]
@@ -364,13 +461,24 @@ export async function saveProductDetailsApi(
 // BINDING HIERARCHY & SEARCH APIS
 // ==========================================
 
-export async function fetchBindingHierarchyApi(): Promise<BindingHierarchyResponse> {
-  if (bindingHierarchyCache && bindingHierarchyCache.expiresAt > Date.now()) {
+export async function fetchBindingHierarchyApi(
+  category?: string,
+  subCategory?: string,
+  thirdCategory?: string
+): Promise<BindingHierarchyResponse> {
+  if (!category && !subCategory && !thirdCategory && bindingHierarchyCache && bindingHierarchyCache.expiresAt > Date.now()) {
     return bindingHierarchyCache.data;
   }
   try {
-    const data = await apiFetch<BindingHierarchyResponse>("/api/v1/product-characteristics/binding-hierarchy");
-    bindingHierarchyCache = { data, expiresAt: Date.now() + BINDING_CACHE_TTL_MS };
+    const params = new URLSearchParams();
+    if (category && category.trim()) params.append("category", category.trim());
+    if (subCategory && subCategory.trim()) params.append("sub_category", subCategory.trim());
+    if (thirdCategory && thirdCategory.trim()) params.append("third_category", thirdCategory.trim());
+    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const data = await apiFetch<BindingHierarchyResponse>(`/api/v1/product-characteristics/binding-hierarchy${queryStr}`);
+    if (!category && !subCategory && !thirdCategory) {
+      bindingHierarchyCache = { data, expiresAt: Date.now() + BINDING_CACHE_TTL_MS };
+    }
     return data;
   } catch (err) {
     console.error("Error fetching binding hierarchy:", err);
@@ -448,22 +556,37 @@ export async function searchProductsByMaterialApi(code?: string): Promise<Produc
 }
 
 export async function searchProductsByBindingApi(
-  b1: string,
+  b1?: string,
   b2?: string,
   c1Caliper?: string,
   c2Material?: string,
   c2Finish?: string,
-  limit?: number
+  limit?: number,
+  category?: string,
+  subCategory?: string,
+  thirdCategory?: string
 ): Promise<ProductSearchResult[]> {
   try {
-    if (!b1 || !b1.trim()) return [];
-    let endpoint = `/api/v1/product-characteristics/filter-by-binding?b1=${encodeURIComponent(b1.trim())}`;
-    if (b2 && b2.trim()) endpoint += `&b2=${encodeURIComponent(b2.trim())}`;
-    if (c1Caliper && c1Caliper.trim()) endpoint += `&c1_caliper=${encodeURIComponent(c1Caliper.trim())}`;
-    if (c2Material && c2Material.trim()) endpoint += `&c2_material=${encodeURIComponent(c2Material.trim())}`;
-    if (c2Finish && c2Finish.trim()) endpoint += `&c2_finish=${encodeURIComponent(c2Finish.trim())}`;
-    if (limit != null) endpoint += `&limit=${Math.max(1, Math.floor(limit))}`;
+    const hasFilter =
+      (b1 && b1.trim()) ||
+      (b2 && b2.trim()) ||
+      (category && category.trim()) ||
+      (subCategory && subCategory.trim()) ||
+      (thirdCategory && thirdCategory.trim());
+    if (!hasFilter) return [];
 
+    const params = new URLSearchParams();
+    if (b1 && b1.trim()) params.append("b1", b1.trim());
+    if (b2 && b2.trim()) params.append("b2", b2.trim());
+    if (category && category.trim()) params.append("category", category.trim());
+    if (subCategory && subCategory.trim()) params.append("sub_category", subCategory.trim());
+    if (thirdCategory && thirdCategory.trim()) params.append("third_category", thirdCategory.trim());
+    if (c1Caliper && c1Caliper.trim()) params.append("c1_caliper", c1Caliper.trim());
+    if (c2Material && c2Material.trim()) params.append("c2_material", c2Material.trim());
+    if (c2Finish && c2Finish.trim()) params.append("c2_finish", c2Finish.trim());
+    if (limit != null) params.append("limit", String(Math.max(1, Math.floor(limit))));
+
+    const endpoint = `/api/v1/product-characteristics/filter-by-binding?${params.toString()}`;
     const results = await apiFetch<ProductSearchResult[]>(endpoint);
     return results || [];
   } catch (err) {
@@ -486,6 +609,7 @@ export interface UserItem {
   team?: string;
   isTeamHead: boolean;
   plantCode?: string;
+  plantCodes?: string[];
   isActive: boolean;
   createdAt?: string;
 }
@@ -500,6 +624,7 @@ export interface CreateUserPayload {
   team?: string;
   is_team_head?: boolean;
   plant_code?: string;
+  plant_codes?: string[];
   is_active?: boolean;
 }
 
@@ -513,6 +638,7 @@ export interface UpdateUserPayload {
   team?: string;
   is_team_head?: boolean;
   plant_code?: string;
+  plant_codes?: string[];
   is_active?: boolean;
 }
 
@@ -530,6 +656,7 @@ export async function fetchUsersApi(team?: string): Promise<UserItem[]> {
       team: u.team || undefined,
       isTeamHead: Boolean(u.is_team_head),
       plantCode: u.plant_code || undefined,
+      plantCodes: u.plant_codes || (u.plant_code ? [u.plant_code] : []),
       isActive: Boolean(u.is_active),
       createdAt: u.created_at ? String(u.created_at).split("T")[0] : undefined,
     }));
@@ -554,6 +681,7 @@ export async function createUserApi(payload: CreateUserPayload): Promise<UserIte
     team: u.team || undefined,
     isTeamHead: Boolean(u.is_team_head),
     plantCode: u.plant_code || undefined,
+    plantCodes: u.plant_codes || (u.plant_code ? [u.plant_code] : []),
     isActive: Boolean(u.is_active),
     createdAt: u.created_at ? String(u.created_at).split("T")[0] : undefined,
   };
@@ -574,6 +702,7 @@ export async function updateUserApi(id: number, payload: UpdateUserPayload): Pro
     team: u.team || undefined,
     isTeamHead: Boolean(u.is_team_head),
     plantCode: u.plant_code || undefined,
+    plantCodes: u.plant_codes || (u.plant_code ? [u.plant_code] : []),
     isActive: Boolean(u.is_active),
     createdAt: u.created_at ? String(u.created_at).split("T")[0] : undefined,
   };
@@ -616,6 +745,16 @@ export async function deletePlantApi(id: number): Promise<boolean> {
   } catch (err) {
     console.error("Error deleting plant:", err);
     return false;
+  }
+}
+
+export async function fetchProductCategoriesApi(): Promise<ProductCategoriesResponse> {
+  try {
+    const data = await apiFetch<ProductCategoriesResponse>("/api/v1/master/product-categories");
+    return data || { categories: [], flat_categories: [] };
+  } catch (err) {
+    console.error("Error fetching product categories:", err);
+    return { categories: [], flat_categories: [] };
   }
 }
 

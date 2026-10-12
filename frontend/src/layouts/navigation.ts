@@ -1,3 +1,6 @@
+import type { UserProfile } from "@/features/auth";
+import { hasWorkflowTeam, isAdmin } from "@/features/auth/permissions";
+
 export interface NavigationSubItem {
   id: string;
   title: string;
@@ -142,7 +145,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
       },
       {
         id: "plant",
-        title: "Plant Execution",
+        title: "Plant Program Review",
         shortCode: "PL",
         path: "/plant",
         aliases: [
@@ -157,19 +160,8 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
         departmentKey: "plant",
         subItems: [
           { id: "plant-programs", title: "Program Planning", path: "/plant/programs", badgeKey: "plantPrograms" },
-          { id: "plant-production", title: "Production Floor", path: "/plant/production" },
-          { id: "plant-qc", title: "Quality Control", path: "/plant/qc" },
-          { id: "plant-dispatch", title: "Dispatch & Logistics", path: "/plant/dispatch" },
         ],
-        subTeams: ["Program Planning", "Production Floor", "Quality Control (QC)", "Tooling & Die Prep", "Dispatch & Logistics"],
-      },
-      {
-        id: "analytics",
-        title: "Capacity & SLA Analytics",
-        shortCode: "AN",
-        path: "/analytics",
-        departmentKey: "analytics",
-        subTeams: ["Annual Capacity Matrix", "Plant Load Rebalance", "SLA Radar"],
+        subTeams: ["Program Planning Review"],
       },
       {
         id: "members",
@@ -192,11 +184,11 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
     ],
   },
   {
-    groupTitle: "System & Governance",
+    groupTitle: "Preferences & Support",
     items: [
       {
         id: "settings",
-        title: "System Settings",
+        title: "Settings",
         shortCode: "CF",
         path: "/settings",
         departmentKey: "settings",
@@ -213,6 +205,37 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
 ];
 
 export const ALL_NAVIGATION_ITEMS = NAVIGATION_GROUPS.flatMap((group) => group.items);
+
+export function getNavigationGroupsForUser(user: UserProfile): NavigationGroup[] {
+  const admin = isAdmin(user);
+  const allowedDepartments = new Set<string>(["settings", "help"]);
+  if (admin) {
+    NAVIGATION_GROUPS.forEach((group) => group.items.forEach((item) => allowedDepartments.add(item.departmentKey)));
+  } else {
+    if (hasWorkflowTeam(user, "marketing")) allowedDepartments.add("marketing");
+    if (hasWorkflowTeam(user, "samp")) allowedDepartments.add("samp");
+    if (hasWorkflowTeam(user, "creative_studio")) {
+      allowedDepartments.add("creative");
+      allowedDepartments.add("studio");
+    }
+    if (hasWorkflowTeam(user, "plant")) allowedDepartments.add("plant");
+  }
+
+  return NAVIGATION_GROUPS.map((group) => ({
+    ...group,
+    items: group.items
+      .filter((item) => allowedDepartments.has(item.departmentKey))
+      .map((item) => item.departmentKey === "plant"
+        ? {
+            ...item,
+            title: "Plant Program Review",
+            aliases: ["/plant-execution", "/plant-work", "/plants"],
+            subItems: item.subItems?.filter((sub) => sub.id === "plant-programs"),
+            subTeams: ["Program Planning Review"],
+          }
+        : item),
+  })).filter((group) => group.items.length > 0);
+}
 
 export function getNavigationTitle(pathname: string): string {
   const normalizedPath = pathname.toLowerCase();

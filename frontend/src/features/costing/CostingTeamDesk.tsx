@@ -28,6 +28,9 @@ import {
 } from "lucide-react";
 import { CostingItem } from "./types";
 import { CostingInspectorModal } from "./components/CostingInspectorModal";
+import { CostingRequestInspectorModal } from "./components/CostingRequestInspectorModal";
+import { SampleRequestItem } from "@/features/sample-requests/types";
+import { fetchSampleRequestsApi, updateSampleRequestApi } from "@/infrastructure/api/sampleRequestsApi";
 
 export interface CostingTeamDeskProps {
   user?: UserProfile | null;
@@ -71,18 +74,72 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
   const [selectedVolumeTier, setSelectedVolumeTier] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [costingRequests, setCostingRequests] = useState<SampleRequestItem[]>([]);
+  const [selectedCostingRequest, setSelectedCostingRequest] = useState<SampleRequestItem | null>(null);
+  const [isSubmittingCostingOutput, setIsSubmittingCostingOutput] = useState(false);
+  const [isOfferingCostingCounterDate, setIsOfferingCostingCounterDate] = useState(false);
 
   // Sync from cross-desk API on mount
   const loadCostings = useCallback(async () => {
     try {
-      const live = await fetchCostingEstimationsApi();
+      const [live, requests] = await Promise.all([
+        fetchCostingEstimationsApi().catch(() => []),
+        fetchSampleRequestsApi(undefined, false, "costing").catch(() => []),
+      ]);
       if (Array.isArray(live)) {
         setCostings(live);
+      }
+      if (Array.isArray(requests)) {
+        setCostingRequests(requests.filter((request) => {
+          const status = String(request.status || "").toLowerCase();
+          return request.requestTypes?.includes("costing") &&
+            !status.includes("complete") && !status.includes("marketing") &&
+            !status.includes("closed") && !status.includes("cancel") && !status.includes("reject");
+        }));
       }
     } catch {
       // Keep existing state
     }
   }, []);
+
+  const handleSubmitCostingOutput = async (counterDate: string, outputPath: string) => {
+    if (!selectedCostingRequest) return;
+    setIsSubmittingCostingOutput(true);
+    try {
+      const updated = await updateSampleRequestApi(selectedCostingRequest.id, {
+        costingCounterDate: counterDate || null,
+        costingOutputPath: outputPath.trim(),
+        status: "Marketing Review",
+      });
+      if (!updated) throw new Error("The costing handoff could not be saved.");
+      setSelectedCostingRequest(null);
+      await loadCostings();
+      showToast(`Costing output sent to Marketing for ${updated.srNumber || selectedCostingRequest.srNumber}.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not submit costing output.");
+    } finally {
+      setIsSubmittingCostingOutput(false);
+    }
+  };
+
+  const handleOfferCostingCounterDate = async (counterDate: string) => {
+    if (!selectedCostingRequest || !counterDate) return;
+    setIsOfferingCostingCounterDate(true);
+    try {
+      const updated = await updateSampleRequestApi(selectedCostingRequest.id, {
+        costingCounterDate: counterDate,
+        status: "Costing Counter Date Offered",
+      });
+      if (!updated) throw new Error("The counter date could not be saved.");
+      setSelectedCostingRequest(updated);
+      setCostingRequests((previous) => previous.map((request) => request.id === updated.id ? updated : request));
+      showToast(`Counter date offered for ${updated.srNumber}.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not offer the counter date.");
+    } finally {
+      setIsOfferingCostingCounterDate(false);
+    }
+  };
 
   useEffect(() => {
     loadCostings();
@@ -460,7 +517,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         sortable: true,
         width: "w-[125px]",
         cell: (row) => (
-          <span className="font-mono text-[12px] font-semibold text-zinc-800 dark:text-zinc-200 tnum">
+          <span className="font-mono tabular-nums text-[12px] font-semibold text-zinc-800 dark:text-zinc-200">
             {row.targetVolume.toLocaleString()} pcs
           </span>
         ),
@@ -471,7 +528,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         sortable: true,
         width: "w-[120px]",
         cell: (row) => (
-          <div className="flex flex-col font-mono text-[11px]">
+          <div className="flex flex-col font-mono tabular-nums text-[11px]">
             <span className="font-semibold text-zinc-800 dark:text-zinc-200">
               ₹ {row.netUnitCost.toFixed(2)}
             </span>
@@ -487,7 +544,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         sortable: true,
         width: "w-[95px]",
         cell: (row) => (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono tabular-nums font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60">
             <TrendingUp className="w-3 h-3 text-emerald-600" />
             {row.marginPct.toFixed(1)}%
           </span>
@@ -499,7 +556,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         sortable: true,
         width: "w-[130px]",
         cell: (row) => (
-          <div className="flex flex-col font-mono">
+          <div className="flex flex-col font-mono tabular-nums">
             <span className="font-bold text-xs text-brand-600 dark:text-brand-400">
               ₹ {row.quotedUnitPrice.toFixed(2)}
             </span>
@@ -539,13 +596,37 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
   );
 
   return (
-    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-white dark:bg-[#0b0c10] select-text">
+    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-white dark:bg-zinc-950 select-text">
       {/* Toast */}
       {toastMessage && (
         <div className="fixed top-16 right-5 z-[60] flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xl text-[12px] font-semibold border border-zinc-800 dark:border-zinc-200/80 max-w-sm animate-smooth-toast">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
           <span>{toastMessage}</span>
         </div>
+      )}
+
+      {costingRequests.length > 0 && (
+        <section className="shrink-0 space-y-3 border-b border-teal-900/10 bg-teal-50/35 px-4 py-4 dark:border-white/[0.06] dark:bg-teal-950/10 sm:px-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-950 dark:text-white">Costing Request Intake</h2>
+              <p className="mt-0.5 text-xs text-slate-600 dark:text-zinc-400">Review specifications, offer a counter date, and submit the costing output path to Marketing.</p>
+            </div>
+            <span className="rounded-full bg-teal-800/10 px-2.5 py-1 font-mono text-xs font-bold text-teal-900 dark:text-teal-200">{costingRequests.length} open</span>
+          </div>
+          <div className="grid max-h-[30vh] grid-cols-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
+            {costingRequests.map((request) => (
+              <button key={request.id} type="button" onClick={() => setSelectedCostingRequest(request)} className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-white p-3 text-left transition hover:bg-teal-50 dark:bg-zinc-900 dark:hover:bg-teal-950/25">
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-bold text-slate-900 dark:text-zinc-100">{request.productDescription}</span>
+                  <span className="mt-1 block truncate text-[11px] text-slate-600 dark:text-zinc-400">{request.customer} · {request.srNumber} · Qty {Number(request.qtyDesignCosting || 0).toLocaleString()} {request.unitPcPack || "PC"}{request.unitPcPack === "Pack" ? ` (${request.qtyPerPack || 1} pc/pack)` : ""}</span>
+                  <span className="mt-1 block text-[10px] font-medium text-teal-800 dark:text-teal-300">Required {request.costingRequiredDate || "date missing"}</span>
+                </span>
+                <span className="shrink-0 rounded-lg bg-teal-800 px-3 py-2 text-[11px] font-bold text-white dark:bg-teal-600">Inspect</span>
+              </button>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* 1. Process Stage Ribbon */}
@@ -572,7 +653,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search Costing ID, Customer, Substrate… (Ctrl+K)"
-              className="h-9 w-60 sm:w-72 pl-9 pr-8 rounded-md border border-zinc-300 dark:border-white/15 bg-white dark:bg-[#111318] text-[13px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 transition-colors font-sans"
+              className="h-9 w-60 sm:w-72 pl-9 pr-8 rounded-md border border-zinc-300 dark:border-white/15 bg-white dark:bg-zinc-900 text-[13px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 transition-colors font-sans"
             />
             {searchTerm && (
               <button
@@ -691,6 +772,14 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         setSimulatedMargin={setSimulatedMargin}
         onReleaseQuote={handleReleaseQuote}
         showToast={showToast}
+      />
+      <CostingRequestInspectorModal
+        request={selectedCostingRequest}
+        isSubmitting={isSubmittingCostingOutput}
+        isOfferingCounterDate={isOfferingCostingCounterDate}
+        onClose={() => setSelectedCostingRequest(null)}
+        onSubmit={handleSubmitCostingOutput}
+        onOfferCounterDate={handleOfferCostingCounterDate}
       />
     </div>
   );

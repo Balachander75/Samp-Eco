@@ -6,8 +6,9 @@ import {
   ProgramActivityItem,
   CreateProgramRequestPayload,
   AddProgramMaterialPayload,
-  ProgramReviewPayload,
+  ProgramOutputPayload,
   ProgramSeenPayload,
+  ProgramActivityReplyPayload,
 } from "@/features/sample-requests/types";
 import { getBusinessYearForDate } from "@/lib/businessYear";
 
@@ -38,6 +39,9 @@ export function mapProgramActivity(item: Record<string, unknown>): ProgramActivi
     action: String(item.action || "LOG"),
     payload: (typeof item.payload === "object" && item.payload !== null ? item.payload : {}) as Record<string, any>,
     createdAt: String(item.created_at || ""),
+    pinnedByMarketing: Boolean(item.pinned_by_marketing),
+    pinnedBy: typeof item.pinned_by === "string" ? item.pinned_by : null,
+    pinnedAt: typeof item.pinned_at === "string" ? item.pinned_at : null,
   };
 }
 
@@ -128,9 +132,23 @@ export function mapProgramRequestToSampleRequest(record: ProgramRequestRecord): 
   };
 }
 
-export async function fetchProgramRequestsApi(): Promise<SampleRequestItem[]> {
-  const data = await apiFetch<Record<string, unknown>[]>("/api/v1/program-requests");
+function dispatchProgramRequestChanged(record: ProgramRequestRecord): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("samp:requests-changed", {
+    detail: mapProgramRequestToSampleRequest(record),
+  }));
+}
+
+export async function fetchProgramRequestsApi(year?: string): Promise<SampleRequestItem[]> {
+  const query = year && year.toUpperCase() !== "ALL" ? `?year=${encodeURIComponent(year)}` : "";
+  const data = await apiFetch<Record<string, unknown>[]>(`/api/v1/program-requests${query}`);
   return data.map((item) => mapProgramRequestToSampleRequest(mapProgramResponse(item)));
+}
+
+export async function fetchProgramRequestApi(requestId: number | string): Promise<SampleRequestItem> {
+  const cleanId = String(requestId).replace(/^program-/, "");
+  const data = await apiFetch<Record<string, unknown>>(`/api/v1/program-requests/${Number(cleanId)}`);
+  return mapProgramRequestToSampleRequest(mapProgramResponse(data));
 }
 
 export async function createProgramRequestApi(
@@ -268,22 +286,51 @@ export async function updateProgramRequestStatusApi(
   return mapProgramResponse(data);
 }
 
-export async function submitProgramReviewApi(
+export async function submitProgramOutputApi(
   requestId: number | string,
-  payload: ProgramReviewPayload
+  payload: ProgramOutputPayload
 ): Promise<ProgramRequestRecord> {
   const cleanId = String(requestId).replace(/^program-/, "");
   const data = await apiFetch<Record<string, unknown>>(
-    `/api/v1/program-requests/${cleanId}/review`,
+    `/api/v1/program-requests/${cleanId}/outputs`,
     {
       method: "POST",
       jsonBody: payload,
     }
   );
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
-  return mapProgramResponse(data);
+  const record = mapProgramResponse(data);
+  dispatchProgramRequestChanged(record);
+  return record;
+}
+
+export async function pinProgramActivityApi(
+  requestId: number | string,
+  activityId: number,
+  pinned: boolean,
+): Promise<ProgramRequestRecord> {
+  const cleanId = String(requestId).replace(/^program-/, "");
+  const data = await apiFetch<Record<string, unknown>>(
+    `/api/v1/program-requests/${cleanId}/activities/${activityId}/pin`,
+    { method: "POST", jsonBody: { pinned } },
+  );
+  const record = mapProgramResponse(data);
+  dispatchProgramRequestChanged(record);
+  return record;
+}
+
+export async function replyToProgramActivityApi(
+  requestId: number | string,
+  activityId: number,
+  payload: ProgramActivityReplyPayload,
+): Promise<ProgramRequestRecord> {
+  const cleanId = String(requestId).replace(/^program-/, "");
+  const data = await apiFetch<Record<string, unknown>>(
+    `/api/v1/program-requests/${cleanId}/activities/${activityId}/reply`,
+    { method: "POST", jsonBody: payload },
+  );
+  const record = mapProgramResponse(data);
+  dispatchProgramRequestChanged(record);
+  return record;
 }
 
 export async function markProgramSeenApi(
@@ -298,9 +345,7 @@ export async function markProgramSeenApi(
       jsonBody: payload,
     }
   );
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
-  return mapProgramResponse(data);
+  const record = mapProgramResponse(data);
+  dispatchProgramRequestChanged(record);
+  return record;
 }
-

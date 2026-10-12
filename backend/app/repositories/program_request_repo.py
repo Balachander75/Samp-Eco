@@ -4,9 +4,16 @@ Handles all database operations for `program_requests` and `program_material_spe
 """
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import text
+from sqlalchemy import func, text
 from app.repositories.base import BaseRepository
-from app.models.program_request import ProgramRequest, ProgramMaterialSpecification, ProgramActivityLog
+from app.models.program_request import (
+    ProgramActivityLog,
+    ProgramMaterialSpecification,
+    ProgramRequest,
+)
+from app.utils.business_year import get_business_year_date_range
+from datetime import datetime, time, timezone
+from sqlalchemy import and_, or_
 
 
 class ProgramRequestRepository(BaseRepository[ProgramRequest]):
@@ -15,17 +22,48 @@ class ProgramRequestRepository(BaseRepository[ProgramRequest]):
     def __init__(self, db: Session):
         super().__init__(ProgramRequest, db)
 
-    def list_all_detailed(self) -> List[ProgramRequest]:
-        """List all program requests with eager-loaded material specifications and activity logs."""
-        return (
+    def list_all_detailed(
+        self,
+        year: Optional[str] = None,
+        status_filter: Optional[str] = None,
+        plant_labels: Optional[set[str]] = None,
+        created_by_user_id: Optional[int] = None,
+    ) -> List[ProgramRequest]:
+        """List program queue rows and material matrix without loading audit history."""
+        query = (
             self.db.query(ProgramRequest)
-            .options(
-                selectinload(ProgramRequest.materials),
-                selectinload(ProgramRequest.activities),
-            )
-            .order_by(ProgramRequest.id.desc())
-            .all()
+            .options(selectinload(ProgramRequest.materials))
         )
+        if year and year.strip().upper() != "ALL":
+            date_range = get_business_year_date_range(year)
+            if date_range:
+                start, end = date_range
+                start_dt = datetime.combine(start, time.min, tzinfo=timezone.utc)
+                end_dt = datetime.combine(end, time.min, tzinfo=timezone.utc)
+                query = query.filter(or_(
+                    ProgramRequest.program_year == year.strip(),
+                    and_(
+                        or_(
+                            ProgramRequest.program_year.is_(None),
+                            ~ProgramRequest.program_year.like("%-%"),
+                        ),
+                        ProgramRequest.created_at >= start_dt,
+                        ProgramRequest.created_at < end_dt,
+                    ),
+                ))
+        if status_filter and status_filter.strip():
+            query = query.filter(ProgramRequest.status == status_filter.strip())
+        if created_by_user_id is not None:
+            query = query.filter(ProgramRequest.created_by_user_id == created_by_user_id)
+        if plant_labels is not None:
+            normalized_plant = func.regexp_replace(
+                func.lower(func.coalesce(ProgramRequest.target_plant, "")),
+                "[^a-z0-9]+",
+                " ",
+                "g",
+            )
+            query = query.filter(normalized_plant.in_(plant_labels))
+        return query.order_by(ProgramRequest.id.desc()).all()
 
     def get_with_materials(self, request_id: int) -> Optional[ProgramRequest]:
         """Fetch program request by ID with materials and activity logs."""
@@ -39,6 +77,19 @@ class ProgramRequestRepository(BaseRepository[ProgramRequest]):
             .first()
         )
 
+    def get_for_update(self, request_id: int) -> Optional[ProgramRequest]:
+        """Load a workflow row under a database lock before a state transition."""
+        return (
+            self.db.query(ProgramRequest)
+            .options(
+                selectinload(ProgramRequest.materials),
+                selectinload(ProgramRequest.activities),
+            )
+            .filter(ProgramRequest.id == request_id)
+            .with_for_update()
+            .first()
+        )
+
     def add_activity_log(
         self,
         program_request_id: int,
@@ -47,6 +98,7 @@ class ProgramRequestRepository(BaseRepository[ProgramRequest]):
         action: str,
         payload: Dict[str, Any],
         actor_id: Optional[int] = None,
+        commit: bool = True,
     ) -> ProgramActivityLog:
         """Create and persist an activity log for seasonal program planning."""
         log = ProgramActivityLog(
@@ -58,8 +110,9 @@ class ProgramRequestRepository(BaseRepository[ProgramRequest]):
             payload=payload,
         )
         self.db.add(log)
-        self.db.commit()
-        self.db.refresh(log)
+        if commit:
+            self.db.commit()
+            self.db.refresh(log)
         return log
 
 
@@ -67,6 +120,8 @@ class ProgramRequestRepository(BaseRepository[ProgramRequest]):
         self,
         program_request_id: int,
         material_data: Dict[str, Any],
+        *,
+        commit: bool = True,
     ) -> ProgramMaterialSpecification:
         """Add a material row to a program request."""
         mat = ProgramMaterialSpecification(
@@ -74,8 +129,11 @@ class ProgramRequestRepository(BaseRepository[ProgramRequest]):
             **material_data,
         )
         self.db.add(mat)
-        self.db.commit()
-        self.db.refresh(mat)
+        if commit:
+            self.db.commit()
+            self.db.refresh(mat)
+        else:
+            self.db.flush()
         return mat
 
     def delete_material(self, program_request_id: int, material_id: int) -> bool:

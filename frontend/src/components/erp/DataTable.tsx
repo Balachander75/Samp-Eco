@@ -83,22 +83,22 @@ export function DataTable<T>({
   const totalPages = Math.ceil((totalCount ?? data.length) / pageSize) || 1;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white dark:bg-[#0b0c10]">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-[var(--surface-lowest)] text-[var(--text-primary)]">
       {/* Table Utility Bar */}
-      <div className="h-9 px-5 border-b border-zinc-200 dark:border-white/[0.07] flex items-center justify-between gap-3 bg-zinc-50/50 dark:bg-[#0a0b0f] shrink-0">
+      <div className="h-9 px-5 border-b border-[var(--border-subtle)] flex items-center justify-between gap-3 bg-[var(--surface-low)] shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           {toolbarLeft ?? (
-            <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 font-sans">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-sans">
               <span>
                 Showing{" "}
-                <span className="font-semibold text-zinc-900 dark:text-zinc-100 font-mono">
+                <span className="font-semibold text-[var(--text-primary)] font-mono tabular-nums">
                   {(totalCount ?? data.length).toLocaleString()}
                 </span>{" "}
                 records
               </span>
               {selectedIds && selectedIds.size > 0 && (
                 <div className="flex items-center gap-1.5 ml-2">
-                  <span className="px-1.5 py-0.5 rounded bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800/60 text-brand-700 dark:text-brand-300 font-bold text-[10px] tabular-nums">
+                  <span className="px-1.5 py-0.5 rounded bg-[var(--accent-primary-subtle)] border border-[var(--border-subtle)] text-[var(--accent-primary-strong)] font-bold text-[10px] tabular-nums">
                     {selectedIds.size} selected
                   </span>
                   {onToggleSelectAll && (
@@ -125,10 +125,10 @@ export function DataTable<T>({
       <div className="flex-1 overflow-auto min-h-0 relative">
         <table className="w-full text-left text-[13px] border-collapse min-w-[1080px]">
           {/* Sticky Header */}
-          <thead className="sticky top-0 z-20 bg-zinc-50 dark:bg-[#0f1118] border-b border-zinc-200 dark:border-white/[0.08] shadow-2xs">
+          <thead className="sticky top-0 z-20 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] shadow-2xs">
             <tr>
               {enableSelection && (
-                <th className="w-10 px-4 py-2.5 text-center bg-zinc-50 dark:bg-[#0f1018]">
+                <th className="w-10 px-4 py-2.5 text-center bg-[var(--surface-low)]">
                   <input
                     type="checkbox"
                     checked={isAllSelected}
@@ -158,15 +158,15 @@ export function DataTable<T>({
                     key={col.id}
                     onClick={() => col.sortable && onSortChange && onSortChange(col.id)}
                     className={[
-                      "px-4 py-2.5 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.045em] text-zinc-500 dark:text-zinc-400",
+                      "px-4 py-2.5 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.045em] text-[var(--text-muted)]",
                       col.width ?? "",
                       col.sortable
                         ? "cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 group select-none transition-colors"
                         : "",
                       isStickyLeft
-                        ? "sticky left-0 z-25 bg-zinc-50 dark:bg-[#0f1018] border-r border-zinc-150 dark:border-white/[0.07]"
+                        ? "sticky left-0 z-25 bg-[var(--surface-low)] border-r border-[var(--border-subtle)]"
                         : isStickyRight
-                        ? "sticky right-0 z-25 bg-zinc-50 dark:bg-[#0f1018] border-l border-zinc-150 dark:border-white/[0.07]"
+                        ? "sticky right-0 z-25 bg-[var(--surface-low)] border-l border-[var(--border-subtle)]"
                         : "",
                     ].join(" ")}
                   >
@@ -176,9 +176,9 @@ export function DataTable<T>({
                         <span className="shrink-0">
                           {isSortActive ? (
                             sortDirection === "asc" ? (
-                              <ArrowUp className="w-3 h-3 text-brand-600 dark:text-brand-400" />
+                              <ArrowUp className="w-3 h-3 text-[var(--accent-primary-strong)]" />
                             ) : (
-                              <ArrowDown className="w-3 h-3 text-brand-600 dark:text-brand-400" />
+                              <ArrowDown className="w-3 h-3 text-[var(--accent-primary-strong)]" />
                             )
                           ) : (
                             <ArrowUpDown className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
@@ -193,19 +193,19 @@ export function DataTable<T>({
           </thead>
 
           {/* Table Body */}
-          <tbody className="divide-y divide-zinc-100 dark:divide-white/[0.035]">
+          <tbody className="divide-y divide-[var(--border-subtle)]">
             {isLoading ? (
               Array.from({ length: 12 }).map((_, rIdx) => (
                 <tr key={rIdx} className="animate-pulse">
                   {enableSelection && (
                   <td className="px-4 py-2.5 text-center">
-                      <div className="h-3.5 w-3.5 bg-zinc-200 dark:bg-zinc-800 rounded mx-auto" />
+                      <div className="h-3.5 w-3.5 bg-[var(--surface-container)] rounded mx-auto" />
                     </td>
                   )}
                   {columns.map((col, cIdx) => (
                     <td key={cIdx} className="px-4 py-2.5">
                       <div
-                        className={`h-3.5 bg-zinc-100 dark:bg-zinc-800/70 rounded ${
+                        className={`h-3.5 bg-[var(--surface-low)] rounded ${
                           cIdx === 0 ? "w-3/4" : cIdx % 3 === 0 ? "w-2/5" : "w-3/5"
                         }`}
                       />
@@ -220,14 +220,14 @@ export function DataTable<T>({
                   className="py-24 text-center"
                 >
                   <div className="flex flex-col items-center justify-center gap-3 max-w-xs mx-auto">
-                    <div className="w-11 h-11 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 flex items-center justify-center">
-                      <PackageOpen className="w-5 h-5 text-zinc-400 dark:text-zinc-600" />
+                    <div className="w-10 h-10 rounded-lg bg-[var(--surface-low)] flex items-center justify-center">
+                      <PackageOpen className="w-5 h-5 text-[var(--text-muted)]" />
                     </div>
                     <div>
-                      <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-200">
+                      <p className="text-[13px] font-semibold text-[var(--text-primary)]">
                         {emptyMessage}
                       </p>
-                      <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                         Try adjusting your search or filters
                       </p>
                     </div>
@@ -252,13 +252,13 @@ export function DataTable<T>({
                     tabIndex={onRowClick ? 0 : undefined}
                     aria-selected={isSelected}
                     className={[
-                      "transition-colors duration-100 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500",
+                      "transition-colors duration-100 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--border-focus)]",
                       onRowClick ? "cursor-pointer" : "",
                       isSelected
-                        ? "bg-brand-50/60 dark:bg-brand-950/25 shadow-[inset_3px_0_0_0_#2563eb] dark:shadow-[inset_3px_0_0_0_#3b82f6]"
+                        ? "bg-[var(--accent-primary-subtle)] shadow-[inset_2px_0_0_0_var(--accent-primary)]"
                         : isChecked
-                        ? "bg-brand-50/20 dark:bg-brand-950/10"
-                        : "hover:bg-zinc-50/80 dark:hover:bg-white/[0.022]",
+                        ? "bg-[var(--accent-primary-subtle)]"
+                        : "hover:bg-[var(--surface-low)]",
                     ].join(" ")}
                   >
                     {enableSelection && (
@@ -297,16 +297,16 @@ export function DataTable<T>({
                               ? "text-center"
                               : "text-left",
                             isStickyLeft
-                              ? `sticky left-0 z-10 border-r border-zinc-100 dark:border-white/[0.035] ${
+                              ? `sticky left-0 z-10 border-r border-[var(--border-subtle)] ${
                                   isSelected
-                                    ? "bg-brand-50/60 dark:bg-brand-950/25"
-                                    : "bg-white dark:bg-[#0b0c10] group-hover:bg-zinc-50/80 dark:group-hover:bg-[#161822]"
+                                    ? "bg-[var(--accent-primary-subtle)]"
+                                    : "bg-[var(--surface-lowest)] group-hover:bg-[var(--surface-low)]"
                                 }`
                               : isStickyRight
-                              ? `sticky right-0 z-10 border-l border-zinc-100 dark:border-white/[0.035] ${
+                              ? `sticky right-0 z-10 border-l border-[var(--border-subtle)] ${
                                   isSelected
-                                    ? "bg-brand-50/60 dark:bg-brand-950/25"
-                                    : "bg-white dark:bg-[#0b0c10] group-hover:bg-zinc-50/80 dark:group-hover:bg-[#161822]"
+                                    ? "bg-[var(--accent-primary-subtle)]"
+                                    : "bg-[var(--surface-lowest)] group-hover:bg-[var(--surface-low)]"
                                 }`
                               : "",
                           ].join(" ")}
@@ -325,17 +325,17 @@ export function DataTable<T>({
 
       {/* Pagination Footer */}
       {onPageChange && (
-        <div className="h-10 px-5 bg-white dark:bg-[#0f1118] border-t border-zinc-200 dark:border-white/[0.08] flex items-center justify-between gap-3 shrink-0 select-none">
-          <span className="text-[11px] font-mono text-zinc-400 dark:text-zinc-500">
-            <span className="font-bold text-zinc-800 dark:text-zinc-300 tabular-nums">
+        <div className="h-10 px-5 bg-[var(--surface-lowest)] border-t border-[var(--border-subtle)] flex items-center justify-between gap-3 shrink-0 select-none">
+          <span className="text-[11px] font-mono text-[var(--text-muted)]">
+            <span className="font-bold text-[var(--text-secondary)] tabular-nums">
               {data.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}
             </span>
             {" – "}
-            <span className="font-bold text-zinc-800 dark:text-zinc-300 tabular-nums">
+            <span className="font-bold text-[var(--text-secondary)] tabular-nums">
               {Math.min(currentPage * pageSize, totalCount ?? data.length)}
             </span>
             {" of "}
-            <span className="font-bold text-zinc-800 dark:text-zinc-300 tabular-nums">
+            <span className="font-bold text-[var(--text-secondary)] tabular-nums">
               {(totalCount ?? data.length).toLocaleString()}
             </span>
           </span>
@@ -345,13 +345,13 @@ export function DataTable<T>({
               type="button"
               disabled={currentPage <= 1}
               onClick={() => onPageChange(currentPage - 1)}
-              className="h-8 w-8 flex items-center justify-center rounded-md border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#161822] text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              className="h-8 w-8 flex items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--text-secondary)] hover:bg-[var(--surface-low)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
               aria-label="Previous page"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            <span className="text-[12px] font-mono font-medium text-zinc-600 dark:text-zinc-400 px-2.5 tabular-nums">
+            <span className="text-[12px] font-mono font-medium text-[var(--text-secondary)] px-2.5 tabular-nums">
               {currentPage} / {totalPages}
             </span>
 
@@ -359,7 +359,7 @@ export function DataTable<T>({
               type="button"
               disabled={currentPage >= totalPages}
               onClick={() => onPageChange(currentPage + 1)}
-              className="h-8 w-8 flex items-center justify-center rounded-md border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#161822] text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              className="h-8 w-8 flex items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--text-secondary)] hover:bg-[var(--surface-low)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
               aria-label="Next page"
             >
               <ChevronRight className="w-4 h-4" />

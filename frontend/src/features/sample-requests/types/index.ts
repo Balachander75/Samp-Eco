@@ -27,6 +27,7 @@ export interface SampleRequestItem {
   dateRequestCreated: string;
   createdBy: string;
   materialCode: string;
+  requestCode?: string;
   barcode?: string;
   customerProductCode?: string;
   sourceSampleCode?: string;
@@ -36,22 +37,38 @@ export interface SampleRequestItem {
   productType?: string;
   productTypeNavneet?: string;
   productTypeNewCustomer?: string;
+  productCategory?: string;
+  productSubCategory?: string;
+  productThirdCategory?: string;
   productImagePath?: string;
   designsCustomerCreative?: string;
   brandName?: string;
   unitPcPack?: string | number;
+  qtyPerPack?: string | number;
   qtyDesignCosting?: string | number;
+  costingRequiredDate?: string | null;
+  costingCounterDate?: string | null;
+  costingOutputPath?: string | null;
   productArtworkNos?: string | number;
   targetArtworkDateCreative?: string;
   targetArtworkDateStudio?: string;
   qtyForSampling?: string | number;
+  qtyForMockup?: string | number;
   mockupRequired?: string;
+  mockupWorkflowState?: MockupWorkflowState;
   status: SampleStatus | string;
   creationMode?: "material_code" | "binding" | string;
   programYear?: string;
   programName?: string;
   programCampaignTitle?: string;
   programMaterials?: ProgramMaterialItem[];
+  customDetails?: Array<{
+    id?: number;
+    className: string;
+    characteristicName: string;
+    value: string | null;
+    uom?: string | null;
+  }>;
   requestTypes?: RequestType[];
   requestKind?: "sample" | "design" | "feasibility" | "program";
   designRequestId?: number;
@@ -69,13 +86,17 @@ export interface SampleRequestItem {
   releasedAt?: string | null;
   claimedBy?: string | null;
   claimedAt?: string | null;
+    designRequestCreatedAt?: string | null;
   isCounterDateActive?: boolean;
   proposedTargetDate?: string | null;
   counterDateReason?: string | null;
   counterDateRequestedAt?: string | null;
-  counterDateDecision?: "pending" | "accepted" | "rejected" | null;
+  counterDateDecision?: "pending" | "accepted" | "rejected" | "auto_accepted" | null;
   counterDateDecisionAt?: string | null;
   counterDateDecisionNotes?: string | null;
+  counterDateRequestedBy?: string | null;
+  workflowEvents?: Array<Record<string, any>>;
+  workflowNotes?: Array<Record<string, any>>;
   createdAt: string;
   updatedAt?: string;
   plantFeasibilityResponse?: "Yes" | "No" | "Maybe" | null;
@@ -87,14 +108,25 @@ export interface SampleRequestItem {
   feasibilityClosedAt?: string | null;
   feasibilityClosedBy?: "plant" | "sampling" | null;
   isRespondedOnTime?: boolean | null;
+  sampCounterDate?: string | null;
+  sampCounterDateReason?: string | null;
+  sampCounterDateProposedAt?: string | null;
+  sampCounterDateProposedBy?: string | null;
+  counterDateDecisionBy?: string | null;
+  counterDateDecisionRemark?: string | null;
+  counterDateDecisionDueAt?: string | null;
+  counterDateWaitWorkdays?: number | null;
+  sampSlaPausedWorkdays?: number;
   marketingDecision?: "Accepted" | "Rejected" | null;
   marketingDecisionBy?: string | null;
   marketingDecisionAt?: string | null;
   marketingDecisionRemark?: string | null;
   takenBySamp?: string | null;
+  takenBySampUserId?: number | null;
   takenAtSamp?: string | null;
   convertedSampleRequestId?: number | string | null;
   convertedSrNumber?: string | null;
+  convertedRequestTypes?: Array<"sample" | "costing">;
   convertedAt?: string | null;
   convertedBy?: string | null;
   activities?: FeasibilityActivityItem[];
@@ -106,6 +138,8 @@ export interface SampleRequestItem {
   customFeasibilityType?: string | null;
   feasibilityDescription?: string;
   marketingRemarks?: string | null;
+  feasibilityConditions?: string | null;
+  leadTimeNote?: string | null;
   // Program Planning Dual Reviews (Sampling & Plant)
   samplingSeenAt?: string | null;
   samplingSeenBy?: string | null;
@@ -119,6 +153,47 @@ export interface SampleRequestItem {
   plantRemark?: string | null;
   plantSignedAt?: string | null;
   plantSignedBy?: string | null;
+}
+
+export interface MockupWorkflowEvent {
+  action: string;
+  title: string;
+  actorName: string;
+  actorDepartment: string;
+  timestamp: string;
+  mockupUrl?: string;
+}
+
+export interface MockupWorkflowState {
+  stage: "marketing" | "awaiting_design_acceptance" | "creative" | "studio" | string;
+  designNeeded?: boolean;
+  marketingShutterstockNo?: string;
+  marketingRemark?: string;
+  creativeShutterstockNo?: string;
+  creativeRemark?: string;
+  creativeCharacteristicKeys?: Array<{ className: string; characteristicName: string }>;
+  creativeRequiredCharacteristicKeys?: Array<{ className: string; characteristicName: string }>;
+  creativeCharacteristicsClearedAt?: string;
+  qtyForMockup?: string;
+  requiredDate?: string;
+  releasedToCreativeAt?: string;
+  sentToStudioAt?: string;
+  sentToStudioBy?: string;
+  mockupUrl?: string;
+  submittedToMarketingAt?: string;
+  submittedToMarketingBy?: string;
+  claimedBy?: string;
+  claimedByUserId?: number;
+  claimedAt?: string;
+  claimedStage?: "creative" | "studio";
+  plantReleasedAt?: string;
+  plantReleasedBy?: string;
+  plantReleaseTarget?: string;
+  samplingRemark?: string;
+  samplingFeedback?: string;
+  samplingFeedbackAt?: string;
+  samplingFeedbackBy?: string;
+  events?: MockupWorkflowEvent[];
 }
 
 export interface FeasibilityActivityItem {
@@ -147,6 +222,8 @@ export interface FeasibilityRequestPayload {
 export interface FeasibilitySampVerdictPayload {
   response: "Yes" | "No" | "Maybe";
   remark?: string | null;
+  conditions?: string | null;
+  lead_time_note?: string | null;
 }
 
 export interface FeasibilityMarketingDecisionPayload {
@@ -157,7 +234,6 @@ export interface FeasibilityMarketingDecisionPayload {
 export interface FeasibilityRequestRecord extends FeasibilityRequestPayload {
   id: number;
   requestCode: string;
-  srNumber: string;
   status: string;
   createdBy?: string | null;
   requestCreatedBy?: string | null;
@@ -170,14 +246,30 @@ export interface FeasibilityRequestRecord extends FeasibilityRequestPayload {
   feasibilityClosedAt?: string | null;
   feasibilityClosedBy?: string | null;
   isRespondedOnTime?: boolean | null;
+  sampCounterDate?: string | null;
+  sampCounterDateReason?: string | null;
+  sampCounterDateProposedAt?: string | null;
+  sampCounterDateProposedBy?: string | null;
+  counterDateDecision?: "pending" | "accepted" | "rejected" | "auto_accepted" | null;
+  counterDateDecisionAt?: string | null;
+  counterDateDecisionBy?: string | null;
+  counterDateDecisionRemark?: string | null;
+  counterDateDecisionDueAt?: string | null;
+  counterDateWaitWorkdays?: number | null;
+  sampSlaPausedWorkdays?: number;
   marketingDecision?: "Accepted" | "Rejected" | null;
   marketingDecisionBy?: string | null;
   marketingDecisionAt?: string | null;
   marketingDecisionRemark?: string | null;
   takenBySamp?: string | null;
+  takenBySampUserId?: number | null;
   takenAtSamp?: string | null;
+  targetPlant?: string | null;
+  feasibilityConditions?: string | null;
+  leadTimeNote?: string | null;
   convertedSampleRequestId?: number | string | null;
   convertedSrNumber?: string | null;
+  convertedRequestTypes?: Array<"sample" | "costing">;
   convertedAt?: string | null;
   convertedBy?: string | null;
   activities?: (FeasibilityActivityItem | ProgramActivityItem)[];
@@ -186,6 +278,7 @@ export interface FeasibilityRequestRecord extends FeasibilityRequestPayload {
 
 
 export interface CreateSampleRequestForm {
+  clientDraftKey?: string;
   year?: string;
   programYear?: string;
   productDescription?: string;
@@ -202,12 +295,18 @@ export interface CreateSampleRequestForm {
   productTypeNavneet?: string;
   productTypeNewCustomer?: string;
   unitPcPack?: string | number;
+  qtyPerPack?: string | number;
   qtyDesignCosting?: string | number;
+  costingRequiredDate?: string | null;
+  costingCounterDate?: string | null;
+  costingOutputPath?: string | null;
   productArtworkNos?: string | number;
   targetArtworkDateCreative?: string;
   targetArtworkDateStudio?: string;
   qtyForSampling?: string | number;
+  qtyForMockup?: string | number;
   mockupRequired?: string;
+  mockupWorkflowState?: MockupWorkflowState;
   designsCustomerCreative?: string;
   productImagePath?: string;
   dateRequestCreated?: string;
@@ -219,6 +318,7 @@ export interface CreateSampleRequestForm {
   customBinding1?: string;
   customBinding2?: string;
   customDetails?: Array<{
+    id?: number;
     className: string;
     characteristicName: string;
     value: string | null;
@@ -261,9 +361,12 @@ export interface StagedProductItem {
   barcode?: string;
   customerProductCode?: string;
   productType?: string;
+  productCategory?: string;
+  productSubCategory?: string;
+  productThirdCategory?: string;
   sourceSampleRequestId?: number;
   sourceRequestId?: number;
-  creationMode: "material_code" | "binding";
+  creationMode: "material_code" | "binding" | "custom" | "new";
   bindingType1: string;
   bindingType2: string;
   originalBindingType1?: string;
@@ -293,6 +396,9 @@ export interface BatchSampleRequestItemPayload {
   customer_product_code?: string | null;
   source_sample_code?: string | null;
   product_type?: string | null;
+  product_category?: string | null;
+  product_sub_category?: string | null;
+  product_third_category?: string | null;
   source_sample_request_id?: number;
   creation_mode: "material_code" | "binding";
   custom_binding_1?: string | null;
@@ -376,6 +482,9 @@ export interface ProgramActivityItem {
   action: "CREATED" | "NOTE_POSTED" | "STATUS_UPDATED" | "MATERIAL_ADDED" | "MATERIAL_DELETED" | "SAMP_REMARK_UPDATED" | "SAMP_REMARKS_UPDATED" | "UPDATED" | string;
   payload: Record<string, any>;
   createdAt: string;
+  pinnedByMarketing?: boolean;
+  pinnedBy?: string | null;
+  pinnedAt?: string | null;
 }
 
 export interface ProgramRequestRecord {
@@ -406,19 +515,19 @@ export interface ProgramRequestRecord {
   activities?: ProgramActivityItem[];
 }
 
-export interface ProgramReviewPayload {
+export interface ProgramOutputPayload {
   department: "sampling" | "plant";
-  verdict: string;
-  remark?: string | null;
-  actor_name?: string | null;
+  remark: string;
+}
+
+export interface ProgramActivityReplyPayload {
+  remark: string;
 }
 
 export interface ProgramSeenPayload {
   department: "sampling" | "plant";
   actor_name?: string | null;
 }
-
-
 
 export interface CreateProgramRequestPayload {
   customer_name: string;

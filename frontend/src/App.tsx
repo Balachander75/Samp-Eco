@@ -1,38 +1,41 @@
-import { useState, Suspense } from "react";
+import { lazy, useState, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, LayoutGrid, Settings2 } from "lucide-react";
 import { BusinessYearProvider } from "@/context/BusinessYearContext";
 import { PlantProvider } from "@/context/PlantContext";
 import { SignInPage, UserProfile, AuthResponse } from "@/features/auth";
+import { canAccessWorkspacePath, getWorkspaceHome, hasWorkflowTeam, isAdmin } from "@/features/auth/permissions";
 import { readAuthToken, readAuthUser, clearAuthStorage } from "@/lib/session";
 import { AppShell, getNavigationTitle } from "@/layouts";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { ThemeProvider } from "@/context/ThemeContext";
 
-// Primary department workspaces (direct imports for instant 0ms switching)
-import OperationsOverview from "@/features/dashboard/OperationsOverview";
-import SampleRequestsDesk from "@/features/sample-requests/SampleRequestsDesk";
-import ProgramPlanningWorkspace from "@/features/sample-requests/components/ProgramPlanningWorkspace";
-import ProductStagingWorkspace from "@/features/sample-requests/components/ProductStagingWorkspace";
-import DraftWorkspacePage from "@/features/sample-requests/components/DraftWorkspacePage";
-import SamplingTeamDesk from "@/features/samp-team/SamplingTeamDesk";
-import CreativeWorkDesk from "@/features/creative/CreativeWorkDesk";
-import StudioWorkDesk from "@/features/studio/StudioWorkDesk";
-import CostingTeamDesk from "@/features/costing/CostingTeamDesk";
-import PlantExecutionDesk from "@/features/plant/PlantExecutionDesk";
-import MembersAndPlantsDesk from "@/features/members/MembersAndPlantsDesk";
+// Load each workspace on first visit so less-used departments do not inflate startup JS.
+const OperationsOverview = lazy(() => import("@/features/dashboard/OperationsOverview"));
+const SampleRequestsDesk = lazy(() => import("@/features/sample-requests/SampleRequestsDesk"));
+const ProgramPlanningWorkspace = lazy(() => import("@/features/sample-requests/components/ProgramPlanningWorkspace"));
+const ProductStagingWorkspace = lazy(() => import("@/features/sample-requests/components/ProductStagingWorkspace"));
+const DraftWorkspacePage = lazy(() => import("@/features/sample-requests/components/DraftWorkspacePage"));
+const SamplingTeamDesk = lazy(() => import("@/features/samp-team/SamplingTeamDesk"));
+const CreativeWorkDesk = lazy(() => import("@/features/creative/CreativeWorkDesk"));
+const StudioWorkDesk = lazy(() => import("@/features/studio/StudioWorkDesk"));
+const CostingTeamDesk = lazy(() => import("@/features/costing/CostingTeamDesk"));
+const PlantExecutionDesk = lazy(() => import("@/features/plant/PlantExecutionDesk"));
+const MembersAndPlantsDesk = lazy(() => import("@/features/members/MembersAndPlantsDesk"));
+const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
 
 // Low-CLS industrial skeleton loader matching ERP table & ribbon metrics
 function DeskSkeletonLoader() {
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#fafafa] dark:bg-[#08090d] animate-pulse select-none">
-      <div className="h-14 border-b border-zinc-200 dark:border-white/[0.08] px-6 flex items-center justify-between bg-white dark:bg-[#0f1118]">
+    <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-zinc-950 animate-pulse select-none">
+      <div className="h-14 border-b border-zinc-200 dark:border-white/[0.08] px-6 flex items-center justify-between bg-white dark:bg-zinc-900">
         <div className="h-4 w-52 bg-zinc-200 dark:bg-zinc-800 rounded" />
         <div className="flex items-center gap-2">
           <div className="h-8.5 w-24 bg-zinc-200 dark:bg-zinc-800 rounded-md" />
           <div className="h-8.5 w-32 bg-zinc-200 dark:bg-zinc-800 rounded-md" />
         </div>
       </div>
-      <div className="h-12 border-b border-zinc-200 dark:border-white/[0.07] bg-white dark:bg-[#0f1118] px-6 flex items-center gap-6">
+      <div className="h-12 border-b border-zinc-200 dark:border-white/[0.07] bg-white dark:bg-zinc-900 px-6 flex items-center gap-6">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="h-5 w-28 bg-zinc-200/60 dark:bg-zinc-800/60 rounded" />
         ))}
@@ -63,8 +66,12 @@ function ActiveModuleView({
   return (
     <ErrorBoundary variant="page">
     <Suspense fallback={<DeskSkeletonLoader />}>
-      <div key={location.pathname} className="flex-1 min-h-0 flex flex-col">
+      <div key={location.pathname} className="app-route flex-1 min-h-0 min-w-0 flex flex-col">
       {(() => {
+        if (location.pathname === "/settings") {
+          return <SettingsPage />;
+        }
+
         // Executive Operations Overview (Dashboard Landing)
         if (location.pathname === "/dashboard" || location.pathname === "/") {
           return <OperationsOverview user={user} />;
@@ -153,7 +160,7 @@ function ActiveModuleView({
           return <SampleRequestsDesk user={user} />;
         }
 
-        // Plant Execution Desk (Seasonal Program Planning, Production Floor, QC, Dispatch)
+        // Existing Plant Program Planning review desk
         if (
           location.pathname === "/plant" ||
           location.pathname === "/plant-execution" ||
@@ -183,13 +190,13 @@ function ActiveModuleView({
 
         return (
           <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-app)]">
-            <header className="border-b border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] px-5 sm:px-7 py-4">
+            <header className="border-b border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 px-5 sm:px-7 py-4">
               <div className="text-[11px] text-zinc-500 dark:text-zinc-400">Workspace <span className="px-1.5 text-zinc-300 dark:text-zinc-600">/</span> {title}</div>
               <h1 className="mt-1 text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">{title}</h1>
             </header>
 
             <div className="mx-auto w-full max-w-6xl space-y-6 p-5 sm:p-7">
-              <section className="rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#0f1118] p-6 sm:p-8">
+              <section className="rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-zinc-900 p-6 sm:p-8">
                 <div className="flex max-w-2xl items-start gap-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-300">
                     <Settings2 className="h-5 w-5" />
@@ -198,11 +205,13 @@ function ActiveModuleView({
                     <span className="inline-flex items-center rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">Not configured</span>
                     <h2 className="mt-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">This workspace is not ready yet</h2>
                     <p className="mt-1.5 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{descriptionByPath[location.pathname] || "This workspace is not configured yet."}</p>
-                    <button type="button" onClick={() => navigate("/dashboard")} className="mt-5 inline-flex h-9 items-center gap-2 rounded-md bg-brand-600 px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand-700">
-                      <LayoutGrid className="h-4 w-4" />
-                      Operations overview
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
+                    {isAdmin(user) && (
+                      <button type="button" onClick={() => navigate("/dashboard")} className="mt-5 inline-flex h-9 items-center gap-2 rounded-md bg-brand-600 px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand-700">
+                        <LayoutGrid className="h-4 w-4" />
+                        Operations overview
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </section>
@@ -214,7 +223,7 @@ function ActiveModuleView({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {destinations.map((item) => (
-                    <button key={item.path} type="button" onClick={() => navigate(item.path)} className="group flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-brand-300 hover:bg-brand-50/40 dark:border-white/[0.08] dark:bg-[#0f1118] dark:hover:border-brand-800 dark:hover:bg-brand-950/20 card-hover-lift cursor-pointer">
+                    <button key={item.path} type="button" onClick={() => navigate(item.path)} className="group flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-brand-300 hover:bg-brand-50/40 dark:border-white/[0.08] dark:bg-zinc-900 dark:hover:border-brand-800 dark:hover:bg-brand-950/20 card-hover-lift cursor-pointer">
                       <span>
                         <span className="block text-[13px] font-semibold text-zinc-900 dark:text-zinc-100">{item.label}</span>
                         <span className="mt-0.5 block text-xs text-zinc-500 dark:text-zinc-400">{item.detail}</span>
@@ -248,6 +257,17 @@ function AppShellRouteWrapper({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const normalizedPath = location.pathname.toLowerCase();
+  const isDeferredPlantRoute = ["/plant/production", "/plant/qc", "/plant/dispatch"].some(
+    (path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`)
+  );
+  if (isDeferredPlantRoute && (isAdmin(user) || hasWorkflowTeam(user, "plant"))) {
+    return <Navigate to="/plant/programs" replace />;
+  }
+  if (!canAccessWorkspacePath(user, normalizedPath)) {
+    return <Navigate to={getWorkspaceHome(user)} replace />;
+  }
 
   const handleNavigate = (path: string) => {
     // If user is currently in the Product Staging flow and clicks another section in the sidebar:
@@ -387,13 +407,15 @@ function AppRoutes() {
   ];
 
   return (
+    <ThemeProvider key={currentUser?.id ?? "guest"} userId={currentUser?.id} initialTheme={currentUser?.theme_id}>
+    <PlantProvider key={currentUser ? `user-${currentUser.id}` : "guest"}>
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route
           path="/signin"
           element={
             currentUser ? (
-              <Navigate to="/dashboard" replace />
+              <Navigate to={getWorkspaceHome(currentUser)} replace />
             ) : (
               <SignInPage onSignInSuccess={handleSignInSuccess} />
             )
@@ -404,20 +426,20 @@ function AppRoutes() {
         {AUTH_ROUTES.map((path) => (
           <Route key={path} path={path} element={protectedElement} />
         ))}
-        <Route path="*" element={<Navigate to={currentUser ? "/dashboard" : "/signin"} replace />} />
+        <Route path="*" element={<Navigate to={currentUser ? getWorkspaceHome(currentUser) : "/signin"} replace />} />
       </Routes>
     </BrowserRouter>
+    </PlantProvider>
+    </ThemeProvider>
   );
 }
 
 export default function App() {
   return (
     <BusinessYearProvider>
-      <PlantProvider>
-        <ErrorBoundary variant="page">
-          <AppRoutes />
-        </ErrorBoundary>
-      </PlantProvider>
+      <ErrorBoundary variant="page">
+        <AppRoutes />
+      </ErrorBoundary>
     </BusinessYearProvider>
   );
 }

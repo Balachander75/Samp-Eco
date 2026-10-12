@@ -1,0 +1,156 @@
+"""Role helpers for the deck-owned SMPS workflows."""
+
+import re
+from typing import Iterable
+
+from fastapi import Depends, HTTPException, Request, status
+
+from app.auth.security import get_current_user
+
+
+_TEAM_TERMS = {
+    "marketing": ("marketing",),
+    "samp": ("samp", "sampling"),
+    "plant": ("plant",),
+    "creative_studio": ("creative", "studio"),
+}
+
+
+def _normalized(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").casefold()).strip()
+
+
+def is_admin(user) -> bool:
+    """Root admin is a top-level account role; team labels cannot grant access."""
+    return _normalized(getattr(user, "role", "")) in {"admin", "administrator"}
+
+
+def is_team_head(user) -> bool:
+    """Team leadership is scoped to the assigned team, never a global role."""
+    return bool(getattr(user, "is_team_head", False)) and not is_admin(user)
+
+
+def require_workflow_write_access(
+    request: Request,
+    current_user=Depends(get_current_user),
+):
+    """Keep every operational write endpoint read-only for team heads."""
+    if request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"} and is_team_head(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Team heads have read-only access to operational workflows",
+        )
+    return current_user
+
+
+def user_has_team(user, team: str) -> bool:
+    terms = _TEAM_TERMS[team]
+    primary_team = getattr(user, "team", None)
+    normalized_values = (_normalized(primary_team),) if primary_team else ()
+    return any(term in value for term in terms for value in normalized_values)
+
+
+def require_admin(user=Depends(get_current_user)):
+    if not is_admin(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access is required")
+    return user
+
+
+def require_team(user, team: str):
+    if is_admin(user) or user_has_team(user, team):
+        return user
+    label = {"samp": "SAMP Team", "creative_studio": "Creative/Studio"}.get(team, team.title())
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"{label} access is required")
+
+
+def require_any_team(user, teams: Iterable[str]):
+    if is_admin(user) or any(user_has_team(user, team) for team in teams):
+        return user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="SMPS team access is required")
+
+
+def require_smps_member(user=Depends(get_current_user)):
+    return require_any_team(user, ("marketing", "samp", "plant", "creative_studio"))
+
+
+def assigned_plant_values(user, db) -> set[str]:
+    from app.models.master import Plant, UserPlantAssignment
+
+    labels = set()
+    assignments = (
+        db.query(Plant)
+        .join(UserPlantAssignment, UserPlantAssignment.plant_id == Plant.id)
+        .filter(UserPlantAssignment.user_id == user.id)
+        .all()
+    )
+    for plant in assignments:
+        labels.update((plant.code, plant.name))
+    if labels:
+        return labels
+
+    legacy_code = str(getattr(user, "plant_code", None) or "").strip()
+    if legacy_code:
+        legacy_plant = (
+            db.query(Plant)
+            .filter((Plant.code.ilike(legacy_code)) | (Plant.name.ilike(legacy_code)))
+            .first()
+        )
+        if legacy_plant:
+            labels.update((legacy_plant.code, legacy_plant.name))
+    return labels
+
+
+def assigned_plant_labels(user, db) -> set[str]:
+    return {_normalized(value) for value in assigned_plant_values(user, db)}
+
+
+def can_access_plant(user, plant_value: object, db) -> bool:
+    if is_admin(user) or not user_has_team(user, "plant"):
+        return True
+    target = _normalized(plant_value)
+    return bool(target and target in assigned_plant_labels(user, db))
+
+
+def filter_plant_values(user, values, db):
+    values = list(values)
+    if is_admin(user) or not user_has_team(user, "plant"):
+        return values
+    assigned = assigned_plant_labels(user, db)
+    return [value for value in values if _normalized(value) in assigned]
+
+
+def require_plant_access(user, plant_value: object, db):
+    if not can_access_plant(user, plant_value, db):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
+
+
+def filter_linked_plant_records(user, records, db):
+    if is_admin(user) or not user_has_team(user, "plant"):
+        return records
+    from app.models.sample_request import CreateSampleRequest
+
+    sr_numbers = {
+        record.get("sr_number") or record.get("srNumber")
+        for record in records
+        if record.get("sr_number") or record.get("srNumber")
+    }
+    targets = dict(
+        db.query(CreateSampleRequest.sr_number, CreateSampleRequest.target_plant)
+        .filter(CreateSampleRequest.sr_number.in_(sr_numbers))
+        .all()
+    ) if sr_numbers else {}
+    assigned = assigned_plant_labels(user, db)
+    return [
+        record for record in records
+        if _normalized(targets.get(record.get("sr_number") or record.get("srNumber"))) in assigned
+    ]
+
+
+def filter_plant_records(user, records, db):
+    if is_admin(user) or not user_has_team(user, "plant"):
+        return records
+    assigned = assigned_plant_labels(user, db)
+    return [
+        record for record in records
+        if _normalized(record.get("target_plant", record.get("targetPlant"))) in assigned
+    ]

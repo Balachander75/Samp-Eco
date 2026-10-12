@@ -37,11 +37,28 @@ export interface ProductSearchResult {
   product_description: string;
   customer?: string;
   target_plant?: string;
+  source_sample_code?: string;
   binding_type_1?: string;
   binding_type_2?: string;
-  source_sample_code?: string;
+  product_category?: string;
+  product_sub_category?: string;
+  product_third_category?: string;
   c1_caliper_weight?: string;
   c2_material_type?: string;
   c2_cover_finish?: string;
   details_count?: number;
 }
+
+export interface ProductCategoryItem {
+  name: string;
+  subcategories: Array<{
+    name: string;
+    third_categories: string[];
+  }>;
+}
+
+export interface ProductCategoriesResponse {
+  categories: ProductCategoryItem[];
+  flat_categories: string[];
+}
+

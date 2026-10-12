@@ -3,9 +3,10 @@ Creative Design Request Service.
 Encapsulates business operations for Creative Design Requests, artwork variant counts,
 and workflow status transitions.
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from sqlalchemy.orm import Session
 from app.repositories.design_request_repo import DesignRequestRepository
+from app.models.sample_request import DesignRequest
 
 
 class DesignRequestService:
@@ -15,13 +16,18 @@ class DesignRequestService:
         self.db = db
         self.repo = DesignRequestRepository(db)
 
-    def list_all(self) -> List[Dict[str, Any]]:
-        """List all design requests."""
-        return self.repo.list_all_records()
+    def list_all(self, year: Optional[str] = None, draft_only: bool = False) -> List[Dict[str, Any]]:
+        """List design requests for the selected business year."""
+        return self.repo.list_all_records(year=year, draft_only=draft_only)
 
     def get_by_id(self, item_id: int) -> Optional[Dict[str, Any]]:
         """Fetch design request by ID."""
         return self.repo.get_record_by_id(item_id)
+
+    def get_by_sr_number(self, sr_number: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Fetch the design workflow linked to one sample request without scanning the full queue."""
+        item = self.repo.get_model_by_sr_number(sr_number)
+        return self.repo.to_dict(item) if item else None
 
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new creative design request."""
@@ -30,6 +36,10 @@ class DesignRequestService:
     def update(self, item_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update creative design request fields."""
         return self.repo.update_record(item_id, updates)
+
+    def mutate(self, item_id: int, mutator: Callable[[DesignRequest], None]) -> Optional[Dict[str, Any]]:
+        """Apply a workflow transition while holding the design request row lock."""
+        return self.repo.mutate_record(item_id, mutator)
 
     def delete(self, item_id: int) -> bool:
         """Delete creative design request."""

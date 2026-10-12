@@ -8,349 +8,770 @@ import {
   ArrowRight,
   Search,
   ChevronRight,
-  TrendingUp,
   FileCode2,
   Download,
   Scissors,
   X,
+  RefreshCw,
+  Building2,
+  Calendar,
+  ExternalLink,
+  Copy,
+  Activity,
+  FlaskConical,
 } from "lucide-react";
-import { DielineItem } from "@/features/sample-requests/types";
+import { SampleRequestItem } from "@/features/sample-requests/types";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { CopyBadge } from "@/components/ui/CopyBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { PaginationBar } from "@/components/erp/PaginationBar";
 import { exportRecordsToCsv } from "@/lib/csvExport";
+import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 
 export interface StudioOverviewPageProps {
-  dielines: DielineItem[];
+  mockupRequests: SampleRequestItem[];
+  samplingRequests?: SampleRequestItem[];
   isLoading: boolean;
   selectedYear: string;
   selectedPlant: string;
   onNavigateToMockup: () => void;
   onNavigateToSampling: () => void;
-  onInspectDieline: (dieline: DielineItem) => void;
+  onInspectRequest: (req: SampleRequestItem) => void;
+  onRefresh?: () => Promise<void>;
+  onExportCSV?: () => void;
 }
 
 export const StudioOverviewPage: React.FC<StudioOverviewPageProps> = ({
-  dielines,
+  mockupRequests = [],
+  samplingRequests = [],
   isLoading,
   selectedYear,
   selectedPlant,
   onNavigateToMockup,
   onNavigateToSampling,
-  onInspectDieline,
+  onInspectRequest,
+  onRefresh,
+  onExportCSV,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "submitted">("all");
+  const [customerFilter, setCustomerFilter] = useState("all");
+  const [plantFilter, setPlantFilter] = useState("all");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const totalDielines = dielines.length;
-  const inSimulation = dielines.filter((d) => d.status === "3D Simulation").length;
-  const inPlotter = dielines.filter((d) => d.status === "Plotter Sample Tested").length;
-  const clearedCount = dielines.filter((d) => d.status === "Laser Die Cleared").length;
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 40;
 
-  // Format distribution
-  const formatCounts = useMemo(() => {
-    return {
-      rigid: dielines.filter((d) => d.boxFormat === "Rigid Box").length,
-      folding: dielines.filter((d) => d.boxFormat === "Folding Carton").length,
-      flute: dielines.filter((d) => d.boxFormat === "Flute Corrugated").length,
-      blister: dielines.filter((d) => d.boxFormat === "Blister / Sleeve").length,
-    };
-  }, [dielines]);
+  // Combine requests where Studio is active
+  const allStudioItems = useMemo(() => {
+    const map = new Map<string | number, SampleRequestItem>();
+    mockupRequests.forEach((r) => map.set(r.id, r));
+    samplingRequests.forEach((r) => {
+      if (!map.has(r.id)) map.set(r.id, r);
+    });
+    return Array.from(map.values());
+  }, [mockupRequests, samplingRequests]);
 
-  // Recent dielines
-  const filteredDielines = useMemo(() => {
-    let items = [...dielines];
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      items = items.filter(
-        (d) =>
-          d.dielineCode.toLowerCase().includes(q) ||
-          d.title.toLowerCase().includes(q) ||
-          d.client.toLowerCase().includes(q) ||
-          d.targetPlant.toLowerCase().includes(q) ||
-          d.boxFormat.toLowerCase().includes(q)
+  // Base items filtered by plant prop if not "ALL"
+  const baseItems = useMemo(() => {
+    if (selectedPlant === "ALL" || !selectedPlant) return allStudioItems;
+    return allStudioItems.filter((r) =>
+      (r.targetPlant || "").toLowerCase().includes(selectedPlant.toLowerCase())
+    );
+  }, [allStudioItems, selectedPlant]);
+
+  // Telemetry counts
+  const totalCount = baseItems.length;
+
+  const pendingOutputCount = useMemo(() => {
+    return baseItems.filter((r) => !r.mockupWorkflowState?.mockupUrl).length;
+  }, [baseItems]);
+
+  const submittedCount = useMemo(() => {
+    return baseItems.filter((r) => Boolean(r.mockupWorkflowState?.mockupUrl)).length;
+  }, [baseItems]);
+
+  const mockupTotal = useMemo(() => {
+    return baseItems.filter((r) => {
+      return (
+        (r.requestTypes || []).includes("mockup") ||
+        String(r.mockupRequired || "").toLowerCase() === "yes"
       );
-    }
-    return items;
-  }, [dielines, searchTerm]);
+    }).length;
+  }, [baseItems]);
 
-  const handleExportCSV = () => {
+  const samplingTotal = useMemo(() => {
+    return baseItems.filter((r) => (r.requestTypes || []).includes("sample")).length;
+  }, [baseItems]);
+
+  // Unique customers
+  const customerList = useMemo(() => {
+    const set = new Set<string>();
+    baseItems.forEach((r) => {
+      if (r.customer?.trim()) set.add(r.customer.trim());
+    });
+    return Array.from(set).sort();
+  }, [baseItems]);
+
+  // Unique plants
+  const plantList = useMemo(() => {
+    const set = new Set<string>();
+    baseItems.forEach((r) => {
+      if (r.targetPlant?.trim()) set.add(r.targetPlant.trim());
+    });
+    return Array.from(set).sort();
+  }, [baseItems]);
+
+  // Filtered requests
+  const filteredItems = useMemo(() => {
+    return baseItems.filter((r) => {
+      const state = r.mockupWorkflowState;
+      const isPending = !state?.mockupUrl;
+      const isSubmitted = Boolean(state?.mockupUrl);
+
+      if (statusFilter === "pending" && !isPending) return false;
+      if (statusFilter === "submitted" && !isSubmitted) return false;
+
+      if (customerFilter !== "all" && (r.customer || "").trim() !== customerFilter) return false;
+      if (plantFilter !== "all" && (r.targetPlant || "").trim() !== plantFilter) return false;
+
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        return (
+          (r.srNumber || "").toLowerCase().includes(q) ||
+          (r.materialCode || "").toLowerCase().includes(q) ||
+          (r.productDescription || "").toLowerCase().includes(q) ||
+          (r.customer || "").toLowerCase().includes(q) ||
+          (r.targetPlant || "").toLowerCase().includes(q) ||
+          (r.productCategory || "").toLowerCase().includes(q) ||
+          (state?.mockupUrl || "").toLowerCase().includes(q)
+        );
+      }
+
+      return true;
+    });
+  }, [baseItems, statusFilter, customerFilter, plantFilter, searchTerm]);
+
+  // Paginated slice
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, currentPage, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setCustomerFilter("all");
+    setPlantFilter("all");
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+      statusFilter !== "all" ||
+      customerFilter !== "all" ||
+      plantFilter !== "all"
+  );
+
+  const handleRefreshClick = async () => {
+    if (!onRefresh || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleExportCSVClick = () => {
+    if (onExportCSV) {
+      onExportCSV();
+      return;
+    }
     const dateStr = new Date().toISOString().split("T")[0];
     exportRecordsToCsv({
-      filename: `studio_engineering_overview_${dateStr}.csv`,
+      filename: `studio_operations_overview_${dateStr}.csv`,
       columns: [
-        { header: "Dieline Code", accessor: (d) => d.dielineCode },
-        { header: "Title", accessor: (d) => d.title },
-        { header: "Client", accessor: (d) => d.client },
-        { header: "Box Format", accessor: (d) => d.boxFormat },
-        { header: "Dimensions", accessor: (d) => d.dimensions },
-        { header: "Substrate", accessor: (d) => d.substrate },
-        { header: "Caliper Microns", accessor: (d) => d.caliperMicrons },
-        { header: "Machine", accessor: (d) => d.machineCompatibility },
-        { header: "Status", accessor: (d) => d.status },
-        { header: "Due Date", accessor: (d) => d.dueDate },
-        { header: "Plant", accessor: (d) => d.targetPlant },
+        { header: "SR Code", accessor: (r) => r.srNumber || r.id },
+        { header: "Product Description", accessor: (r) => r.productDescription },
+        { header: "Customer / Brand", accessor: (r) => r.customer },
+        { header: "Material Code", accessor: (r) => r.materialCode },
+        { header: "Plant", accessor: (r) => r.targetPlant },
+        { header: "Due Date", accessor: (r) => r.sampleRequiredDate },
+        {
+          header: "Mockup Output (Link / Path)",
+          accessor: (r) => r.mockupWorkflowState?.mockupUrl || "Pending Output",
+        },
+        { header: "Workflow Stage", accessor: (r) => r.mockupWorkflowState?.stage || r.status },
       ],
-      data: filteredDielines,
+      data: filteredItems,
     });
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0c0d14] text-slate-800 dark:text-zinc-100 select-text overflow-hidden">
-      {/* ── 1. Compact Editorial Header (Maximized Space for Requests) ── */}
-      <header className="bg-white dark:bg-[#121622] px-6 py-3 shrink-0 border-b border-slate-200/60 dark:border-white/[0.06] shadow-[0_1px_4px_rgba(11,28,48,0.02)]">
+    <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] select-text font-sans overflow-hidden">
+      {/* ── 1. Compact Editorial Header ── */}
+      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-zinc-100 font-display">
-              Studio Structural CAD &amp; Engineering Command
-            </h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-zinc-400">
-              {totalDielines} Specifications
-            </span>
-            {inSimulation > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 animate-pulse">
-                ⚡ {inSimulation} 3D Fold Simulations Active
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="p-1 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 shrink-0">
+                <Box className="w-3.5 h-3.5" />
               </span>
-            )}
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--on-surface)] font-display">
+                Studio CAD &amp; 3D Mockup Command
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
+                BY {selectedYear === "ALL" ? "Consolidated" : selectedYear}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                {totalCount} Deliverables
+              </span>
+              {pendingOutputCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                  <Activity className="w-3 h-3 text-amber-500 animate-pulse" />
+                  <span>{pendingOutputCount} Awaiting Output Link/Path</span>
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-xs text-[var(--on-surface-muted)]">
+              Inspect technical product dockets, produce 3D CAD renders, and deliver the final mockup link or file path to Marketing.
+            </p>
           </div>
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Quick Navigate to Mockups Queue */}
             <button
               type="button"
-              onClick={handleExportCSV}
-              disabled={filteredDielines.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-xs font-semibold text-slate-700 dark:text-zinc-300 transition cursor-pointer disabled:opacity-50"
+              onClick={onNavigateToMockup}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors shadow-2xs cursor-pointer"
+              title="Open 3D Mockup Queue"
+            >
+              <Box className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>3D Mockups</span>
+              {mockupTotal > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+                  {mockupTotal}
+                </span>
+              )}
+            </button>
+
+            {/* Quick Navigate to Sampling */}
+            <button
+              type="button"
+              onClick={onNavigateToSampling}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors shadow-2xs cursor-pointer"
+              title="Open Sampling CAD Queue"
+            >
+              <FlaskConical className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="hidden sm:inline">Sampling CAD</span>
+            </button>
+
+            {/* Refresh */}
+            <button
+              type="button"
+              onClick={handleRefreshClick}
+              disabled={isLoading || isRefreshing}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
+              title="Refresh Queue"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${
+                  isLoading || isRefreshing
+                    ? "animate-spin text-[var(--accent-primary)]"
+                    : "text-[var(--on-surface-subtle)]"
+                }`}
+              />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+
+            {/* Export CSV */}
+            <button
+              type="button"
+              onClick={handleExportCSVClick}
+              disabled={filteredItems.length === 0}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
               title="Export Filtered CSV"
             >
-              <Download className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
-              <span>Export CSV</span>
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Export</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* ── 2. Scrollable Body with Clean Architecture ── */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* KPI Summary Tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── 2. Interactive KPI Workflow Strip ── */}
+      <section
+        aria-label="Studio queue summary"
+        className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2.5 sm:px-8"
+      >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {/* Card 1: Total Queue */}
           <button
             type="button"
-            onClick={onNavigateToMockup}
-            className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/60 dark:bg-[#121622]/60 hover:bg-white dark:hover:bg-[#161a26] hover:border-[#006d32] hover:shadow-sm text-left transition cursor-pointer group card-hover-lift"
+            onClick={() => {
+              setStatusFilter("all");
+              setCurrentPage(1);
+            }}
+            className={`min-w-0 rounded-xl border p-2.5 text-left shadow-2xs transition-all cursor-pointer ${
+              statusFilter === "all"
+                ? "border-indigo-500 bg-[var(--surface-lowest)] ring-2 ring-indigo-500/20"
+                : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-low)]"
+            }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                Total Structural CAD
-              </span>
-              <Box className="w-4 h-4 text-[#006d32] group-hover:scale-110 transition-transform" />
-            </div>
-            <div className="text-xl font-bold font-mono text-slate-900 dark:text-zinc-100 mt-1">
-              {isLoading ? "—" : totalDielines}
-            </div>
-            <div className="flex items-center justify-between mt-0.5">
-              <span className="text-[10.5px] text-slate-500 dark:text-zinc-400">Active blueprints</span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-[#006d32]" />
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={onNavigateToMockup}
-            className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/60 dark:bg-[#121622]/60 hover:bg-white dark:hover:bg-[#161a26] hover:border-amber-500 hover:shadow-sm text-left transition cursor-pointer group card-hover-lift"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                3D Fold Simulations
-              </span>
-              <Sparkles className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
-            </div>
-            <div className="text-xl font-bold font-mono text-slate-900 dark:text-zinc-100 mt-1">
-              {isLoading ? "—" : inSimulation}
-            </div>
-            <div className="flex items-center justify-between mt-0.5">
-              <span className="text-[10.5px] font-semibold text-amber-600 dark:text-amber-400">Kinematics check</span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-amber-500" />
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={onNavigateToMockup}
-            className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/60 dark:bg-[#121622]/60 hover:bg-white dark:hover:bg-[#161a26] hover:border-sky-500 hover:shadow-sm text-left transition cursor-pointer group card-hover-lift"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                Plotter Cut Tested
-              </span>
-              <Clock className="w-4 h-4 text-sky-500 group-hover:scale-110 transition-transform" />
-            </div>
-            <div className="text-xl font-bold font-mono text-slate-900 dark:text-zinc-100 mt-1">
-              {isLoading ? "—" : inPlotter}
-            </div>
-            <div className="flex items-center justify-between mt-0.5">
-              <span className="text-[10.5px] text-slate-500 dark:text-zinc-400">Kongsberg sample</span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-sky-500" />
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={onNavigateToSampling}
-            className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/60 dark:bg-[#121622]/60 hover:bg-white dark:hover:bg-[#161a26] hover:border-emerald-500 hover:shadow-sm text-left transition cursor-pointer group card-hover-lift"
-          >
-
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                Laser Die Cleared
-              </span>
-              <CheckCircle2 className="w-4 h-4 text-[#006d32] dark:text-emerald-400 group-hover:scale-110 transition-transform" />
-            </div>
-            <div className="text-xl font-bold font-mono text-slate-900 dark:text-zinc-100 mt-1">
-              {isLoading ? "—" : clearedCount}
-            </div>
-            <div className="flex items-center justify-between mt-0.5">
-              <span className="text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400">Tooling certified</span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-emerald-700" />
-            </div>
-          </button>
-        </div>
-
-
-        {/* Packaging Format Breakdown */}
-        <div>
-          <div className="flex items-center gap-2 mb-2.5">
-            <TrendingUp className="w-3.5 h-3.5 text-[#006d32] dark:text-emerald-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-              Packaging Format Engineering Distribution
-            </span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 bg-slate-50/70 dark:bg-[#121622]/60 rounded-xl border border-slate-200/70 dark:border-white/[0.06]">
-              <span className="text-[10.5px] uppercase font-bold text-slate-500 dark:text-zinc-400 font-mono tracking-wider">Rigid Box</span>
-              <div className="text-lg font-bold font-mono text-slate-900 dark:text-zinc-100 mt-0.5">{formatCounts.rigid}</div>
-              <div className="text-[11px] text-slate-400 dark:text-zinc-500">Kappa board &amp; wraps</div>
-            </div>
-            <div className="p-3 bg-slate-50/70 dark:bg-[#121622]/60 rounded-xl border border-slate-200/70 dark:border-white/[0.06]">
-              <span className="text-[10.5px] uppercase font-bold text-slate-500 dark:text-zinc-400 font-mono tracking-wider">Folding Carton</span>
-              <div className="text-lg font-bold font-mono text-slate-900 dark:text-zinc-100 mt-0.5">{formatCounts.folding}</div>
-              <div className="text-[11px] text-slate-400 dark:text-zinc-500">FBB / SBS paperboards</div>
-            </div>
-            <div className="p-3 bg-slate-50/70 dark:bg-[#121622]/60 rounded-xl border border-slate-200/70 dark:border-white/[0.06]">
-              <span className="text-[10.5px] uppercase font-bold text-slate-500 dark:text-zinc-400 font-mono tracking-wider">Flute Corrugated</span>
-              <div className="text-lg font-bold font-mono text-slate-900 dark:text-zinc-100 mt-0.5">{formatCounts.flute}</div>
-              <div className="text-[11px] text-slate-400 dark:text-zinc-500">E-Flute / Kraft Mailers</div>
-            </div>
-            <div className="p-3 bg-slate-50/70 dark:bg-[#121622]/60 rounded-xl border border-slate-200/70 dark:border-white/[0.06]">
-              <span className="text-[10.5px] uppercase font-bold text-slate-500 dark:text-zinc-400 font-mono tracking-wider">Blister / Sleeve</span>
-              <div className="text-lg font-bold font-mono text-slate-900 dark:text-zinc-100 mt-0.5">{formatCounts.blister}</div>
-              <div className="text-[11px] text-slate-400 dark:text-zinc-500">PET &amp; header cards</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Structural CAD Table */}
-        <div className="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-white dark:bg-[#121622] shadow-2xs overflow-hidden flex flex-col">
-          <div className="px-6 py-3 border-b border-slate-100 dark:border-white/[0.06] flex items-center justify-between gap-4 flex-wrap bg-slate-50/50 dark:bg-white/[0.02]">
-            <div className="flex items-center gap-2">
-              <FileCode2 className="w-4 h-4 text-[#006d32] dark:text-emerald-400" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-zinc-200">
-                Recent Structural Dielines &amp; Tooling Specs ({filteredDielines.length})
-              </h2>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="relative w-48 sm:w-60 group">
-                <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-[#006d32] transition-colors pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search dielines, client..."
-                  className="w-full h-8.5 pl-[32px] pr-7 rounded-lg bg-white dark:bg-white/[0.06] border border-slate-200 dark:border-white/[0.08] text-xs text-slate-800 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#006d32]/15 focus:border-[#006d32]/40 transition"
-                />
-                {searchTerm && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchTerm("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.1] transition-colors cursor-pointer"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                <span className="truncate">Total Studio Queue</span>
               </div>
-              <button
-                type="button"
-                onClick={onNavigateToMockup}
-                className="text-xs font-semibold text-[#006d32] dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <span>View All Mockups</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+              <Box className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             </div>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-lg font-display font-bold tabular-nums text-[var(--on-surface)]">
+                {isLoading ? "—" : totalCount}
+              </span>
+              <span className="truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                Mockups &amp; CAD tasks
+              </span>
+            </div>
+          </button>
+
+          {/* Card 2: Awaiting Output (Need Link / Path) */}
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("pending");
+              setCurrentPage(1);
+            }}
+            className={`min-w-0 rounded-xl border p-2.5 text-left shadow-2xs transition-all cursor-pointer ${
+              statusFilter === "pending"
+                ? "border-amber-500 bg-[var(--surface-lowest)] ring-2 ring-amber-500/20"
+                : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-low)]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500 animate-pulse" />
+                <span className="truncate">Awaiting Link / Path</span>
+              </div>
+              <Clock className="w-3.5 h-3.5 text-amber-500" />
+            </div>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-lg font-display font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                {isLoading ? "—" : pendingOutputCount}
+              </span>
+              <span className="truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                Action required
+              </span>
+            </div>
+          </button>
+
+          {/* Card 3: Output Submitted */}
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("submitted");
+              setCurrentPage(1);
+            }}
+            className={`min-w-0 rounded-xl border p-2.5 text-left shadow-2xs transition-all cursor-pointer ${
+              statusFilter === "submitted"
+                ? "border-emerald-500 bg-[var(--surface-lowest)] ring-2 ring-emerald-500/20"
+                : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-low)]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                <span className="truncate">Output Submitted</span>
+              </div>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            </div>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-lg font-display font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {isLoading ? "—" : submittedCount}
+              </span>
+              <span className="truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                Sent to Marketing
+              </span>
+            </div>
+          </button>
+
+          {/* Card 4: CAD Mockups */}
+          <button
+            type="button"
+            onClick={onNavigateToMockup}
+            className="min-w-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-indigo-500 hover:bg-[var(--surface-low)] p-2.5 text-left shadow-2xs transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                <span className="truncate">3D Mockup Queue</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-indigo-500 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-lg font-display font-bold tabular-nums text-indigo-600 dark:text-indigo-400">
+                {isLoading ? "—" : mockupTotal}
+              </span>
+              <span className="truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                Review queue
+              </span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      {/* ── 3. Compact Filter Controls (Single h-8 Row) ── */}
+      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-2 sm:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {/* Search Box */}
+            <div className="relative w-52 sm:w-64 group">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] group-focus-within:text-[var(--accent-primary)] transition-colors pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search SR#, product, customer, link..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full h-8 pl-8 pr-7 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] shadow-2xs transition-all"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setCurrentPage(1);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Status Filter Dropdown */}
+            <select
+              aria-label="Filter by status"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="h-8 max-w-[170px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
+              title="Filter by Output Status"
+            >
+              <option value="all">All Statuses ({baseItems.length})</option>
+              <option value="pending">Awaiting Output ({pendingOutputCount})</option>
+              <option value="submitted">Output Submitted ({submittedCount})</option>
+            </select>
+
+            {/* Customer Filter */}
+            {customerList.length > 0 && (
+              <select
+                aria-label="Filter by customer"
+                value={customerFilter}
+                onChange={(e) => {
+                  setCustomerFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="h-8 max-w-[160px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
+                title="Filter by Customer / Brand"
+              >
+                <option value="all">All Brands ({customerList.length})</option>
+                {customerList.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Plant Filter */}
+            {plantList.length > 0 && (
+              <select
+                aria-label="Filter by plant"
+                value={plantFilter}
+                onChange={(e) => {
+                  setPlantFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="h-8 max-w-[150px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
+                title="Filter by Plant"
+              >
+                <option value="all">All Plants ({plantList.length})</option>
+                {plantList.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-[#121622] border-b border-slate-200/70 dark:border-white/[0.08]">
-                <tr className="text-slate-600 dark:text-zinc-400 font-mono text-[11px] uppercase tracking-wider select-none">
-                  <th className="py-3 pl-6 pr-3 font-semibold whitespace-nowrap">Dieline Code</th>
-                  <th className="py-3 px-4 font-semibold">Packaging Title</th>
-                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Client</th>
-                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Box Format</th>
-                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Dimensions (L×W×D)</th>
-                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Caliper</th>
-                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Plant</th>
-                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Status</th>
-                  <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Action</th>
+          {/* Reset Filters */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-xs text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+              title="Reset all search and dropdown filters"
+            >
+              <X className="w-3 h-3" />
+              <span className="hidden sm:inline">Reset</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── 4. Main Workspace: Full-Bleed High-Density Table ── */}
+      <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col text-[var(--on-surface)]">
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="sticky top-0 z-10 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
+              <tr className="text-[var(--on-surface-muted)] font-mono text-[11px] uppercase tracking-wider select-none">
+                <th className="py-3 pl-6 pr-3 font-semibold whitespace-nowrap">SR Code</th>
+                <th className="py-3 px-4 font-semibold">Deliverable &amp; Category</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">Customer / Brand</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">Scopes</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">Target Plant</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">Required SLA Date</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">Studio Output (Link / File Path)</th>
+                <th className="py-3 px-4 font-semibold whitespace-nowrap">Workflow Status</th>
+                <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-[var(--border-subtle)]">
+              {isLoading ? (
+                <TableSkeletonRows rows={8} columns={9} />
+              ) : filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-16 text-center">
+                    <EmptyState
+                      icon={Box}
+                      title="No Studio Deliverables Found"
+                      description={
+                        hasActiveFilters
+                          ? "No requests match your search query or active filter."
+                          : "There are currently no deliverables assigned to Studio."
+                      }
+                      onResetFilters={hasActiveFilters ? handleResetFilters : undefined}
+                      resetLabel="Reset filters"
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-white/[0.04]">
-                {filteredDielines.slice(0, 10).map((d) => (
-                  <tr
-                    key={d.id}
-                    onClick={() => onInspectDieline(d)}
-                    className="hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors cursor-pointer"
-                  >
-                    <td className="py-3 pl-6 pr-3 whitespace-nowrap">
-                      <CopyBadge text={d.dielineCode} />
-                    </td>
-                    <td className="py-3 px-4 text-slate-900 dark:text-zinc-100 font-medium max-w-[200px] truncate">
-                      {d.title}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 dark:text-zinc-400 whitespace-nowrap font-medium">
-                      {d.client}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap font-mono">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[0.06] text-[10.5px] font-semibold text-slate-700 dark:text-zinc-300">
-                        {d.boxFormat}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-600 dark:text-zinc-400 whitespace-nowrap">
-                      {d.dimensions}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500 dark:text-zinc-400 whitespace-nowrap">
-                      {d.caliperMicrons}µm
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 dark:text-zinc-400 whitespace-nowrap">
-                      {d.targetPlant}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <StatusPill status={d.status} size="sm" />
-                    </td>
-                    <td className="py-3 pl-4 pr-6 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onInspectDieline(d);
-                        }}
-                        className="px-3 py-1 rounded-lg border border-slate-200 dark:border-white/[0.08] hover:bg-slate-100 dark:hover:bg-white/[0.06] text-[11px] font-semibold text-slate-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer"
+              ) : (
+                paginatedItems.map((r) => {
+                  const state = r.mockupWorkflowState;
+                  const outputUrl = state?.mockupUrl;
+                  const isPending = !outputUrl;
+                  const isSubmitted = Boolean(outputUrl);
+
+                  const scopes = r.requestTypes || [];
+                  const hasMockup =
+                    scopes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes";
+                  const hasSample = scopes.includes("sample");
+
+                  const categoryHierarchy = [
+                    r.productCategory,
+                    r.productSubCategory,
+                    r.productThirdCategory,
+                  ]
+                    .filter(Boolean)
+                    .join(" / ");
+
+                  const isWebUrl = outputUrl && (outputUrl.startsWith("http://") || outputUrl.startsWith("https://"));
+
+                  return (
+                    <tr
+                      key={r.id}
+                      onClick={() => onInspectRequest(r)}
+                      className="hover:bg-[var(--surface-low)] transition-colors cursor-pointer group"
+                    >
+                      {/* SR Code */}
+                      <td className="py-3.5 pl-6 pr-3 font-mono font-bold whitespace-nowrap">
+                        <CopyBadge text={r.srNumber || `SR-${r.id}`} />
+                        <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                          Raised {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
+                        </div>
+                      </td>
+
+                      {/* Product Description & Category */}
+                      <td className="py-3.5 px-4 max-w-sm">
+                        <div
+                          className="font-semibold text-xs text-[var(--on-surface)] truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"
+                          title={r.productDescription || (r as any).opportunityName || "Packaging Deliverable"}
+                        >
+                          {r.productDescription || (r as any).opportunityName || "Packaging Deliverable"}
+                        </div>
+                        <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 truncate">
+                          {categoryHierarchy || r.materialCode || "Cartonboard Packaging"}
+                        </div>
+                      </td>
+
+                      {/* Customer / Brand */}
+                      <td className="py-3.5 px-4 font-semibold text-[var(--on-surface)] whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
+                          <span className="truncate max-w-[160px]" title={r.customer || ""}>
+                            {r.customer || "—"}
+                          </span>
+                        </div>
+                        <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
+                          {r.brandName || "Commercial Account"}
+                        </div>
+                      </td>
+
+                      {/* Scopes */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {hasMockup && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+                              <Box className="w-2.5 h-2.5 text-indigo-600" />
+                              <span>Mockup</span>
+                            </span>
+                          )}
+                          {hasSample && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                              <FlaskConical className="w-2.5 h-2.5 text-emerald-600" />
+                              <span>Sample</span>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Plant */}
+                      <td className="py-3.5 px-4 font-mono text-xs text-[var(--on-surface-muted)] whitespace-nowrap">
+                        {r.targetPlant || "Khaniwade"}
+                      </td>
+
+                      {/* Required SLA Date */}
+                      <td className="py-3.5 px-4 whitespace-nowrap font-mono text-[var(--on-surface-muted)]">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
+                          <span>
+                            {r.sampleRequiredDate
+                              ? formatOdooDate(r.sampleRequiredDate)
+                              : "Standard SLA"}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Studio Output (Link / File Path) */}
+                      <td className="py-3.5 px-4 max-w-xs" onClick={(e) => e.stopPropagation()}>
+                        {outputUrl ? (
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300 truncate max-w-[200px]"
+                              title={outputUrl}
+                            >
+                              {outputUrl}
+                            </span>
+                            <CopyBadge text={outputUrl} label="" />
+                            {isWebUrl && (
+                              <a
+                                href={outputUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1 rounded hover:bg-[var(--surface-container)] text-indigo-600 dark:text-indigo-400 transition"
+                                title="Open Link"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        ) : isPending ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-mono font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                            <Clock className="w-2.5 h-2.5" />
+                            <span>Awaiting Link / Path</span>
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">—</span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <StatusPill
+                          status={
+                            isSubmitted
+                              ? "Mockup Submitted"
+                              : isPending
+                              ? "Studio Action"
+                              : r.status || "In Review"
+                          }
+                          size="sm"
+                          showDot
+                        />
+                      </td>
+
+                      {/* Actions */}
+                      <td
+                        className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        Inspect
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        {isPending ? (
+                          <button
+                            type="button"
+                            onClick={() => onInspectRequest(r)}
+                            className="inline-flex select-none items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold font-mono transition cursor-pointer shadow-2xs active:scale-98"
+                            title="Provide Output Link or File Path"
+                          >
+                            <span>Provide Link / Path</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onInspectRequest(r)}
+                            className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
+                            title="Inspect Docket Details"
+                          >
+                            <span>Inspect</span>
+                            <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Table Footer with Pagination */}
+        <div className="mt-auto px-6 py-2.5 bg-[var(--surface-lowest)] border-t border-[var(--border-subtle)] text-[var(--on-surface-subtle)] flex items-center justify-between text-xs font-mono shrink-0">
+          <span>
+            Showing {filteredItems.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+            {filteredItems.length > 0 && (
+              <> – {Math.min(filteredItems.length, currentPage * pageSize)}</>
+            )}{" "}
+            of {filteredItems.length} deliverables
+          </span>
+          <div className="flex items-center gap-4">
+            <span className="hidden sm:flex items-center gap-1.5 text-[var(--on-surface-subtle)]">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              Sorted by Latest Intake
+            </span>
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalCount={filteredItems.length}
+              pageSize={pageSize}
+              onPageChange={(p) => setCurrentPage(p)}
+              itemLabel="deliverables"
+              className="border-t-0 p-0"
+            />
           </div>
         </div>
       </div>

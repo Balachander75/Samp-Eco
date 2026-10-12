@@ -25,7 +25,7 @@ export const ProcessStageRibbon: React.FC<ProcessStageRibbonProps> = ({
 
   return (
     <div
-      className={`border-b border-[#e2e8f0] dark:border-white/[0.08] bg-[#f8f9fa] dark:bg-[#0e1017] px-4 sm:px-6 py-2 overflow-x-auto smooth-scroll select-none no-scrollbar flex items-center justify-between gap-4 ${className}`}
+      className={`border-b border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-zinc-950 px-4 sm:px-6 py-2 overflow-x-auto smooth-scroll select-none no-scrollbar flex items-center justify-between gap-4 ${className}`}
     >
       {/* Odoo 19 Polygon Chevron Statusbar */}
       <div className="o_statusbar_status select-none shadow-2xs">
@@ -54,7 +54,7 @@ export const ProcessStageRibbon: React.FC<ProcessStageRibbonProps> = ({
                   isSelected
                     ? "bg-white/25 text-white"
                     : isDone
-                    ? "bg-[#017e84]/15 text-[#017e84] dark:bg-[#017e84]/30 dark:text-[#2dd4bf]"
+                    ? "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400"
                     : stage.count > 0
                     ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
                     : "bg-zinc-200/50 dark:bg-zinc-800/50 text-zinc-400 dark:text-zinc-500"
@@ -68,7 +68,7 @@ export const ProcessStageRibbon: React.FC<ProcessStageRibbonProps> = ({
       </div>
 
       <div className="hidden lg:flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#714B67] dark:bg-purple-400" />
+        <span className="w-1.5 h-1.5 rounded-full bg-purple-600 dark:bg-purple-400" />
         <span>Odoo 19 Enterprise Workflow Pipeline</span>
       </div>
     </div>

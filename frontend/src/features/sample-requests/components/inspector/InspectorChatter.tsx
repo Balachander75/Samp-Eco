@@ -16,16 +16,16 @@ export interface InspectorChatterProps {
 
 export const InspectorChatter: React.FC<InspectorChatterProps> = ({ chatterFeed }) => {
   return (
-    <aside className="hidden lg:flex w-80 xl:w-96 border-l border-slate-100 dark:border-white/5 bg-white dark:bg-[#161822] flex-col h-full shrink-0 select-none">
+    <aside className="hidden lg:flex w-80 xl:w-96 border-l border-[var(--border-subtle)] bg-[var(--surface-lowest)] flex-col h-full shrink-0 select-none">
       {/* SLA Target Banner */}
-      <div className="px-4 py-3 bg-[#eff4ff]/60 dark:bg-zinc-900/40 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+      <div className="px-4 py-3 bg-[var(--surface-base)] border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <span className="w-2 h-2 rounded-full bg-[#006d32] animate-pulse"></span>
+          <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)]"></span>
           <span className="font-bold text-xs text-slate-800 dark:text-zinc-200 font-display">
             SLA: On Target
           </span>
         </div>
-        <span className="text-[10px] font-mono font-bold bg-[#eff4ff] text-[#006d32] dark:bg-[#006d32]/25 dark:text-[#00d166] px-2 py-0.5 rounded-md border border-[#006d32]/20">
+        <span className="text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] px-2 py-0.5 rounded-md border border-[var(--accent-primary)]/25">
           Optimal Turnaround
         </span>
       </div>
@@ -33,7 +33,7 @@ export const InspectorChatter: React.FC<InspectorChatterProps> = ({ chatterFeed 
       {/* Header Bar - Live Activity Log */}
       <div className="px-4 py-2.5 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-zinc-900/60 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#006d32]"></span>
+          <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)]"></span>
           <span className="font-bold text-xs text-slate-800 dark:text-zinc-200 font-display">
             Audit Trail &amp; History
           </span>
@@ -47,7 +47,7 @@ export const InspectorChatter: React.FC<InspectorChatterProps> = ({ chatterFeed 
       <div className="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
         {chatterFeed.map((item) => (
           <div key={item.id} className="flex space-x-2.5">
-            <div className="w-6 h-6 rounded-full bg-[#006d32] text-white flex items-center justify-center font-bold text-[9px] shrink-0 shadow-2xs font-display">
+            <div className="w-6 h-6 rounded-full bg-[var(--accent-primary)] text-white flex items-center justify-center font-bold text-[9px] shrink-0 shadow-2xs font-display">
               {item.initials}
             </div>
             <div className="flex-1 min-w-0">

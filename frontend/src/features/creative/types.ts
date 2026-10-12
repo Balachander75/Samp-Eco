@@ -1,7 +1,7 @@
 export interface CreativeDesignOutputRow {
   designNumber: string;
   description: string;
-  stockNumber: string;
+  shutterstockNo: string;
   remarks: string;
 }
 
@@ -41,6 +41,9 @@ export interface DesignRequest {
   counterDateDecision?: "pending" | "accepted" | "rejected" | null;
   counterDateDecisionAt?: string | null;
   counterDateDecisionNotes?: string | null;
+  counterDateRequestedBy?: string | null;
+  workflowEvents?: Array<Record<string, any>>;
+  workflowNotes?: Array<Record<string, any>>;
   status: string;
   createdBy: string;
   updatedBy: string;
@@ -58,6 +61,9 @@ export interface DesignRequestForm {
   referenceImage: string;
   productDescription: string;
   designRequiredDate: string;
+  designRemarks?: string;
+  referenceImages?: string[];
+  referenceLinks?: string[];
 }
 
 export interface CreativeBriefItem {

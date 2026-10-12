@@ -16,7 +16,7 @@ export const InspectorReviewTab: React.FC<InspectorReviewTabProps> = ({
       {trackType === "program_planning" ? (
         /* Plant Planning SCU Effort */
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          <div className="bg-[#eff4ff]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 p-4 rounded-2xl">
+          <div className="bg-[var(--accent-primary-subtle)]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 p-4 rounded-2xl">
             <div className="font-display text-[10px] uppercase text-slate-400 font-bold">
               Base Notebook Effort
             </div>
@@ -27,18 +27,18 @@ export const InspectorReviewTab: React.FC<InspectorReviewTabProps> = ({
               Standard scholastic binding baseline.
             </div>
           </div>
-          <div className="bg-[#eff4ff]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 p-4 rounded-2xl">
+          <div className="bg-[var(--accent-primary-subtle)]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 p-4 rounded-2xl">
             <div className="font-display text-[10px] uppercase text-slate-400 font-bold">
               Wiro + Tab Modifier
             </div>
-            <div className="text-lg font-bold text-[#006d32] dark:text-[#00d166] font-display mt-1">
+            <div className="text-lg font-bold text-[var(--accent-primary)] dark:text-[var(--accent-primary)] font-display mt-1">
               +0.50 SCU
             </div>
             <div className="text-[11px] text-slate-500 mt-0.5">
               Twin loop wire insertion &amp; tabs.
             </div>
           </div>
-          <div className="bg-[#eff4ff]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 p-4 rounded-2xl">
+          <div className="bg-[var(--accent-primary-subtle)]/60 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 p-4 rounded-2xl">
             <div className="font-display text-[10px] uppercase text-slate-400 font-bold">
               Total Capacity Required
             </div>
@@ -55,7 +55,7 @@ export const InspectorReviewTab: React.FC<InspectorReviewTabProps> = ({
         <div className="space-y-4">
           {activeRequest.samplingFeasibilityResponse ? (
             /* Evaluated View */
-            <div className="p-5 rounded-2xl bg-white dark:bg-[#161928] border border-slate-100 dark:border-white/5 shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-3">
+            <div className="p-5 rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100 dark:border-white/5">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-600 dark:text-zinc-400 font-display">
@@ -64,7 +64,7 @@ export const InspectorReviewTab: React.FC<InspectorReviewTabProps> = ({
                   <span
                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold font-display ${
                       activeRequest.samplingFeasibilityResponse === "Yes"
-                        ? "bg-emerald-50 text-[#006d32] dark:bg-emerald-950/60 dark:text-[#00d166]"
+                        ? "bg-emerald-50 text-[var(--accent-primary)] dark:bg-emerald-950/60 dark:text-[var(--accent-primary)]"
                         : activeRequest.samplingFeasibilityResponse === "No"
                         ? "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
                         : "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
@@ -119,12 +119,12 @@ export const InspectorReviewTab: React.FC<InspectorReviewTabProps> = ({
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {/* Department 1: Creative Studio */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#161928] border border-slate-100 dark:border-white/5 shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-2">
+            <div className="p-4 rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold font-display text-slate-800 dark:text-zinc-200">
                   Creative &amp; Artwork Brief
                 </span>
-                <span className="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold bg-[#eff4ff] text-[#006d32]">
+                <span className="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
                   {activeRequest.targetArtworkDateCreative ? "Scheduled" : "In Progress"}
                 </span>
               </div>
@@ -136,7 +136,7 @@ export const InspectorReviewTab: React.FC<InspectorReviewTabProps> = ({
             </div>
 
             {/* Department 2: Structural CAD */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#161928] border border-slate-100 dark:border-white/5 shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-2">
+            <div className="p-4 rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold font-display text-slate-800 dark:text-zinc-200">
                   CAD Dielines &amp; Structural Specs
@@ -153,12 +153,12 @@ export const InspectorReviewTab: React.FC<InspectorReviewTabProps> = ({
             </div>
 
             {/* Department 3: Costing & BOM */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#161928] border border-slate-100 dark:border-white/5 shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-2">
+            <div className="p-4 rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold font-display text-slate-800 dark:text-zinc-200">
                   Costing Estimations &amp; Margins
                 </span>
-                <span className="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold bg-[#eff4ff] text-[#006d32]">
+                <span className="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
                   Run: {Number(activeRequest.qtyDesignCosting || 10000).toLocaleString()}
                 </span>
               </div>
@@ -168,12 +168,12 @@ export const InspectorReviewTab: React.FC<InspectorReviewTabProps> = ({
             </div>
 
             {/* Department 4: Plant Execution */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#161928] border border-slate-100 dark:border-white/5 shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-2">
+            <div className="p-4 rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold font-display text-slate-800 dark:text-zinc-200">
                   Plant Fulfillment Facility
                 </span>
-                <span className="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold bg-[#eff4ff] text-[#006d32]">
+                <span className="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
                   Plant {activeRequest.targetPlant || "1"}
                 </span>
               </div>

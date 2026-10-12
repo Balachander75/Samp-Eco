@@ -2,13 +2,14 @@
 Navneet SAMP ERP — FastAPI Application Entry Point
 
 Startup sequence:
-1. Auto-create any new DB tables (SQLAlchemy DDL — idempotent)
+1. Apply versioned database schema and data migrations
 2. Mount CORS middleware (strict allowlist)
 3. Register all routers
 """
+import asyncio
 import logging
 import re
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -16,8 +17,10 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from app.config import settings
-from app.database import engine, Base, ensure_design_workflow_columns, ensure_program_review_columns
+from app.database import SessionLocal
+from app.migrations import apply_database_migrations
 from app.routers import auth, feasibility, master, program_requests, sample_requests
+from app.auth.permissions import require_workflow_write_access
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -29,19 +32,39 @@ logger = logging.getLogger("uvicorn.error")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run startup tasks before serving requests."""
-    # Auto-create any new DB tables (idempotent, safe to run on every restart)
-    Base.metadata.create_all(bind=engine)
-    ensure_design_workflow_columns()
-    ensure_program_review_columns()
+    apply_database_migrations()
     try:
-        from app.database import SessionLocal
         from app.services.downstream_service import DownstreamService
         with SessionLocal() as db:
             DownstreamService(db).seed_if_empty()
     except Exception as e:
         logger.warning("[Startup] Downstream seeding skipped: %s", e)
-    logger.info("[Startup] ✓ Database tables verified / created.")
+    logger.info("[Startup] Database migrations applied.")
+    from app.services.feasibility_service import FeasibilityService
+
+    def process_due_counter_dates():
+        with SessionLocal() as db:
+            return FeasibilityService.auto_accept_due_counter_dates(db)
+
+    async def auto_accept_counter_dates():
+        while True:
+            try:
+                count = await asyncio.to_thread(process_due_counter_dates)
+                if count:
+                    logger.info("[Feasibility] Auto-accepted %s expired counter-date proposal(s).", count)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("[Feasibility] Counter-date auto-accept worker failed")
+            await asyncio.sleep(30)
+
+    counter_date_worker = asyncio.create_task(auto_accept_counter_dates())
     yield
+    counter_date_worker.cancel()
+    try:
+        await counter_date_worker
+    except asyncio.CancelledError:
+        pass
 
 
 
@@ -120,9 +143,9 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.include_router(auth.router)
 app.include_router(master.router)
-app.include_router(feasibility.router)
-app.include_router(program_requests.router)
-app.include_router(sample_requests.router)
+app.include_router(feasibility.router, dependencies=[Depends(require_workflow_write_access)])
+app.include_router(program_requests.router, dependencies=[Depends(require_workflow_write_access)])
+app.include_router(sample_requests.router, dependencies=[Depends(require_workflow_write_access)])
 
 
 # ---------------------------------------------------------------------------

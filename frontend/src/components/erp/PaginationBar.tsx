@@ -51,7 +51,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white dark:bg-[#12141d] border-t border-neutral-200/90 dark:border-white/[0.08] select-none text-xs text-neutral-600 dark:text-zinc-400 ${className}`}
+      className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white dark:bg-zinc-900 border-t border-neutral-200/90 dark:border-white/[0.08] select-none text-xs text-neutral-600 dark:text-zinc-400 ${className}`}
     >
       {/* Entries Counter & Page Size */}
       <div className="flex items-center gap-3">
@@ -108,7 +108,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
               onClick={() => onPageChange(pageNum)}
               className={`min-w-[28px] h-7 px-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 isActive
-                  ? "bg-[#714B67] text-white shadow-2xs"
+                  ? "bg-purple-600 text-white shadow-2xs"
                   : "hover:bg-neutral-100 dark:hover:bg-zinc-800 text-neutral-700 dark:text-zinc-300"
               }`}
             >

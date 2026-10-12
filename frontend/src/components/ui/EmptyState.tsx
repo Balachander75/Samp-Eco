@@ -7,6 +7,8 @@ export interface EmptyStateProps {
   description?: string;
   onResetFilters?: () => void;
   resetLabel?: string;
+  actionLabel?: string;
+  onAction?: () => void;
   action?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
@@ -19,41 +21,45 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   description,
   onResetFilters,
   resetLabel = "Reset All Filters",
+  actionLabel,
+  onAction,
   action,
   children,
   className = "",
   compact = false,
 }) => {
+  const handleReset = onResetFilters || onAction;
+  const label = actionLabel || resetLabel;
   return (
     <div
       className={`flex flex-col items-center justify-center text-center max-w-xl mx-auto ${
         compact ? "py-8 px-4" : "py-14 px-4"
       } ${className}`}
     >
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#714B67]/15 to-[#714B67]/5 dark:from-[#714B67]/30 dark:to-transparent border border-[#714B67]/20 flex items-center justify-center text-[#714B67] dark:text-purple-300 mb-4 shadow-2xs">
-        <Icon className="w-8 h-8" />
+      <div className="w-14 h-14 rounded-2xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--accent-primary)] mb-3.5 shadow-2xs">
+        <Icon className="w-7 h-7" />
       </div>
 
-      <h3 className="text-base font-bold text-neutral-900 dark:text-zinc-100 mb-1.5">
+      <h3 className="text-sm font-semibold text-[var(--on-surface)] mb-1 font-display">
         {title}
       </h3>
 
       {description && (
-        <p className="text-xs text-neutral-500 dark:text-zinc-400 max-w-md mb-6 leading-relaxed">
+        <p className="text-xs text-[var(--on-surface-muted)] max-w-md mb-5 leading-relaxed">
           {description}
         </p>
       )}
 
-      {(onResetFilters || action) && (
-        <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
-          {onResetFilters && (
+      {(handleReset || action) && (
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-5">
+          {handleReset && (
             <button
               type="button"
-              onClick={onResetFilters}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-[#714B67]/40 dark:border-purple-400/40 text-xs font-semibold text-[#714B67] dark:text-purple-300 hover:bg-[#714B67]/10 dark:hover:bg-purple-900/30 transition shadow-2xs cursor-pointer"
+              onClick={handleReset}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs font-semibold text-[var(--on-surface)] hover:bg-[var(--surface-container)] transition shadow-2xs cursor-pointer"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>{resetLabel}</span>
+              <RotateCcw className="w-3.5 h-3.5 text-[var(--on-surface-muted)]" />
+              <span>{label}</span>
             </button>
           )}
           {action}

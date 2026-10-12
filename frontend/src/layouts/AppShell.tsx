@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { UserProfile } from "@/features/auth";
+import { hasWorkflowTeam, isAdmin } from "@/features/auth/permissions";
 import { Sidebar } from "./Sidebar";
 import { getNavigationTitle } from "./navigation";
 import { useBusinessYear } from "@/context/BusinessYearContext";
@@ -12,6 +13,8 @@ import {
   ChevronDown,
   LogOut,
   Settings,
+  Info,
+  Palette,
 } from "lucide-react";
 
 export interface AppShellProps {
@@ -53,16 +56,32 @@ export const AppShell: React.FC<AppShellProps> = ({
     setSelectedPlant,
     plantOptions,
     activePlantLabel,
+    isLoading: isPlantLoading,
   } = usePlant();
+  const isPlantScopedUser = !isAdmin(user) && hasWorkflowTeam(user, "plant");
 
   const plantsList = useMemo(() => [
-    { code: "ALL", name: "Consolidated (All Plants)", label: "Consolidated (All Plants)" },
+    {
+      code: "ALL",
+      name: isPlantScopedUser ? "My assigned plants" : "Consolidated (All Plants)",
+      label: isPlantScopedUser ? "My assigned plants" : "Consolidated (All Plants)",
+    },
     ...plantOptions.map((p) => ({
       code: p.code,
       name: p.name,
       label: p.displayName,
     })),
-  ], [plantOptions]);
+  ], [isPlantScopedUser, plantOptions]);
+
+  const plantDisplayLabel = isPlantScopedUser
+    ? isPlantLoading
+      ? "Loading assigned plants"
+      : plantOptions.length === 0
+      ? "No plants assigned"
+      : selectedPlant === "ALL"
+        ? "My assigned plants"
+        : activePlantLabel
+    : activePlantLabel;
 
   const handleSelectPlant = (plantCode: string, plantLabel: string) => {
     setSelectedPlant(plantCode);
@@ -75,7 +94,7 @@ export const AppShell: React.FC<AppShellProps> = ({
     window.dispatchEvent(
       new CustomEvent("app:show-toast", {
         detail: {
-          message: `Fulfillment plant scope updated: ${plantLabel}`,
+          message: `Plant scope updated: ${plantLabel}`,
           tone: "info",
         },
       })
@@ -100,6 +119,25 @@ export const AppShell: React.FC<AppShellProps> = ({
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Ctrl/Cmd+S falls through to the browser's "Save webpage" action unless
+  // the application cancels the native shortcut. This app has no page-save action.
+  useEffect(() => {
+    const preventBrowserPageSave = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        (!event.ctrlKey && !event.metaKey) ||
+        event.key.toLowerCase() !== "s"
+      ) {
+        return;
+      }
+      event.preventDefault();
+    };
+
+    document.addEventListener("keydown", preventBrowserPageSave, true);
+    return () => document.removeEventListener("keydown", preventBrowserPageSave, true);
   }, []);
 
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -162,10 +200,9 @@ export const AppShell: React.FC<AppShellProps> = ({
     .toUpperCase();
 
   const activeTitle = getNavigationTitle(currentPath);
-  const plantDisplayLabel = activePlantLabel;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#f8f9ff] text-slate-900 font-sans transition-colors duration-150 select-none">
+    <div className="app-shell flex w-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] font-sans transition-colors duration-150">
       {/* Primary Navigation Sidebar */}
       <Sidebar
         user={user}
@@ -178,217 +215,232 @@ export const AppShell: React.FC<AppShellProps> = ({
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        {/* Enterprise Frosted Utility Top Bar */}
-        <header className="h-14 bg-white text-slate-900 flex items-center justify-between px-4 sm:px-6 border-b border-slate-200 shrink-0 z-40 transition-colors gap-3">
+        {/* Enterprise Thematic Utility Top Bar */}
+        <header className="app-topbar h-14 bg-[var(--sidebar-surface)] text-[var(--sidebar-text)] flex items-center justify-between px-4 sm:px-6 border-b border-[var(--border-subtle)] shrink-0 z-40 transition-colors duration-200 gap-3">
           
-          {/* Left: Mobile Menu Toggle & Current Workspace Breadcrumb */}
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              type="button"
-              onClick={() => setIsMobileNavOpen(true)}
-              className="md:hidden p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 transition focus:outline-none cursor-pointer"
-              aria-label="Open navigation menu"
-            >
-              <Menu className="w-4.5 h-4.5" />
-            </button>
-
-            {/* Current Active Workspace Indicator */}
-            <div className="flex items-center gap-2.5">
-              <span className="text-xs text-slate-400 font-medium hidden sm:inline">Workspace</span>
-              <span className="text-slate-300 text-xs hidden sm:inline">/</span>
-              <h1 className="text-sm sm:text-base font-bold font-display tracking-tight text-slate-900 truncate">
-                {activeTitle}
-              </h1>
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold font-mono tracking-wide uppercase border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live
-              </span>
-            </div>
-          </div>
-
-          {/* Right: Multi-Plant Selector, Live Date/Time, BY, Profile */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Multi-Plant Scope Selector */}
-            <div className="relative" ref={plantDropdownRef}>
+            {/* Left: Mobile Menu Toggle, Active Workspace Title & Live Status Pill */}
+            <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
-                onClick={() => setIsPlantDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 px-3 py-1.5 rounded-full border border-slate-200/80 text-xs text-slate-800 cursor-pointer transition select-none shadow-2xs"
-                title="Select Active Fulfillment Plant"
+                onClick={() => setIsMobileNavOpen(true)}
+                className="md:hidden p-2 rounded-xl text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-surface-raised)] transition-colors focus:outline-none cursor-pointer"
+                aria-label="Open navigation menu"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="text-[10px] text-slate-400 uppercase font-mono hidden md:inline">Plant:</span>
-                <span className="font-semibold text-xs truncate max-w-[130px] sm:max-w-none">
-                  {plantDisplayLabel}
-                </span>
-                <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
+                <Menu className="w-4 h-4" />
               </button>
 
-              {isPlantDropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-white text-slate-800 border border-slate-200 shadow-xl z-50 p-1.5 text-xs select-none animate-in fade-in duration-100">
-                  <div className="px-2.5 py-1.5 text-[10px] font-mono uppercase text-slate-400 font-bold border-b border-slate-100 mb-1">
-                    Select Plant Scope
-                  </div>
-                  <div className="max-h-60 overflow-y-auto space-y-0.5">
-                    {plantsList.map((opt) => (
-                      <button
-                        key={opt.code}
-                        type="button"
-                        onClick={() => handleSelectPlant(opt.code, opt.label)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition cursor-pointer ${
-                          selectedPlant === opt.code
-                            ? "bg-emerald-500/10 text-emerald-600 font-bold"
-                            : "hover:bg-slate-50 text-slate-700 font-medium"
-                        }`}
-                      >
-                        <span className="truncate">{opt.label}</span>
-                        {selectedPlant === opt.code && <span className="text-emerald-600 font-bold ml-1">✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <h1 className="font-display font-bold text-sm tracking-tight text-[var(--sidebar-text)] truncate select-none">
+                  {activeTitle}
+                </h1>
+                <span className="w-1 h-1 rounded-full bg-[var(--sidebar-text-subtle)]/40 shrink-0 hidden sm:inline" />
 
-            {/* Live Clock & Date Badge */}
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100/70 border border-slate-200/60 text-xs text-slate-600">
-              <div className="flex items-center gap-1.5 text-slate-500">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span>{formattedDate}</span>
-              </div>
-              <span className="text-slate-300">|</span>
-              <div className="flex items-center gap-1.5 font-mono font-semibold text-slate-800">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span>{formattedTime}</span>
+                {/* Beautiful Live System Telemetry Status (Theme-aligned) */}
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[var(--sidebar-surface-raised)] text-[var(--sidebar-text)] border border-[var(--border-subtle)] shadow-2xs transition-all select-none">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
+                  </span>
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--sidebar-text)]">
+                    Live
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Business Year Selector */}
-            <div className="relative hidden sm:inline-block" ref={yearDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setIsYearDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 px-3 py-1.5 rounded-full border border-slate-200/80 text-slate-800 font-mono text-xs font-semibold cursor-pointer select-none"
-                title="Business Year (October to September)"
-              >
-                <span>{selectedYear === "ALL" ? "All Years" : `BY ${selectedYear}`}</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
+            {/* Right: Multi-Plant Selector, Live Date/Time, BY, Profile */}
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              {/* Multi-Plant Scope Selector */}
+              <div className="relative" ref={plantDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsPlantDropdownOpen((prev) => !prev)}
+                  disabled={isPlantScopedUser && !isPlantLoading && plantOptions.length === 0}
+                  className="flex items-center gap-2 bg-[var(--sidebar-surface-raised)] hover:bg-[var(--sidebar-surface-raised)]/90 px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] text-xs text-[var(--sidebar-text)] cursor-pointer transition select-none disabled:cursor-not-allowed disabled:opacity-60 shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                  title={isPlantScopedUser ? "Choose one of your assigned plants" : "Select active plant scope"}
+                  aria-label={`Plant scope: ${plantDisplayLabel}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--sidebar-accent)] shrink-0" />
+                  <span className="text-[10px] text-[var(--sidebar-text-muted)] uppercase font-mono font-semibold hidden md:inline">Plant:</span>
+                  <span className="font-semibold text-xs truncate max-w-[92px] sm:max-w-[130px] text-[var(--sidebar-text)]">
+                    {plantDisplayLabel}
+                  </span>
+                  <ChevronDown className={`w-3 h-3 text-[var(--sidebar-text-muted)] ml-0.5 transition-transform duration-200 ${isPlantDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
 
-              {isYearDropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white text-slate-800 border border-slate-200 shadow-xl z-50 p-1.5 text-xs select-none animate-in fade-in duration-100 max-h-72 overflow-y-auto">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedYear("ALL");
-                      setIsYearDropdownOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-mono transition cursor-pointer ${
-                      selectedYear === "ALL"
-                        ? "bg-emerald-500/10 text-emerald-600 font-bold"
-                        : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span>All Business Years</span>
-                    <span className="text-[11px] text-slate-400">{totalRecords.toLocaleString()}</span>
-                  </button>
-
-                  {yearsList.map((y) => {
-                    const isSelected = selectedYear === y.year;
-                    return (
-                      <button
-                        key={y.year}
-                        type="button"
-                        onClick={() => {
-                          setSelectedYear(y.year);
-                          setIsYearDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-mono transition cursor-pointer ${
-                          isSelected
-                            ? "bg-emerald-500/10 text-emerald-600 font-bold"
-                            : "text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <span>BY {y.year}</span>
-                          {y.is_current && <span className="text-[10px] text-emerald-600 font-sans font-bold">(Current)</span>}
-                        </span>
-                        <span className="text-[11px] text-slate-400 tabular-nums">{y.count.toLocaleString()}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* User Profile Pill & Dropdown */}
-            <div className="relative" ref={userMenuRef}>
-              <button
-                type="button"
-                onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                className="flex items-center gap-2 pl-2 border-l border-slate-200 cursor-pointer select-none group"
-              >
-                <span className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#006d32] to-[#00d166] text-white font-bold flex items-center justify-center text-xs shadow-xs font-display">
-                  {initials}
-                </span>
-                <span className="hidden xl:inline text-xs font-semibold text-slate-800 truncate max-w-[120px]">
-                  {user?.name || "Admin"}
-                </span>
-              </button>
-
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white text-slate-800 border border-slate-200 shadow-xl z-50 p-1.5 text-xs select-none animate-in fade-in duration-100">
-                  <div className="px-3 py-2 border-b border-slate-100 mb-1">
-                    <p className="font-bold text-slate-900 truncate font-display">{user?.name}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">{user?.role || "Global Admin"}</p>
+                {isPlantDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-64 rounded-xl bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-xl z-50 p-1.5 text-xs select-none animate-in fade-in duration-100">
+                    <div className="px-2.5 py-1.5 text-[10px] font-mono uppercase text-[var(--on-surface-muted)] font-bold border-b border-[var(--border-subtle)] mb-1">
+                      {isPlantScopedUser ? "Your Assigned Plants" : "Select Plant Scope"}
+                    </div>
+                    <div className="max-h-60 overflow-y-auto space-y-0.5">
+                      {plantsList.map((opt) => (
+                        <button
+                          key={opt.code}
+                          type="button"
+                          onClick={() => handleSelectPlant(opt.code, opt.label)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition cursor-pointer ${
+                            selectedPlant === opt.code
+                              ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] font-semibold"
+                              : "hover:bg-[var(--surface-low)] text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] font-medium"
+                          }`}
+                        >
+                          <span className="truncate">{opt.label}</span>
+                          {selectedPlant === opt.code && <span className="text-[var(--accent-primary-strong)] font-bold ml-1">✓</span>}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      onNavigate("/settings");
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-xl transition text-left cursor-pointer font-medium"
-                  >
-                    <Settings className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Workspace Settings</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      onLogout();
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl transition text-left cursor-pointer font-semibold"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-          </div>
+              {/* Live Clock & Date Badge */}
+              <div className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-[var(--sidebar-surface-raised)] border border-[var(--border-subtle)] text-xs text-[var(--sidebar-text-muted)] shadow-2xs select-none">
+                <div className="flex items-center gap-1.5 text-[var(--sidebar-text-muted)]">
+                  <Calendar className="w-3.5 h-3.5 text-[var(--sidebar-accent)]" />
+                  <span className="font-medium text-[11px]">{formattedDate}</span>
+                </div>
+                <span className="text-[var(--sidebar-text-subtle)]/40">·</span>
+                <div className="flex items-center gap-1.5 font-mono font-semibold text-[var(--sidebar-text)]">
+                  <Clock className="w-3.5 h-3.5 text-[var(--sidebar-accent)]" />
+                  <span className="tabular-nums text-[11px]">{formattedTime}</span>
+                </div>
+              </div>
+
+              {/* Business Year Selector */}
+              <div className="relative hidden sm:inline-block" ref={yearDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsYearDropdownOpen((prev) => !prev)}
+                  className="flex items-center gap-1.5 bg-[var(--sidebar-surface-raised)] hover:bg-[var(--sidebar-surface-raised)]/90 px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] text-[var(--sidebar-text)] font-mono text-xs font-semibold cursor-pointer select-none transition-colors shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                  title="Business Year (October to September)"
+                >
+                  <span>{selectedYear === "ALL" ? "All Years" : `BY ${selectedYear}`}</span>
+                  <ChevronDown className={`w-3 h-3 text-[var(--sidebar-text-muted)] transition-transform duration-200 ${isYearDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {isYearDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-xl z-50 p-1.5 text-xs select-none animate-in fade-in duration-100 max-h-72 overflow-y-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedYear("ALL");
+                        setIsYearDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-mono transition cursor-pointer ${
+                        selectedYear === "ALL"
+                          ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] font-bold"
+                          : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
+                      }`}
+                    >
+                      <span>All Business Years</span>
+                      <span className="text-[11px] text-[var(--on-surface-subtle)] tabular-nums">{totalRecords.toLocaleString()}</span>
+                    </button>
+
+                    {yearsList.map((y) => {
+                      const isSelected = selectedYear === y.year;
+                      return (
+                        <button
+                          key={y.year}
+                          type="button"
+                          onClick={() => {
+                            setSelectedYear(y.year);
+                            setIsYearDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-mono transition cursor-pointer ${
+                            isSelected
+                              ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] font-bold"
+                              : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>BY {y.year}</span>
+                            {y.is_current && <span className="text-[10px] text-[var(--accent-primary-strong)] font-sans font-bold">(Current)</span>}
+                          </span>
+                          <span className="text-[11px] text-[var(--on-surface-subtle)] tabular-nums">{y.count.toLocaleString()}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* User Profile Pill & Dropdown */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-2 pl-2 border-l border-[var(--border-subtle)] cursor-pointer select-none group focus-visible:outline-none"
+                >
+                  <span className="w-8 h-8 rounded-xl bg-[var(--sidebar-accent)] text-[var(--on-accent-primary,white)] font-bold flex items-center justify-center text-xs font-display shadow-2xs group-hover:opacity-90 transition-opacity">
+                    {initials}
+                  </span>
+                  <span className="hidden xl:inline text-xs font-semibold text-[var(--sidebar-text)] truncate max-w-[120px]">
+                    {user?.name || "Admin"}
+                  </span>
+                  <ChevronDown className={`w-3 h-3 text-[var(--sidebar-text-muted)] transition-transform duration-200 ${isUserMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-xl z-50 p-1.5 text-xs select-none animate-in fade-in duration-100">
+                    <div className="px-3 py-2 border-b border-[var(--border-subtle)] mb-1">
+                      <p className="font-bold text-[var(--on-surface)] truncate font-display">{user?.name}</p>
+                      <p className="text-[10px] text-[var(--on-surface-muted)] font-mono">{isAdmin(user) ? "Admin" : user?.team || user?.sub_role || "Member"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onNavigate("/settings");
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] rounded-lg transition-colors text-left cursor-pointer font-medium"
+                    >
+                      <Palette className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                      <span>Workspace Settings & Themes</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onLogout();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40 rounded-lg transition-colors text-left cursor-pointer font-semibold"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
         </header>
+
+        {isPlantScopedUser && !isPlantLoading && plantOptions.length === 0 && (
+          <div role="status" className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>No plant facilities are assigned to your account yet. Contact an Admin to request access.</span>
+          </div>
+        )}
 
         {/* Global Toast Alert */}
         {globalToast && (
           <div className="fixed bottom-5 right-5 z-50 max-w-sm w-[calc(100vw-2.5rem)] animate-in fade-in slide-in-from-bottom-3 duration-200">
-            <div className="bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-800 flex items-center gap-3 text-xs">
+            <div className={`px-4 py-3 rounded-xl shadow-xl border flex items-center gap-3 text-xs ${globalToast.tone === "error" ? "bg-rose-50 text-rose-950 border-rose-200 dark:bg-rose-950/70 dark:text-rose-100 dark:border-rose-800" : globalToast.tone === "info" ? "bg-[var(--accent-teal-subtle)] text-[var(--accent-teal-hover)] border-[var(--border-subtle)]" : "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] border-[var(--border-subtle)]"}`}>
               <span
                 className={`w-2 h-2 rounded-full shrink-0 ${
                   globalToast.tone === "error"
-                    ? "bg-rose-500 shadow-[0_0_8px_#f43f5e]"
+                    ? "bg-rose-600"
                     : globalToast.tone === "info"
-                    ? "bg-blue-400 shadow-[0_0_8px_#60a5fa]"
-                    : "bg-[#00d166] shadow-[0_0_8px_#00d166]"
+                    ? "bg-[var(--accent-teal)]"
+                    : "bg-[var(--accent-primary)]"
                 }`}
               />
               <span className="flex-1 leading-snug font-medium">{globalToast.message}</span>
               <button
                 type="button"
                 onClick={() => setGlobalToast(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 cursor-pointer transition"
+                className="text-current opacity-60 hover:opacity-100 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer transition"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -404,3 +456,4 @@ export const AppShell: React.FC<AppShellProps> = ({
     </div>
   );
 };
+

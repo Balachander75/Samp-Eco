@@ -41,7 +41,7 @@ export const PlantProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       setIsLoading(true);
       const items: PlantItem[] = await fetchPlantsApi();
-      if (items && items.length > 0) {
+      if (Array.isArray(items)) {
         const active = items.filter((p) => p.isActive !== false);
         const mapped: PlantOption[] = active.map((p) => {
           const code = p.code || p.name.split("-")[0].trim();
@@ -54,9 +54,12 @@ export const PlantProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           };
         });
         setPlantOptions(mapped);
+      } else {
+        setPlantOptions([]);
       }
     } catch (err) {
       console.error("Failed to load plants from database:", err);
+      setPlantOptions([]);
     } finally {
       setIsLoading(false);
     }
@@ -75,6 +78,14 @@ export const PlantProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     window.dispatchEvent(new CustomEvent("app:plant-changed", { detail: { plant: plantCode } }));
   }, []);
+
+  useEffect(() => {
+    if (isLoading || selectedPlant === "ALL") return;
+    const selectionIsVisible = plantOptions.some(
+      (plant) => plant.code === selectedPlant || plant.name === selectedPlant
+    );
+    if (!selectionIsVisible) setSelectedPlant("ALL");
+  }, [isLoading, plantOptions, selectedPlant, setSelectedPlant]);
 
   const activePlantOption = useMemo(() => {
     if (selectedPlant === "ALL") return null;

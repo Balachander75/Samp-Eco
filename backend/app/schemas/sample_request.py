@@ -21,10 +21,14 @@ class SampleRequestBase(BaseModel):
     program_name: Optional[str] = None
     date_request_created: Optional[str] = None
     sample_required_date: Optional[str] = None
-    created_by: Optional[str] = "Marketing Team (Corporate)"
+    created_by: Optional[str] = None
     unit_pc_pack: Optional[str] = "1"
+    qty_per_pack: Optional[str] = None
     qty_for_sampling: Optional[str] = "1"
     qty_design_costing: Optional[str] = "0"
+    costing_required_date: Optional[str] = None
+    costing_counter_date: Optional[str] = None
+    costing_output_path: Optional[str] = None
     mockup_required: Optional[str] = "No"
     designs_customer_creative: Optional[str] = None
     product_artwork_nos: Optional[str] = None
@@ -33,6 +37,9 @@ class SampleRequestBase(BaseModel):
     creation_mode: Optional[str] = "feasibility_check"
     request_types: Optional[List[str]] = Field(default_factory=lambda: ["sample"])
     product_image_path: Optional[str] = None
+    product_category: Optional[str] = None
+    product_sub_category: Optional[str] = None
+    product_third_category: Optional[str] = None
     reference_images: Optional[List[str]] = Field(default_factory=list)
     reference_links: Optional[List[str]] = Field(default_factory=list)
     plant_feasibility_response: Optional[str] = None
@@ -59,12 +66,19 @@ class SampleRequestUpdate(BaseModel):
     brand_name: Optional[str] = None
     product_type: Optional[str] = None
     unit_pc_pack: Optional[str] = None
+    qty_per_pack: Optional[str] = None
     qty_for_sampling: Optional[str] = None
     qty_design_costing: Optional[str] = None
+    costing_required_date: Optional[str] = None
+    costing_counter_date: Optional[str] = None
+    costing_output_path: Optional[str] = None
     mockup_required: Optional[str] = None
     designs_customer_creative: Optional[str] = None
     product_artwork_nos: Optional[str] = None
     product_image_path: Optional[str] = None
+    product_category: Optional[str] = None
+    product_sub_category: Optional[str] = None
+    product_third_category: Optional[str] = None
     creation_mode: Optional[str] = None
     request_types: Optional[List[str]] = None
     source_sample_code: Optional[str] = None
@@ -127,6 +141,9 @@ class StagedProductItemPayload(BaseModel):
     barcode: Optional[str] = None
     brand_name: Optional[str] = None
     product_type: Optional[str] = None
+    product_category: Optional[str] = None
+    product_sub_category: Optional[str] = None
+    product_third_category: Optional[str] = None
     sample_required_date: Optional[str] = None
 
 
@@ -136,7 +153,7 @@ class BatchCreateSampleRequestsPayload(BaseModel):
     program_year: Optional[str] = None
     year: Optional[str] = None
     target_plant: Optional[str] = None
-    created_by: Optional[str] = "Marketing"
+    created_by: Optional[str] = None
     date_request_created: Optional[str] = None
     sample_required_date: Optional[str] = None
     items: Optional[List[StagedProductItemPayload]] = None
@@ -157,9 +174,8 @@ class DesignBriefSubmitPayload(BaseModel):
 
 class CreativeDesignRow(BaseModel):
     design_number: Optional[str] = None
-    description: str
-    stock_number: Optional[str] = ""
-    remarks: Optional[str] = ""
+    shutterstock_no: Optional[str] = None
+    remarks: Optional[str] = None
 
 
 class CreativeOutputPayload(BaseModel):

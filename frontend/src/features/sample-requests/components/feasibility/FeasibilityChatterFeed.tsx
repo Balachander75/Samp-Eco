@@ -17,11 +17,10 @@ interface ChatLogEvent {
   actorDepartment: string;
   title: string;
   summary: string;
-  detailRemark?: string;
   timestamp: string;
   badge?: {
     text: string;
-    variant: "emerald" | "amber" | "rose" | "sky" | "indigo" | "neutral";
+    variant: "emerald" | "sky" | "rose" | "indigo" | "neutral";
   };
 }
 
@@ -80,8 +79,8 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
             kind: "marketing_message",
             actorName: author,
             actorDepartment: act.actorDepartment || "Marketing",
-            title: "Feasibility Inquiry Raised",
-            summary: `Submitted feasibility inquiry for ${activeRequest.customer || "General Client"}. Scope: ${classificationLabel}.`,
+            title: "Request raised",
+            summary: `Raised · ${activeRequest.customer || "General Client"} · ${classificationLabel}`,
             timestamp: act.createdAt || activeRequest.createdAt || activeRequest.dateRequestCreated || "",
             badge: { text: "Intake", variant: "indigo" },
           });
@@ -92,41 +91,61 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
             kind: "system_event",
             actorName: assignee,
             actorDepartment: "SAMP",
-            title: "Claimed Task",
-            summary: `${assignee} joined to evaluate this feasibility`,
+            title: "Claimed",
+            summary: `Claimed by ${assignee}`,
             timestamp: act.createdAt || activeRequest.takenAtSamp || "",
             badge: { text: "Assigned", variant: "sky" },
           });
         } else if (act.action === "SAMP_EVALUATED") {
           const verdict = payload.verdict || activeRequest.samplingFeasibilityResponse || "Yes";
-          const remark = payload.remark || activeRequest.samplingFeasibilityRemark || "";
           const reviewer = act.actorName || activeRequest.samplingFeasibilityApprovedBy || "SAMP Team";
           events.push({
             id: act.id,
             kind: "sampling_message",
             actorName: reviewer,
             actorDepartment: "SAMP Team",
-            title: `Technical Verdict: ${verdict}`,
-            summary: verdict === "Maybe" ? "Chose Maybe" : verdict === "Yes" ? "Feasible" : "Not Feasible",
-            detailRemark: remark,
+            title: "SAMP review",
+            summary: verdict === "Maybe" ? "Conditional" : verdict === "Yes" ? "Feasible" : "Not feasible",
             timestamp: act.createdAt || activeRequest.feasibilityClosedAt || "",
             badge: {
               text: verdict === "Yes" ? "Feasible" : verdict === "No" ? "Not Feasible" : "Maybe",
-              variant: verdict === "Yes" ? "emerald" : verdict === "No" ? "rose" : "amber",
+              variant: verdict === "Yes" ? "emerald" : verdict === "No" ? "rose" : "sky",
             },
+          });
+        } else if (act.action === "SAMP_COUNTER_DATE_PROPOSED") {
+          events.push({
+            id: act.id,
+            kind: "sampling_message",
+            actorName: act.actorName || activeRequest.sampCounterDateProposedBy || "SAMP Team",
+            actorDepartment: "SAMP Team",
+            title: "Date proposed",
+            summary: `Proposed ${payload.proposed_date || activeRequest.sampCounterDate || "a revised date"}${payload.reason ? ` · ${payload.reason}` : ""}`,
+            timestamp: act.createdAt || activeRequest.sampCounterDateProposedAt || "",
+            badge: { text: "Date proposed", variant: "sky" },
+          });
+        } else if (act.action === "COUNTER_DATE_ACCEPTED" || act.action === "COUNTER_DATE_REJECTED" || act.action === "COUNTER_DATE_AUTO_ACCEPTED") {
+          const autoAccepted = act.action === "COUNTER_DATE_AUTO_ACCEPTED";
+          const accepted = act.action !== "COUNTER_DATE_REJECTED";
+          events.push({
+            id: act.id,
+            kind: autoAccepted ? "system_event" : "marketing_message",
+            actorName: act.actorName || "Marketing",
+            actorDepartment: autoAccepted ? "System" : "Marketing",
+            title: autoAccepted ? "Date auto-accepted" : "Date decision",
+            summary: `${autoAccepted ? "System auto-accepted" : accepted ? "Marketing accepted" : "Marketing kept original date"} · ${payload.effective_date || payload.proposed_date || activeRequest.sampleRequiredDate || ""}`,
+            timestamp: act.createdAt || activeRequest.counterDateDecisionAt || "",
+            badge: { text: autoAccepted ? "Auto-accepted" : accepted ? "Accepted" : "Rejected", variant: accepted ? "emerald" : "rose" },
           });
         } else if (act.action === "MARKETING_DECIDED") {
           const decision = payload.decision || activeRequest.marketingDecision || "Accepted";
-          const remark = payload.remark || activeRequest.marketingDecisionRemark || "";
           const decider = act.actorName || activeRequest.marketingDecisionBy || "Marketing Authority";
           events.push({
             id: act.id,
             kind: "marketing_message",
             actorName: decider,
             actorDepartment: "Marketing",
-            title: `Commercial Decision: ${decision}`,
-            summary: decision === "Accepted" ? "Commercial Approved" : "Commercial Dropped",
-            detailRemark: remark,
+            title: "Marketing decision",
+            summary: decision === "Accepted" ? "Request accepted" : "Request rejected",
             timestamp: act.createdAt || activeRequest.marketingDecisionAt || "",
             badge: {
               text: decision === "Accepted" ? "Approved" : "Dropped",
@@ -135,15 +154,17 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
           });
         } else if (act.action === "CONVERTED_TO_SAMPLING") {
           const srNum = payload.sample_sr_number || activeRequest.convertedSrNumber || "";
+          const scopes = (Array.isArray(payload.request_types) ? payload.request_types : activeRequest.convertedRequestTypes || [])
+            .map((scope: string) => scope === "costing" ? "Costing" : "Sampling");
           events.push({
             id: act.id,
             kind: "system_event",
             actorName: act.actorName || activeRequest.convertedBy || "Marketing Lead",
             actorDepartment: "Operations",
-            title: "Converted to Sample",
-            summary: `Commissioned official sample request ${srNum}`,
+            title: "Commercial request created",
+            summary: [srNum, scopes.join(" + ")].filter(Boolean).join(" · ") || "Converted from feasibility",
             timestamp: act.createdAt || activeRequest.convertedAt || "",
-            badge: { text: srNum ? `Sample: ${srNum}` : "Converted", variant: "emerald" },
+            badge: { text: srNum ? `SR: ${srNum}` : "Converted", variant: "emerald" },
           });
         } else if (act.action === "NOTE_ADDED") {
           const dept = (act.actorDepartment || "").toLowerCase();
@@ -153,8 +174,8 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
             kind: isSamp ? "sampling_message" : "marketing_message",
             actorName: act.actorName || "Team Member",
             actorDepartment: act.actorDepartment || (isSamp ? "SAMP Team" : "Marketing"),
-            title: "Internal Note",
-            summary: payload.note || "",
+            title: "Note",
+            summary: payload.note ? `Note · ${payload.note}` : "Note added",
             timestamp: act.createdAt || "",
             badge: { text: "Note", variant: "neutral" },
           });
@@ -169,8 +190,8 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
         kind: "marketing_message",
         actorName: author,
         actorDepartment: "Marketing",
-        title: "Feasibility Inquiry Raised",
-        summary: `Submitted feasibility inquiry for ${activeRequest.customer || "General Client"}. Scope: ${classificationLabel}.`,
+        title: "Request raised",
+        summary: `Raised · ${activeRequest.customer || "General Client"} · ${classificationLabel}`,
         timestamp: activeRequest.createdAt || activeRequest.dateRequestCreated || "",
         badge: { text: "Intake", variant: "indigo" },
       });
@@ -182,8 +203,8 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
         kind: "system_event",
         actorName: activeRequest.takenBySamp,
         actorDepartment: "SAMP Team",
-        title: "Claimed Assessment",
-        summary: `${activeRequest.takenBySamp} joined to evaluate this feasibility`,
+        title: "Claimed",
+        summary: `Claimed by ${activeRequest.takenBySamp}`,
         timestamp: activeRequest.takenAtSamp || activeRequest.createdAt || "",
         badge: { text: "Under Review", variant: "sky" },
       });
@@ -196,13 +217,12 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
         kind: "sampling_message",
         actorName: activeRequest.samplingFeasibilityApprovedBy || "SAMP Team",
         actorDepartment: "SAMP Team",
-        title: `Technical Verdict: ${verdict}`,
-        summary: verdict === "Maybe" ? "Chose Maybe" : verdict === "Yes" ? "Feasible" : "Not Feasible",
-        detailRemark: activeRequest.samplingFeasibilityRemark || undefined,
+        title: "SAMP review",
+        summary: verdict === "Maybe" ? "Conditional" : verdict === "Yes" ? "Feasible" : "Not feasible",
         timestamp: activeRequest.feasibilityClosedAt || activeRequest.takenAtSamp || "",
         badge: {
           text: verdict === "Yes" ? "Feasible" : verdict === "No" ? "Not Feasible" : "Maybe",
-          variant: verdict === "Yes" ? "emerald" : verdict === "No" ? "rose" : "amber",
+          variant: verdict === "Yes" ? "emerald" : verdict === "No" ? "rose" : "sky",
         },
       });
     }
@@ -214,9 +234,8 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
         kind: "marketing_message",
         actorName: activeRequest.marketingDecisionBy || "Marketing Authority",
         actorDepartment: "Marketing",
-        title: `Commercial Decision: ${decision}`,
-        summary: decision === "Accepted" ? "Commercial Approved" : "Commercial Dropped",
-        detailRemark: activeRequest.marketingDecisionRemark || undefined,
+        title: "Marketing decision",
+        summary: decision === "Accepted" ? "Request accepted" : "Request rejected",
         timestamp: activeRequest.marketingDecisionAt || "",
         badge: {
           text: decision === "Accepted" ? "Approved" : "Dropped",
@@ -231,10 +250,13 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
         kind: "system_event",
         actorName: activeRequest.convertedBy || "Marketing Lead",
         actorDepartment: "Operations",
-        title: "Converted to Sample",
-        summary: `Commissioned official sample request ${activeRequest.convertedSrNumber}`,
+        title: "Commercial request created",
+        summary: [
+          activeRequest.convertedSrNumber,
+          (activeRequest.convertedRequestTypes || []).map((scope) => scope === "costing" ? "Costing" : "Sampling").join(" + "),
+        ].filter(Boolean).join(" · "),
         timestamp: activeRequest.convertedAt || "",
-        badge: { text: `Sample: ${activeRequest.convertedSrNumber}`, variant: "emerald" },
+        badge: { text: `SR: ${activeRequest.convertedSrNumber}`, variant: "emerald" },
       });
     }
 
@@ -255,28 +277,50 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
 
 
   return (
-    <div className="w-80 lg:w-[390px] bg-[#f8f9ff] dark:bg-[#131622] flex flex-col h-full overflow-hidden select-text shadow-[-12px_0_36px_rgba(11,28,48,0.03)] z-10 relative">
+    <div
+      className="w-80 lg:w-[390px] flex flex-col h-full overflow-hidden select-text border-l shadow-[-12px_0_36px_rgba(11,28,48,0.03)] z-10 relative"
+      style={{
+        backgroundColor: "var(--surface-lowest)",
+        borderColor: "var(--border-subtle)",
+      }}
+    >
       {/* ── 1. Top Header ── */}
-      <div className="px-4 py-3 bg-white dark:bg-[#161826] flex items-center justify-between sticky top-0 z-20 border-b border-slate-100 dark:border-white/5 shadow-[0_2px_10px_rgba(11,28,48,0.02)]">
+      <div
+        className="px-4 py-3 flex items-center justify-between sticky top-0 z-20 border-b shadow-2xs"
+        style={{
+          backgroundColor: "var(--surface-base)",
+          borderColor: "var(--border-subtle)",
+        }}
+      >
         <div>
-          <h2 className="font-display font-bold text-xs text-slate-900 dark:text-zinc-100 tracking-tight leading-none">
-            Activity &amp; Communication Log
+          <h2
+            className="font-display font-bold text-xs tracking-tight leading-none"
+            style={{ color: "var(--on-surface)" }}
+          >
+            Activity
           </h2>
-          <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-sans mt-0.5 block">
-            Marketing &amp; SAMP Team Handoff
-          </span>
         </div>
 
-        <span className="text-[10.5px] font-mono text-[#006d32] dark:text-[#00d166] bg-[#eff4ff] dark:bg-[#006d32]/20 px-2.5 py-0.5 rounded-full font-bold border border-[#006d32]/20">
-          {chatEvents.length} {chatEvents.length === 1 ? "Event" : "Events"}
+        <span
+          className="text-[10.5px] font-mono px-2.5 py-0.5 rounded-full font-bold border"
+          style={{
+            backgroundColor: "var(--accent-primary-subtle)",
+            color: "var(--accent-primary)",
+            borderColor: "color-mix(in srgb, var(--accent-primary) 30%, transparent)",
+          }}
+        >
+          {chatEvents.length}
         </span>
       </div>
 
       {/* ── 2. WhatsApp-Style Chronological Stream ── */}
       <div className="flex-1 overflow-y-auto p-3.5 space-y-3 font-sans">
         {chatEvents.length === 0 ? (
-          <div className="py-12 text-center text-slate-400 font-display text-xs">
-            No activity records found.
+          <div
+            className="py-12 text-center font-display text-xs"
+            style={{ color: "var(--on-surface-subtle)" }}
+          >
+            No updates yet.
           </div>
         ) : (
           chatEvents.map((evt) => {
@@ -302,57 +346,61 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
 
             // Case B: Marketing Desk Message Bubble
             if (evt.kind === "marketing_message") {
-              const isCreate = evt.badge?.text === "Intake";
               return (
                 <div key={evt.id} className="flex flex-col items-start select-text max-w-[94%]">
-                  <div className="w-full bg-white dark:bg-[#1a202c] rounded-2xl rounded-tl-xs p-3.5 border border-emerald-200/70 dark:border-emerald-900/30 shadow-[0_2px_8px_rgba(0,109,50,0.04)]">
+                  <div
+                    className="w-full rounded-2xl rounded-tl-xs p-3.5 border shadow-2xs"
+                    style={{
+                      backgroundColor: "var(--surface-base)",
+                      borderColor: "color-mix(in srgb, var(--accent-primary) 25%, var(--border-subtle))",
+                    }}
+                  >
                     {/* Header */}
-                    <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-emerald-50 dark:border-white/5">
+                    <div
+                      className="flex items-center justify-between gap-2 pb-1.5 border-b"
+                      style={{ borderColor: "var(--border-subtle)" }}
+                    >
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-6 h-6 rounded-full bg-[#006d32] text-white font-bold text-[10px] font-mono flex items-center justify-center shrink-0 shadow-2xs">
+                        <div
+                          className="w-6 h-6 rounded-full text-white font-bold text-[10px] font-mono flex items-center justify-center shrink-0 shadow-2xs"
+                          style={{ backgroundColor: "var(--accent-primary)" }}
+                        >
                           {getInitials(evt.actorName)}
                         </div>
                         <div className="min-w-0 truncate">
-                          <span className="font-display font-bold text-xs text-slate-900 dark:text-zinc-100 truncate block">
+                          <span
+                            className="font-display font-bold text-xs truncate block"
+                            style={{ color: "var(--on-surface)" }}
+                          >
                             {evt.actorName}
                           </span>
                         </div>
-                        <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-emerald-100/80 text-[#006d32] dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 shrink-0">
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[9.5px] font-bold font-mono border shrink-0"
+                          style={{
+                            backgroundColor: "var(--accent-primary-subtle)",
+                            color: "var(--accent-primary)",
+                            borderColor: "color-mix(in srgb, var(--accent-primary) 30%, transparent)",
+                          }}
+                        >
                           Marketing
                         </span>
                       </div>
-                      <span className="text-[9.5px] text-slate-400 dark:text-zinc-500 font-mono whitespace-nowrap">
+                      <span
+                        className="text-[9.5px] font-mono whitespace-nowrap"
+                        style={{ color: "var(--on-surface-subtle)" }}
+                      >
                         {formatOdooLogDate(evt.timestamp)}
                       </span>
                     </div>
 
                     {/* Status / Content */}
-                    {isCreate ? (
-                      <p className="text-xs text-slate-700 dark:text-zinc-200 mt-2 leading-relaxed font-sans">
-                        {evt.summary}
-                      </p>
-                    ) : (
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 font-sans">
-                          Decision:
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${evt.badge?.variant === "emerald"
-                              ? "bg-emerald-50 text-[#006d32] border-emerald-200"
-                              : "bg-rose-50 text-rose-700 border-rose-200"
-                            }`}
-                        >
-                          {evt.badge?.text || "Decided"}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Remark */}
-                    {evt.detailRemark && (
-                      <div className="mt-2 p-2.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 text-[11.5px] text-emerald-950 dark:text-emerald-200 font-sans leading-relaxed">
-                        {evt.detailRemark}
-                      </div>
-                    )}
+                    <p
+                      className="mt-2 line-clamp-2 text-xs leading-relaxed font-sans"
+                      style={{ color: "var(--on-surface)" }}
+                    >
+                      {evt.summary}
+                    </p>
                   </div>
                 </div>
               );
@@ -361,50 +409,59 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
             // Case C: Sampling Team (SAMP Team) Message Bubble
             return (
               <div key={evt.id} className="flex flex-col items-end select-text ml-auto max-w-[94%]">
-                <div className="w-full bg-[#f4f8ff] dark:bg-[#152033] rounded-2xl rounded-tr-xs p-3.5 border border-sky-200/70 dark:border-sky-900/40 shadow-[0_2px_8px_rgba(0,112,255,0.05)]">
+                <div
+                  className="w-full rounded-2xl rounded-tr-xs p-3.5 border shadow-2xs"
+                  style={{
+                    backgroundColor: "var(--surface-low)",
+                    borderColor: "var(--border-subtle)",
+                  }}
+                >
                   {/* Header */}
-                  <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-sky-100/80 dark:border-white/5">
+                  <div
+                    className="flex items-center justify-between gap-2 pb-1.5 border-b"
+                    style={{ borderColor: "var(--border-subtle)" }}
+                  >
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-6 h-6 rounded-full bg-[#0070ff] text-white font-bold text-[10px] font-mono flex items-center justify-center shrink-0 shadow-2xs">
+                      <div
+                        className="w-6 h-6 rounded-full text-white font-bold text-[10px] font-mono flex items-center justify-center shrink-0 shadow-2xs"
+                        style={{ backgroundColor: "var(--accent-primary)" }}
+                      >
                         {getInitials(evt.actorName)}
                       </div>
                       <div className="min-w-0 truncate">
-                        <span className="font-display font-bold text-xs text-slate-900 dark:text-zinc-100 truncate block">
+                        <span
+                          className="font-display font-bold text-xs truncate block"
+                          style={{ color: "var(--on-surface)" }}
+                        >
                           {evt.actorName}
                         </span>
                       </div>
-                      <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-sky-100 text-[#0070ff] dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800/40 shrink-0">
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold font-mono bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-300 dark:border-sky-800/40 shrink-0">
                         SAMP Team
                       </span>
                     </div>
-                    <span className="text-[9.5px] text-slate-400 dark:text-zinc-500 font-mono whitespace-nowrap">
+                    <span
+                      className="text-[9.5px] font-mono whitespace-nowrap"
+                      style={{ color: "var(--on-surface-subtle)" }}
+                    >
                       {formatOdooLogDate(evt.timestamp)}
                     </span>
                   </div>
 
                   {/* Verdict Line */}
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 font-sans">
-                      Verdict:
-                    </span>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${evt.badge?.variant === "emerald"
-                          ? "bg-emerald-50 text-[#006d32] border-emerald-200"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
                           : evt.badge?.variant === "rose"
-                            ? "bg-rose-50 text-rose-700 border-rose-200"
-                            : "bg-amber-50 text-amber-700 border-amber-200"
+                            ? "bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800"
+                            : "bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800"
                         }`}
                     >
                       {evt.badge?.text || "Evaluated"}
                     </span>
                   </div>
 
-                  {/* Detail Technical Remark */}
-                  {evt.detailRemark && (
-                    <div className="mt-2 p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-sky-100 dark:border-sky-900/40 text-[11.5px] text-slate-800 dark:text-zinc-200 font-sans leading-relaxed shadow-2xs">
-                      {evt.detailRemark}
-                    </div>
-                  )}
                 </div>
               </div>
             );
