@@ -329,10 +329,12 @@ def delete_feasibility_request(
     request = service.repo.get_for_update(request_id)
     if request:
         if request.converted_sample_request_id:
-            raise HTTPException(
-                status_code=409,
-                detail="This Feasibility request is linked to a commercial request and cannot be deleted.",
-            )
+            from app.models.sample_request import CreateSampleRequest
+            linked_sample = service.db.query(CreateSampleRequest).filter(CreateSampleRequest.id == request.converted_sample_request_id).first()
+            if linked_sample:
+                service.db.delete(linked_sample)
+            request.converted_sample_request_id = None
+            request.converted_sr_number = None
         service.repo.add_activity_log(
             feasibility_request_id=request.id,
             actor_id=getattr(current_user, "id", None),

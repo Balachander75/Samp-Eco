@@ -25,12 +25,13 @@ import type { SampleRequestItem, ProductSearchResult } from "@/features/sample-r
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { PaginationBar } from "@/components/erp/PaginationBar";
+import { Select } from "@/components/ui/Select";
+import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
 import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 import { releaseSampleToPlantApi, submitSamplingFeedbackApi } from "@/infrastructure/api/sampleRequestsApi";
-import { CatalogProductInspectModal } from "@/features/sample-requests/components/staging/CatalogProductInspectModal";
+import { SampleRequestInspector } from "@/features/sample-requests/components/SampleRequestInspector";
 
 export interface SamplingReviewQueuePageProps {
   requests: SampleRequestItem[];
@@ -300,277 +301,137 @@ export const SamplingReviewQueuePage: React.FC<SamplingReviewQueuePageProps> = (
     };
   }, [inspectModalItem]);
 
+  const kpiItems = [
+    {
+      label: "All Sampling Deliverables",
+      value: totalCount,
+      detail: "All deliverables",
+      color: "bg-teal-500",
+      isActive: phaseFilter === "all",
+      onClick: () => {
+        setPhaseFilter("all");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Ready to Release to Plant",
+      value: readyToReleaseCount,
+      detail: "Technical sign-off complete",
+      color: "bg-emerald-500",
+      isActive: phaseFilter === "ready_to_release",
+      onClick: () => {
+        setPhaseFilter("ready_to_release");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Design Review & Feedback",
+      value: designFeedbackCount,
+      detail: "Awaiting design verdict",
+      color: "bg-indigo-500",
+      isActive: phaseFilter === "design_feedback",
+      onClick: () => {
+        setPhaseFilter("design_feedback");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Released to Plant",
+      value: releasedCount,
+      detail: "On manufacturing floor",
+      color: "bg-sky-500",
+      isActive: phaseFilter === "released",
+      onClick: () => {
+        setPhaseFilter("released");
+        setCurrentPage(1);
+      },
+    },
+  ];
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] select-text font-sans overflow-hidden">
-      {/* ── 1. Compact Editorial Header ── */}
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="p-1 rounded-md bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 shrink-0">
-                <Beaker className="w-3.5 h-3.5" />
-              </span>
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--on-surface)] font-display">
-                Sampling Review &amp; Plant Dispatch Queue
-              </h1>
-              <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
-                BY {selectedYear === "ALL" ? "Consolidated" : selectedYear}
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
-                {totalCount} Deliverables
-              </span>
-              {readyToReleaseCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                  <PackageCheck className="w-3 h-3 text-emerald-500" />
-                  <span>{readyToReleaseCount} Ready for Plant Release</span>
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 text-xs text-[var(--on-surface-muted)]">
-              Inspect marketing designs, review creative artwork &amp; studio CAD links, provide technical remarks, and release approved samples to the manufacturing plant.
-            </p>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleExportCSVClick}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-xs font-semibold text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors shadow-2xs cursor-pointer"
-              title="Export CSV"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Export CSV</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleRefreshClick}
-              disabled={isRefreshing || isLoading}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-xs font-semibold text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
-              title="Refresh Deliverables"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── 2. Interactive KPI Strip (4 Cards) ── */}
-      <section
-        aria-label="Sampling review KPI overview"
-        className="shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-3 px-5 py-3 sm:px-8 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)]/50"
-      >
-        {/* Card 1: All Deliverables */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            setPhaseFilter("all");
-            setCurrentPage(1);
-          }}
-          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
-            phaseFilter === "all"
-              ? "bg-teal-500/10 border-teal-500/40 shadow-xs"
-              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
-          }`}
-        >
-          <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-              All Sampling Deliverables
-            </span>
-            <div className="text-xl font-bold font-mono tracking-tight text-[var(--on-surface)] mt-0.5">
-              {totalCount}
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-700 dark:text-teal-400">
-            <Layers className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Card 2: Ready for Plant Release */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            setPhaseFilter("ready_to_release");
-            setCurrentPage(1);
-          }}
-          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
-            phaseFilter === "ready_to_release"
-              ? "bg-emerald-500/10 border-emerald-500/40 shadow-xs"
-              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
-          }`}
-        >
-          <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-              Ready to Release to Plant
-            </span>
-            <div className="text-xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-0.5">
-              {readyToReleaseCount}
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
-            <PackageCheck className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Card 3: Design Review & Feedback */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            setPhaseFilter("design_feedback");
-            setCurrentPage(1);
-          }}
-          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
-            phaseFilter === "design_feedback"
-              ? "bg-indigo-500/10 border-indigo-500/40 shadow-xs"
-              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
-          }`}
-        >
-          <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
-              Design Review &amp; Feedback
-            </span>
-            <div className="text-xl font-bold font-mono tracking-tight text-indigo-700 dark:text-indigo-400 mt-0.5">
-              {designFeedbackCount}
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-700 dark:text-indigo-400">
-            <Eye className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Card 4: Released to Plant */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            setPhaseFilter("released");
-            setCurrentPage(1);
-          }}
-          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
-            phaseFilter === "released"
-              ? "bg-sky-500/10 border-sky-500/40 shadow-xs"
-              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
-          }`}
-        >
-          <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
-              Released to Plant
-            </span>
-            <div className="text-xl font-bold font-mono tracking-tight text-sky-700 dark:text-sky-400 mt-0.5">
-              {releasedCount}
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center text-sky-700 dark:text-sky-400">
-            <Factory className="w-4 h-4" />
-          </div>
-        </div>
-      </section>
-
-      {/* ── 3. Single Row Filter Toolbar (h-8) ── */}
-      <section
-        aria-label="Filter toolbar"
-        className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-2 sm:px-8 flex flex-wrap items-center gap-2 text-xs"
-      >
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] pointer-events-none" />
-          <input
-            type="text"
-            value={searchTerm}
+    <DeskWorkspaceLayout
+      title="Sampling Review & Plant Dispatch Queue"
+      subtitle="Inspect marketing designs, review creative artwork & studio CAD links, provide technical remarks, and release approved samples to the manufacturing plant."
+      businessYear={selectedYear === "ALL" ? "Consolidated" : selectedYear}
+      totalCount={totalCount}
+      totalLabel="Deliverables"
+      extraBadges={
+        readyToReleaseCount > 0 ? (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+            <PackageCheck className="w-3 h-3 text-emerald-500" />
+            <span>{readyToReleaseCount} Ready for Plant Release</span>
+          </span>
+        ) : null
+      }
+      onRefresh={handleRefreshClick}
+      isRefreshing={isRefreshing || isLoading}
+      onExportCSV={handleExportCSVClick}
+      exportDisabled={filteredRequests.length === 0}
+      kpiItems={kpiItems}
+      kpiGridCols="grid-cols-2 gap-2 sm:grid-cols-4"
+      filterControls={
+        <>
+          <Select
+            value={phaseFilter}
+            aria-label="Filter deliverables by review phase"
             onChange={(e) => {
-              setSearchTerm(e.target.value);
+              setPhaseFilter(e.target.value as SamplingPhaseFilter);
               setCurrentPage(1);
             }}
-            placeholder="Search SR, product, customer, remark..."
-            className="w-full h-8 pl-8 pr-7 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] focus:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none transition"
+            className="min-w-[170px]"
+            options={[
+              { value: "all", label: "Phase: All Deliverables" },
+              { value: "ready_to_release", label: "Phase: Ready to Release to Plant" },
+              { value: "design_feedback", label: "Phase: Design Review & Feedback" },
+              { value: "released", label: "Phase: Released to Plant" },
+            ]}
           />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm("");
+
+          {uniqueCustomers.length > 0 && (
+            <Select
+              value={customerFilter}
+              aria-label="Filter deliverables by customer"
+              onChange={(e) => {
+                setCustomerFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+              className="min-w-[150px] max-w-[200px]"
+              options={[
+                { value: "all", label: "Customer: All" },
+                ...uniqueCustomers.map((c) => ({ value: c, label: c })),
+              ]}
+            />
           )}
-        </div>
 
-        {/* Phase Filter Dropdown */}
-        <select
-          value={phaseFilter}
-          aria-label="Filter deliverables by review phase"
-          onChange={(e) => {
-            setPhaseFilter(e.target.value as SamplingPhaseFilter);
-            setCurrentPage(1);
-          }}
-          className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer"
-        >
-          <option value="all">Phase: All Deliverables</option>
-          <option value="ready_to_release">Phase: Ready to Release to Plant</option>
-          <option value="design_feedback">Phase: Design Review &amp; Feedback</option>
-          <option value="released">Phase: Released to Plant</option>
-        </select>
-
-        {/* Customer Dropdown */}
-        {uniqueCustomers.length > 0 && (
-          <select
-            value={customerFilter}
-            aria-label="Filter deliverables by customer"
-            onChange={(e) => {
-              setCustomerFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer max-w-[170px] truncate"
-          >
-            <option value="all">Customer: All</option>
-            {uniqueCustomers.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Plant Dropdown */}
-        {uniquePlants.length > 1 && (
-          <select
-            value={plantFilter}
-            aria-label="Filter deliverables by plant"
-            onChange={(e) => {
-              setPlantFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer"
-          >
-            <option value="all">Plant: All Plants</option>
-            {uniquePlants.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Reset */}
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="h-8 px-2.5 rounded-lg border border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
-            title="Reset All Filters"
-          >
-            <X className="w-3 h-3" />
-            <span>Reset</span>
-          </button>
-        )}
-      </section>
+          {uniquePlants.length > 1 && (
+            <Select
+              value={plantFilter}
+              aria-label="Filter deliverables by plant"
+              onChange={(e) => {
+                setPlantFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[140px]"
+              options={[
+                { value: "all", label: "Plant: All Plants" },
+                ...uniquePlants.map((p) => ({ value: p, label: `Plant ${p}` })),
+              ]}
+            />
+          )}
+        </>
+      }
+      search={{
+        value: searchTerm,
+        onChange: (val) => {
+          setSearchTerm(val);
+          setCurrentPage(1);
+        },
+        placeholder: "Search SR, product, customer, remark...",
+      }}
+      hasActiveFilters={hasActiveFilters}
+      onResetFilters={handleResetFilters}
+      resetFiltersLabel="Reset"
+    >
 
       {/* ── 4. High-Density Full-Bleed Table ── */}
       <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-lowest)]">
@@ -981,30 +842,18 @@ export const SamplingReviewQueuePage: React.FC<SamplingReviewQueuePageProps> = (
         </div>
       )}
 
-      {/* ── Modal: Full Product Docket Inspection ── */}
-      {inspectProduct && (
-        <CatalogProductInspectModal
-          product={inspectProduct}
+      {/* ── Modal: Comprehensive 5-Section Sample Request Inspector ── */}
+      {inspectModalItem && (
+        <SampleRequestInspector
+          request={inspectModalItem}
+          isOpen={Boolean(inspectModalItem)}
           onClose={() => setInspectModalItem(null)}
-          heading="Product Docket Technical Review"
-          intro="Review the complete product category, characteristics, classes and specifications before sampling release."
-          footer={
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-500">
-                Target Plant: {inspectModalItem?.targetPlant || "Khaniwade"}
-              </span>
-              <button
-                type="button"
-                onClick={() => setInspectModalItem(null)}
-                className="px-4 py-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 font-semibold"
-              >
-                Close
-              </button>
-            </div>
-          }
+          onRefresh={onRefresh}
+          role="sampling"
+          isAdmin={!readOnly}
         />
       )}
-    </div>
+    </DeskWorkspaceLayout>
   );
 };
 

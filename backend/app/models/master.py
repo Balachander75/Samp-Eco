@@ -44,20 +44,12 @@ class User(Base):
     plant_code = Column(String(50), nullable=True)
     theme_id = Column(String(20), nullable=False, default="emerald", server_default="emerald")
     is_active = Column(Boolean, default=True, nullable=False)
-    plant_assignments = relationship(
-        "UserPlantAssignment",
-        back_populates="user",
-        cascade="all, delete-orphan",
-    )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     @property
     def plant_codes(self):
-        codes = sorted({assignment.plant.code for assignment in self.plant_assignments})
-        if not codes and self.plant_code:
-            return [self.plant_code]
-        return codes
+        return [self.plant_code] if self.plant_code else []
 
 
 class Customer(Base):
@@ -85,22 +77,6 @@ class Plant(Base):
     created_by = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    user_assignments = relationship(
-        "UserPlantAssignment",
-        back_populates="plant",
-        cascade="all, delete-orphan",
-    )
-
-
-class UserPlantAssignment(Base):
-    """Many-to-many plant visibility assignments for enterprise users."""
-
-    __tablename__ = "user_plant_assignments"
-
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    plant_id = Column(Integer, ForeignKey("plants.id", ondelete="CASCADE"), primary_key=True)
-    user = relationship("User", back_populates="plant_assignments")
-    plant = relationship("Plant", back_populates="user_assignments")
 
 
 class RefreshToken(Base):

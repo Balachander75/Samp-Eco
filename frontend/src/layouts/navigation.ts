@@ -165,7 +165,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
       },
       {
         id: "members",
-        title: "Members & Plants",
+        title: "Team Members",
         shortCode: "MB",
         path: "/members",
         aliases: [
@@ -174,12 +174,6 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
           "/members/governance",
         ],
         departmentKey: "members",
-        subItems: [
-          { id: "members-teams", title: "Teams & Members", path: "/members/teams" },
-          { id: "members-plants", title: "Manufacturing Plants", path: "/members/plants" },
-          { id: "members-governance", title: "Access Governance", path: "/members/governance" },
-        ],
-        subTeams: ["Teams & Members", "Manufacturing Plants", "Access Governance"],
       },
     ],
   },

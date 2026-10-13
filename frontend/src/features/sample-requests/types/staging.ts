@@ -35,6 +35,9 @@ export interface StagedProductItem {
     value: string | null;
     uom?: string | null;
   }>;
+  hasCreativeChanges?: boolean;
+  creativeCharacteristicsCleared?: boolean;
+  creativePendingCharacteristicKeys?: Array<{ className: string; characteristicName: string }>;
   requestTypeTimestamps?: Record<string, string | null>;
   plant?: string;
   unitPcPack?: string;

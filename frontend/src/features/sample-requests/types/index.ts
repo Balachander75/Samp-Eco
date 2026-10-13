@@ -162,10 +162,11 @@ export interface MockupWorkflowEvent {
   actorDepartment: string;
   timestamp: string;
   mockupUrl?: string;
+  remark?: string | null;
 }
 
 export interface MockupWorkflowState {
-  stage: "marketing" | "awaiting_design_acceptance" | "creative" | "studio" | string;
+  stage: "marketing" | "awaiting_design_acceptance" | "creative" | "studio" | "creative_approval" | "awaiting_marketing_acceptance" | "done" | string;
   designNeeded?: boolean;
   marketingShutterstockNo?: string;
   marketingRemark?: string;
@@ -173,9 +174,33 @@ export interface MockupWorkflowState {
   creativeRemark?: string;
   creativeCharacteristicKeys?: Array<{ className: string; characteristicName: string }>;
   creativeRequiredCharacteristicKeys?: Array<{ className: string; characteristicName: string }>;
+  creativePendingCharacteristicKeys?: Array<{ className: string; characteristicName: string }>;
   creativeCharacteristicsClearedAt?: string;
   qtyForMockup?: string;
   requiredDate?: string;
+  marketingRequiredDate?: string;
+  studioSystemRequiredDate?: string;
+  creativeSystemRequiredDate?: string;
+  creativeDateDecisionDueAt?: string;
+  creativeDateDecision?: "confirmed" | "proposed";
+  creativeInputDate?: string;
+  creativeConfirmedDate?: string | null;
+  creativeProposedDate?: string | null;
+  creativeDateDecisionAt?: string;
+  creativeDateDecisionLate?: boolean;
+  studioEarliestStartDate?: string;
+  creativeChangesRequired?: boolean;
+  studioSubmittedAt?: string;
+  submittedToCreativeAt?: string;
+  submittedToCreativeBy?: string;
+  creativeApprovalDueAt?: string;
+  creativeApprovalActualAt?: string;
+  creativeApprovalLate?: boolean;
+  creativeApprovalDecision?: "accept" | "request_revision";
+  creativeApprovedAt?: string;
+  creativeRevisionRemark?: string;
+  marketingDecision?: "accept" | "request_revision";
+  marketingRevisionRemark?: string;
   releasedToCreativeAt?: string;
   sentToStudioAt?: string;
   sentToStudioBy?: string;
@@ -185,7 +210,7 @@ export interface MockupWorkflowState {
   claimedBy?: string;
   claimedByUserId?: number;
   claimedAt?: string;
-  claimedStage?: "creative" | "studio";
+  claimedStage?: "creative" | "studio" | "creative_approval";
   plantReleasedAt?: string;
   plantReleasedBy?: string;
   plantReleaseTarget?: string;

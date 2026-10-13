@@ -30,6 +30,7 @@ import {
   FeasibilityTechnicalReviewTab,
   FeasibilityCommercialDecisionTab,
   FeasibilityChatterFeed,
+  FeasibilityCounterDateModal,
 } from "./feasibility";
 import { ImageLightboxModal } from "./inspector";
 
@@ -108,6 +109,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   const [isSubmittingCounterDate, setIsSubmittingCounterDate] = useState(false);
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"specs" | "review" | "decision">("specs");
+  const [isCounterDateModalOpen, setIsCounterDateModalOpen] = useState(false);
 
   useEffect(() => {
     setSampVerdictChoice("Yes");
@@ -118,11 +120,14 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     setCounterDate("");
     setCounterDateReason("");
     setCounterDateError(null);
+    setIsCounterDateModalOpen(false);
   }, [request?.id]);
 
   useEffect(() => {
-    setActiveTab("specs");
-  }, [isOpen, request?.id, sourceDesk]);
+    if (isOpen) {
+      setActiveTab("specs");
+    }
+  }, [isOpen, request?.id]);
 
   useEffect(() => {
     if (!isOpen || !activeRequest?.id || activeRequest.counterDateDecision !== "pending") return;
@@ -276,6 +281,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
       const updated = await claimFeasibilityTaskApi(activeRequest.id);
       setLocalOverride(updated);
       window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
     } catch (err) {
       console.error("Failed to claim feasibility task:", err);
     } finally {
@@ -286,10 +292,6 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   // SAMP Technical Verdict Submission
   const handleSubmitSampVerdict = async () => {
     if (!activeRequest?.id || isSubmittingSampVerdict || !canEvaluateTechnical) return;
-    if ((sampVerdictChoice === "No" || sampVerdictChoice === "Maybe") && !sampVerdictRemark.trim()) {
-      setSampVerdictError(`A detailed technical explanation is required when selecting "${sampVerdictChoice}".`);
-      return;
-    }
     setSampVerdictError(null);
     setIsSubmittingSampVerdict(true);
     try {
@@ -301,6 +303,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
       });
       setLocalOverride(updated);
       window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
     } catch (err: any) {
       console.error("Failed to submit SAMP verdict:", err);
       setSampVerdictError(err.message || "Failed to submit technical verdict.");
@@ -317,6 +320,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
       const updated = await proposeFeasibilityCounterDateApi(activeRequest.id, counterDate, counterDateReason.trim());
       setLocalOverride(updated);
       window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
     } catch (err) {
       setCounterDateError(err instanceof Error ? err.message : "Could not propose the revised date.");
     } finally {
@@ -324,12 +328,31 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     }
   };
 
-  const handleCounterDateDecision = async (accepted: boolean) => {
+  const handleProposeCounterDateSubmit = async (newDate: string, reason: string) => {
+    if (!activeRequest?.id || isSubmittingCounterDate) return;
+    setIsSubmittingCounterDate(true);
+    try {
+      const updated = await proposeFeasibilityCounterDateApi(activeRequest.id, newDate, reason);
+      setLocalOverride(updated);
+      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
+    } catch (err: any) {
+      throw new Error(err?.message || "Could not propose revised target date.");
+    } finally {
+      setIsSubmittingCounterDate(false);
+    }
+  };
+
+  const handleCounterDateDecision = async (accepted: boolean, notes?: string) => {
     if (!activeRequest?.id || isSubmittingDecision) return;
     setDecisionError(null);
     setIsSubmittingDecision(true);
     try {
-      const updated = await decideFeasibilityCounterDateApi(activeRequest.id, accepted ? "accepted" : "rejected");
+      const updated = await decideFeasibilityCounterDateApi(
+        activeRequest.id,
+        accepted ? "accepted" : "rejected",
+        notes
+      );
       setLocalOverride(updated);
       window.dispatchEvent(new CustomEvent("samp:requests-changed"));
       await onRefresh?.();
@@ -395,6 +418,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
             : "Converted to Costing",
         });
         window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+        await onRefresh?.();
       }
     } catch (err) {
       console.error("Failed to convert feasibility to sampling request:", err);
@@ -452,17 +476,13 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
               <FeasibilitySheetHeader
                 activeRequest={activeRequest}
                 classificationLabel={classificationLabel}
-                previewableImagesCount={previewableImages.length}
-                referenceLinks={feasibilityDetails.referenceLinks}
+                sourceDesk={sourceDesk}
                 canEvaluateTechnical={canEvaluateTechnical}
                 canMakeCommercialDecision={canMakeCommercialDecision}
                 isClaiming={isClaiming}
-                isSubmittingDecision={isSubmittingDecision}
-                isConverting={isConverting}
                 onClaimTask={handleClaimTask}
-                onOpenReviewTab={() => setActiveTab("review")}
-                onMarketingFinalApprove={handleMarketingFinalApprove}
-                onConvertToSampling={handleConvertToSampling}
+                onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
+                onCounterDateDecision={handleCounterDateDecision}
               />
 
               {/* Notebook Tab Strip */}
@@ -791,6 +811,24 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
           />
         </div>
       </div>
+
+      {/* Counter Date Proposal Modal */}
+      {isCounterDateModalOpen && (
+        <FeasibilityCounterDateModal
+          isOpen={isCounterDateModalOpen}
+          onClose={() => setIsCounterDateModalOpen(false)}
+          originalDate={activeRequest.sampleRequiredDate || ""}
+          isEligible={Boolean(canEvaluateTechnical && activeRequest.takenBySamp && !activeRequest.sampCounterDate && !activeRequest.samplingFeasibilityResponse)}
+          statusLabel={
+            !activeRequest.takenBySamp
+              ? "Claim task first"
+              : activeRequest.sampCounterDate
+              ? "Counter proposal already used"
+              : "Within operational policy"
+          }
+          onSubmitCounterDate={handleProposeCounterDateSubmit}
+        />
+      )}
 
       {/* Full Resolution Image Lightbox Modal */}
       <ImageLightboxModal

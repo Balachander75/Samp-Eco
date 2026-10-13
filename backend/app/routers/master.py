@@ -9,9 +9,7 @@ from app.database import get_db
 from app.schemas.master import (
     CustomerCreate,
     CustomerOut,
-    PlantCreate,
     PlantOut,
-    PlantUpdate,
     UserCreate,
     UserOut,
     UserUpdate,
@@ -56,7 +54,7 @@ def create_customer(
 
 
 # ---------------------------------------------------------------------------
-# Manufacturing Plants
+# Manufacturing Plants (Read-Only Master Data)
 # ---------------------------------------------------------------------------
 @router.get("/api/v1/plants", response_model=List[PlantOut], summary="List plants")
 def list_plants(
@@ -67,48 +65,6 @@ def list_plants(
     plants = service.list_plants()
     visible_codes = set(filter_plant_values(current_user, (plant.code for plant in plants), service.repo.db))
     return [plant for plant in plants if plant.code in visible_codes]
-
-
-@router.post(
-    "/api/v1/plants",
-    response_model=PlantOut,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a plant",
-    dependencies=[Depends(require_admin)],
-)
-def create_plant(
-    payload: PlantCreate,
-    service: MasterService = Depends(get_master_service),
-):
-    return service.create_plant(payload)
-
-
-@router.patch(
-    "/api/v1/plants/{id}",
-    response_model=PlantOut,
-    summary="Update a plant",
-    dependencies=[Depends(require_admin)],
-)
-def update_plant(
-    id: int,
-    payload: PlantUpdate,
-    service: MasterService = Depends(get_master_service),
-):
-    return service.update_plant(id, payload)
-
-
-@router.delete(
-    "/api/v1/plants/{id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a plant",
-    dependencies=[Depends(require_admin)],
-)
-def delete_plant(
-    id: int,
-    service: MasterService = Depends(get_master_service),
-):
-    service.delete_plant(id)
-    return None
 
 
 # ---------------------------------------------------------------------------

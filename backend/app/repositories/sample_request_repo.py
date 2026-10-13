@@ -5,10 +5,12 @@ Handles all database operations for the `create_sample_requests` entity.
 from typing import Optional, List, Dict, Any, Tuple
 import re
 from sqlalchemy.orm import Session, aliased, selectinload
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_, and_, literal_column
 from app.repositories.base import BaseRepository
 from app.models.sample_request import CreateSampleRequest, ProductDetail
 from app.utils.business_year import get_business_year_date_range
+
+MISSING_TAXONOMY_FILTER = "__missing__"
 
 
 class SampleRequestRepository(BaseRepository[CreateSampleRequest]):
@@ -220,6 +222,13 @@ class SampleRequestRepository(BaseRepository[CreateSampleRequest]):
         def normalized_value(value: str) -> str:
             return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
 
+        def apply_taxonomy_filter(query, column, value: Optional[str]):
+            if not value or not value.strip():
+                return query
+            if value == MISSING_TAXONOMY_FILTER:
+                return query.filter(or_(column.is_(None), func.trim(func.coalesce(column, "")) == ""))
+            return query.filter(normalized_sql(column) == normalized_value(value))
+
         binding1_detail = aliased(ProductDetail)
         binding2_detail = aliased(ProductDetail)
         binding1_name = normalized_sql(binding1_detail.characteristic_name)
@@ -241,12 +250,12 @@ class SampleRequestRepository(BaseRepository[CreateSampleRequest]):
         )
 
         # Taxonomy filters
-        if category and category.strip():
-            query = query.filter(normalized_sql(CreateSampleRequest.product_category) == normalized_value(category))
-        if sub_category and sub_category.strip():
-            query = query.filter(normalized_sql(CreateSampleRequest.product_sub_category) == normalized_value(sub_category))
-        if third_category and third_category.strip():
-            query = query.filter(normalized_sql(CreateSampleRequest.product_third_category) == normalized_value(third_category))
+        for column, value in (
+            (CreateSampleRequest.product_category, category),
+            (CreateSampleRequest.product_sub_category, sub_category),
+            (CreateSampleRequest.product_third_category, third_category),
+        ):
+            query = apply_taxonomy_filter(query, column, value)
 
         # Binding 1 filter
         if binding1 and binding1.strip():
@@ -272,6 +281,145 @@ class SampleRequestRepository(BaseRepository[CreateSampleRequest]):
         if limit is not None and limit > 0:
             query = query.limit(limit)
         return query.all()
+
+    def catalog_filter_counts(
+        self,
+        *,
+        category: Optional[str] = None,
+        sub_category: Optional[str] = None,
+        third_category: Optional[str] = None,
+        binding1: Optional[str] = None,
+        created_by_user_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Return product counts for each next category and binding filter."""
+        def normalized_sql(column):
+            return func.regexp_replace(
+                func.lower(func.coalesce(column, literal_column("''"))),
+                literal_column("'[^a-z0-9]+'"),
+                literal_column("''"),
+                literal_column("'g'"),
+            )
+
+        def normalized_value(value: str) -> str:
+            return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
+
+        def apply_taxonomy_filter(query, column, value: Optional[str]):
+            if not value or not value.strip():
+                return query
+            if value == MISSING_TAXONOMY_FILTER:
+                return query.filter(or_(column.is_(None), func.trim(func.coalesce(column, "")) == ""))
+            return query.filter(normalized_sql(column) == normalized_value(value))
+
+        def binding_join(alias, names):
+            return and_(
+                alias.sample_request_id == CreateSampleRequest.id,
+                normalized_sql(alias.class_name) == "nbbinding",
+                normalized_sql(alias.characteristic_name).in_(names),
+            )
+
+        def grouped_counts(
+            *,
+            category_filter: Optional[str] = None,
+            sub_category_filter: Optional[str] = None,
+            third_category_filter: Optional[str] = None,
+            binding1_filter: Optional[str] = None,
+            binding_facet: Optional[str] = None,
+        ) -> Dict[str, int]:
+            binding1_detail = aliased(ProductDetail) if binding1_filter or binding_facet else None
+            binding2_detail = aliased(ProductDetail) if binding_facet == "binding2" else None
+            if binding_facet == "binding1":
+                facet_column = binding1_detail.value
+            elif binding_facet == "binding2":
+                facet_column = binding2_detail.value
+            elif binding_facet:
+                raise ValueError("Unsupported binding facet")
+            else:
+                facet_column = None
+
+            query = self.db.query(
+                normalized_sql(facet_column) if facet_column is not None else None,
+                func.count(func.distinct(CreateSampleRequest.id)),
+            ).select_from(CreateSampleRequest)
+            if binding1_detail is not None:
+                query = query.outerjoin(
+                    binding1_detail,
+                    binding_join(binding1_detail, ("bindingtype1", "binding1")),
+                )
+            if binding2_detail is not None:
+                query = query.outerjoin(
+                    binding2_detail,
+                    binding_join(binding2_detail, ("bindingtype2", "binding2")),
+                )
+            if created_by_user_id is not None:
+                query = query.filter(CreateSampleRequest.created_by_user_id == created_by_user_id)
+            for column, value in (
+                (CreateSampleRequest.product_category, category_filter),
+                (CreateSampleRequest.product_sub_category, sub_category_filter),
+                (CreateSampleRequest.product_third_category, third_category_filter),
+            ):
+                query = apply_taxonomy_filter(query, column, value)
+            if binding1_filter and binding1_detail is not None:
+                query = query.filter(normalized_sql(binding1_detail.value) == normalized_value(binding1_filter))
+            if facet_column is not None:
+                query = query.filter(facet_column.isnot(None)).filter(func.trim(facet_column) != "")
+                query = query.group_by(normalized_sql(facet_column))
+                rows = query.all()
+                return {str(value): int(count) for value, count in rows if value}
+
+            return {}
+
+        def taxonomy_counts(column, category_filter=None, sub_category_filter=None):
+            query = self.db.query(
+                normalized_sql(column),
+                func.count(func.distinct(CreateSampleRequest.id)),
+            ).filter(column.isnot(None)).filter(func.trim(column) != "")
+            if created_by_user_id is not None:
+                query = query.filter(CreateSampleRequest.created_by_user_id == created_by_user_id)
+            query = apply_taxonomy_filter(query, CreateSampleRequest.product_category, category_filter)
+            query = apply_taxonomy_filter(query, CreateSampleRequest.product_sub_category, sub_category_filter)
+            query = query.group_by(normalized_sql(column))
+            return {str(value): int(count) for value, count in query.all() if value}
+
+        def taxonomy_missing_count(column, category_filter=None, sub_category_filter=None):
+            query = self.db.query(func.count(func.distinct(CreateSampleRequest.id)))
+            if created_by_user_id is not None:
+                query = query.filter(CreateSampleRequest.created_by_user_id == created_by_user_id)
+            query = apply_taxonomy_filter(query, CreateSampleRequest.product_category, category_filter)
+            query = apply_taxonomy_filter(query, CreateSampleRequest.product_sub_category, sub_category_filter)
+            query = query.filter(or_(column.is_(None), func.trim(func.coalesce(column, "")) == ""))
+            return int(query.scalar() or 0)
+
+        return {
+            "categories": taxonomy_counts(CreateSampleRequest.product_category),
+            "sub_categories": taxonomy_counts(CreateSampleRequest.product_sub_category, category_filter=category),
+            "sub_categories_missing": taxonomy_missing_count(
+                CreateSampleRequest.product_sub_category,
+                category_filter=category,
+            ),
+            "third_categories": taxonomy_counts(
+                CreateSampleRequest.product_third_category,
+                category_filter=category,
+                sub_category_filter=sub_category,
+            ),
+            "third_categories_missing": taxonomy_missing_count(
+                CreateSampleRequest.product_third_category,
+                category_filter=category,
+                sub_category_filter=sub_category,
+            ),
+            "binding1": grouped_counts(
+                category_filter=category,
+                sub_category_filter=sub_category,
+                third_category_filter=third_category,
+                binding_facet="binding1",
+            ),
+            "binding2": grouped_counts(
+                category_filter=category,
+                sub_category_filter=sub_category,
+                third_category_filter=third_category,
+                binding1_filter=binding1,
+                binding_facet="binding2",
+            ),
+        }
 
     def batch_update_status(self, ids: List[int], status: str) -> int:
         """Batch update status on multiple requests in a single transaction."""

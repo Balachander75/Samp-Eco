@@ -114,8 +114,16 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             logger.exception("Could not import the design request JSON backup into PostgreSQL: %s", e)
             raise
 
-    def list_all_records(self, year: Optional[str] = None, draft_only: bool = False) -> List[Dict[str, Any]]:
-        """List design requests, restricting FY views in PostgreSQL before serialization."""
+    def list_all_records(
+        self,
+        year: Optional[str] = None,
+        draft_only: bool = False,
+        created_by_user_id: Optional[int] = None,
+        status_in: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """List design requests, restricting FY and role views in PostgreSQL before serialization."""
         query = self.db.query(DesignRequest)
         if year and year.strip().upper() != "ALL":
             date_range = get_business_year_date_range(year)
@@ -140,7 +148,18 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
                 normalized_status.like("%draft%"),
                 normalized_status.like("%smt%"),
             ))
-        items = query.order_by(DesignRequest.id.desc()).all()
+        if created_by_user_id is not None:
+            query = query.filter(DesignRequest.created_by_user_id == created_by_user_id)
+        if status_in:
+            normalized_statuses = [s.strip().lower() for s in status_in if s and s.strip()]
+            if normalized_statuses:
+                query = query.filter(func.lower(func.coalesce(DesignRequest.status, "")).in_(normalized_statuses))
+        query = query.order_by(DesignRequest.id.desc())
+        if offset is not None and offset > 0:
+            query = query.offset(offset)
+        if limit is not None and limit > 0:
+            query = query.limit(limit)
+        items = query.all()
         return [self.to_dict(item) for item in items]
 
     def get_record_by_id(self, item_id: int) -> Optional[Dict[str, Any]]:

@@ -5,7 +5,7 @@ Handles all database operations for `customers`, `plants`, and enterprise `users
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from app.repositories.base import BaseRepository
-from app.models.master import Customer, Plant, User, UserPlantAssignment
+from app.models.master import Customer, Plant, User
 
 
 class MasterRepository:
@@ -37,45 +37,15 @@ class MasterRepository:
         return self.customers.create(customer)
 
     # ---------------------------------------------------------
-    # Plants
+    # Plants (Read-Only Dimension)
     # ---------------------------------------------------------
     def list_plants(self) -> List[Plant]:
         """Query all plants."""
         return self.db.query(Plant).order_by(Plant.id.asc()).all()
 
-    def get_plant_by_id(self, id: int) -> Optional[Plant]:
-        """Fetch plant by ID."""
-        return self.plants.get_by_id(id)
-
     def get_plant_by_code(self, code: str) -> Optional[Plant]:
         """Fetch plant by code."""
         return self.db.query(Plant).filter(Plant.code == code.strip()).first()
-
-    def create_plant(
-        self,
-        code: str,
-        name: str,
-        location: Optional[str] = None,
-        is_active: bool = True,
-        created_by: Optional[str] = None,
-    ) -> Plant:
-        """Create and persist a new plant."""
-        plant = Plant(
-            code=code.strip(),
-            name=name.strip(),
-            location=location,
-            is_active=is_active,
-            created_by=created_by,
-        )
-        return self.plants.create(plant)
-
-    def update_plant(self, plant: Plant, fields: Dict[str, Any]) -> Plant:
-        """Update existing plant attributes."""
-        return self.plants.update(plant, fields)
-
-    def delete_plant(self, id: int) -> bool:
-        """Delete plant by ID."""
-        return self.plants.delete(id)
 
     # ---------------------------------------------------------
     # Users & Teams
@@ -128,22 +98,8 @@ class MasterRepository:
         return self.users.create(user)
 
     def replace_user_plant_assignments(self, user: User, plant_codes: List[str]) -> User:
-        """Replace a user's plant assignments after validating every supplied code."""
-        cleaned = list(dict.fromkeys(code.strip() for code in plant_codes if code and code.strip()))
-        plants = []
-        for code in cleaned:
-            plant = self.db.query(Plant).filter(Plant.code.ilike(code)).first()
-            if not plant:
-                from fastapi import HTTPException, status
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Assigned plant '{code}' does not exist.",
-                )
-            plants.append(plant)
-        user.plant_assignments = []
-        user.plant_assignments.extend(
-            UserPlantAssignment(plant=plant) for plant in plants
-        )
+        """Assign primary plant code directly on the user without junction table."""
+        cleaned = self.validate_plant_codes(plant_codes)
         user.plant_code = cleaned[0] if cleaned else None
         self.db.add(user)
         self.db.commit()

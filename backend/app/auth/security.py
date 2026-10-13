@@ -2,6 +2,8 @@
 Authentication Security Utilities
 Handles password hashing with bcrypt and JWT token creation/validation.
 """
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
 import bcrypt
@@ -60,9 +62,6 @@ def create_access_token(
         payload.update(extra)
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
-
-import hashlib
-import secrets
 
 def _hash_token(raw_token: str) -> str:
     """Compute SHA-256 hash of a token for safe database persistence."""
@@ -198,32 +197,6 @@ def decode_access_token(token: str) -> dict:
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def get_optional_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-) -> Optional["User"]:
-    """
-    Returns the active user if a valid bearer token is provided.
-    Falls back to first active user only in development/debug mode.
-    """
-    from app.models.master import User
-
-    if credentials is not None:
-        try:
-            payload = decode_access_token(credentials.credentials)
-            user_id = payload.get("sub")
-            if user_id:
-                user = db.query(User).filter(User.id == int(user_id)).first()
-                if user and user.is_active:
-                    return user
-        except Exception:
-            pass
-
-    if not (settings.APP_ENV.lower() in ("production", "prod")) and settings.DEBUG:
-        return db.query(User).filter(User.is_active == True).first()
-    return None
-
-
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: Session = Depends(get_db),
@@ -277,3 +250,25 @@ def require_admin(current_user=Depends(get_current_user)):
             detail="Admin privileges required to access this resource.",
         )
     return current_user
+
+
+def prune_expired_refresh_tokens(db: Session, older_than_days: int = 14) -> int:
+    """
+    Safely delete revoked or expired refresh tokens older than N days.
+    Prevents unbounded growth of the refresh_tokens table.
+    """
+    from app.models.master import RefreshToken
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+    try:
+        deleted = (
+            db.query(RefreshToken)
+            .filter((RefreshToken.is_revoked == True) | (RefreshToken.expires_at < cutoff))
+            .delete(synchronize_session=False)
+        )
+        db.commit()
+        return deleted
+    except Exception:
+        db.rollback()
+        return 0
+

@@ -17,31 +17,33 @@ import {
   Layers,
 } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { MarketingCounterDateBanner } from "../inspector/MarketingCounterDateBanner";
+import { FeasibilityClaimStrip } from "./FeasibilityClaimStrip";
 
 export interface FeasibilitySheetHeaderProps {
   activeRequest: SampleRequestItem;
   classificationLabel: string;
-  previewableImagesCount?: number;
-  referenceLinks?: string[];
+  sourceDesk?: "marketing" | "samp";
   canEvaluateTechnical?: boolean;
   canMakeCommercialDecision?: boolean;
   isClaiming?: boolean;
-  isSubmittingDecision?: boolean;
-  isConverting?: boolean;
   onClaimTask?: () => void;
-  onOpenReviewTab?: () => void;
-  onMarketingFinalApprove?: (approved: boolean) => void;
-  onConvertToSampling?: () => void;
+  onOpenCounterDateModal?: () => void;
+  onCounterDateDecision?: (accepted: boolean, notes?: string) => Promise<void> | void;
 }
 
 export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
   activeRequest,
   classificationLabel,
+  sourceDesk = "marketing",
+  canEvaluateTechnical = false,
+  isClaiming = false,
+  onClaimTask,
+  onOpenCounterDateModal,
+  onCounterDateDecision,
 }) => {
   const code = activeRequest.materialCode || `FC-${String(activeRequest.id).padStart(4, "0")}`;
   const isEvaluated = Boolean(activeRequest.samplingFeasibilityResponse);
-  const isDecided = Boolean(activeRequest.marketingDecision);
-  const isConverted = Boolean(activeRequest.convertedSrNumber);
 
   return (
     <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
@@ -142,16 +144,62 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
             </div>
           </div>
 
-          {/* Card 2: Target Required Date */}
+          {/* Card 2: Target Required Date & Counter-Date Controls */}
           <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-0.5">
             <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
               Required Target Date
             </span>
-            <div className="font-mono font-bold text-xs text-[var(--on-surface)]">
-              {activeRequest.sampleRequiredDate
-                ? formatOdooDate(activeRequest.sampleRequiredDate)
-                : "Flexible"}
+            <div className="font-mono font-bold text-xs text-[var(--on-surface)] flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span>
+                {activeRequest.sampleRequiredDate
+                  ? formatOdooDate(activeRequest.sampleRequiredDate)
+                  : "Flexible"}
+              </span>
             </div>
+
+            {/* Counter-Date Status & Triggers */}
+            {activeRequest.counterDateDecision === "pending" ? (
+              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                <span
+                  role="status"
+                  className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
+                >
+                  <Clock className="h-3 w-3" /> Awaiting Marketing
+                </span>
+                {activeRequest.sampCounterDate && (
+                  <span className="text-[10px] font-mono font-bold text-amber-800 dark:text-amber-300">
+                    Proposed: {formatOdooDate(activeRequest.sampCounterDate)}
+                  </span>
+                )}
+              </div>
+            ) : canEvaluateTechnical && !activeRequest.samplingFeasibilityResponse ? (
+              <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  disabled={!activeRequest.takenBySamp || Boolean(activeRequest.sampCounterDate)}
+                  onClick={onOpenCounterDateModal}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] dark:text-emerald-300 hover:underline disabled:opacity-40 disabled:no-underline cursor-pointer"
+                  title={
+                    !activeRequest.takenBySamp
+                      ? "Claim task first to propose a counter date"
+                      : activeRequest.sampCounterDate
+                      ? "Only one counter-date proposal is allowed for this request"
+                      : "Propose a revised required target date to Marketing"
+                  }
+                >
+                  <Clock className="w-3 h-3" />
+                  <span>Propose Date</span>
+                </button>
+                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                  {!activeRequest.takenBySamp
+                    ? "Claim task to propose"
+                    : activeRequest.sampCounterDate
+                    ? "Proposal used"
+                    : "Within 2-day policy"}
+                </span>
+              </div>
+            ) : null}
           </div>
 
           {/* Card 3: SAMP Team Assignee */}
@@ -197,6 +245,41 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
               )}
             </div>
           </div>
+        </div>
+
+        {/* ── Workflow Negotiation & Task Claim Strips ── */}
+        <div className="mt-3.5 space-y-2.5">
+          {/* Counter Date Negotiation Banner */}
+          {activeRequest.counterDateDecision === "pending" && (
+            <MarketingCounterDateBanner
+              originalDate={formatOdooDate(activeRequest.sampleRequiredDate)}
+              proposedDate={formatOdooDate(activeRequest.sampCounterDate)}
+              reason={activeRequest.sampCounterDateReason}
+              claimedBy={activeRequest.sampCounterDateProposedBy || activeRequest.takenBySamp}
+              requestedAt={activeRequest.sampCounterDateProposedAt}
+              isMarketingMode={sourceDesk === "marketing"}
+              proposerTitle="Sampling Team"
+              onAccept={() => onCounterDateDecision?.(true)}
+              onReject={(notes) => onCounterDateDecision?.(false, notes)}
+            />
+          )}
+
+          {/* Task Ownership & Claim Strip */}
+          <FeasibilityClaimStrip
+            claimedBy={activeRequest.takenBySamp}
+            claimedAt={activeRequest.takenAtSamp}
+            isSamplingMode={canEvaluateTechnical}
+            isClaiming={isClaiming}
+            canClaim={Boolean(canEvaluateTechnical && !activeRequest.takenBySamp && !activeRequest.samplingFeasibilityResponse)}
+            claimDisabledReason={
+              activeRequest.samplingFeasibilityResponse
+                ? "Technical review has already been completed."
+                : !canEvaluateTechnical
+                ? "Only the Sampling Team can claim this task."
+                : undefined
+            }
+            onClaim={() => onClaimTask?.()}
+          />
         </div>
       </div>
     </div>

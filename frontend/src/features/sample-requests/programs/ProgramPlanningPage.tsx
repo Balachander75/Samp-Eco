@@ -12,7 +12,8 @@ import {
   Download,
 } from "lucide-react";
 import { CopyBadge } from "@/components/ui/CopyBadge";
-import { PaginationBar } from "@/components/erp/PaginationBar";
+import { Select } from "@/components/ui/Select";
+import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 
 const NewProgramPlanningModal = React.lazy(() =>
@@ -236,103 +237,87 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
     });
   };
 
+  const kpiItems = [
+    {
+      label: "Programs",
+      value: stageCounts.all,
+      detail: "All seasonal plans",
+      color: "bg-[var(--accent-primary)]",
+      isActive: filterTab === "all" && customerFilter === "all" && selectedPlantFilter === "all" && !searchTerm,
+      onClick: clearFilters,
+    },
+    {
+      label: "Awaiting SAMP",
+      value: stageCounts.awaiting_samp,
+      detail: "SAMP note needed",
+      color: "bg-amber-500",
+      isActive: filterTab === "awaiting_samp",
+      onClick: () => {
+        setFilterTab("awaiting_samp");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "SAMP note added",
+      value: stageCounts.samp_added,
+      detail: "Sampling input received",
+      color: "bg-sky-500",
+      isActive: filterTab === "samp_added",
+      onClick: () => {
+        setFilterTab("samp_added");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Plant note added",
+      value: stageCounts.plant_added,
+      detail: "Plant input received",
+      color: "bg-emerald-500",
+      isActive: filterTab === "plant_added",
+      onClick: () => {
+        setFilterTab("plant_added");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Total SKUs",
+      value: programStats.totalSkus,
+      detail: "Across program plans",
+      color: "bg-violet-500",
+    },
+  ];
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-base)] text-[var(--on-surface)] select-text">
-      {/* ── 1. Compact Editorial Header (Maximized Space for Requests) ── */}
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-base font-bold tracking-tight text-[var(--on-surface)] sm:text-lg">
-              Seasonal Program Planning
-            </h1>
-            <p className="mt-0.5 text-[11px] text-[var(--on-surface-subtle)]">Seasonal campaign plans with SAMP and Plant team notes</p>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* New Program Button */}
-            {!isReadOnly && (
-              <button
-                type="button"
-                onClick={() => setIsNewModalOpen(true)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold text-white transition bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] cursor-pointer"
-                title="Initialize New Seasonal Program with Matrix"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Program Planning</span>
-              </button>
-            )}
-
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isLoading}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] cursor-pointer disabled:opacity-50"
-              title="Refresh Program Records"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            {/* Export CSV */}
-            <button
-              type="button"
-              onClick={handleExportCSV}
-              disabled={filteredRequests.length === 0}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] cursor-pointer disabled:opacity-50"
-              title="Export To CSV"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <section aria-label="Program planning summary" className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-2.5 sm:px-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-          {[
-            { label: "Programs", value: stageCounts.all, detail: "All seasonal plans", color: "bg-[var(--accent-primary)]", filter: "all" as const },
-            { label: "Awaiting SAMP", value: stageCounts.awaiting_samp, detail: "SAMP note needed", color: "bg-amber-500", filter: "awaiting_samp" as const },
-            { label: "SAMP note added", value: stageCounts.samp_added, detail: "Sampling input received", color: "bg-sky-500", filter: "samp_added" as const },
-            { label: "Plant note added", value: stageCounts.plant_added, detail: "Plant input received", color: "bg-emerald-500", filter: "plant_added" as const },
-            { label: "Total SKUs", value: programStats.totalSkus, detail: "Across program plans", color: "bg-violet-500" },
-          ].map((item) => {
-            const active = "filter" in item && item.filter
-              ? item.filter === "all"
-                ? filterTab === "all" && customerFilter === "all" && selectedPlantFilter === "all" && !searchTerm
-                : filterTab === item.filter
-              : false;
-            const content = (
-              <>
-                <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.color}`} />
-                  <span className="truncate">{item.label}</span>
-                </span>
-                <span className="mt-1 flex items-baseline justify-between gap-2">
-                  <span className="text-lg font-bold leading-none tabular-nums text-[var(--on-surface)]">{item.value}</span>
-                  <span className="truncate text-[10px] text-[var(--on-surface-subtle)]">{item.detail}</span>
-                </span>
-              </>
-            );
-            return "filter" in item && item.filter ? (
-              <button key={item.label} type="button" onClick={() => { if (item.filter === "all") clearFilters(); else { setFilterTab(item.filter); setCurrentPage(1); } }} aria-pressed={active} className={`min-w-0 rounded-lg border px-3 py-2 text-left shadow-2xs transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--surface-low)] ${active ? "border-[var(--accent-primary)] bg-[var(--surface-lowest)] ring-2 ring-[var(--accent-primary)]/20" : "border-[var(--border-subtle)] bg-[var(--surface-lowest)]"}`}>
-                {content}
-              </button>
-            ) : (
-              <div key={item.label} className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2 shadow-2xs">
-                {content}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ── 2. Floating Filter & Search Strip ── */}
-      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-4 py-2.5 sm:px-6">
-        {/* Right Search, Customer, Plant Select */}
-        <div className="flex flex-wrap items-center gap-2">
+    <DeskWorkspaceLayout
+      title="Seasonal Program Planning"
+      subtitle="Seasonal campaign plans with SAMP and Plant team notes"
+      businessYear={selectedYear}
+      totalCount={programRequests.length}
+      totalLabel="Programs"
+      extraBadges={
+        programStats.totalSkus > 0 ? (
+          <span className="px-2 py-0.5 rounded-md bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)] text-[10px] font-mono font-bold">
+            Total SKUs · {programStats.totalSkus}
+          </span>
+        ) : null
+      }
+      primaryAction={
+        !isReadOnly
+          ? {
+              label: "New Program Planning",
+              icon: Plus,
+              onClick: () => setIsNewModalOpen(true),
+              title: "Initialize New Seasonal Program with Matrix",
+            }
+          : undefined
+      }
+      onRefresh={onRefresh}
+      isRefreshing={isLoading}
+      onExportCSV={handleExportCSV}
+      exportDisabled={filteredRequests.length === 0}
+      kpiItems={kpiItems}
+      filterControls={
+        <>
           {selectedIds.size > 0 && isAdmin && (
             <button
               type="button"
@@ -340,7 +325,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                 const target = programRequests.find((r) => selectedIds.has(r.id));
                 if (target) onDeleteRequest(target);
               }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700 cursor-pointer"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700 cursor-pointer shadow-2xs"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete ({selectedIds.size})</span>
@@ -348,75 +333,52 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
           )}
 
           {customerList.length > 0 && (
-            <select
+            <Select
+              aria-label="Filter by customer"
               value={customerFilter}
               onChange={(e) => {
                 setCustomerFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 min-w-[160px] max-w-[240px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--border-focus)] cursor-pointer"
-            >
-              <option value="all">All Customers</option>
-              {customerList.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+              className="min-w-[160px] max-w-[240px]"
+              options={[
+                { value: "all", label: "All Customers" },
+                ...customerList.map((c) => ({ value: c, label: c })),
+              ]}
+            />
           )}
 
           {plantList.length > 0 && (
-            <select
+            <Select
+              aria-label="Filter by plant"
               value={selectedPlantFilter}
               onChange={(e) => {
                 setSelectedPlantFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-9 min-w-[140px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--border-focus)] cursor-pointer font-mono"
-            >
-              <option value="all">All Plants</option>
-              {plantList.map((p) => (
-                <option key={p} value={p}>
-                  Plant {p}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <div className="relative w-60 sm:w-72 group">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--on-surface-subtle)] transition-colors group-focus-within:text-[var(--accent-primary)]" />
-            <input
-              type="text"
-              placeholder="Search code, customer, title..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="h-9 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] pl-[34px] pr-8 text-xs text-[var(--on-surface)] outline-none transition-all placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--accent-primary)]/15"
+              className="min-w-[140px]"
+              options={[
+                { value: "all", label: "All Plants" },
+                ...plantList.map((p) => ({ value: p, label: `Plant ${p}` })),
+              ]}
             />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-low)] cursor-pointer"
-                title="Clear search"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          {(customerFilter !== "all" || selectedPlantFilter !== "all" || filterTab !== "all" || searchTerm) && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="h-9 rounded-lg px-2.5 text-xs font-medium text-[var(--on-surface-muted)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)]"
-            >
-              Clear filters
-            </button>
           )}
-        </div>
-      </div>
+        </>
+      }
+      search={{
+        value: searchTerm,
+        onChange: (val) => {
+          setSearchTerm(val);
+          setCurrentPage(1);
+        },
+        placeholder: "Search code, customer, title...",
+      }}
+      hasActiveFilters={Boolean(
+        customerFilter !== "all" || selectedPlantFilter !== "all" || filterTab !== "all" || searchTerm
+      )}
+      onResetFilters={clearFilters}
+      resetFiltersLabel="Clear filters"
+    >
 
       {/* ── 3. Full-Bleed Table Workspace (Seamlessly Blended into Full UI) ── */}
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2 text-xs text-[var(--on-surface-muted)] sm:px-6">
@@ -609,7 +571,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
         />
 
       </React.Suspense>
-    </div>
+    </DeskWorkspaceLayout>
   );
 };
 

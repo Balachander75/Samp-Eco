@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.repositories.master_repo import MasterRepository
 from app.models.master import Customer, Plant, User
-from app.schemas.master import CustomerCreate, PlantCreate, PlantUpdate, UserCreate, UserUpdate
+from app.schemas.master import CustomerCreate, UserCreate, UserUpdate
 from app.auth.security import hash_password
 
 
@@ -29,51 +29,11 @@ class MasterService:
         return self.repo.create_customer(name=payload.name, country=payload.country)
 
     # ---------------------------------------------------------
-    # Plants
+    # Plants (Read-Only Dimension)
     # ---------------------------------------------------------
     def list_plants(self) -> List[Plant]:
         """Fetch all manufacturing plants."""
         return self.repo.list_plants()
-
-    def create_plant(self, payload: PlantCreate) -> Plant:
-        """Create a new manufacturing plant master entry."""
-        existing = self.repo.get_plant_by_code(payload.code)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Plant with code '{payload.code}' already exists.",
-            )
-        is_active = payload.is_active if payload.is_active is not None else True
-        return self.repo.create_plant(
-            code=payload.code,
-            name=payload.name,
-            location=payload.location,
-            is_active=is_active,
-            created_by=payload.created_by,
-        )
-
-    def update_plant(self, plant_id: int, payload: PlantUpdate) -> Plant:
-        """Update an existing plant."""
-        plant = self.repo.get_plant_by_id(plant_id)
-        if not plant:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plant not found.")
-        updates: Dict[str, Any] = {}
-        if payload.code is not None:
-            updates["code"] = payload.code.strip()
-        if payload.name is not None:
-            updates["name"] = payload.name.strip()
-        if payload.location is not None:
-            updates["location"] = payload.location.strip()
-        if payload.is_active is not None:
-            updates["is_active"] = payload.is_active
-        return self.repo.update_plant(plant, updates)
-
-    def delete_plant(self, plant_id: int) -> bool:
-        """Delete a plant."""
-        plant = self.repo.get_plant_by_id(plant_id)
-        if not plant:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plant not found.")
-        return self.repo.delete_plant(plant_id)
 
     # ---------------------------------------------------------
     # Users & Team Hierarchy

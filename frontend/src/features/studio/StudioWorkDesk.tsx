@@ -81,13 +81,7 @@ export const StudioWorkDesk: React.FC<StudioWorkDeskProps> = ({ user }) => {
           (request.requestTypes || []).includes("mockup") ||
           String(request.mockupRequired || "").toLowerCase() === "yes";
         const state = request.mockupWorkflowState;
-        return (
-          isMockup &&
-          (state?.stage === "studio" ||
-            Boolean(state?.mockupUrl) ||
-            Boolean(state?.sentToStudioAt) ||
-            state?.stage === "marketing")
-        );
+        return isMockup && state?.stage === "studio";
       });
 
       // Filter Sampling requests: has "sample" in requestTypes
@@ -231,6 +225,7 @@ export const StudioWorkDesk: React.FC<StudioWorkDeskProps> = ({ user }) => {
         role="studio"
         readOnly={isReadOnlyTeamHead(user)}
         actorName={user?.name || user?.userid}
+        actorUserId={user?.id}
         onClose={() => setIsMockupInspectorOpen(false)}
         onRefresh={loadStudioData}
       />

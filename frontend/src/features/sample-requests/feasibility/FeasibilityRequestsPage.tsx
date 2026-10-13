@@ -21,7 +21,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { CopyBadge } from "@/components/ui/CopyBadge";
-import { DataTable, type ColumnDef } from "@/components/erp/DataTable";
+import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Select } from "@/components/ui/Select";
 
@@ -252,16 +252,20 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
         const mat = (r.materialCode || "").toLowerCase();
-        const desc = (r.productDescription || r.feasibilityDescription || "").toLowerCase();
+        const desc = (r.productDescription || r.feasibilityDescription || r.descriptionNotes || "").toLowerCase();
         const cust = (r.customer || "").toLowerCase();
+        const plant = (r.targetPlant || "").toLowerCase();
         const samp = (r.takenBySamp || "").toLowerCase();
         const requester = (r.createdBy || "").toLowerCase();
+        const cat = (r.customFeasibilityType || r.feasibilityType || "").toLowerCase();
         return (
           mat.includes(q) ||
           desc.includes(q) ||
           cust.includes(q) ||
+          plant.includes(q) ||
           samp.includes(q) ||
-          requester.includes(q)
+          requester.includes(q) ||
+          cat.includes(q)
         );
       }
 
@@ -301,11 +305,11 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
     {
       id: "request",
       header: "Request",
-      width: "w-[150px]",
+      width: "w-[130px]",
       cell: (req) => (
         <div className="min-w-0">
           <CopyBadge text={req.materialCode || `FC-${String(req.id).padStart(4, "0")}`} />
-          <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+          <div className="mt-1 truncate text-[10px] font-mono text-zinc-400 dark:text-zinc-500">
             Raised{" "}
             {req.dateRequestCreated
               ? formatOdooDate(req.dateRequestCreated)
@@ -317,31 +321,60 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
       ),
     },
     {
-      id: "customer_scope",
-      header: "Customer & Category",
-      width: "min-w-[200px] max-w-[260px]",
+      id: "customer",
+      header: "Customer",
+      width: "w-[170px]",
+      cell: (req) => (
+        <div className="min-w-0">
+          <div
+            className="truncate font-semibold text-xs text-zinc-900 dark:text-zinc-100"
+            title={req.customer || "Customer not set"}
+          >
+            {req.customer || "—"}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "category",
+      header: "Category",
+      width: "w-[140px]",
       cell: (req) => {
         const category =
           req.customFeasibilityType ||
           (req.feasibilityType
             ? req.feasibilityType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-            : "NPD Feasibility");
+            : "Feasibility Check");
         return (
-          <div className="min-w-0 max-w-[260px]">
-            <div
-              className="truncate font-semibold text-[var(--on-surface)]"
-              title={req.customer || "Customer not set"}
+          <div className="min-w-0">
+            <span
+              className="inline-block max-w-[130px] truncate rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-600 dark:text-zinc-300"
+              title={category}
             >
-              {req.customer || "—"}
-            </div>
-            <div className="mt-1 min-w-0">
-              <span
-                className="max-w-[145px] shrink-0 truncate rounded-md border border-[var(--border-subtle)] bg-[var(--surface-low)] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[var(--on-surface-muted)]"
-                title={category}
-              >
-                {category}
-              </span>
-            </div>
+              {category}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      id: "description",
+      header: "Description / Scope",
+      width: "min-w-[220px]",
+      cell: (req) => {
+        const desc =
+          req.productDescription ||
+          req.descriptionNotes ||
+          req.feasibilityDescription ||
+          "—";
+        return (
+          <div className="min-w-0">
+            <span
+              className="text-xs text-zinc-600 dark:text-zinc-400 truncate block max-w-sm"
+              title={desc}
+            >
+              {desc}
+            </span>
           </div>
         );
       },
@@ -349,37 +382,101 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
     {
       id: "required_date",
       header: "Required Date",
-      width: "w-[125px]",
-      cell: (req) => (
-        <span className="whitespace-nowrap font-mono text-xs tabular-nums text-[var(--on-surface)]">
-          {req.sampleRequiredDate ? formatOdooDate(req.sampleRequiredDate) : "—"}
-        </span>
-      ),
+      width: "w-[150px]",
+      cell: (req) => {
+        const isFinalDecision =
+          Boolean(req.marketingDecision) ||
+          (req.status || "").toLowerCase().includes("approved") ||
+          (req.status || "").toLowerCase().includes("rejected") ||
+          (req.status || "").toLowerCase().includes("closed");
+
+        const hasCounterDate = Boolean(req.sampCounterDate);
+
+        // Check if date has passed without completion
+        let isPastDue = false;
+        if (!isFinalDecision && req.sampleRequiredDate) {
+          const reqTime = new Date(req.sampleRequiredDate).setHours(0, 0, 0, 0);
+          const todayTime = new Date().setHours(0, 0, 0, 0);
+          if (!isNaN(reqTime) && reqTime < todayTime) {
+            isPastDue = true;
+          }
+        }
+
+        // Delay ONLY applies when the committed date has passed without delivery/response
+        const isDelayed = isPastDue || req.isRespondedOnTime === false;
+
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 whitespace-nowrap font-mono text-xs tabular-nums text-zinc-900 dark:text-zinc-100">
+              <Clock
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  isDelayed ? "text-rose-500 dark:text-rose-400" : "text-zinc-400 dark:text-zinc-500"
+                }`}
+              />
+              <span className={isDelayed ? "font-semibold text-rose-600 dark:text-rose-400" : ""}>
+                {req.sampleRequiredDate ? formatOdooDate(req.sampleRequiredDate) : "—"}
+              </span>
+            </div>
+
+            {req.counterDateDecision === "pending" && req.sampCounterDate ? (
+              <div className="flex items-center gap-1">
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60"
+                  title={`Sampling proposed revised date awaiting Marketing review: ${req.sampCounterDate}`}
+                >
+                  <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>Proposed: {formatOdooDate(req.sampCounterDate)}</span>
+                </span>
+              </div>
+            ) : isPastDue ? (
+              <div className="flex items-center gap-1">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
+                  <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                  <span>Overdue</span>
+                </span>
+              </div>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       id: "raised_by",
       header: "Requester",
-      width: "w-[155px]",
+      width: "w-[130px]",
       cell: (req) => (
-        <div className="min-w-0 max-w-[155px]">
+        <div className="min-w-0">
           <div
-            className="truncate font-semibold text-[var(--on-surface)]"
+            className="truncate font-medium text-xs text-zinc-900 dark:text-zinc-100"
             title={req.createdBy?.trim() || "Marketing"}
           >
             {req.createdBy?.trim() || "Marketing"}
           </div>
-          <span className="mt-1 inline-flex rounded-md border border-[var(--border-subtle)] bg-[var(--surface-low)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--on-surface-muted)]">
-            Marketing Desk
-          </span>
         </div>
       ),
     },
     {
       id: "samp_review",
-      header: "SAMP Technical Review",
-      width: "w-[185px]",
+      header: "Sampling Team Review",
+      width: "w-[175px]",
       cell: (req) => {
         const verdict = req.samplingFeasibilityResponse;
+        const isAssigned = Boolean(req.takenBySamp);
+
+        if (!isAssigned && !verdict) {
+          return (
+            <div className="space-y-0.5">
+              <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 block">
+                Unassigned
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200/90 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span>Awaiting Claim</span>
+              </span>
+            </div>
+          );
+        }
+
         const tone =
           verdict === "Yes"
             ? "success"
@@ -395,13 +492,15 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
             ? "Not Feasible"
             : verdict === "Maybe"
             ? "Conditional"
-            : "Awaiting Claim";
+            : "In Review";
+
         return (
-          <div className="min-w-0 space-y-1">
-            <div className="flex min-w-0 items-center text-[11px] text-[var(--on-surface-muted)] font-mono">
-              <span className="truncate" title={req.takenBySamp || "Not yet claimed by SAMP"}>
-                {req.takenBySamp || "Unassigned"}
-              </span>
+          <div className="space-y-0.5">
+            <div
+              className="font-mono text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate"
+              title={req.takenBySamp || ""}
+            >
+              {req.takenBySamp || "Sampling Team"}
             </div>
             <StatusPill status={label} tone={tone} size="xs" />
           </div>
@@ -411,7 +510,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
     {
       id: "marketing_status",
       header: "Marketing Decision",
-      width: "w-[180px]",
+      width: "w-[160px]",
       cell: (req) => {
         const finalStatus = (req.status || "").toLowerCase();
         const isFinalDecision =
@@ -441,7 +540,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
       id: "actions",
       header: "Action",
       align: "right",
-      width: "w-[170px]",
+      width: "w-[100px]",
       cell: (req) => {
         const finalStatus = (req.status || "").toLowerCase();
         const isFinalDecision =
@@ -467,7 +566,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
               <button
                 type="button"
                 onClick={() => onInspectRequest(req)}
-                className="select-none rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
+                className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
               >
                 <span>Review Date</span>
                 <ChevronRight className="w-3 h-3" />
@@ -476,28 +575,19 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
               <button
                 type="button"
                 onClick={() => onInspectRequest(req)}
-                className="select-none rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
+                className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
               >
                 <span>Sign-Off</span>
                 <ChevronRight className="w-3 h-3" />
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onInspectRequest(req)}
-                className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
-              >
-                <span>Inspect</span>
-                <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
-              </button>
-            )}
+            ) : null}
             {isAdmin && (
               <button
                 type="button"
                 onClick={(event) => onDeleteRequest(req, event)}
                 aria-label={`Delete feasibility request ${req.materialCode || req.id}`}
                 title="Delete request"
-                className="inline-flex h-7 w-7 select-none items-center justify-center rounded-lg text-[var(--on-surface-subtle)] transition-colors hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 dark:hover:text-rose-300 cursor-pointer"
+                className="inline-flex h-7 w-7 select-none items-center justify-center rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -508,164 +598,78 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
     },
   ];
 
+  const kpiItems = [
+    {
+      label: "All Feasibility",
+      value: metrics.total,
+      detail: "Total pipeline",
+      color: "bg-[var(--accent-primary)]",
+      isActive:
+        filterTab === "all" &&
+        outcomeFilter === "all" &&
+        customerFilter === "all" &&
+        !searchTerm,
+      onClick: clearFilters,
+    },
+    {
+      label: "Needs Claim",
+      value: metrics.awaitingClaim,
+      detail: "Waiting for Sampling Team",
+      color: "bg-amber-500",
+      isActive: filterTab === "awaiting_claim",
+      onClick: () => setFilterTab("awaiting_claim"),
+    },
+    {
+      label: "In Sampling Review",
+      value: metrics.inReview,
+      detail: "Sampling team review",
+      color: "bg-sky-500",
+      isActive: filterTab === "in_review",
+      onClick: () => setFilterTab("in_review"),
+    },
+    {
+      label: "Sign-Off Needed",
+      value: metrics.awaitingMarketingAction,
+      detail: "Date or verdict sign-off",
+      color: "bg-purple-500",
+      isActive: filterTab === "awaiting_decision",
+      onClick: () => setFilterTab("awaiting_decision"),
+    },
+    {
+      label: "Decision Complete",
+      value: metrics.decisionComplete,
+      detail: "Approved or dropped",
+      color: "bg-teal-500",
+      isActive: filterTab === "decision_complete",
+      onClick: () => setFilterTab("decision_complete"),
+    },
+  ];
+
+  const hasActiveFilters = Boolean(
+    searchTerm || customerFilter !== "all" || outcomeFilter !== "all" || filterTab !== "all"
+  );
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--bg-app)] text-[var(--on-surface)] select-text font-sans">
-      {/* ── 1. Compact Enterprise Header ── */}
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)] shrink-0" />
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--on-surface)] font-display">
-                  NPD Feasibility Checks
-                </h1>
-                <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
-                  BY {selectedYear}
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs text-[var(--on-surface-muted)]">
-                Technical NPD reviews and marketing commercial sign-off before physical tooling.
-              </p>
-            </div>
-          </div>
-
-          {/* Action Toolbar */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Register New Request Button */}
-            {!isReadOnly && (
-              <button
-                type="button"
-                onClick={onOpenNewModal}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] shadow-2xs cursor-pointer"
-                title="Submit New Technical Feasibility Request"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Request</span>
-              </button>
-            )}
-
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isLoading}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
-              title="Refresh Queue"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            {/* Export CSV */}
-            <button
-              type="button"
-              onClick={onExportCSV}
-              disabled={filteredRequests.length === 0}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
-              title="Export To CSV"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── 2. Interactive KPI Workflow Strip (Direct Queue Filters) ── */}
-      <section
-        aria-label="Feasibility workflow summary"
-        className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2.5 sm:px-8"
-      >
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-          {[
-            {
-              label: "All Feasibility",
-              value: metrics.total,
-              detail: "Total NPD pipeline",
-              color: "bg-[var(--accent-primary)]",
-              filter: "all" as const,
-            },
-            {
-              label: "Needs Claim",
-              value: metrics.awaitingClaim,
-              detail: "Waiting for SAMP Lab",
-              color: "bg-teal-500",
-              filter: "awaiting_claim" as const,
-            },
-            {
-              label: "In Lab Review",
-              value: metrics.inReview,
-              detail: "Under technical trial",
-              color: "bg-sky-500",
-              filter: "in_review" as const,
-            },
-            {
-              label: "Sign-Off Needed",
-              value: metrics.awaitingMarketingAction,
-              detail: "Date or verdict sign-off",
-              color: "bg-amber-500",
-              filter: "awaiting_decision" as const,
-            },
-            {
-              label: "Decision Complete",
-              value: metrics.decisionComplete,
-              detail: "Approved or dropped",
-              color: "bg-emerald-500",
-              filter: "decision_complete" as const,
-            },
-          ].map((item) => {
-            const isSelected =
-              item.filter === "all"
-                ? filterTab === "all" &&
-                  outcomeFilter === "all" &&
-                  customerFilter === "all" &&
-                  !searchTerm
-                : filterTab === item.filter;
-
-            return (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => {
-                  if (item.filter === "all") {
-                    clearFilters();
-                  } else {
-                    setFilterTab(item.filter);
-                  }
-                }}
-                className={`min-w-0 rounded-xl border p-2.5 text-left shadow-2xs transition-all cursor-pointer ${
-                  isSelected
-                    ? "border-[var(--accent-primary)] bg-[var(--surface-lowest)] ring-2 ring-[var(--accent-primary)]/20"
-                    : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-low)]"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${item.color}`} />
-                    <span className="truncate">{item.label}</span>
-                  </div>
-                  {isSelected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)]" />
-                  )}
-                </div>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-lg font-display font-bold tabular-nums text-[var(--on-surface)]">
-                    {item.value}
-                  </span>
-                  <span className="truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
-                    {item.detail}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ── 3. Compact Filter Controls (Search, Customer, Outcome) ── */}
-      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-2 sm:px-8">
-        <div className="flex flex-wrap items-center gap-2.5">
+    <DeskWorkspaceLayout
+      title="Feasibility Checks"
+      businessYear={selectedYear}
+      primaryAction={
+        !isReadOnly
+          ? {
+              label: "New Request",
+              icon: Plus,
+              onClick: onOpenNewModal,
+              title: "Submit New Technical Feasibility Request",
+            }
+          : undefined
+      }
+      onRefresh={onRefresh}
+      isRefreshing={isLoading}
+      onExportCSV={onExportCSV}
+      exportDisabled={filteredRequests.length === 0}
+      kpiItems={kpiItems}
+      filterControls={
+        <>
           {customerList.length > 0 && (
             <Select
               aria-label="Filter by customer"
@@ -686,52 +690,23 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
             className="min-w-[140px]"
             options={[
               { value: "all", label: "All Outcomes" },
-              { value: "feasible", label: "Feasible (Lab Approved)" },
+              { value: "feasible", label: "Feasible (Sampling Approved)" },
               { value: "conditional", label: "Conditional Feasibility" },
               { value: "approved", label: "Approved by Marketing" },
               { value: "converted", label: "Converted to Sampling" },
               { value: "rejected", label: "Dropped / Rejected" },
             ]}
           />
-
-          {/* Search Input */}
-          <div className="group relative min-w-[200px] flex-1 sm:max-w-[340px]">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--on-surface-subtle)] transition-colors group-focus-within:text-[var(--accent-primary)]" />
-            <input
-              type="text"
-              placeholder="Search code, customer, requester..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] pl-8 pr-7 text-xs text-[var(--on-surface)] outline-none transition-all placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
-                title="Clear search"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-
-          {(searchTerm ||
-            customerFilter !== "all" ||
-            outcomeFilter !== "all" ||
-            filterTab !== "all") && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="h-8 select-none rounded-lg px-2 text-xs font-semibold text-[var(--on-surface-muted)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] cursor-pointer"
-            >
-              Clear Filters
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── 4. High-Performance Full-Bleed Table Workspace ── */}
+        </>
+      }
+      search={{
+        value: searchTerm,
+        onChange: setSearchTerm,
+        placeholder: "Search code, customer, requester...",
+      }}
+      hasActiveFilters={hasActiveFilters}
+      onResetFilters={clearFilters}
+    >
       <DataTable
         data={filteredRequests}
         columns={columns}
@@ -748,20 +723,20 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
         onToggleSelectRow={handleToggleSelectRow}
         onToggleSelectAll={handleToggleSelectAll}
         toolbarLeft={
-          <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--on-surface-muted)]">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <span className="truncate">
               Showing{" "}
-              <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
                 {filteredRequests.length}
               </span>{" "}
               of{" "}
-              <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
                 {feasibilityRequests.length}
               </span>{" "}
               feasibility checks
             </span>
             {selectedIds.size > 0 && (
-              <span className="shrink-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-low)] px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-[var(--accent-primary)] font-bold">
+              <span className="shrink-0 rounded-md border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-emerald-700 dark:text-emerald-300 font-bold">
                 {selectedIds.size} selected
               </span>
             )}
@@ -777,13 +752,13 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
               <Trash2 className="h-3.5 w-3.5" /> Delete Selected
             </button>
           ) : (
-            <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">
-              SAMP Lab Feasibility Queue
+            <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500">
+              Sampling Feasibility Queue
             </span>
           )
         }
       />
-    </div>
+    </DeskWorkspaceLayout>
   );
 };
 

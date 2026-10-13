@@ -23,6 +23,9 @@ pnpm-debug.log*
 .env.test.local
 .env.production.local
 
+# Local database exports (may contain sensitive application data)
+database_dumps/
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -43,4 +46,7 @@ __pycache__/
 # Temporary and swap files
 *.tmp
 *.tmp.*
+
+# Slide presentations
+*.pptx
 

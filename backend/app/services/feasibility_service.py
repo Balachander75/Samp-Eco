@@ -5,11 +5,17 @@ status transitions, and activity audit logging.
 """
 import base64
 import binascii
+import io
 import re
 from uuid import uuid4
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional, List, Dict, Any, Tuple
 from zoneinfo import ZoneInfo
+try:
+    from PIL import Image, ImageOps
+except ImportError:  # pragma: no cover
+    Image = None
+    ImageOps = None
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.repositories.feasibility_repo import FeasibilityRepository
@@ -28,6 +34,7 @@ from app.schemas.feasibility import (
     FeasibilityCounterDateDecisionPayload,
 )
 
+MAX_RAW_IMAGE_BYTES = 15 * 1024 * 1024
 MAX_IMAGE_BYTES = 1_048_576
 IMAGE_DATA_URL_RE = re.compile(r"^data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$")
 
@@ -89,8 +96,46 @@ class FeasibilityService:
         self.api_prefix = api_prefix
 
     @staticmethod
-    def decode_image_data_url(data_url: str, enforce_size_limit: bool = True) -> Tuple[str, bytes]:
-        """Decode and validate a base64 image data URL."""
+    def compress_image(
+        image_bytes: bytes,
+        original_content_type: str,
+        max_dimension: int = 1600,
+        quality: int = 80,
+    ) -> Tuple[str, bytes]:
+        """Compress image binary using Pillow to optimize database storage and delivery speed."""
+        if Image is None or ImageOps is None:
+            return original_content_type, image_bytes
+        try:
+            with Image.open(io.BytesIO(image_bytes)) as img:
+                img = ImageOps.exif_transpose(img)
+                width, height = img.size
+                if max(width, height) > max_dimension:
+                    scale = max_dimension / max(width, height)
+                    new_width = max(1, int(width * scale))
+                    new_height = max(1, int(height * scale))
+                    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                out_buffer = io.BytesIO()
+                has_alpha = img.mode in ("RGBA", "LA", "PA") or (img.mode == "P" and "transparency" in img.info)
+                if original_content_type == "image/jpeg" or not has_alpha:
+                    if img.mode != "RGB":
+                        img = img.convert("RGB")
+                    img.save(out_buffer, format="JPEG", quality=quality, optimize=True)
+                    target_content_type = "image/jpeg"
+                else:
+                    img.save(out_buffer, format="WEBP", quality=quality, method=4)
+                    target_content_type = "image/webp"
+
+                compressed_bytes = out_buffer.getvalue()
+                if len(compressed_bytes) < len(image_bytes):
+                    return target_content_type, compressed_bytes
+                return original_content_type, image_bytes
+        except Exception:
+            return original_content_type, image_bytes
+
+    @classmethod
+    def decode_image_data_url(cls, data_url: str, enforce_size_limit: bool = True) -> Tuple[str, bytes]:
+        """Decode, validate, and compress a base64 image data URL."""
         match = IMAGE_DATA_URL_RE.fullmatch(data_url or "")
         if not match:
             raise HTTPException(status_code=422, detail="Reference images must be JPEG, PNG, or WebP data URLs")
@@ -99,8 +144,8 @@ class FeasibilityService:
             image_data = base64.b64decode(encoded, validate=True)
         except (binascii.Error, ValueError):
             raise HTTPException(status_code=422, detail="Reference image data is invalid")
-        if not image_data or (enforce_size_limit and len(image_data) > MAX_IMAGE_BYTES):
-            raise HTTPException(status_code=413, detail="Each compressed reference image must be at most 1 MB")
+        if not image_data or len(image_data) > MAX_RAW_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail="Each reference image upload must be at most 15 MB")
         signatures = {
             "image/jpeg": image_data.startswith(b"\xff\xd8\xff"),
             "image/png": image_data.startswith(b"\x89PNG\r\n\x1a\n"),
@@ -108,7 +153,14 @@ class FeasibilityService:
         }
         if not signatures.get(content_type, False):
             raise HTTPException(status_code=422, detail="Reference image content does not match its file type")
-        return content_type, image_data
+
+        # Compress image before storing
+        target_content_type, compressed_data = cls.compress_image(image_data, content_type)
+
+        if enforce_size_limit and len(compressed_data) > MAX_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail="Each compressed reference image must be at most 1 MB")
+
+        return target_content_type, compressed_data
 
     def serialize_activity(self, activity) -> Dict[str, Any]:
         """Serialize an activity log entry."""
@@ -145,13 +197,8 @@ class FeasibilityService:
             "required_date": request.required_date,
             "marketing_remarks": request.marketing_remarks,
             "reference_images": [
-                *[
-                    f"{self.api_prefix}/{request.id}/images/{image.id}"
-                    for image in (request.reference_image_records or [])
-                ],
-                *[
-                    value for value in (request.reference_images or []) if isinstance(value, str)
-                ],
+                f"{self.api_prefix}/{request.id}/images/{image.id}"
+                for image in (request.reference_image_records or [])
             ],
             "reference_image_names": [
                 image.original_name for image in (request.reference_image_records or [])
@@ -159,7 +206,7 @@ class FeasibilityService:
             "reference_links": request.reference_links or [],
             "status": request.status,
             "created_by": request.created_by,
-            "request_created_by": request.request_created_by,
+            "request_created_by": request.created_by,
             "created_by_user_id": request.created_by_user_id,
             "request_raised_at": request.request_raised_at,
             "updated_at": request.updated_at,
@@ -209,6 +256,7 @@ class FeasibilityService:
         visible_samp_user_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """List queue rows without audit history; history is loaded on inspector open."""
+        self.auto_accept_due_counter_dates(self.db)
         requests = self.repo.list_all_detailed(
             year=year,
             status_filter=status_filter,
@@ -222,6 +270,9 @@ class FeasibilityService:
         req = self.repo.get_with_details(request_id)
         if not req:
             return None
+        if self._auto_accept_if_due(req):
+            self.db.commit()
+            req = self.repo.get_with_details(request_id)
         return self.serialize_request(req)
 
     def create(self, payload: FeasibilityRequestCreate, current_user=None) -> Dict[str, Any]:
@@ -231,9 +282,10 @@ class FeasibilityService:
                 status_code=422,
                 detail="Required date must be a working day. Sundays and 2nd/4th Saturdays are off.",
             )
-        target_plant = self.db.query(Plant).filter(Plant.code == "1505").first()
-        if not target_plant or not target_plant.name:
-            raise HTTPException(status_code=409, detail="Khaniwade plant master record (code 1505) is required")
+        target_plant_name = "1505- Khaniwade"
+        plant = self.db.query(Plant).filter(Plant.code == "1505").first()
+        if plant and plant.name:
+            target_plant_name = plant.name
         customer_name = payload.customer.strip()
         customer = self.db.query(Customer).filter(Customer.name.ilike(customer_name)).first()
         if not customer:
@@ -247,16 +299,14 @@ class FeasibilityService:
         req = FeasibilityRequest(
             request_code="PENDING",
             customer_id=customer.id,
-            target_plant=target_plant.name,
+            target_plant=target_plant_name,
             feasibility_type=payload.feasibility_type,
             custom_feasibility_type=payload.custom_feasibility_type,
             description_notes=payload.description_notes,
             required_date=payload.required_date,
             marketing_remarks=payload.marketing_remarks,
-            reference_images=[],
             reference_links=payload.reference_links or [],
             created_by=creator_name,
-            request_created_by=creator_name,
             created_by_user_id=creator_user_id,
             status="Pending Feasibility",
         )
@@ -342,12 +392,6 @@ class FeasibilityService:
             req = self.repo.get_for_update(request_id)
         if req.counter_date_decision == "pending":
             raise HTTPException(status_code=409, detail="Resolve the pending Marketing counter-date decision before submitting the technical verdict")
-
-        if payload.response in ("No", "Maybe") and not (payload.remark or "").strip():
-            raise HTTPException(
-                status_code=400,
-                detail=f"Technical evaluation remarks are compulsory when selecting '{payload.response}'.",
-            )
 
         actor_name = current_user.name if current_user else (req.taken_by_samp or "Sampling Lead")
         actor_id = current_user.id if current_user else None
@@ -689,10 +733,10 @@ class FeasibilityService:
         customer_name = req.customer.name if req.customer else "Unknown Customer"
         now_date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-        plant = self.db.query(Plant).filter(Plant.code == "1505").first()
-        if not plant or not plant.name:
-            raise HTTPException(status_code=409, detail="Khaniwade plant master record (code 1505) is required")
-        target_plant = plant.name
+        target_plant = req.target_plant
+        if not target_plant:
+            plant = self.db.query(Plant).filter(Plant.code == "1505").first()
+            target_plant = plant.name if plant and plant.name else "1505- Khaniwade"
 
         sample_req = CreateSampleRequest(
             sr_number=f"TMP-FC-{uuid4().hex}",

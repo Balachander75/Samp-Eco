@@ -15,3 +15,23 @@ export function updateThemePreferenceApi(themeId: ThemeId): Promise<ThemePrefere
     jsonBody: { theme_id: themeId },
   });
 }
+
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
+  confirm_password?: string;
+}
+
+export interface ChangePasswordResponse {
+  success: boolean;
+  message: string;
+}
+
+export function changePasswordApi(
+  payload: ChangePasswordPayload
+): Promise<ChangePasswordResponse> {
+  return apiFetch<ChangePasswordResponse>("/api/auth/change-password", {
+    method: "POST",
+    jsonBody: payload,
+  });
+}

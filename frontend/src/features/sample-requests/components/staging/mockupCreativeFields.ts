@@ -5,9 +5,11 @@ const normalize = (value: string) => value.replace(/[^a-z0-9]/gi, "").toUpperCas
 const bindingFields = new Set([
   "BINDINGCOLORSTYLE",
   "EDGEFINISHINGNOOFDESIGN",
+  "EDGEFINISHINGNOOFDESIGNS",
   "EDGEFINISHINNOOFDESIGN",
   "EDGEFINISHINGDESIGNNOTES",
   "ACCESSORIESDETAIL",
+  "ACCESSORIESDETAILS",
   "ACCESSORIEESDETAIL",
 ]);
 
@@ -17,20 +19,32 @@ const componentFieldSuffixes = new Set([
   "NAMEOFCOLORB1",
   "RULLINGPRINTINGDESIGNNAME1",
   "RULINGPRINTINGDESIGNNAME1",
+  "RULINGPRINTDESIGNNAME1",
   "NAMEOFCOLORSFB",
   "NAMEOFCOLORFB",
   "NAMEOFCOLORB",
   "RULLINGPRINTINGDESIGNNAME2",
   "RULINGPRINTINGDESIGNNAME2",
+  "RULINGPRINTDESIGNNAME2",
 ]);
 
 const dividerFields = new Set([
   "NOOFDESIGNPRINT",
+  "NOOFDESIGNSPRINT",
   "NOOFCOLORB",
+  "NOOFCOLORSFB",
+  "NOOFCOLOURSFB",
   "NAMEOFCOLORB",
+  "NAMEOFCOLORSFB",
   "PRINTINGFINISH",
+  "PRINTFINISHING",
   "D2NAMEOFCOLORB",
   "D2PRINTINGFINISH",
+]);
+
+const packagingSpecFields = new Set([
+  "NOOFCOLOURSFB",
+  "NAMEOFCOLORSFB2",
 ]);
 
 const packingFields = new Set([
@@ -39,6 +53,7 @@ const packingFields = new Set([
   "NAMEOFCOLORFB2",
   "DESIGNCOLORASSORTMENT",
   "SPECIALINSTRUCTION",
+  "SPECIALINSTRUCTIONS",
   "DESIGNCOLORASSORTMENT2",
 ]);
 
@@ -46,11 +61,16 @@ export function isMockupCreativeCharacteristic(className: string, characteristic
   const classKey = normalize(className);
   const field = normalize(characteristicName);
 
-  if (classKey === "NBBINDING") return bindingFields.has(field);
-  if (classKey === "NBDIVIDERSPECS") return dividerFields.has(field);
-  if (classKey === "PACKINGDETAILS") return packingFields.has(field);
+  if (classKey.startsWith("NBBINDING")) return bindingFields.has(field);
+  if (["NBDIVIDERSPEC", "NBDIVIDERSPECS", "NBDIVIDINGSPEC", "NBDIVIDINGSPECS"].includes(classKey)) {
+    return dividerFields.has(field) || dividerFields.has(field.replace(/^D[12]/, ""));
+  }
+  if (classKey.startsWith("PACKAGINGSPEC")) return packagingSpecFields.has(field);
+  if (["PACKINGDETAIL", "PACKINGDETAILS", "PACKAGINGDETAIL", "PACKAGINGDETAILS"].includes(classKey)) {
+    return packingFields.has(field);
+  }
 
-  const componentMatch = classKey.match(/^NBCOMPONENT([1-6])$/);
+  const componentMatch = classKey.match(/^(?:NB)?COMPONENT([1-6])$/);
   if (!componentMatch) return false;
   const index = componentMatch[1];
   const fieldWithoutIndex = field.replace(new RegExp(`^C?${index}`), "");

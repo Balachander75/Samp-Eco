@@ -24,22 +24,12 @@ class PlantBase(BaseModel):
     is_active: Optional[bool] = True
     created_by: Optional[str] = None
 
-class PlantCreate(PlantBase):
-    pass
-
 class PlantOut(PlantBase):
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class PlantUpdate(BaseModel):
-    code: Optional[str] = None
-    name: Optional[str] = None
-    location: Optional[str] = None
-    is_active: Optional[bool] = None
 
 
 class UserCreate(BaseModel):

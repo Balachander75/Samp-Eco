@@ -11,3 +11,8 @@ export * from "./DesignClaimStrip";
 export * from "./DesignCounterDateModal";
 export * from "./MarketingCounterDateBanner";
 export * from "./CreativeOutputSubmissionModal";
+export * from "./DesignBriefTab";
+export * from "./DesignDeliverablesTab";
+export * from "./DesignChatterStream";
+export * from "./DesignNextWorkTab";
+export * from "./DesignMetadataStrip";

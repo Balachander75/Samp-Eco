@@ -183,10 +183,10 @@ export async function createFeasibilityRequestApi(
     jsonBody: {
       customer: payload.customer,
       feasibility_type: payload.feasibilityType,
-      custom_feasibility_type: payload.customFeasibilityType || null,
-      description_notes: payload.descriptionNotes,
+      custom_feasibility_type: payload.customFeasibilityType ? payload.customFeasibilityType.trim().slice(0, 25) : null,
+      description_notes: (payload.descriptionNotes || "").trim().slice(0, 75),
       required_date: payload.requiredDate,
-      marketing_remarks: payload.marketingRemarks || null,
+      marketing_remarks: payload.marketingRemarks ? payload.marketingRemarks.trim().slice(0, 100) : null,
       reference_images: payload.referenceImages || [],
       reference_image_names: payload.referenceImageNames || [],
       reference_links: payload.referenceLinks || [],
@@ -342,7 +342,7 @@ export async function deleteFeasibilityRequestApi(requestId: number | string): P
     return true;
   } catch (err) {
     console.error("Error deleting feasibility request:", err);
-    return false;
+    throw err;
   }
 }
 

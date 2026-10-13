@@ -1,6 +1,6 @@
 import React from "react";
 import { SampleRequestItem } from "../../types";
-import { Clock, Package, Check, X, ShieldCheck, ArrowRight, AlertTriangle } from "lucide-react";
+import { Clock, Package, Check, X, ShieldCheck, ArrowRight, AlertTriangle, Copy } from "lucide-react";
 
 export interface FeasibilityCommercialDecisionTabProps {
   activeRequest: SampleRequestItem;
@@ -28,11 +28,16 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
   onConvertToSampling,
 }) => {
   const [conversionTypes, setConversionTypes] = React.useState<Array<"sample" | "costing">>(["sample"]);
+  const [copiedSr, setCopiedSr] = React.useState(false);
 
   const toggleConversionType = (type: "sample" | "costing") => {
-    setConversionTypes((current) =>
-      (["sample", "costing"] as const).filter((value) => value === type || current.includes(value))
-    );
+    setConversionTypes((current) => {
+      if (current.includes(type)) {
+        if (current.length === 1) return current;
+        return current.filter((item) => item !== type);
+      }
+      return [...current, type];
+    });
   };
 
   return (
@@ -279,9 +284,26 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
               {activeRequest.convertedSrNumber ? (
                 <div className="p-4 bg-[var(--surface-lowest)] rounded-xl border border-[var(--border-subtle)] flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <span className="font-mono font-bold text-sm text-[var(--accent-primary)]">
-                      Official Request Code: {activeRequest.convertedSrNumber}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sm text-[var(--accent-primary)]">
+                        Official Request Code: {activeRequest.convertedSrNumber}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (activeRequest.convertedSrNumber) {
+                            navigator.clipboard.writeText(activeRequest.convertedSrNumber);
+                            setCopiedSr(true);
+                            setTimeout(() => setCopiedSr(false), 2000);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface-muted)] transition cursor-pointer"
+                        title="Copy SR Number"
+                      >
+                        {copiedSr ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedSr ? "Copied" : "Copy"}</span>
+                      </button>
+                    </div>
                     <p className="text-[11px] text-[var(--on-surface-muted)] mt-0.5">
                       Created for {(activeRequest.convertedRequestTypes || activeRequest.requestTypes || [])
                         .map((type) => type === "sample" ? "Sampling" : "Costing")

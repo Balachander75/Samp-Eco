@@ -1,7 +1,6 @@
 import { apiFetch, API_BASE_URL, createApiHeaders } from "./client";
 import {
   PlantItem,
-  CreatePlantForm,
   CustomerItem,
   BindingHierarchyResponse,
   ProductSearchResult,
@@ -132,34 +131,6 @@ export async function fetchPlantsApi(): Promise<PlantItem[]> {
   } catch (err) {
     console.error("Error fetching plants from API:", err);
     return [];
-  }
-}
-
-export async function createPlantApi(payload: CreatePlantForm, createdBy: string = "Admin"): Promise<PlantItem | null> {
-  try {
-    const p = await apiFetch<any>("/api/v1/plants", {
-      method: "POST",
-      jsonBody: {
-        code: payload.code,
-        name: payload.name,
-        location: payload.location,
-        created_by: createdBy,
-        is_active: payload.isActive ?? true,
-      },
-    });
-    return {
-      id: p.id,
-      code: p.code,
-      name: p.name,
-      location: p.location || undefined,
-      isActive: p.is_active,
-      createdBy: p.created_by,
-      createdAt: p.created_at ? p.created_at.split("T")[0] : "",
-      updatedAt: p.updated_at ? p.updated_at.split("T")[0] : "",
-    };
-  } catch (err) {
-    console.error("Error adding plant:", err);
-    throw err;
   }
 }
 
@@ -338,10 +309,12 @@ export async function fetchProductDetailsApi(
 
 /** Load the full read-only specification catalog for one saved product record. */
 export async function fetchProductInspectionDetailsApi(
-  sampleRequestId: number | string
+  sampleRequestId: number | string,
+  catalogLookup = false
 ): Promise<ProductDetailItem[]> {
+  const catalogQuery = catalogLookup ? "?catalog_lookup=true" : "";
   const [rawDetails, characteristics] = await Promise.all([
-    apiFetch<any[]>(`/api/v1/product-characteristics/details/${sampleRequestId}`),
+    apiFetch<any[]>(`/api/v1/product-characteristics/details/${sampleRequestId}${catalogQuery}`),
     fetchAllProductCharacteristics(),
   ]);
   const savedDetails = Array.isArray(rawDetails) ? rawDetails : [];
@@ -483,6 +456,48 @@ export async function fetchBindingHierarchyApi(
   } catch (err) {
     console.error("Error fetching binding hierarchy:", err);
     return { binding1_options: [], hierarchy: {} };
+  }
+}
+
+export interface ProductCatalogFilterCounts {
+  categories: Record<string, number>;
+  sub_categories: Record<string, number>;
+  sub_categories_missing: number;
+  third_categories: Record<string, number>;
+  third_categories_missing: number;
+  binding1: Record<string, number>;
+  binding2: Record<string, number>;
+}
+
+export const MISSING_TAXONOMY_FILTER_VALUE = "__missing__";
+
+export async function fetchProductCatalogFilterCountsApi(
+  category?: string,
+  subCategory?: string,
+  thirdCategory?: string,
+  binding1?: string
+): Promise<ProductCatalogFilterCounts> {
+  const params = new URLSearchParams();
+  if (category?.trim()) params.set("category", category.trim());
+  if (subCategory?.trim()) params.set("sub_category", subCategory.trim());
+  if (thirdCategory?.trim()) params.set("third_category", thirdCategory.trim());
+  if (binding1?.trim()) params.set("b1", binding1.trim());
+  const query = params.toString();
+  try {
+    return await apiFetch<ProductCatalogFilterCounts>(
+      `/api/v1/product-characteristics/catalog-filter-counts${query ? `?${query}` : ""}`
+    );
+  } catch (err) {
+    console.error("Error fetching catalog filter counts:", err);
+    return {
+      categories: {},
+      sub_categories: {},
+      sub_categories_missing: 0,
+      third_categories: {},
+      third_categories_missing: 0,
+      binding1: {},
+      binding2: {},
+    };
   }
 }
 
@@ -718,35 +733,6 @@ export async function deleteUserApi(id: number): Promise<boolean> {
   }
 }
 
-export async function updatePlantApi(
-  id: number,
-  payload: { code?: string; name?: string; location?: string; is_active?: boolean }
-): Promise<PlantItem> {
-  const p = await apiFetch<any>(`/api/v1/plants/${id}`, {
-    method: "PATCH",
-    jsonBody: payload,
-  });
-  return {
-    id: p.id,
-    code: p.code,
-    name: p.name,
-    location: p.location || undefined,
-    isActive: p.is_active,
-    createdBy: p.created_by,
-    createdAt: p.created_at ? p.created_at.split("T")[0] : "",
-    updatedAt: p.updated_at ? p.updated_at.split("T")[0] : "",
-  };
-}
-
-export async function deletePlantApi(id: number): Promise<boolean> {
-  try {
-    await apiFetch(`/api/v1/plants/${id}`, { method: "DELETE" });
-    return true;
-  } catch (err) {
-    console.error("Error deleting plant:", err);
-    return false;
-  }
-}
 
 export async function fetchProductCategoriesApi(): Promise<ProductCategoriesResponse> {
   try {

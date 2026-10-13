@@ -165,14 +165,18 @@ class DesignRequest(Base):
     """
 
     __tablename__ = "design_requests"
+    __table_args__ = (
+        Index("ix_design_requests_program_year_status", "program_year", "status"),
+        Index("ix_design_requests_status_created_at", "status", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     request_code = Column(String(50), nullable=False, unique=True, index=True)
     sr_number = Column(String(50), nullable=True, index=True)
     customer_name = Column(String(150), nullable=False, index=True)
     program_name = Column(String(150), nullable=True)
-    program_year = Column(String(50), nullable=True)
-    status = Column(String(50), nullable=False, default="Draft (Pre-SMT)")
+    program_year = Column(String(50), nullable=True, index=True)
+    status = Column(String(50), nullable=False, default="Draft (Pre-SMT)", index=True)
     number_of_designs = Column(Integer, nullable=False, default=1)
     trend = Column(String(200), nullable=True)
     target_audience = Column(String(200), nullable=True)
@@ -189,7 +193,7 @@ class DesignRequest(Base):
     remaining_design_count = Column(Integer, nullable=False, default=0, server_default="0")
     workflow_state = Column(JSONB, nullable=False, default=dict, server_default="{}")
 
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc))
 
 

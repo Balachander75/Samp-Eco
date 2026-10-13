@@ -27,18 +27,16 @@ class FeasibilityRequest(Base):
     target_plant = Column(String(100), nullable=True, index=True)
 
     feasibility_type = Column(String(64), nullable=False)
-    custom_feasibility_type = Column(String(255), nullable=True)
-    description_notes = Column(Text, nullable=False)
+    custom_feasibility_type = Column(String(25), nullable=True)
+    description_notes = Column(String(75), nullable=False)
     required_date = Column(Date, nullable=False)
-    marketing_remarks = Column(Text, nullable=True)
+    marketing_remarks = Column(String(100), nullable=True)
 
-    reference_images = Column(JSON, nullable=False, default=list, server_default="[]")
     reference_links = Column(JSON, nullable=False, default=list, server_default="[]")
 
     status = Column(String(64), nullable=False, default="Pending Feasibility", server_default="Pending Feasibility")
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_by = Column(String(255), nullable=True)
-    request_created_by = Column(String(255), nullable=True)
     request_raised_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -104,12 +102,6 @@ class FeasibilityRequest(Base):
         cascade="all, delete-orphan",
         order_by="FeasibilityReferenceImage.sort_order.asc()",
     )
-    technical_attachments = relationship(
-        "FeasibilityTechnicalAttachment",
-        back_populates="feasibility_request",
-        cascade="all, delete-orphan",
-        order_by="FeasibilityTechnicalAttachment.id.asc()",
-    )
 
 
 class FeasibilityActivityLog(Base):
@@ -159,24 +151,3 @@ class FeasibilityReferenceImage(Base):
         "FeasibilityRequest", back_populates="reference_image_records"
     )
 
-
-class FeasibilityTechnicalAttachment(Base):
-    """Evidence attached by SAMP when submitting a technical feasibility assessment."""
-
-    __tablename__ = "feasibility_technical_attachments"
-
-    id = Column(Integer, primary_key=True, index=True)
-    feasibility_request_id = Column(
-        Integer,
-        ForeignKey("feasibility_requests.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    uploaded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    uploaded_by = Column(String(255), nullable=False)
-    original_name = Column(String(255), nullable=False)
-    content_type = Column(String(100), nullable=False)
-    file_data = Column(LargeBinary, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-    feasibility_request = relationship("FeasibilityRequest", back_populates="technical_attachments")

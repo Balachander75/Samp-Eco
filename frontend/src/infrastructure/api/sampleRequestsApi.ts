@@ -329,6 +329,13 @@ export async function createDesignBriefFromSampleApi(sampleRequestId: string | n
   return mapDesignRequest(data.data);
 }
 
+function notifyDesignWorkflowUpdated(id?: number | string) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+    window.dispatchEvent(new CustomEvent("samp:design-workflow-updated", { detail: { id, requestId: id } }));
+  }
+}
+
 export async function submitCreativeDesignOutputApi(id: number, payload: {
   designFileUrl: string;
   rows: Array<{ shutterstockNo: string; remarks: string }>;
@@ -341,9 +348,7 @@ export async function submitCreativeDesignOutputApi(id: number, payload: {
       rows: payload.rows.map((row) => ({ shutterstock_no: row.shutterstockNo, remarks: row.remarks })),
     },
   });
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
+  notifyDesignWorkflowUpdated(id);
   return mapDesignRequest(data);
 }
 
@@ -352,9 +357,7 @@ export async function recordMarketingDesignDecisionApi(id: number, decision: "ac
     method: "POST",
     jsonBody: { decision },
   });
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
+  notifyDesignWorkflowUpdated(id);
   return mapDesignRequest(data);
 }
 
@@ -366,9 +369,7 @@ export async function requestPostDesignDeliverablesApi(
     method: "POST",
     jsonBody: { deliverables },
   });
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
+  notifyDesignWorkflowUpdated(id);
   return mapSampleRequest(data);
 }
 
@@ -377,9 +378,7 @@ export async function claimDesignRequestApi(id: number, designerName: string): P
     method: "POST",
     jsonBody: { designer_name: designerName },
   });
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
+  notifyDesignWorkflowUpdated(id);
   return mapDesignRequest(data);
 }
 
@@ -388,9 +387,7 @@ export async function proposeDesignCounterDateApi(id: number, proposedDate: stri
     method: "POST",
     jsonBody: { proposed_date: proposedDate, reason, designer_name: designerName },
   });
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
+  notifyDesignWorkflowUpdated(id);
   return mapDesignRequest(data);
 }
 
@@ -399,9 +396,7 @@ export async function decideDesignCounterDateApi(id: number, decision: "accepted
     method: "POST",
     jsonBody: { decision, notes },
   });
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
+  notifyDesignWorkflowUpdated(id);
   return mapDesignRequest(data);
 }
 
@@ -410,9 +405,7 @@ export async function addDesignWorkflowNoteApi(id: number, body: string, actorDe
     method: "POST",
     jsonBody: { body, actor_department: actorDepartment },
   });
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
+  notifyDesignWorkflowUpdated(id);
   return mapDesignRequest(data);
 }
 
@@ -558,6 +551,48 @@ export async function sendMockupRequestToStudioApi(
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("samp:requests-changed"));
   }
+  return mapSampleRequest(data);
+}
+
+export async function saveMockupCreativeDateApi(
+  sampleRequestId: string | number,
+  decision: "confirmed" | "proposed",
+  date: string,
+  actorName?: string,
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/mockup/creative-date`, {
+    method: "POST",
+    jsonBody: { decision, date, actor_name: actorName },
+  });
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  return mapSampleRequest(data);
+}
+
+export async function decideMockupCreativeApprovalApi(
+  sampleRequestId: string | number,
+  decision: "accept" | "request_revision",
+  remark?: string,
+  actorName?: string,
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/mockup/creative-approval`, {
+    method: "POST",
+    jsonBody: { decision, remark, actor_name: actorName },
+  });
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  return mapSampleRequest(data);
+}
+
+export async function decideMockupMarketingAcceptanceApi(
+  sampleRequestId: string | number,
+  decision: "accept" | "request_revision",
+  remark?: string,
+  actorName?: string,
+): Promise<SampleRequestItem> {
+  const data = await apiFetch<ApiSampleRequest>(`/api/v1/sample-requests/${sampleRequestId}/mockup/marketing-decision`, {
+    method: "POST",
+    jsonBody: { decision, remark, actor_name: actorName },
+  });
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("samp:requests-changed"));
   return mapSampleRequest(data);
 }
 

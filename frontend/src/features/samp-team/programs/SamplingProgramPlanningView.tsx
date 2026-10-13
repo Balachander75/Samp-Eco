@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { isMaterialAddedRecently } from "@/features/sample-requests/utils/dateUtils";
 import { CopyBadge } from "@/components/ui/CopyBadge";
-import { PaginationBar } from "@/components/erp/PaginationBar";
+import { Select } from "@/components/ui/Select";
+import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 
 export interface SamplingProgramPlanningViewProps {
@@ -164,49 +165,115 @@ export const SamplingProgramPlanningView: React.FC<SamplingProgramPlanningViewPr
     showToast(`Exported ${filteredRequests.length} program planning records to CSV`);
   };
 
+  const kpiItems = [
+    {
+      label: "Programs",
+      value: metrics.total,
+      detail: "All assigned plans",
+      color: "bg-[var(--accent-primary)]",
+      isActive: filterTab === "all" && customerFilter === "all" && plantFilter === "all" && !searchTerm,
+      onClick: clearFilters,
+    },
+    {
+      label: "SAMP note needed",
+      value: metrics.pending,
+      detail: "Awaiting your input",
+      color: "bg-amber-500",
+      isActive: filterTab === "pending_note",
+      onClick: () => {
+        setFilterTab("pending_note");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "SAMP note added",
+      value: metrics.sampNotes,
+      detail: "Your planning input",
+      color: "bg-sky-500",
+      isActive: filterTab === "samp_note_added",
+      onClick: () => {
+        setFilterTab("samp_note_added");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Plant note added",
+      value: metrics.plantNotes,
+      detail: "Plant planning input",
+      color: "bg-emerald-500",
+      isActive: filterTab === "plant_note_added",
+      onClick: () => {
+        setFilterTab("plant_note_added");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Material lines",
+      value: metrics.totalMaterials,
+      detail: "Across all plans",
+      color: "bg-sky-500",
+    },
+  ];
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-base)] text-[var(--on-surface)] select-text">
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-base font-bold tracking-tight text-[var(--on-surface)] sm:text-lg">Program Planning</h1>
-            <p className="mt-0.5 text-[11px] text-[var(--on-surface-subtle)]">Review Marketing plans and add SAMP planning notes</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button type="button" onClick={onRefresh} disabled={isLoading} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] disabled:opacity-50" title="Refresh programs"><RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} /><span className="hidden sm:inline">Refresh</span></button>
-            <button type="button" onClick={handleExportCSV} disabled={filteredRequests.length === 0} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] disabled:opacity-50" title="Export CSV"><Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Export</span></button>
-          </div>
-        </div>
-      </header>
-
-      <section aria-label="SAMP program review summary" className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-2.5 sm:px-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-          {[
-            { label: "Programs", value: metrics.total, detail: "All assigned plans", color: "bg-[var(--accent-primary)]", filter: "all" as const },
-            { label: "SAMP note needed", value: metrics.pending, detail: "Awaiting your input", color: "bg-amber-500", filter: "pending_note" as const },
-            { label: "SAMP note added", value: metrics.sampNotes, detail: "Your planning input", color: "bg-sky-500", filter: "samp_note_added" as const },
-            { label: "Plant note added", value: metrics.plantNotes, detail: "Plant planning input", color: "bg-emerald-500", filter: "plant_note_added" as const },
-            { label: "Material lines", value: metrics.totalMaterials, detail: "Across all plans", color: "bg-sky-500" },
-          ].map((item) => {
-            const active = "filter" in item && item.filter
-              ? item.filter === "all"
-                ? filterTab === "all" && customerFilter === "all" && plantFilter === "all" && !searchTerm
-                : filterTab === item.filter
-              : false;
-            const content = <><span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--on-surface-subtle)]"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.color}`} /><span className="truncate">{item.label}</span></span><span className="mt-1 flex items-baseline justify-between gap-2"><span className="text-lg font-bold leading-none tabular-nums text-[var(--on-surface)]">{item.value}</span><span className="truncate text-[10px] text-[var(--on-surface-subtle)]">{item.detail}</span></span></>;
-            return "filter" in item && item.filter ? <button key={item.label} type="button" onClick={() => { if (item.filter === "all") clearFilters(); else { setFilterTab(item.filter); setCurrentPage(1); } }} aria-pressed={active} className={`min-w-0 rounded-lg border px-3 py-2 text-left shadow-2xs transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--surface-low)] ${active ? "border-[var(--accent-primary)] bg-[var(--surface-lowest)] ring-2 ring-[var(--accent-primary)]/20" : "border-[var(--border-subtle)] bg-[var(--surface-lowest)]"}`}>{content}</button> : <div key={item.label} className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2 shadow-2xs">{content}</div>;
-          })}
-        </div>
-      </section>
-
-      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-4 py-2.5 sm:px-6">
-        <div className="flex flex-wrap items-center gap-2">
-          {customerList.length > 0 && <select aria-label="Filter by customer" value={customerFilter} onChange={(e) => { setCustomerFilter(e.target.value); setCurrentPage(1); }} className="h-9 min-w-[160px] max-w-[240px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--border-focus)]"><option value="all">All customers</option>{customerList.map((customer) => <option key={customer} value={customer}>{customer}</option>)}</select>}
-          {plantList.length > 0 && <select aria-label="Filter by plant" value={plantFilter} onChange={(e) => { setPlantFilter(e.target.value); setCurrentPage(1); }} className="h-9 min-w-[140px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--border-focus)]"><option value="all">All plants</option>{plantList.map((plant) => <option key={plant} value={plant}>Plant {plant}</option>)}</select>}
-          <div className="group relative min-w-[220px] flex-1 sm:max-w-[360px]"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--on-surface-subtle)] transition-colors group-focus-within:text-[var(--accent-primary)]" /><input type="text" placeholder="Search code, campaign, customer..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="h-9 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] pl-[34px] pr-8 text-xs text-[var(--on-surface)] outline-none transition-all placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--accent-primary)]/15" />{searchTerm && <button type="button" onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-low)]" title="Clear search"><X className="h-3 w-3" /></button>}</div>
-          {(customerFilter !== "all" || plantFilter !== "all" || filterTab !== "all" || searchTerm) && <button type="button" onClick={clearFilters} className="h-9 rounded-lg px-2.5 text-xs font-medium text-[var(--on-surface-muted)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)]">Clear filters</button>}
-        </div>
-      </div>
+    <DeskWorkspaceLayout
+      title="Program Planning"
+      subtitle="Review Marketing plans and add SAMP planning notes"
+      totalCount={metrics.total}
+      totalLabel="Programs"
+      onRefresh={onRefresh}
+      isRefreshing={isLoading}
+      onExportCSV={handleExportCSV}
+      exportDisabled={filteredRequests.length === 0}
+      kpiItems={kpiItems}
+      filterControls={
+        <>
+          {customerList.length > 0 && (
+            <Select
+              aria-label="Filter by customer"
+              value={customerFilter}
+              onChange={(e) => {
+                setCustomerFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[160px] max-w-[240px]"
+              options={[
+                { value: "all", label: "All customers" },
+                ...customerList.map((customer) => ({ value: customer, label: customer })),
+              ]}
+            />
+          )}
+          {plantList.length > 0 && (
+            <Select
+              aria-label="Filter by plant"
+              value={plantFilter}
+              onChange={(e) => {
+                setPlantFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[140px]"
+              options={[
+                { value: "all", label: "All plants" },
+                ...plantList.map((plant) => ({ value: plant, label: `Plant ${plant}` })),
+              ]}
+            />
+          )}
+        </>
+      }
+      search={{
+        value: searchTerm,
+        onChange: (val) => {
+          setSearchTerm(val);
+          setCurrentPage(1);
+        },
+        placeholder: "Search code, campaign, customer...",
+      }}
+      hasActiveFilters={Boolean(
+        customerFilter !== "all" || plantFilter !== "all" || filterTab !== "all" || searchTerm
+      )}
+      onResetFilters={clearFilters}
+      resetFiltersLabel="Clear filters"
+    >
 
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2 text-xs text-[var(--on-surface-muted)] sm:px-6"><span>Showing <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">{filteredRequests.length}</span> of <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">{programRequests.length}</span> programs</span><span className="font-mono text-[10px] text-[var(--on-surface-subtle)]">Newest plans first</span></div>
       <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col">
@@ -372,7 +439,7 @@ export const SamplingProgramPlanningView: React.FC<SamplingProgramPlanningViewPr
           />
         </div>
       </div>
-    </div>
+    </DeskWorkspaceLayout>
   );
 };
 

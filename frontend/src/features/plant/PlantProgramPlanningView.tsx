@@ -1,17 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { SampleRequestItem } from "@/features/sample-requests/types";
 import { getRequestTrackType } from "@/features/sample-requests/utils/trackTypes";
-import {
-  Search,
-  RefreshCw,
-  Download,
-  X,
-} from "lucide-react";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { Select } from "@/components/ui/Select";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
-import { PaginationBar } from "@/components/erp/PaginationBar";
+import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 
 export interface PlantProgramPlanningViewProps {
@@ -173,43 +167,75 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
     showToast(`Exported ${filteredRequests.length} plant program records to CSV`);
   };
 
+  const kpiItems = [
+    {
+      label: "Programs",
+      value: metrics.total,
+      detail: "Assigned to this scope",
+      color: "bg-[var(--accent-primary)]",
+      isActive: filterTab === "all" && customerFilter === "all" && plantFilter === "all" && !searchTerm,
+      onClick: clearFilters,
+    },
+    {
+      label: "Plant note needed",
+      value: metrics.awaitingReview,
+      detail: "Awaiting your input",
+      color: "bg-amber-500",
+      isActive: filterTab === "awaiting_review",
+      onClick: () => {
+        setFilterTab("awaiting_review");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Plant note added",
+      value: metrics.reviewed,
+      detail: "Your planning input",
+      color: "bg-emerald-500",
+      isActive: filterTab === "reviewed",
+      onClick: () => {
+        setFilterTab("reviewed");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "SAMP note added",
+      value: plantScopedRequests.filter(hasSampNote).length,
+      detail: "Sampling planning input",
+      color: "bg-sky-500",
+      isActive: filterTab === "samp_note_added",
+      onClick: () => {
+        setFilterTab("samp_note_added");
+        setCurrentPage(1);
+      },
+    },
+  ];
+
+  const hasActiveFilters = Boolean(
+    customerFilter !== "all" || plantFilter !== "all" || filterTab !== "all" || searchTerm
+  );
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-base)] text-[var(--text-primary)] select-text">
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-base font-bold tracking-tight text-[var(--text-primary)] sm:text-lg">Program Planning</h1>
-            <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Review the annual plan and add Plant remarks · {selectedPlant || "All plants"}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button type="button" onClick={onRefresh} disabled={isLoading} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-low)] disabled:opacity-50" title="Refresh programs"><RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} /><span className="hidden sm:inline">Refresh</span></button>
-            <button type="button" onClick={handleExportCsv} disabled={filteredRequests.length === 0} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-low)] disabled:opacity-50" title="Export CSV"><Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Export</span></button>
-          </div>
-        </div>
-      </header>
-
-      <section aria-label="Plant program review summary" className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-2.5 sm:px-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {[
-            { label: "Programs", value: metrics.total, detail: "Assigned to this scope", color: "bg-[var(--accent-primary)]", filter: "all" as const },
-            { label: "Plant note needed", value: metrics.awaitingReview, detail: "Awaiting your input", color: "bg-amber-500", filter: "awaiting_review" as const },
-            { label: "Plant note added", value: metrics.reviewed, detail: "Your planning input", color: "bg-emerald-500", filter: "reviewed" as const },
-            { label: "SAMP note added", value: plantScopedRequests.filter(hasSampNote).length, detail: "Sampling planning input", color: "bg-sky-500", filter: "samp_note_added" as const },
-            { label: "Total SKUs", value: metrics.totalSKUs, detail: "Across assigned plans", color: "bg-sky-500" },
-          ].map((item) => {
-            const active = "filter" in item && item.filter
-              ? item.filter === "all"
-                ? filterTab === "all" && customerFilter === "all" && plantFilter === "all" && !searchTerm
-                : filterTab === item.filter
-              : false;
-            const content = <><span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.color}`} /><span className="truncate">{item.label}</span></span><span className="mt-1 flex items-baseline justify-between gap-2"><span className="text-lg font-bold leading-none tabular-nums text-[var(--text-primary)]">{item.value}</span><span className="truncate text-[10px] text-[var(--text-muted)]">{item.detail}</span></span></>;
-            return "filter" in item && item.filter ? <button key={item.label} type="button" onClick={() => { if (item.filter === "all") clearFilters(); else { setFilterTab(item.filter); setCurrentPage(1); } }} aria-pressed={active} className={`min-w-0 rounded-lg border px-3 py-2 text-left shadow-2xs transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--surface-low)] ${active ? "border-[var(--border-focus)] bg-[var(--accent-primary-subtle)]" : "border-[var(--border-subtle)] bg-[var(--surface-lowest)]"}`}>{content}</button> : <div key={item.label} className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2 shadow-2xs">{content}</div>;
-          })}
-        </div>
-      </section>
-
-      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-4 py-2.5 sm:px-6">
-        <div className="flex flex-wrap items-center gap-2">
+    <DeskWorkspaceLayout
+      title="Program Planning"
+      subtitle={`Review the annual plan and add Plant remarks · ${selectedPlant || "All plants"}`}
+      totalCount={metrics.total}
+      totalLabel="Programs"
+      extraBadges={
+        metrics.totalSKUs > 0 ? (
+          <span className="px-2 py-0.5 rounded-md bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)] text-[10px] font-mono font-bold">
+            Total SKUs · {metrics.totalSKUs}
+          </span>
+        ) : null
+      }
+      onRefresh={onRefresh}
+      isRefreshing={isLoading}
+      onExportCSV={handleExportCsv}
+      exportDisabled={filteredRequests.length === 0}
+      kpiItems={kpiItems}
+      kpiGridCols="grid-cols-2 gap-2 sm:grid-cols-4"
+      filterControls={
+        <>
           {customerList.length > 0 && (
             <Select
               aria-label="Filter by customer"
@@ -225,6 +251,7 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
               ]}
             />
           )}
+
           {(selectedPlant === "ALL" || !selectedPlant) && plantList.length > 0 && (
             <Select
               aria-label="Filter by plant"
@@ -240,12 +267,34 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
               ]}
             />
           )}
-          <div className="group relative min-w-[220px] flex-1 sm:max-w-[360px]"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)] transition-colors group-focus-within:text-[var(--accent-primary)]" /><input type="text" placeholder="Search code, campaign, customer..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="h-9 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] pl-[34px] pr-8 text-xs text-[var(--text-primary)] outline-none transition-all placeholder:text-[var(--text-muted)] focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--accent-primary)]/15" />{searchTerm && <button type="button" onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-low)]" title="Clear search"><X className="h-3 w-3" /></button>}</div>
-          {(customerFilter !== "all" || plantFilter !== "all" || filterTab !== "all" || searchTerm) && <button type="button" onClick={clearFilters} className="h-9 rounded-lg px-2.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--text-primary)] cursor-pointer">Clear filters</button>}
-        </div>
+        </>
+      }
+      search={{
+        value: searchTerm,
+        onChange: (val) => {
+          setSearchTerm(val);
+          setCurrentPage(1);
+        },
+        placeholder: "Search code, campaign, customer...",
+      }}
+      hasActiveFilters={hasActiveFilters}
+      onResetFilters={clearFilters}
+      resetFiltersLabel="Clear filters"
+    >
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2 text-xs text-[var(--text-secondary)] sm:px-6">
+        <span>
+          Showing{" "}
+          <span className="font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+            {filteredRequests.length}
+          </span>{" "}
+          of{" "}
+          <span className="font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+            {plantScopedRequests.length}
+          </span>{" "}
+          assigned programs
+        </span>
+        <span className="font-mono text-[10px] text-[var(--text-muted)]">Newest plans first</span>
       </div>
-
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2 text-xs text-[var(--text-secondary)] sm:px-6"><span>Showing <span className="font-mono font-semibold tabular-nums text-[var(--text-primary)]">{filteredRequests.length}</span> of <span className="font-mono font-semibold tabular-nums text-[var(--text-primary)]">{plantScopedRequests.length}</span> assigned programs</span><span className="font-mono text-[10px] text-[var(--text-muted)]">Newest plans first</span></div>
       <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col">
         <table className="w-full min-w-[1160px] text-left text-xs border-collapse">
           <thead className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] select-none">
@@ -417,7 +466,7 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
           />
         </div>
       </div>
-    </div>
+    </DeskWorkspaceLayout>
   );
 };
 
