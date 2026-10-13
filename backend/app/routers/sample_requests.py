@@ -12,7 +12,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.auth.permissions import (
@@ -34,6 +34,7 @@ from app.database import get_db
 from app.models.feasibility import FeasibilityRequest
 from app.models.master import Plant
 from app.models.sample_request import CreateSampleRequest, DesignRequest, ProductCharacteristic, ProductDetail, SampleRequestActivityLog
+from app.repositories.sample_request_repo import MISSING_TAXONOMY_FILTER
 from app.services.sample_request_service import SampleRequestService
 from app.services.design_request_service import DesignRequestService
 from app.services.downstream_service import DownstreamService
@@ -51,26 +52,32 @@ def _normalize_binding(value: Any) -> str:
 def _is_mockup_creative_characteristic(class_name: Any, characteristic_name: Any) -> bool:
     class_key = _normalize_binding(class_name).upper()
     field = _normalize_binding(characteristic_name).upper()
-    if class_key == "NBBINDING":
+    if class_key.startswith("NBBINDING"):
         return field in {
             "BINDINGCOLORSTYLE",
             "EDGEFINISHINGNOOFDESIGN",
+            "EDGEFINISHINGNOOFDESIGNS",
             "EDGEFINISHINNOOFDESIGN",
             "EDGEFINISHINGDESIGNNOTES",
             "ACCESSORIESDETAIL",
+            "ACCESSORIESDETAILS",
             "ACCESSORIEESDETAIL",
         }
-    if class_key == "NBDIVIDERSPECS":
-        return field in {
-            "NOOFDESIGNPRINT", "NOOFCOLORB", "NAMEOFCOLORB", "PRINTINGFINISH",
-            "D2NAMEOFCOLORB", "D2PRINTINGFINISH",
+    if class_key in {"NBDIVIDERSPEC", "NBDIVIDERSPECS", "NBDIVIDINGSPEC", "NBDIVIDINGSPECS"}:
+        divider_field = re.sub(r"^D[12]", "", field)
+        return divider_field in {
+            "NOOFDESIGNPRINT", "NOOFDESIGNSPRINT", "NOOFCOLORB", "NOOFCOLORSFB", "NOOFCOLOURSFB",
+            "NAMEOFCOLORB", "NAMEOFCOLORSFB", "PRINTINGFINISH", "PRINTFINISHING",
         }
-    if class_key == "PACKINGDETAILS":
+    if class_key.startswith("PACKAGINGSPEC"):
+        return field in {"NOOFCOLOURSFB", "NAMEOFCOLORSFB2"}
+    if class_key in {"PACKINGDETAIL", "PACKINGDETAILS", "PACKAGINGDETAIL", "PACKAGINGDETAILS"}:
         return field in {
             "NAMEOFCOLOR", "NAMEOFCOLORFB", "NAMEOFCOLORFB2",
-            "DESIGNCOLORASSORTMENT", "SPECIALINSTRUCTION", "DESIGNCOLORASSORTMENT2",
+            "DESIGNCOLORASSORTMENT", "SPECIALINSTRUCTION", "SPECIALINSTRUCTIONS",
+            "DESIGNCOLORASSORTMENT2",
         }
-    component_match = re.fullmatch(r"NBCOMPONENT([1-6])", class_key)
+    component_match = re.fullmatch(r"(?:NB)?COMPONENT([1-6])", class_key)
     if not component_match:
         return False
     component_number = component_match.group(1)
@@ -81,11 +88,13 @@ def _is_mockup_creative_characteristic(class_name: Any, characteristic_name: Any
         "NAMEOFCOLORB1",
         "RULLINGPRINTINGDESIGNNAME1",
         "RULINGPRINTINGDESIGNNAME1",
+        "RULINGPRINTDESIGNNAME1",
         "NAMEOFCOLORSFB",
         "NAMEOFCOLORFB",
         "NAMEOFCOLORB",
         "RULLINGPRINTINGDESIGNNAME2",
         "RULINGPRINTINGDESIGNNAME2",
+        "RULINGPRINTDESIGNNAME2",
     }
 
 
@@ -563,7 +572,8 @@ def search_materials_get(
     current_user=Depends(get_current_user),
 ):
     search_term = code or query or ""
-    return filter_plant_records(current_user, _filter_marketing_sample_owners(service.search_materials(search_term), current_user), service.db)
+    require_team(current_user, "marketing")
+    return service.search_materials(search_term)
 
 
 @router.get("/api/v1/sample-requests/{id}", response_model=Dict[str, Any], summary="Get sample request by ID or SR Number")
@@ -755,7 +765,8 @@ def search_materials_post(
     current_user=Depends(get_current_user),
 ):
     query = body.get("query", "") if isinstance(body, dict) else ""
-    return filter_plant_records(current_user, _filter_marketing_sample_owners(service.search_materials(query), current_user), service.db)
+    require_team(current_user, "marketing")
+    return service.search_materials(query)
 
 
 @router.put("/api/v1/sample-requests/{id}", summary="Update sample request (PUT)")
@@ -1628,14 +1639,13 @@ def delete_sample_request(
     if not record:
         raise HTTPException(status_code=404, detail="Sample request not found")
     existing_sr_number = record.sr_number
-    linked_feasibility_id = service.db.query(FeasibilityRequest.id).filter(
+    linked_feasibility = service.db.query(FeasibilityRequest).filter(
         FeasibilityRequest.converted_sample_request_id == num_id
-    ).scalar()
-    if linked_feasibility_id:
-        raise HTTPException(
-            status_code=409,
-            detail="This sample request is linked to an accepted Feasibility request and cannot be deleted.",
-        )
+    ).first()
+    if linked_feasibility:
+        linked_feasibility.converted_sample_request_id = None
+        linked_feasibility.converted_sr_number = None
+        linked_feasibility.status = "Marketing Accepted"
     if "design" in (record.request_types or []):
         linked_design = design_service.repo.get_model_by_sr_number(existing_sr_number)
         if linked_design:
@@ -1672,25 +1682,34 @@ def list_design_requests(
     service: DesignRequestService = Depends(get_design_request_service),
     current_user=Depends(get_current_user),
 ):
-    records = service.list_all(year=year, draft_only=draft_only)
+    created_by_filter = None
+    status_filter = None
     if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user):
-        records = [row for row in records if row.get("created_by_user_id") == current_user.id]
+        created_by_filter = current_user.id
     if user_has_team(current_user, "creative_studio") and not is_admin(current_user):
+        status_filter = ["creative", "creative remaining requested", "creative studio", "target date counter proposed"]
+
+    records = service.list_all(
+        year=year,
+        draft_only=draft_only,
+        created_by_user_id=created_by_filter,
+        status_in=status_filter,
+    )
+
+    if user_has_team(current_user, "creative_studio") and not is_admin(current_user) and not is_team_head(current_user):
         actor_name = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "").casefold()
-        open_statuses = {"creative", "creative remaining requested", "creative studio", "target date counter proposed"}
         visible = []
         for row in records:
-            if str(row.get("status") or "").casefold() not in open_statuses:
-                continue
             state = row.get("workflow_state") if isinstance(row.get("workflow_state"), dict) else {}
             claim_id = state.get("claimedByUserId")
             claim_name = str(state.get("claimedBy") or "").casefold()
-            if not is_team_head(current_user) and not claim_id and claim_name and claim_name != actor_name:
+            if not claim_id and claim_name and claim_name != actor_name:
                 continue
-            if not is_team_head(current_user) and claim_id and claim_id != current_user.id:
+            if claim_id and claim_id != current_user.id:
                 continue
             visible.append(row)
         records = visible
+
     return filter_linked_plant_records(current_user, records, service.db)
 
 
@@ -2720,6 +2739,7 @@ def list_characteristic_classes(service: SampleRequestService = Depends(get_samp
 def get_product_details(
     sample_request_id: int,
     exclude_na: bool = False,
+    catalog_lookup: bool = False,
     service: SampleRequestService = Depends(get_sample_request_service),
     current_user=Depends(get_current_user),
 ):
@@ -2735,7 +2755,9 @@ def get_product_details(
         and isinstance(state, dict)
         and state.get("stage") in {"creative", "studio", "creative_approval"}
     )
-    if not creative_workflow_read:
+    if catalog_lookup:
+        require_team(current_user, "marketing")
+    elif not creative_workflow_read:
         _require_marketing_sample_owner(sample, current_user)
         require_plant_access(current_user, sample.get("target_plant"), service.db)
     return service.get_product_details(sample_request_id)
@@ -2804,6 +2826,7 @@ def get_binding_hierarchy(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    require_team(current_user, "marketing")
     binding_characteristics = (
         db.query(ProductCharacteristic)
         .filter(
@@ -2835,39 +2858,33 @@ def get_binding_hierarchy(
     def normalized_taxonomy_value(value: str) -> str:
         return _normalize_binding(value)
 
-    product_query = db.query(CreateSampleRequest.id)
-    if category and category.strip():
-        product_query = product_query.filter(
-            normalized_taxonomy_sql(CreateSampleRequest.product_category)
-            == normalized_taxonomy_value(category)
-        )
-    if sub_category and sub_category.strip():
-        product_query = product_query.filter(
-            normalized_taxonomy_sql(CreateSampleRequest.product_sub_category)
-            == normalized_taxonomy_value(sub_category)
-        )
-    if third_category and third_category.strip():
-        product_query = product_query.filter(
-            normalized_taxonomy_sql(CreateSampleRequest.product_third_category)
-            == normalized_taxonomy_value(third_category)
-        )
-    product_ids = [request_id for (request_id,) in product_query.all()]
-    products_by_request: Dict[int, Dict[str, str]] = {request_id: {} for request_id in product_ids}
-    binding_rows = (
+    def apply_taxonomy_filter(query, column, value):
+        if not value or not value.strip():
+            return query
+        if value == MISSING_TAXONOMY_FILTER:
+            return query.filter(or_(column.is_(None), func.trim(func.coalesce(column, "")) == ""))
+        return query.filter(normalized_taxonomy_sql(column) == normalized_taxonomy_value(value))
+
+    binding_query = (
         db.query(
             ProductDetail.sample_request_id,
             ProductDetail.characteristic_name,
             ProductDetail.value,
         )
-        .filter(ProductDetail.sample_request_id.in_(product_ids))
+        .join(CreateSampleRequest, ProductDetail.sample_request_id == CreateSampleRequest.id)
+    )
+    binding_query = apply_taxonomy_filter(binding_query, CreateSampleRequest.product_category, category)
+    binding_query = apply_taxonomy_filter(binding_query, CreateSampleRequest.product_sub_category, sub_category)
+    binding_query = apply_taxonomy_filter(binding_query, CreateSampleRequest.product_third_category, third_category)
+    binding_rows = (
+        binding_query
         .filter(func.upper(ProductDetail.class_name) == "NB_BINDING")
         .filter(normalized_taxonomy_sql(ProductDetail.characteristic_name).in_(
             ("bindingtype1", "binding1", "bindingtype2", "binding2")
         ))
         .all()
-        if product_ids
-        else []
     )
+    products_by_request: Dict[int, Dict[str, str]] = {}
     for request_id, characteristic_name, value in binding_rows:
         normalized = _normalize_binding(characteristic_name)
         clean_value = str(value or "").strip()
@@ -2906,8 +2923,9 @@ def get_binding_hierarchy(
                 options_by_normalized_value[normalized] = label
         return sorted(options_by_normalized_value.values(), key=lambda label: (label.casefold(), label))
 
-    b1_cleaned = merge_binding_options(product_b1_options, master_b1_options)
-    b2_cleaned = merge_binding_options(product_b2_options, master_b2_options)
+    has_taxonomy_filter = any(value and value.strip() for value in (category, sub_category, third_category))
+    b1_cleaned = merge_binding_options(product_b1_options, [] if has_taxonomy_filter else master_b1_options)
+    b2_cleaned = merge_binding_options(product_b2_options, [] if has_taxonomy_filter else master_b2_options)
 
     # Build the dependency only from actual saved product pairs. The master
     # option lists do not encode which Binding 2 values belong to each Binding 1.
@@ -2939,6 +2957,7 @@ def search_products_by_binding(
     service: SampleRequestService = Depends(get_sample_request_service),
     current_user=Depends(get_current_user),
 ):
+    require_team(current_user, "marketing")
     if not any(value and value.strip() for value in (b1, b2, category, sub_category, third_category)):
         return []
     rows = service.search_products_by_binding(
@@ -2949,4 +2968,22 @@ def search_products_by_binding(
         third_category=third_category,
         limit=limit,
     )
-    return filter_plant_records(current_user, _filter_marketing_sample_owners(rows, current_user), service.db)
+    return rows
+
+
+@router.get("/api/v1/product-characteristics/catalog-filter-counts", summary="Count products for catalog filters")
+def get_catalog_filter_counts(
+    category: Optional[str] = None,
+    sub_category: Optional[str] = None,
+    third_category: Optional[str] = None,
+    b1: Optional[str] = None,
+    service: SampleRequestService = Depends(get_sample_request_service),
+    current_user=Depends(get_current_user),
+):
+    require_team(current_user, "marketing")
+    return service.catalog_filter_counts(
+        category=category,
+        sub_category=sub_category,
+        third_category=third_category,
+        binding1=b1,
+    )

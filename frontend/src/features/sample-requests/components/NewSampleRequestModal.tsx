@@ -659,12 +659,10 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
       );
     }
 
-    const fullDescriptionWithMetadata = sections.join("\n\n");
-
     const payload: Partial<SampleRequestItem> = {
       customer,
-      productDescription: fullDescriptionWithMetadata,
-      descriptionNotes: fullDescriptionWithMetadata,
+      productDescription: feasibilityDescription.trim().slice(0, 75),
+      descriptionNotes: feasibilityDescription.trim().slice(0, 75),
       programName: `${customer} · ${effectiveTypeLabel}`,
       programYear: byInfo.businessYearStr,
       year: byInfo.businessYearStr,
@@ -685,9 +683,9 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
       referenceImageNames: uploadedImages.map((img) => img.name),
       referenceLinks: webLinks,
       feasibilityType: selectedFeasibilityType,
-      customFeasibilityType: selectedFeasibilityType === "other" ? customTypeOther.trim() : null,
-      feasibilityDescription: feasibilityDescription.trim(),
-      marketingRemarks: releaseRemarks.trim() || null,
+      customFeasibilityType: selectedFeasibilityType === "other" ? customTypeOther.trim().slice(0, 25) : null,
+      feasibilityDescription: feasibilityDescription.trim().slice(0, 75),
+      marketingRemarks: releaseRemarks.trim() ? releaseRemarks.trim().slice(0, 100) : null,
     };
 
     setIsSubmitting(true);
@@ -874,18 +872,22 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               return (
                                 <div
                                   key={type.id}
-                                  className="sm:col-span-2 flex min-h-12 items-center rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-primary)]/[0.035] px-3 ring-2 ring-[var(--accent-primary)]/20 shadow-2xs"
+                                  className="sm:col-span-2 flex min-h-12 items-center justify-between rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-primary)]/[0.035] px-3 ring-2 ring-[var(--accent-primary)]/20 shadow-2xs"
                                 >
                                   <input
                                     type="text"
                                     required
                                     autoFocus
+                                    maxLength={25}
                                     aria-label="Describe the other custom feasibility requirement"
-                                    placeholder="Describe the custom requirement..."
+                                    placeholder="Custom requirement (max 25 chars)..."
                                     value={customTypeOther}
-                                    onChange={(e) => setCustomTypeOther(e.target.value)}
+                                    onChange={(e) => setCustomTypeOther(e.target.value.slice(0, 25))}
                                     className="w-full bg-transparent text-xs font-medium text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
                                   />
+                                  <span className={`text-[10px] font-mono shrink-0 ml-2 ${customTypeOther.length >= 25 ? "text-amber-500 font-bold" : "text-zinc-400"}`}>
+                                    {customTypeOther.length}/25
+                                  </span>
                                 </div>
                               );
                             }
@@ -931,15 +933,21 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
 
                       {/* Technical Description & Notes */}
                       <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
-                          Technical Description &amp; Specifications <span className="text-rose-500">*</span>
-                        </label>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans">
+                            Technical Description &amp; Specifications <span className="text-rose-500">*</span>
+                          </label>
+                          <span className={`text-[10px] font-mono ${feasibilityDescription.length >= 75 ? "text-amber-500 font-bold" : "text-zinc-400"}`}>
+                            {feasibilityDescription.length}/75
+                          </span>
+                        </div>
                         <textarea
                           required
                           rows={3}
-                          placeholder="Provide complete technical context, material GSM, binding dimensions, special coatings, machine tolerances, and manufacturing evaluation criteria..."
+                          maxLength={75}
+                          placeholder="Brief technical context, material GSM, binding specs... (max 75 characters)"
                           value={feasibilityDescription}
-                          onChange={(e) => setFeasibilityDescription(e.target.value)}
+                          onChange={(e) => setFeasibilityDescription(e.target.value.slice(0, 75))}
                           className="w-full p-3 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
                         />
                       </div>
@@ -968,13 +976,20 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans">
                             Marketing Remarks / Notes
                           </label>
-                          <span className="text-[10px] text-zinc-400 font-medium">Optional</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-zinc-400 font-medium">Optional</span>
+                            <span className="text-zinc-300 dark:text-zinc-600">·</span>
+                            <span className={`text-[10px] font-mono ${releaseRemarks.length >= 100 ? "text-amber-500 font-bold" : "text-zinc-400"}`}>
+                              {releaseRemarks.length}/100
+                            </span>
+                          </div>
                         </div>
                         <textarea
                           rows={2}
-                          placeholder="Enter any additional marketing remarks, client constraints, or special evaluation instructions..."
+                          maxLength={100}
+                          placeholder="Marketing remarks, client constraints... (max 100 characters)"
                           value={releaseRemarks}
-                          onChange={(e) => setReleaseRemarks(e.target.value)}
+                          onChange={(e) => setReleaseRemarks(e.target.value.slice(0, 100))}
                           className="w-full p-3 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
                         />
                       </div>

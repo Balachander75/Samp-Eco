@@ -12,6 +12,15 @@ import {
 import { ProductSearchResult, BindingHierarchyResponse } from "../../types";
 import { ProductCategoryItem } from "@/types/master";
 import { DeliverableScopeId } from "../../types/staging";
+import {
+  fetchProductCatalogFilterCountsApi,
+  MISSING_TAXONOMY_FILTER_VALUE,
+} from "@/infrastructure/api/masterApi";
+import type { ProductCatalogFilterCounts } from "@/infrastructure/api/masterApi";
+import BrandNewProductSpecifications from "./BrandNewProductSpecifications";
+import type { StagedProductItem } from "../../types/staging";
+
+type CustomProductDetail = NonNullable<StagedProductItem["customDetails"]>[number];
 
 export interface AddProductSamplingStepProps {
   selectedScopes?: DeliverableScopeId[];
@@ -42,6 +51,7 @@ export interface AddProductSamplingStepProps {
   selectedBinding1: string;
   selectedBinding2: string;
   productCategories: ProductCategoryItem[];
+  newProductCustomDetails: CustomProductDetail[];
   selectedCategory: string;
   selectedSubCategory: string;
   selectedThirdCategory: string;
@@ -69,6 +79,7 @@ export interface AddProductSamplingStepProps {
   onSelectCategory: (val: string) => void;
   onSelectSubCategory: (val: string) => void;
   onSelectThirdCategory: (val: string) => void;
+  onSetNewProductCustomDetails: (details: CustomProductDetail[]) => void;
   onSelectBinding1: (b1: string) => void;
   onSelectBinding2: (b2: string) => void;
   onBackToScopes: () => void;
@@ -253,6 +264,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
   selectedBinding1,
   selectedBinding2,
   productCategories,
+  newProductCustomDetails,
   selectedCategory,
   selectedSubCategory,
   selectedThirdCategory,
@@ -280,6 +292,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
   onSelectCategory,
   onSelectSubCategory,
   onSelectThirdCategory,
+  onSetNewProductCustomDetails,
   onSelectBinding1,
   onSelectBinding2,
   onBackToScopes,
@@ -288,6 +301,10 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
 }) => {
   const [showMockupReferenceDialog, setShowMockupReferenceDialog] = useState(false);
   const [mockupReferenceError, setMockupReferenceError] = useState("");
+  const [isBindingFiltersOpen, setIsBindingFiltersOpen] = useState(true);
+  const brandNewSpecificationsRef = useRef<HTMLDivElement>(null);
+  const [catalogFilterCounts, setCatalogFilterCounts] = useState<ProductCatalogFilterCounts | null>(null);
+  const [isLoadingCatalogFilterCounts, setIsLoadingCatalogFilterCounts] = useState(false);
   const includesSample = selectedScopes.includes("sample");
   const includesMockup = selectedScopes.includes("mockup");
   const includesCosting = selectedScopes.includes("costing");
@@ -303,20 +320,107 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
     setMockupReferenceError("");
   }, [selectedDbSample?.id]);
 
+  useEffect(() => {
+    if (samplingSearchMode === "binding") setIsBindingFiltersOpen(true);
+  }, [samplingSearchMode]);
+
   // Derive cascading taxonomy options based on current selections
   const currentCategoryItem = productCategories.find((c) => c.name === selectedCategory);
   const subCategoryOptions = currentCategoryItem?.subcategories || [];
   const currentSubCategoryItem = subCategoryOptions.find((s) => s.name === selectedSubCategory);
   const thirdCategoryOptions = currentSubCategoryItem?.third_categories || [];
+  const getMissingTaxonomyCount = (
+    facet: "sub_categories_missing" | "third_categories_missing"
+  ): string | number => {
+    if (!catalogFilterCounts || isLoadingCatalogFilterCounts) return "…";
+    return catalogFilterCounts[facet] ?? 0;
+  };
+  const missingSubCategoryCount = getMissingTaxonomyCount("sub_categories_missing");
+  const missingThirdCategoryCount = getMissingTaxonomyCount("third_categories_missing");
+  const hasSubCategoryOptions = subCategoryOptions.length > 0 || Number(missingSubCategoryCount) > 0;
+  const hasThirdCategoryOptions = thirdCategoryOptions.length > 0 || Number(missingThirdCategoryCount) > 0;
+  const formatTaxonomyFilter = (value: string) =>
+    value === MISSING_TAXONOMY_FILTER_VALUE ? "None" : value;
 
   // Derive cascading binding 2 options
   const binding2Options = selectedBinding1
     ? bindingHierarchy.hierarchy[selectedBinding1] ?? []
     : [];
   const activeBindingFilters = [
+    [selectedCategory, selectedSubCategory, selectedThirdCategory]
+      .filter(Boolean)
+      .map(formatTaxonomyFilter)
+      .join(" › "),
+    [selectedBinding1, selectedBinding2].filter(Boolean).join(" / "),
+  ].filter(Boolean);
+  const activeBindingFilterCount = [
+    selectedCategory,
+    selectedSubCategory,
+    selectedThirdCategory,
     selectedBinding1,
     selectedBinding2,
-  ].filter(Boolean);
+  ].filter(Boolean).length;
+  const activeBindingFilterSummary = activeBindingFilters.join(" · ");
+  const getCatalogOptionCount = (
+    facet: "categories" | "sub_categories" | "third_categories" | "binding1" | "binding2",
+    value: string
+  ): string | number => {
+    if (!catalogFilterCounts || isLoadingCatalogFilterCounts) return "…";
+    const key = value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    return catalogFilterCounts[facet][key] ?? 0;
+  };
+
+  const isBrandNewSpecificationReady =
+    samplingSearchMode === "new" && Boolean(productDescription.trim()) && Boolean(selectedCategory.trim());
+
+  useEffect(() => {
+    if (!isBrandNewSpecificationReady) return;
+    requestAnimationFrame(() => {
+      brandNewSpecificationsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }, [isBrandNewSpecificationReady]);
+
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    if (samplingSearchMode === "new" && !productDescription.trim()) {
+      event.preventDefault();
+      onSetModalError("Enter a product description before continuing.");
+      return;
+    }
+    if (samplingSearchMode === "new" && !selectedCategory.trim()) {
+      event.preventDefault();
+      onSetModalError("Choose a product category before continuing.");
+      return;
+    }
+    onSubmit(event);
+  };
+
+  useEffect(() => {
+    if (samplingSearchMode !== "binding") {
+      setCatalogFilterCounts(null);
+      setIsLoadingCatalogFilterCounts(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setCatalogFilterCounts(null);
+    setIsLoadingCatalogFilterCounts(true);
+    fetchProductCatalogFilterCountsApi(
+      selectedCategory || undefined,
+      selectedSubCategory || undefined,
+      selectedThirdCategory || undefined,
+      selectedBinding1 || undefined
+    )
+      .then((counts) => {
+        if (isCurrent) setCatalogFilterCounts(counts);
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingCatalogFilterCounts(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [samplingSearchMode, selectedCategory, selectedSubCategory, selectedThirdCategory, selectedBinding1]);
 
   const modalTitle = includesSample
     ? "Configure Sampling Prototype"
@@ -394,7 +498,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
       )}
 
       {/* Form Body */}
-      <form onSubmit={onSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <form onSubmit={handleFormSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto px-6 py-5 sm:px-7 sm:py-6 space-y-4 text-xs">
           {/* Scope Selection: Full Sample vs Partial Sample */}
           {includesSample && (
@@ -713,6 +817,19 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                     </div>
                   </div>
                 </div>
+                {!isBrandNewSpecificationReady && (
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    Enter a product description and choose Category 1 to open product specifications.
+                  </p>
+                )}
+                {isBrandNewSpecificationReady && (
+                  <div ref={brandNewSpecificationsRef}>
+                    <BrandNewProductSpecifications
+                      details={newProductCustomDetails}
+                      onChange={onSetNewProductCustomDetails}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -740,6 +857,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                     </button>
                   )}
                 </div>
+
 
                 <div className="h-80 shrink-0 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/40 divide-y divide-slate-100 dark:border-zinc-700 dark:bg-zinc-900/40 dark:divide-zinc-800">
                   {isSearchingMaterial ? (
@@ -826,97 +944,173 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                ══════════════════════════════════════════════════════════════ */}
             {samplingSearchMode === "binding" && (
               <div className="space-y-3 pt-0.5">
-                <p className="-mt-1 text-[11px] text-slate-500 dark:text-zinc-400">Binding 2 shows only values linked to the selected Binding 1 in saved catalog products.</p>
-                {/* Binding Selection */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                      Binding filters
-                    </label>
-                    {(selectedBinding1 || selectedBinding2) && (
+                <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    <button
+                      type="button"
+                      aria-expanded={isBindingFiltersOpen}
+                      aria-controls="binding-catalog-filters"
+                      onClick={() => setIsBindingFiltersOpen((open) => !open)}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left cursor-pointer select-none"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-semibold text-zinc-800 dark:text-zinc-100">Filter catalog</span>
+                        <span className="mt-0.5 block truncate text-[10.5px] text-zinc-500 dark:text-zinc-400">
+                          {activeBindingFilterSummary || "Choose categories and binding to find matching products"}
+                        </span>
+                      </span>
+                      {activeBindingFilterCount > 0 && (
+                        <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          {activeBindingFilterCount} active
+                        </span>
+                      )}
+                      <ChevronDown className={`h-4 w-4 shrink-0 text-zinc-500 transition-transform dark:text-zinc-400 ${isBindingFiltersOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {activeBindingFilterCount > 0 && (
                       <button
                         type="button"
                         onClick={() => {
+                          onSelectCategory("");
+                          onSelectSubCategory("");
+                          onSelectThirdCategory("");
                           onSelectBinding1("");
                           onSelectBinding2("");
                         }}
-                        className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
+                        className="shrink-0 rounded-md px-2 py-1 text-[10.5px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 cursor-pointer select-none dark:text-rose-300 dark:hover:bg-rose-950/40"
                       >
                         Clear
                       </button>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {/* Binding 1 */}
-                    <div className="space-y-1">
-                      <label className="block text-[10.5px] font-medium text-slate-500 dark:text-zinc-400">
-                        Binding 1
-                      </label>
-                      <div className="relative">
-                        <select
-                          value={selectedBinding1}
-                          disabled={isLoadingBindingHierarchy}
-                          onChange={(e) => onSelectBinding1(e.target.value)}
-                          className={`w-full h-9 pl-3 pr-8 rounded-xl border text-xs font-medium outline-none appearance-none ${
-                            isLoadingBindingHierarchy
-                              ? "border-slate-200/60 dark:border-zinc-800 bg-slate-100/70 dark:bg-zinc-800/40 text-slate-400 dark:text-zinc-500 cursor-wait"
-                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer"
-                          }`}
-                        >
-                          <option value="">
-                            {isLoadingBindingHierarchy
-                              ? "Loading binding options..."
-                              : bindingHierarchy.binding1_options.length === 0
-                                ? "No binding options available"
-                                : "Select Binding 1..."}
-                          </option>
-                          {bindingHierarchy.binding1_options.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="w-3.5 h-3.5 text-zinc-400 pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+                  {isBindingFiltersOpen && (
+                    <div id="binding-catalog-filters" className="space-y-3 border-t border-slate-100 bg-slate-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+                      <div>
+                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Product category</p>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          <label className="block text-[10.5px] font-medium text-slate-600 dark:text-zinc-400">
+                            Category 1
+                            <select
+                              value={selectedCategory}
+                              onChange={(event) => onSelectCategory(event.target.value)}
+                              className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-zinc-900 outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                            >
+                              <option value="">Any category</option>
+                              {productCategories.map((category) => (
+                                <option key={category.name} value={category.name}>
+                                  {category.name} ({getCatalogOptionCount("categories", category.name)})
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block text-[10.5px] font-medium text-slate-600 dark:text-zinc-400">
+                            Category 2
+                            <select
+                              disabled={!selectedCategory || !hasSubCategoryOptions}
+                              value={selectedSubCategory}
+                              onChange={(event) => onSelectSubCategory(event.target.value)}
+                              className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-zinc-900 outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:disabled:bg-zinc-800/60 dark:disabled:text-zinc-500"
+                            >
+                              <option value="">
+                                {!selectedCategory
+                                  ? "Choose Category 1 first"
+                                  : !hasSubCategoryOptions
+                                    ? "No category 2 options"
+                                    : "Any category 2"}
+                              </option>
+                              {subCategoryOptions.map((category) => (
+                                <option key={category.name} value={category.name}>
+                                  {category.name} ({getCatalogOptionCount("sub_categories", category.name)})
+                                </option>
+                              ))}
+                              {Number(missingSubCategoryCount) > 0 && (
+                                <option value={MISSING_TAXONOMY_FILTER_VALUE}>
+                                  None ({missingSubCategoryCount})
+                                </option>
+                              )}
+                            </select>
+                          </label>
+                          <label className="block text-[10.5px] font-medium text-slate-600 dark:text-zinc-400">
+                            Category 3
+                            <select
+                              disabled={!selectedSubCategory || !hasThirdCategoryOptions}
+                              value={selectedThirdCategory}
+                              onChange={(event) => onSelectThirdCategory(event.target.value)}
+                              className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-zinc-900 outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:disabled:bg-zinc-800/60 dark:disabled:text-zinc-500"
+                            >
+                              <option value="">
+                                {!selectedSubCategory
+                                  ? "Choose Category 2 first"
+                                  : !hasThirdCategoryOptions
+                                    ? "No category 3 options"
+                                    : "Any category 3"}
+                              </option>
+                              {thirdCategoryOptions.map((category) => (
+                                <option key={category} value={category}>
+                                  {category} ({getCatalogOptionCount("third_categories", category)})
+                                </option>
+                              ))}
+                              {Number(missingThirdCategoryCount) > 0 && (
+                                <option value={MISSING_TAXONOMY_FILTER_VALUE}>
+                                  None ({missingThirdCategoryCount})
+                                </option>
+                              )}
+                            </select>
+                          </label>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Binding 2 */}
-                    <div className="space-y-1">
-                      <label className="block text-[10.5px] font-medium text-slate-500 dark:text-zinc-400">
-                        Binding 2
-                      </label>
-                      <div className="relative">
-                        <select
-                          disabled={isLoadingBindingHierarchy || !selectedBinding1 || binding2Options.length === 0}
-                          value={selectedBinding2}
-                          onChange={(e) => onSelectBinding2(e.target.value)}
-                          className={`w-full h-9 pl-3 pr-8 rounded-xl border text-xs font-medium outline-none appearance-none ${
-                            isLoadingBindingHierarchy || !selectedBinding1 || binding2Options.length === 0
-                              ? "border-slate-200/60 dark:border-zinc-800 bg-slate-100/70 dark:bg-zinc-800/40 text-slate-400 dark:text-zinc-500 cursor-not-allowed"
-                              : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer"
-                          }`}
-                        >
-                          <option value="">
-                            {isLoadingBindingHierarchy
-                              ? "Loading binding options..."
-                              : !selectedBinding1
-                                ? "Select Binding 1 first..."
-                                : binding2Options.length === 0
-                                  ? "No linked Binding 2 values"
-                                  : "Any linked Binding 2"}
-                          </option>
-                          {binding2Options.map((opt: string) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="w-3.5 h-3.5 text-zinc-400 pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+                      <div className="border-t border-slate-200 pt-3 dark:border-zinc-800">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Binding</p>
+                          <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Binding 2 depends on Binding 1</p>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <label className="block text-[10.5px] font-medium text-slate-600 dark:text-zinc-400">
+                            Binding 1
+                            <select
+                              value={selectedBinding1}
+                              disabled={isLoadingBindingHierarchy}
+                              onChange={(event) => onSelectBinding1(event.target.value)}
+                              className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-zinc-900 outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] disabled:cursor-wait disabled:bg-slate-100 disabled:text-slate-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:disabled:bg-zinc-800/60 dark:disabled:text-zinc-500"
+                            >
+                              <option value="">{isLoadingBindingHierarchy ? "Loading binding options..." : "Any binding 1"}</option>
+                              {bindingHierarchy.binding1_options.map((binding) => (
+                                <option key={binding} value={binding}>
+                                  {binding} ({getCatalogOptionCount("binding1", binding)})
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block text-[10.5px] font-medium text-slate-600 dark:text-zinc-400">
+                            Binding 2
+                            <select
+                              value={selectedBinding2}
+                              disabled={isLoadingBindingHierarchy || !selectedBinding1 || binding2Options.length === 0}
+                              onChange={(event) => onSelectBinding2(event.target.value)}
+                              className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-zinc-900 outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:disabled:bg-zinc-800/60 dark:disabled:text-zinc-500"
+                            >
+                              <option value="">
+                                {isLoadingBindingHierarchy
+                                  ? "Loading binding options..."
+                                  : !selectedBinding1
+                                    ? "Choose Binding 1 first"
+                                    : binding2Options.length === 0
+                                      ? "No linked Binding 2 values"
+                                      : "Any linked Binding 2"}
+                              </option>
+                              {binding2Options.map((binding) => (
+                                <option key={binding} value={binding}>
+                                  {binding} ({getCatalogOptionCount("binding2", binding)})
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+                </section>
 
                 {/* Matching Products (Unlimited) */}
                 <div className="space-y-1.5">
@@ -943,7 +1137,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                   <div className="h-80 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40 dark:border-zinc-700 dark:bg-zinc-900/40">
                     {activeBindingFilters.length === 0 ? (
                       <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-xs text-slate-400 dark:text-zinc-500">
-                        Choose Binding 1 to search the catalog
+                        Choose a category or Binding 1 to search the catalog
                       </div>
                     ) : isSearchingBinding ? (
                       <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-xs text-slate-400 dark:text-zinc-500 font-mono">
@@ -951,7 +1145,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                       </div>
                     ) : bindingSearchResults.length === 0 ? (
                       <div className="flex h-full min-h-32 items-center justify-center px-3 text-center text-xs text-slate-400 dark:text-zinc-500">
-                        No saved products match this binding combination.
+                        No saved products match these filters.
                       </div>
                     ) : (
                       <BindingProductResults

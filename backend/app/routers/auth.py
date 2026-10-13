@@ -16,6 +16,7 @@ from app.models.master import User, LoginAuditLog
 from app.auth.rate_limiter import login_rate_limiter
 from app.auth.security import (
     verify_password,
+    hash_password,
     create_access_token,
     create_refresh_token,
     rotate_refresh_token,
@@ -102,6 +103,12 @@ class RefreshTokenResponse(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: Optional[str] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, description="Current account password")
+    new_password: str = Field(..., min_length=6, description="New password (minimum 6 characters)")
+    confirm_password: Optional[str] = None
 
 
 class ThemePreferenceUpdate(BaseModel):
@@ -430,6 +437,66 @@ def logout(payload: LogoutRequest, db: Session = Depends(get_db)):
 def get_me(current_user: User = Depends(get_current_user)):
     """Returns the profile of the user identified by the Bearer token."""
     return _user_to_out(current_user)
+
+
+@router.post(
+    "/change-password",
+    summary="Change current user's password",
+)
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Allow authenticated user to change their account password.
+    Requires current password verification and a minimum 6-character new password.
+    """
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "success": False,
+                "error": {
+                    "code": "INVALID_CURRENT_PASSWORD",
+                    "message": "Current password is incorrect.",
+                },
+            },
+        )
+
+    if payload.confirm_password and payload.new_password != payload.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "success": False,
+                "error": {
+                    "code": "PASSWORDS_DO_NOT_MATCH",
+                    "message": "New password and confirmation do not match.",
+                },
+            },
+        )
+
+    if len(payload.new_password.strip()) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "success": False,
+                "error": {
+                    "code": "PASSWORD_TOO_SHORT",
+                    "message": "New password must be at least 6 characters long.",
+                },
+            },
+        )
+
+    current_user.password_hash = hash_password(payload.new_password.strip())
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+
+    return {
+        "success": True,
+        "message": "Password updated successfully.",
+    }
 
 
 @router.get(

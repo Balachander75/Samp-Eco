@@ -57,7 +57,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
     setCharacteristicQuery("");
     setExpandedClasses(new Set());
 
-    fetchProductInspectionDetailsApi(product.id)
+    fetchProductInspectionDetailsApi(product.id, true)
       .then((loadedDetails) => {
         if (cancelled) return;
         setDetails(loadedDetails);

@@ -17,10 +17,10 @@ FIXED_FEASIBILITY_TYPES = {
 class FeasibilityRequestCreate(BaseModel):
     customer: str = Field(min_length=1, max_length=255)
     feasibility_type: str = Field(min_length=1, max_length=64)
-    custom_feasibility_type: Optional[str] = Field(default=None, max_length=255)
-    description_notes: str = Field(min_length=1)
+    custom_feasibility_type: Optional[str] = Field(default=None, max_length=25)
+    description_notes: str = Field(min_length=1, max_length=75)
     required_date: date
-    marketing_remarks: Optional[str] = None
+    marketing_remarks: Optional[str] = Field(default=None, max_length=100)
     created_by: Optional[str] = None
     reference_images: list[str] = Field(default_factory=list, max_length=2)
     reference_image_names: list[str] = Field(default_factory=list, max_length=2)
@@ -36,8 +36,8 @@ class FeasibilityRequestCreate(BaseModel):
             raise ValueError("A maximum of 2 images and 1 link can be attached")
         if self.reference_image_names and len(self.reference_image_names) != len(self.reference_images):
             raise ValueError("Each reference image must include one matching filename")
-        if any(len(image) > 1_500_000 for image in self.reference_images):
-            raise ValueError("Reference image exceeds the 1 MB compressed image limit")
+        if any(len(image) > 20_000_000 for image in self.reference_images):
+            raise ValueError("Reference image upload exceeds the 15 MB limit")
         return self
 
 
@@ -48,15 +48,6 @@ class FeasibilitySampVerdictPayload(BaseModel):
     remark: Optional[str] = None
     conditions: Optional[str] = None
     lead_time_note: Optional[str] = None
-
-    @model_validator(mode="after")
-    def validate_remarks_rule(self):
-        # Enforce rule: remarks mandatory for No or Maybe; optional for Yes
-        if self.response in ("No", "Maybe") and not (self.remark or "").strip():
-            raise ValueError(
-                f"Technical evaluation remarks are mandatory when selecting '{self.response}'."
-            )
-        return self
 
 
 class FeasibilityMarketingDecisionPayload(BaseModel):

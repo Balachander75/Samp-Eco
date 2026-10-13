@@ -121,8 +121,15 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
       event.preventDefault();
       void loadData().finally(() => window.dispatchEvent(new Event("app:refresh-complete")));
     };
+    const handleRequestsChanged = () => void loadData();
     window.addEventListener("app:refresh-requested", handleRefresh);
-    return () => window.removeEventListener("app:refresh-requested", handleRefresh);
+    window.addEventListener("samp:requests-changed", handleRequestsChanged);
+    window.addEventListener("samp:design-workflow-updated", handleRequestsChanged);
+    return () => {
+      window.removeEventListener("app:refresh-requested", handleRefresh);
+      window.removeEventListener("samp:requests-changed", handleRequestsChanged);
+      window.removeEventListener("samp:design-workflow-updated", handleRequestsChanged);
+    };
   }, [loadData]);
 
   // Design scoped requests

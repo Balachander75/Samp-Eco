@@ -120,6 +120,39 @@ def ensure_feasibility_workflow_columns():
         connection.execute(text(
             "ALTER TABLE feasibility_requests DROP COLUMN IF EXISTS sr_number"
         ))
+        connection.execute(text(
+            "ALTER TABLE feasibility_requests DROP COLUMN IF EXISTS request_created_by"
+        ))
+        connection.execute(text(
+            "ALTER TABLE feasibility_requests DROP COLUMN IF EXISTS reference_images"
+        ))
+        connection.execute(text(
+            "DROP TABLE IF EXISTS feasibility_technical_attachments CASCADE"
+        ))
+        connection.execute(text(
+            """UPDATE feasibility_requests
+               SET custom_feasibility_type = LEFT(custom_feasibility_type, 25)
+               WHERE LENGTH(custom_feasibility_type) > 25"""
+        ))
+        connection.execute(text(
+            """UPDATE feasibility_requests
+               SET description_notes = LEFT(description_notes, 75)
+               WHERE LENGTH(description_notes) > 75"""
+        ))
+        connection.execute(text(
+            """UPDATE feasibility_requests
+               SET marketing_remarks = LEFT(marketing_remarks, 100)
+               WHERE LENGTH(marketing_remarks) > 100"""
+        ))
+        connection.execute(text(
+            "ALTER TABLE feasibility_requests ALTER COLUMN custom_feasibility_type TYPE VARCHAR(25)"
+        ))
+        connection.execute(text(
+            "ALTER TABLE feasibility_requests ALTER COLUMN description_notes TYPE VARCHAR(75)"
+        ))
+        connection.execute(text(
+            "ALTER TABLE feasibility_requests ALTER COLUMN marketing_remarks TYPE VARCHAR(100)"
+        ))
 
 
 def ensure_design_requests_table():

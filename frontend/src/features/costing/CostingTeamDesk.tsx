@@ -4,6 +4,7 @@ import { fetchCostingEstimationsApi, updateCostingEstimationApi } from "@/infras
 import { ProcessStageRibbon, StageStep } from "@/components/erp/ProcessStageRibbon";
 import { MetricRibbon, MetricTileItem } from "@/components/erp/MetricRibbon";
 import { DataTable, ColumnDef } from "@/components/erp/DataTable";
+import { DeskWorkspaceLayout } from "@/components/erp";
 import { StatusPill } from "@/components/ui/StatusPill";
 import {
   Search,
@@ -595,8 +596,121 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
     [copiedCode, selectedIds, filteredCostings]
   );
 
+  const hasActiveFilters = Boolean(
+    searchTerm || selectedVolumeTier !== "all" || selectedStageId !== "all" || quickFilter !== "none"
+  );
+
   return (
-    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-white dark:bg-zinc-950 select-text">
+    <DeskWorkspaceLayout
+      title="Costing & Margin Desk"
+      subtitle="BOM calculations, substrate & conversion costing, and pricing committee sign-off."
+      totalCount={costings.length}
+      totalLabel="Costings"
+      onRefresh={loadCostings}
+      onExportCSV={handleExportCSV}
+      exportDisabled={filteredCostings.length === 0}
+      customRibbon={
+        <>
+          {costingRequests.length > 0 && (
+            <section className="shrink-0 space-y-3 border-b border-teal-900/10 bg-teal-50/35 px-5 py-3.5 dark:border-white/[0.06] dark:bg-teal-950/10 sm:px-8">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-950 dark:text-white font-display">Costing Request Intake</h2>
+                  <p className="mt-0.5 text-xs text-slate-600 dark:text-zinc-400">Review specifications, offer a counter date, and submit the costing output path to Marketing.</p>
+                </div>
+                <span className="rounded-full bg-teal-800/10 px-2.5 py-1 font-mono text-xs font-bold text-teal-900 dark:text-teal-200">{costingRequests.length} open</span>
+              </div>
+              <div className="grid max-h-[30vh] grid-cols-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
+                {costingRequests.map((request) => (
+                  <button key={request.id} type="button" onClick={() => setSelectedCostingRequest(request)} className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] p-3 text-left transition hover:bg-teal-50 dark:hover:bg-teal-950/25 cursor-pointer shadow-2xs">
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-bold text-[var(--on-surface)]">{request.productDescription}</span>
+                      <span className="mt-1 block truncate text-[11px] text-[var(--on-surface-muted)]">{request.customer} · {request.srNumber} · Qty {Number(request.qtyDesignCosting || 0).toLocaleString()} {request.unitPcPack || "PC"}{request.unitPcPack === "Pack" ? ` (${request.qtyPerPack || 1} pc/pack)` : ""}</span>
+                      <span className="mt-1 block text-[10px] font-medium text-teal-700 dark:text-teal-300">Required {request.costingRequiredDate || "date missing"}</span>
+                    </span>
+                    <span className="shrink-0 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-bold text-white shadow-2xs">Inspect</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 1. Process Stage Ribbon */}
+          <ProcessStageRibbon
+            stages={stageSteps}
+            selectedStageId={selectedStageId}
+            onSelectStage={(id) => {
+              setSelectedStageId(id);
+              setQuickFilter("none");
+            }}
+          />
+
+          {/* 2. High-Density Metric Ribbon */}
+          <MetricRibbon metrics={metrics} />
+        </>
+      }
+      filterControls={
+        <div className="inline-flex bg-[var(--surface-low)] p-0.5 rounded-lg border border-[var(--border-subtle)] text-xs">
+          <button
+            type="button"
+            onClick={() => setSelectedVolumeTier("all")}
+            className={`h-7 px-3 rounded-md transition-colors text-xs font-semibold cursor-pointer ${
+              selectedVolumeTier === "all"
+                ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
+                : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+            }`}
+          >
+            All Volumes
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedVolumeTier("small")}
+            className={`h-7 px-3 rounded-md transition-colors text-xs font-semibold cursor-pointer ${
+              selectedVolumeTier === "small"
+                ? "bg-[var(--surface-lowest)] text-[var(--accent-primary)] shadow-2xs font-bold"
+                : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+            }`}
+          >
+            &lt; 30k pcs
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedVolumeTier("medium")}
+            className={`h-7 px-3 rounded-md transition-colors text-xs font-semibold cursor-pointer ${
+              selectedVolumeTier === "medium"
+                ? "bg-[var(--surface-lowest)] text-amber-600 shadow-2xs font-bold"
+                : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+            }`}
+          >
+            30k - 75k pcs
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedVolumeTier("large")}
+            className={`h-7 px-3 rounded-md transition-colors text-xs font-semibold cursor-pointer ${
+              selectedVolumeTier === "large"
+                ? "bg-[var(--surface-lowest)] text-emerald-600 shadow-2xs font-bold"
+                : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+            }`}
+          >
+            &gt; 75k pcs
+          </button>
+        </div>
+      }
+      search={{
+        value: searchTerm,
+        onChange: setSearchTerm,
+        placeholder: "Search Costing ID, Customer, Substrate…",
+      }}
+      hasActiveFilters={hasActiveFilters}
+      onResetFilters={() => {
+        setSearchTerm("");
+        setSelectedVolumeTier("all");
+        setSelectedStageId("all");
+        setQuickFilter("none");
+      }}
+      resetFiltersLabel="Reset"
+    >
       {/* Toast */}
       {toastMessage && (
         <div className="fixed top-16 right-5 z-[60] flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xl text-[12px] font-semibold border border-zinc-800 dark:border-zinc-200/80 max-w-sm animate-smooth-toast">
@@ -604,146 +718,6 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
           <span>{toastMessage}</span>
         </div>
       )}
-
-      {costingRequests.length > 0 && (
-        <section className="shrink-0 space-y-3 border-b border-teal-900/10 bg-teal-50/35 px-4 py-4 dark:border-white/[0.06] dark:bg-teal-950/10 sm:px-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-slate-950 dark:text-white">Costing Request Intake</h2>
-              <p className="mt-0.5 text-xs text-slate-600 dark:text-zinc-400">Review specifications, offer a counter date, and submit the costing output path to Marketing.</p>
-            </div>
-            <span className="rounded-full bg-teal-800/10 px-2.5 py-1 font-mono text-xs font-bold text-teal-900 dark:text-teal-200">{costingRequests.length} open</span>
-          </div>
-          <div className="grid max-h-[30vh] grid-cols-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
-            {costingRequests.map((request) => (
-              <button key={request.id} type="button" onClick={() => setSelectedCostingRequest(request)} className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-white p-3 text-left transition hover:bg-teal-50 dark:bg-zinc-900 dark:hover:bg-teal-950/25">
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-bold text-slate-900 dark:text-zinc-100">{request.productDescription}</span>
-                  <span className="mt-1 block truncate text-[11px] text-slate-600 dark:text-zinc-400">{request.customer} · {request.srNumber} · Qty {Number(request.qtyDesignCosting || 0).toLocaleString()} {request.unitPcPack || "PC"}{request.unitPcPack === "Pack" ? ` (${request.qtyPerPack || 1} pc/pack)` : ""}</span>
-                  <span className="mt-1 block text-[10px] font-medium text-teal-800 dark:text-teal-300">Required {request.costingRequiredDate || "date missing"}</span>
-                </span>
-                <span className="shrink-0 rounded-lg bg-teal-800 px-3 py-2 text-[11px] font-bold text-white dark:bg-teal-600">Inspect</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 1. Process Stage Ribbon */}
-      <ProcessStageRibbon
-        stages={stageSteps}
-        selectedStageId={selectedStageId}
-        onSelectStage={(id) => {
-          setSelectedStageId(id);
-          setQuickFilter("none");
-        }}
-      />
-
-      {/* 2. High-Density Metric Ribbon */}
-      <MetricRibbon metrics={metrics} />
-
-      {/* 3. Operational Command & Filter Toolbar */}
-      <div className="erp-command-bar px-4 sm:px-6 py-2.5 shrink-0 flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Filters & Search */}
-        <div className="flex items-center flex-wrap gap-2.5">
-          <div className="relative">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search Costing ID, Customer, Substrate… (Ctrl+K)"
-              className="h-9 w-60 sm:w-72 pl-9 pr-8 rounded-md border border-zinc-300 dark:border-white/15 bg-white dark:bg-zinc-900 text-[13px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 transition-colors font-sans"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Volume Tier Filter */}
-          <div className="inline-flex bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-md text-xs border border-zinc-200/60 dark:border-white/[0.05]">
-            <button
-              type="button"
-              onClick={() => setSelectedVolumeTier("all")}
-              className={`h-8 px-3.5 rounded transition-colors text-xs font-medium cursor-pointer ${
-                selectedVolumeTier === "all"
-                  ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 font-semibold shadow-xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-              }`}
-            >
-              All Volumes
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedVolumeTier("small")}
-              className={`h-8 px-3.5 rounded transition-colors text-xs font-medium cursor-pointer ${
-                selectedVolumeTier === "small"
-                  ? "bg-white dark:bg-zinc-700 text-brand-700 dark:text-brand-300 font-semibold shadow-xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-              }`}
-            >
-              &lt; 30k pcs
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedVolumeTier("medium")}
-              className={`h-8 px-3.5 rounded transition-colors text-xs font-medium cursor-pointer ${
-                selectedVolumeTier === "medium"
-                  ? "bg-white dark:bg-zinc-700 text-amber-700 dark:text-amber-300 font-semibold shadow-xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-              }`}
-            >
-              30k - 75k pcs
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedVolumeTier("large")}
-              className={`h-8 px-3.5 rounded transition-colors text-xs font-medium cursor-pointer ${
-                selectedVolumeTier === "large"
-                  ? "bg-white dark:bg-zinc-700 text-emerald-700 dark:text-emerald-300 font-semibold shadow-xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-              }`}
-            >
-              &gt; 75k pcs
-            </button>
-          </div>
-
-          {/* Reset */}
-          {(searchTerm || selectedVolumeTier !== "all" || selectedStageId !== "all" || quickFilter !== "none") && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm("");
-                setSelectedVolumeTier("all");
-                setSelectedStageId("all");
-                setQuickFilter("none");
-              }}
-              className="h-9 px-3.5 rounded-md border border-zinc-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900 text-xs text-zinc-600 dark:text-zinc-400 hover:text-rose-600 hover:border-rose-200 flex items-center gap-1.5 cursor-pointer transition-colors font-medium"
-            >
-              <X className="w-3.5 h-3.5" />
-              Reset
-            </button>
-          )}
-        </div>
-
-        {/* Right Actions */}
-        <div className="flex items-center gap-2 shrink-0 ml-auto">
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="h-9 px-4 rounded-md border border-zinc-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
-          </button>
-        </div>
-      </div>
 
       {/* 4. Dense Data Table */}
       <DataTable
@@ -781,7 +755,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         onSubmit={handleSubmitCostingOutput}
         onOfferCounterDate={handleOfferCostingCounterDate}
       />
-    </div>
+    </DeskWorkspaceLayout>
   );
 };
 

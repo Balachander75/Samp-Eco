@@ -337,9 +337,10 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
   // Delete Request from Database
   const handleDeleteRequest = async (req: SampleRequestItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const reqCode = req.srNumber || req.materialCode || `FC-${String(req.id).padStart(4, "0")}`;
     if (
       !window.confirm(
-        `Permanently delete request ${req.srNumber} (${req.customer}) from database and reset sample codes? (Testing mode)`
+        `Permanently delete request ${reqCode} (${req.customer || "Unspecified"}) from database? (Testing mode)`
       )
     )
       return;
@@ -352,13 +353,13 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
           setSelectedRequest(null);
         }
         await loadRequests();
-        showToast(`✓ Request ${req.srNumber} deleted and sample codes reset.`);
+        showToast(`✓ Request ${reqCode} deleted.`);
       } else {
-        showToast(`Failed to delete request ${req.srNumber} from database.`);
+        showToast(`Failed to delete request ${reqCode} from database.`);
       }
     } catch (err) {
       console.error("Failed to delete request:", err);
-      showToast(`Error deleting request ${req.srNumber}.`);
+      showToast(err instanceof Error ? err.message : `Error deleting request ${reqCode}.`);
     }
   };
 
@@ -482,10 +483,10 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
         const created = await createFeasibilityRequestApi({
           customer: newForm.customer || "",
           feasibilityType: newForm.feasibilityType || "new_category",
-          customFeasibilityType: newForm.customFeasibilityType,
-          descriptionNotes: (newForm as any).descriptionNotes || newForm.feasibilityDescription || newForm.productDescription || "",
+          customFeasibilityType: newForm.customFeasibilityType ? newForm.customFeasibilityType.trim().slice(0, 25) : null,
+          descriptionNotes: (newForm.feasibilityDescription || (newForm as any).descriptionNotes || newForm.productDescription || "").trim().slice(0, 75),
           requiredDate: newForm.sampleRequiredDate || "",
-          marketingRemarks: newForm.marketingRemarks,
+          marketingRemarks: newForm.marketingRemarks ? newForm.marketingRemarks.trim().slice(0, 100) : null,
           referenceImages: newForm.referenceImages || [],
           referenceImageNames: newForm.referenceImageNames || [],
           referenceLinks: newForm.referenceLinks || [],

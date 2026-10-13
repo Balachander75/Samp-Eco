@@ -4,7 +4,6 @@ from app.models.feasibility import (
     FeasibilityActivityLog,
     FeasibilityReferenceImage,
     FeasibilityRequest,
-    FeasibilityTechnicalAttachment,
 )
 from app.models.master import Customer, Plant, User
 from app.models.program_request import (
@@ -30,7 +29,6 @@ __all__ = [
     "FeasibilityActivityLog",
     "FeasibilityReferenceImage",
     "FeasibilityRequest",
-    "FeasibilityTechnicalAttachment",
     "Plant",
     "ProductCharacteristic",
     "ProductDetail",

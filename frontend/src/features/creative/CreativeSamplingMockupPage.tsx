@@ -20,8 +20,9 @@ import { SampleRequestItem } from "@/features/sample-requests/types";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { PaginationBar } from "@/components/erp/PaginationBar";
+import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
 import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { Select } from "@/components/ui/Select";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 import { getBusinessYearForDate } from "@/lib/businessYear";
@@ -322,316 +323,197 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
     }
   };
 
+  const kpiItems = [
+    {
+      label: "All Active",
+      value: isLoading ? "—" : totalCombined,
+      detail: "Active deliverables queue",
+      color: "bg-[var(--accent-primary)]",
+      isActive: selectedStageTab === "all",
+      onClick: () => {
+        setSelectedStageTab("all");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Needs Studio Brief",
+      value: isLoading ? "—" : awaitingHandoffCount,
+      detail: "Awaiting CAD intake",
+      color: "bg-amber-500",
+      isActive: selectedStageTab === "awaiting_handoff",
+      onClick: () => {
+        setSelectedStageTab("awaiting_handoff");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "CAD Mockups",
+      value: isLoading ? "—" : mockupCount,
+      detail: "3D render pipeline",
+      color: "bg-teal-500",
+      isActive: selectedStageTab === "mockup_only",
+      onClick: () => {
+        setSelectedStageTab("mockup_only");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Plant Samples",
+      value: isLoading ? "—" : sampleCount,
+      detail: "Physical fabrication",
+      color: "bg-purple-500",
+      isActive: selectedStageTab === "sample_only",
+      onClick: () => {
+        setSelectedStageTab("sample_only");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Dual Scope",
+      value: isLoading ? "—" : bothCount,
+      detail: "Sample + CAD packages",
+      color: "bg-emerald-500",
+      isActive: selectedStageTab === "both",
+      onClick: () => {
+        setSelectedStageTab("both");
+        setCurrentPage(1);
+      },
+    },
+  ];
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] select-text font-sans overflow-hidden">
-      {/* ── 1. Compact Editorial Header (Maximized Space for Deliverables) ── */}
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--on-surface)] font-display">
-                Sampling &amp; CAD Mockup Deliverables
-              </h1>
-              <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
-                BY {selectedYear === "ALL" ? "Consolidated" : selectedYear}
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
-                {samplingMockupItems.length} Total
-              </span>
-              {mockupCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 shrink-0">
-                  <Activity className="w-3 h-3 text-teal-500 animate-pulse" />
-                  <span>{mockupCount} CAD Simulations</span>
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 text-xs text-[var(--on-surface-muted)]">
-              Physical prototypes, 3D CAD simulations, structural mockups, and plant fabrication handoffs.
-            </p>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={handleRefreshClick}
-              disabled={isLoading || isRefreshing}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
-              title="Refresh Queue"
-            >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${
-                  isLoading || isRefreshing
-                    ? "animate-spin text-[var(--accent-primary)]"
-                    : "text-[var(--on-surface-subtle)]"
-                }`}
-              />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            {/* Export CSV */}
-            <button
-              type="button"
-              onClick={handleExportClick}
-              disabled={filteredItems.length === 0}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
-              title="Export Filtered CSV"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── 2. Interactive KPI Workflow Strip (Direct Queue Filters) ── */}
-      <section
-        aria-label="Sampling & mockup workflow summary"
-        className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2.5 sm:px-8"
-      >
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+    <DeskWorkspaceLayout
+      title="Sampling & CAD Mockup Deliverables"
+      subtitle="Physical prototypes, 3D CAD simulations, structural mockups, and plant fabrication handoffs."
+      businessYear={selectedYear === "ALL" ? "Consolidated" : selectedYear}
+      totalCount={samplingMockupItems.length}
+      extraBadges={
+        mockupCount > 0 ? (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 shrink-0">
+            <Activity className="w-3 h-3 text-teal-500 animate-pulse" />
+            <span>{mockupCount} CAD Simulations</span>
+          </span>
+        ) : null
+      }
+      onRefresh={handleRefreshClick}
+      isRefreshing={isLoading || isRefreshing}
+      onExportCSV={handleExportClick}
+      exportDisabled={filteredItems.length === 0}
+      kpiItems={kpiItems}
+      extraFilterControls={
+        <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5">
           {[
-            {
-              label: "All Active",
-              value: totalCombined,
-              detail: "Active deliverables queue",
-              color: "bg-[var(--accent-primary)]",
-              filter: "all" as const,
-            },
-            {
-              label: "Needs Studio Brief",
-              value: awaitingHandoffCount,
-              detail: "Awaiting CAD intake",
-              color: "bg-amber-500",
-              filter: "awaiting_handoff" as const,
-            },
-            {
-              label: "CAD Mockups",
-              value: mockupCount,
-              detail: "3D render pipeline",
-              color: "bg-teal-500",
-              filter: "mockup_only" as const,
-            },
-            {
-              label: "Plant Samples",
-              value: sampleCount,
-              detail: "Physical fabrication",
-              color: "bg-purple-500",
-              filter: "sample_only" as const,
-            },
-            {
-              label: "Dual Scope",
-              value: bothCount,
-              detail: "Sample + CAD packages",
-              color: "bg-emerald-500",
-              filter: "both" as const,
-            },
+            { id: "all" as const, label: "All Scopes", icon: Layers, count: typeCounts.all },
+            { id: "mockup" as const, label: "CAD Mockups", icon: Box, count: typeCounts.mockup },
+            { id: "sample" as const, label: "Plant Samples", icon: FlaskConical, count: typeCounts.sample },
+            { id: "both" as const, label: "Dual Scope", icon: Sparkles, count: typeCounts.both },
           ].map((item) => {
-            const isSelected = selectedStageTab === item.filter;
-
+            const isSelected = selectedScopeFilter === item.id;
             return (
               <button
-                key={item.label}
+                key={item.id}
                 type="button"
                 onClick={() => {
-                  setSelectedStageTab(item.filter);
+                  setSelectedScopeFilter(item.id);
                   setCurrentPage(1);
                 }}
-                className={`min-w-0 rounded-xl border p-2.5 text-left shadow-2xs transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer select-none ${
                   isSelected
-                    ? "border-[var(--accent-primary)] bg-[var(--surface-lowest)] ring-2 ring-[var(--accent-primary)]/20"
-                    : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-low)]"
+                    ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${item.color}`} />
-                    <span className="truncate">{item.label}</span>
-                  </div>
-                  {isSelected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)]" />
-                  )}
-                </div>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-lg font-display font-bold tabular-nums text-[var(--on-surface)]">
-                    {isLoading ? "—" : item.value}
-                  </span>
-                  <span className="truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
-                    {item.detail}
-                  </span>
-                </div>
+                <item.icon className="w-3.5 h-3.5" />
+                <span>{item.label}</span>
+                <span
+                  className={`text-[10px] font-mono px-1 py-0.2 rounded-full ${
+                    isSelected
+                      ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
+                      : "text-[var(--on-surface-subtle)]"
+                  }`}
+                >
+                  {item.count}
+                </span>
               </button>
             );
           })}
         </div>
-      </section>
+      }
+      filterControls={
+        <>
+          {plantList.length > 0 && (
+            <Select
+              aria-label="Filter by plant"
+              value={plantFilter}
+              onChange={(e) => {
+                setPlantFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[140px] max-w-[170px]"
+              options={[
+                { value: "all", label: `All Plants (${plantList.length})` },
+                ...plantList.map((p) => ({ value: p, label: p })),
+              ]}
+            />
+          )}
 
-      {/* ── 3. Compact Filter Controls (Single h-8 Row) ── */}
-      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-2 sm:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          {/* Search and relevant filters */}
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {/* Search Box */}
-            <div className="relative w-52 sm:w-64 group">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] group-focus-within:text-[var(--accent-primary)] transition-colors pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search SR#, product, customer..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full h-8 pl-8 pr-7 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] shadow-2xs transition-all"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setCurrentPage(1);
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors cursor-pointer"
-                  title="Clear search"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
+          {customerList.length > 0 && (
+            <Select
+              aria-label="Filter by customer"
+              value={customerFilter}
+              onChange={(e) => {
+                setCustomerFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[150px] max-w-[180px]"
+              options={[
+                { value: "all", label: `All Brands (${customerList.length})` },
+                ...customerList.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          )}
 
-            {/* Scope Filter Tabs */}
-            <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5">
-              {[
-                { id: "all" as const, label: "All Scopes", icon: Layers, count: typeCounts.all },
-                { id: "mockup" as const, label: "CAD Mockups", icon: Box, count: typeCounts.mockup },
-                { id: "sample" as const, label: "Plant Samples", icon: FlaskConical, count: typeCounts.sample },
-                { id: "both" as const, label: "Dual Scope", icon: Sparkles, count: typeCounts.both },
-              ].map((item) => {
-                const isSelected = selectedScopeFilter === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedScopeFilter(item.id);
-                      setCurrentPage(1);
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer select-none ${
-                      isSelected
-                        ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
-                        : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
-                    }`}
-                  >
-                    <item.icon className="w-3.5 h-3.5" />
-                    <span>{item.label}</span>
-                    <span
-                      className={`text-[10px] font-mono px-1 py-0.2 rounded-full ${
-                        isSelected
-                          ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
-                          : "text-[var(--on-surface-subtle)]"
-                      }`}
-                    >
-                      {item.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+          {categoryList.length > 0 && (
+            <Select
+              aria-label="Filter by category"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[150px] max-w-[180px]"
+              options={[
+                { value: "all", label: `All Categories (${categoryList.length})` },
+                ...categoryList.map((cat) => ({ value: cat, label: cat })),
+              ]}
+            />
+          )}
 
-            {/* Plant Filter */}
-            {plantList.length > 0 && (
-              <select
-                aria-label="Filter by plant"
-                value={plantFilter}
-                onChange={(e) => {
-                  setPlantFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-8 max-w-[160px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
-                title="Filter by Target Manufacturing Plant"
-              >
-                <option value="all">All Plants ({plantList.length})</option>
-                {plantList.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Customer Filter */}
-            {customerList.length > 0 && (
-              <select
-                aria-label="Filter by customer"
-                value={customerFilter}
-                onChange={(e) => {
-                  setCustomerFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-8 max-w-[160px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
-                title="Filter by Customer / Brand"
-              >
-                <option value="all">All Brands ({customerList.length})</option>
-                {customerList.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Category Filter */}
-            {categoryList.length > 0 && (
-              <select
-                aria-label="Filter by category"
-                value={categoryFilter}
-                onChange={(e) => {
-                  setCategoryFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-8 max-w-[160px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
-                title="Filter by Product Category"
-              >
-                <option value="all">All Categories ({categoryList.length})</option>
-                {categoryList.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Batch Controls & Reset Button */}
-          <div className="flex items-center gap-2 shrink-0 justify-end">
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-1.5 mr-1">
-                <button
-                  type="button"
-                  onClick={() => setSelectedIds(new Set())}
-                  className="text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] text-[11px] underline px-1 cursor-pointer font-mono"
-                >
-                  Clear ({selectedIds.size})
-                </button>
-              </div>
-            )}
-
-            {/* Clear All Filters */}
-            {hasActiveFilters && (
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-1.5 ml-auto">
               <button
                 type="button"
-                onClick={handleResetFilters}
-                className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-xs text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] flex items-center gap-1 transition-colors cursor-pointer shrink-0"
-                title="Reset all search and dropdown filters"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] text-[11px] underline px-1 cursor-pointer font-mono"
               >
-                <X className="w-3 h-3" />
-                <span className="hidden sm:inline">Reset</span>
+                Clear ({selectedIds.size})
               </button>
-            )}
-          </div>
-        </div>
-      </div>
+            </div>
+          )}
+        </>
+      }
+      search={{
+        value: searchTerm,
+        onChange: (val) => {
+          setSearchTerm(val);
+          setCurrentPage(1);
+        },
+        placeholder: "Search SR#, product, customer...",
+      }}
+      hasActiveFilters={hasActiveFilters}
+      onResetFilters={handleResetFilters}
+      resetFiltersLabel="Reset Filters"
+    >
 
       {/* ── 4. Main Workspace: Full-Bleed High-Density Table (Exact Marketing Sampling Standard) ── */}
       <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col text-[var(--on-surface)]">
@@ -874,7 +756,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
           </div>
         </div>
       </div>
-    </div>
+    </DeskWorkspaceLayout>
   );
 };
 

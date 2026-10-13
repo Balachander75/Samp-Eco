@@ -20,8 +20,9 @@ import type { SampleRequestItem } from "@/features/sample-requests/types";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { PaginationBar } from "@/components/erp/PaginationBar";
+import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
 import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { Select } from "@/components/ui/Select";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 import { DielineItem } from "./types";
@@ -225,292 +226,141 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
     }
   };
 
+  const kpiItems = [
+    {
+      label: "All Sampling Deliverables",
+      value: totalCount,
+      detail: "Technical CAD & prototypes",
+      color: "bg-indigo-500",
+      isActive: selectedKpiFilter === "all",
+      onClick: () => {
+        setSelectedKpiFilter("all");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Awaiting Link / Path",
+      value: pendingCount,
+      detail: "Pending deliverable link",
+      color: "bg-amber-500",
+      isActive: selectedKpiFilter === "pending",
+      onClick: () => {
+        setSelectedKpiFilter("pending");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Output Submitted",
+      value: submittedCount,
+      detail: "CAD & sampling published",
+      color: "bg-emerald-500",
+      isActive: selectedKpiFilter === "submitted",
+      onClick: () => {
+        setSelectedKpiFilter("submitted");
+        setCurrentPage(1);
+      },
+    },
+  ];
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] select-text font-sans overflow-hidden">
-      {/* ── 1. Compact Editorial Header ── */}
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="p-1 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 shrink-0">
-                <Scissors className="w-3.5 h-3.5" />
-              </span>
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--on-surface)] font-display">
-                Studio Sampling &amp; CAD Deliverables
-              </h1>
-              <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
-                BY {selectedYear === "ALL" ? "Consolidated" : selectedYear}
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
-                {totalCount} Deliverables
-              </span>
-              {pendingCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0">
-                  <Activity className="w-3 h-3 text-amber-500 animate-pulse" />
-                  <span>{pendingCount} Awaiting Link/Path</span>
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 text-xs text-[var(--on-surface-muted)]">
-              Inspect technical product dockets and provide CAD dieline or sampling output link or network file path to Marketing.
-            </p>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleExportCSVClick}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-xs font-semibold text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors shadow-2xs cursor-pointer"
-              title="Export CSV"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Export CSV</span>
-            </button>
-            {onRefresh && (
-              <button
-                type="button"
-                onClick={handleRefreshClick}
-                disabled={isRefreshing || isLoading}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-xs font-semibold text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
-                title="Refresh Deliverables"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* ── 2. Interactive KPI Strip (3 Cards) ── */}
-      <section
-        aria-label="Studio sampling KPI summary"
-        className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-3 px-5 py-3 sm:px-8 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)]/50"
-      >
-        {/* Card 1: All Deliverables */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            setSelectedKpiFilter("all");
-            setCurrentPage(1);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setSelectedKpiFilter("all");
-              setCurrentPage(1);
-            }
-          }}
-          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
-            selectedKpiFilter === "all"
-              ? "bg-indigo-500/10 border-indigo-500/40 shadow-xs"
-              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
-          }`}
-        >
-          <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-              All Sampling Deliverables
-            </span>
-            <div className="text-xl font-bold font-mono tracking-tight text-[var(--on-surface)] mt-0.5">
-              {totalCount}
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-700 dark:text-indigo-400">
-            <Layers className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Card 2: Awaiting Link / Path */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            setSelectedKpiFilter("pending");
-            setCurrentPage(1);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setSelectedKpiFilter("pending");
-              setCurrentPage(1);
-            }
-          }}
-          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
-            selectedKpiFilter === "pending"
-              ? "bg-amber-500/10 border-amber-500/40 shadow-xs"
-              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
-          }`}
-        >
-          <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-              Awaiting Link / Path
-            </span>
-            <div className="text-xl font-bold font-mono tracking-tight text-amber-700 dark:text-amber-400 mt-0.5">
-              {pendingCount}
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-700 dark:text-amber-400">
-            <Clock className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Card 3: Output Submitted */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            setSelectedKpiFilter("submitted");
-            setCurrentPage(1);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setSelectedKpiFilter("submitted");
-              setCurrentPage(1);
-            }
-          }}
-          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
-            selectedKpiFilter === "submitted"
-              ? "bg-emerald-500/10 border-emerald-500/40 shadow-xs"
-              : "bg-[var(--surface-lowest)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
-          }`}
-        >
-          <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-              Output Submitted
-            </span>
-            <div className="text-xl font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-400 mt-0.5">
-              {submittedCount}
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
-        </div>
-      </section>
-
-      {/* ── 3. Single Row Filter Toolbar (h-8) ── */}
-      <section
-        aria-label="Deliverable filter toolbar"
-        className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-2 sm:px-8 flex flex-wrap items-center gap-2 text-xs"
-      >
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] pointer-events-none" />
-          <input
-            type="text"
-            value={searchTerm}
+    <DeskWorkspaceLayout
+      title="Studio Sampling & CAD Deliverables"
+      subtitle="Inspect technical product dockets and provide CAD dieline or sampling output link or network file path to Marketing."
+      businessYear={selectedYear === "ALL" ? "Consolidated" : selectedYear}
+      totalCount={totalCount}
+      totalLabel="Deliverables"
+      extraBadges={
+        pendingCount > 0 ? (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0">
+            <Activity className="w-3 h-3 text-amber-500 animate-pulse" />
+            <span>{pendingCount} Awaiting Link/Path</span>
+          </span>
+        ) : null
+      }
+      onRefresh={handleRefreshClick}
+      isRefreshing={isRefreshing || isLoading}
+      onExportCSV={handleExportCSVClick}
+      exportDisabled={filteredRequests.length === 0}
+      kpiItems={kpiItems}
+      kpiGridCols="grid-cols-1 sm:grid-cols-3"
+      filterControls={
+        <>
+          <Select
+            aria-label="Filter deliverables by status"
+            value={selectedKpiFilter}
             onChange={(e) => {
-              setSearchTerm(e.target.value);
+              setSelectedKpiFilter(e.target.value as "all" | "pending" | "submitted");
               setCurrentPage(1);
             }}
-            placeholder="Search SR, product, customer, link/path..."
-            className="w-full h-8 pl-8 pr-7 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] focus:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none transition"
+            className="min-w-[150px] max-w-[190px]"
+            options={[
+              { value: "all", label: "Status: All Deliverables" },
+              { value: "pending", label: "Status: Awaiting Link / Path" },
+              { value: "submitted", label: "Status: Output Submitted" },
+            ]}
           />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm("");
+
+          {uniqueCategories.length > 0 && (
+            <Select
+              aria-label="Filter deliverables by category"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+              className="min-w-[150px] max-w-[180px]"
+              options={[
+                { value: "all", label: `Category: All (${uniqueCategories.length})` },
+                ...uniqueCategories.map((cat) => ({ value: cat, label: cat })),
+              ]}
+            />
           )}
-        </div>
 
-        {/* Status / KPI Dropdown */}
-        <select
-          value={selectedKpiFilter}
-          aria-label="Filter deliverables by status"
-          onChange={(e) => {
-            setSelectedKpiFilter(e.target.value as "all" | "pending" | "submitted");
-            setCurrentPage(1);
-          }}
-          className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer"
-        >
-          <option value="all">Status: All Deliverables</option>
-          <option value="pending">Status: Awaiting Link / Path</option>
-          <option value="submitted">Status: Output Submitted</option>
-        </select>
+          {uniqueCustomers.length > 0 && (
+            <Select
+              aria-label="Filter deliverables by customer"
+              value={customerFilter}
+              onChange={(e) => {
+                setCustomerFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[150px] max-w-[180px]"
+              options={[
+                { value: "all", label: `Customer: All (${uniqueCustomers.length})` },
+                ...uniqueCustomers.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          )}
 
-        {/* Category Dropdown */}
-        {uniqueCategories.length > 0 && (
-          <select
-            value={categoryFilter}
-            aria-label="Filter deliverables by category"
-            onChange={(e) => {
-              setCategoryFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer max-w-[170px] truncate"
-          >
-            <option value="all">Category: All</option>
-            {uniqueCategories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Customer Dropdown */}
-        {uniqueCustomers.length > 0 && (
-          <select
-            value={customerFilter}
-            aria-label="Filter deliverables by customer"
-            onChange={(e) => {
-              setCustomerFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer max-w-[170px] truncate"
-          >
-            <option value="all">Customer: All</option>
-            {uniqueCustomers.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Plant Dropdown */}
-        {uniquePlants.length > 1 && (
-          <select
-            value={plantFilter}
-            aria-label="Filter deliverables by plant"
-            onChange={(e) => {
-              setPlantFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] hover:bg-[var(--surface-lowest)] focus:border-[var(--accent-primary)] outline-none cursor-pointer"
-          >
-            <option value="all">Plant: All Plants</option>
-            {uniquePlants.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Reset Filter Button */}
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="h-8 px-2.5 rounded-lg border border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
-            title="Reset All Filters"
-          >
-            <X className="w-3 h-3" />
-            <span>Reset</span>
-          </button>
-        )}
-      </section>
+          {uniquePlants.length > 1 && (
+            <Select
+              aria-label="Filter deliverables by plant"
+              value={plantFilter}
+              onChange={(e) => {
+                setPlantFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[130px] max-w-[160px]"
+              options={[
+                { value: "all", label: "Plant: All Plants" },
+                ...uniquePlants.map((p) => ({ value: p, label: `Plant ${p}` })),
+              ]}
+            />
+          )}
+        </>
+      }
+      search={{
+        value: searchTerm,
+        onChange: (val) => {
+          setSearchTerm(val);
+          setCurrentPage(1);
+        },
+        placeholder: "Search SR, product, customer, link/path...",
+      }}
+      hasActiveFilters={hasActiveFilters}
+      onResetFilters={handleResetFilters}
+      resetFiltersLabel="Reset"
+    >
 
       {/* ── 4. High-Density Full-Bleed Table ── */}
       <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-lowest)]">
@@ -737,7 +587,7 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
         pageSize={pageSize}
         onPageChange={setCurrentPage}
       />
-    </div>
+    </DeskWorkspaceLayout>
   );
 };
 

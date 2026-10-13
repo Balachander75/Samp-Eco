@@ -6,3 +6,4 @@ export * from "./CustomerCombobox";
 export * from "./WorkflowTabStrip";
 export * from "./PaginationBar";
 export * from "./TableSkeletonRows";
+export * from "./DeskWorkspaceLayout";

@@ -17,8 +17,9 @@ import { UserProfile } from "@/features/auth";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { PaginationBar } from "@/components/erp/PaginationBar";
+import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
 import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { Select } from "@/components/ui/Select";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 import { mergeWithWorkflowState } from "@/features/sample-requests/utils/designWorkflowStorage";
@@ -333,341 +334,221 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
     });
   };
 
+  const kpiItems = [
+    {
+      label: "All Active",
+      value: metrics.total,
+      detail: "Active artwork queue",
+      color: "bg-[var(--accent-primary)]",
+      isActive: selectedStageTab === "all",
+      onClick: () => {
+        setSelectedStageTab("all");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Brief Intake",
+      value: metrics.intake,
+      detail: "Needs concept start",
+      color: "bg-teal-500",
+      isActive: selectedStageTab === "intake",
+      onClick: () => {
+        setSelectedStageTab("intake");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "In Concept",
+      value: metrics.concept,
+      detail: "Under artwork design",
+      color: "bg-purple-500",
+      isActive: selectedStageTab === "concept",
+      onClick: () => {
+        setSelectedStageTab("concept");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Client Review",
+      value: metrics.review,
+      detail: "Proof sent for approval",
+      color: "bg-sky-500",
+      isActive: selectedStageTab === "review",
+      onClick: () => {
+        setSelectedStageTab("review");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Revisions",
+      value: metrics.revisions,
+      detail: "Changes requested",
+      color: "bg-rose-500",
+      isActive: selectedStageTab === "revisions",
+      onClick: () => {
+        setSelectedStageTab("revisions");
+        setCurrentPage(1);
+      },
+    },
+    {
+      label: "Prepress Approved",
+      value: metrics.approved,
+      detail: "Press-ready certified",
+      color: "bg-emerald-500",
+      isActive: selectedStageTab === "approved",
+      onClick: () => {
+        setSelectedStageTab("approved");
+        setCurrentPage(1);
+      },
+    },
+  ];
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] select-text font-sans overflow-hidden">
-      {/* ── 1. Compact Editorial Header (Maximized Space for Briefs) ── */}
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--on-surface)] font-display">
-                Packaging Artwork &amp; Design Briefs
-              </h1>
-              <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
-                BY {selectedYear}
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
-                {unifiedDesigns.length} Total
-              </span>
-            </div>
-            <p className="mt-0.5 text-xs text-[var(--on-surface-muted)]">
-              Graphic packaging concepts, brand typography, and prepress proof reviews.
-            </p>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Create New Brief Button */}
-            {onOpenNewBriefModal && (
-              <button
-                type="button"
-                onClick={onOpenNewBriefModal}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] shadow-2xs cursor-pointer active:scale-98"
-                title="Create New Artwork Brief"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Design Brief</span>
-              </button>
-            )}
-
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={handleRefreshClick}
-              disabled={isRefreshing}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
-              title="Refresh Queue"
-            >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${
-                  isRefreshing ? "animate-spin text-[var(--accent-primary)]" : "text-[var(--on-surface-subtle)]"
-                }`}
-              />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            {/* Export CSV */}
-            <button
-              type="button"
-              onClick={handleExportClick}
-              disabled={filteredDesigns.length === 0}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
-              title="Export Filtered CSV"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── 2. Interactive KPI Workflow Strip (Direct Queue Filters) ── */}
-      <section
-        aria-label="Creative design workflow summary"
-        className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2.5 sm:px-8"
-      >
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+    <DeskWorkspaceLayout
+      title="Packaging Artwork & Design Briefs"
+      subtitle="Graphic packaging concepts, brand typography, and prepress proof reviews."
+      businessYear={selectedYear}
+      totalCount={unifiedDesigns.length}
+      primaryAction={
+        onOpenNewBriefModal
+          ? {
+              label: "New Design Brief",
+              icon: Plus,
+              onClick: onOpenNewBriefModal,
+              title: "Create New Artwork Brief",
+            }
+          : undefined
+      }
+      onRefresh={handleRefreshClick}
+      isRefreshing={isRefreshing}
+      onExportCSV={handleExportClick}
+      exportDisabled={filteredDesigns.length === 0}
+      kpiItems={kpiItems}
+      kpiGridCols="grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
+      extraFilterControls={
+        <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5">
           {[
-            {
-              label: "All Active",
-              value: metrics.total,
-              detail: "Active artwork queue",
-              color: "bg-[var(--accent-primary)]",
-              filter: "all" as const,
-            },
-            {
-              label: "Brief Intake",
-              value: metrics.intake,
-              detail: "Needs concept start",
-              color: "bg-teal-500",
-              filter: "intake" as const,
-            },
-            {
-              label: "In Concept",
-              value: metrics.concept,
-              detail: "Under artwork design",
-              color: "bg-purple-500",
-              filter: "concept" as const,
-            },
-            {
-              label: "Client Review",
-              value: metrics.review,
-              detail: "Proof sent for approval",
-              color: "bg-sky-500",
-              filter: "review" as const,
-            },
-            {
-              label: "Revisions",
-              value: metrics.revisions,
-              detail: "Changes requested",
-              color: "bg-rose-500",
-              filter: "revisions" as const,
-            },
-            {
-              label: "Prepress Approved",
-              value: metrics.approved,
-              detail: "Press-ready certified",
-              color: "bg-emerald-500",
-              filter: "approved" as const,
-            },
+            { id: "all" as const, label: "All Scopes", icon: Layers, count: typeCounts.all },
+            { id: "brief" as const, label: "Studio Briefs", icon: Palette, count: typeCounts.brief },
+            { id: "request" as const, label: "Commercial SR", icon: Package, count: typeCounts.request },
           ].map((item) => {
-            const isSelected = selectedStageTab === item.filter;
-
+            const isSelected = selectedScopeFilter === item.id;
             return (
               <button
-                key={item.label}
+                key={item.id}
                 type="button"
                 onClick={() => {
-                  setSelectedStageTab(item.filter);
+                  setSelectedScopeFilter(item.id);
                   setCurrentPage(1);
                 }}
-                className={`min-w-0 rounded-xl border p-2.5 text-left shadow-2xs transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer select-none ${
                   isSelected
-                    ? "border-[var(--accent-primary)] bg-[var(--surface-lowest)] ring-2 ring-[var(--accent-primary)]/20"
-                    : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-low)]"
+                    ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${item.color}`} />
-                    <span className="truncate">{item.label}</span>
-                  </div>
-                  {isSelected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)]" />
-                  )}
-                </div>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-lg font-display font-bold tabular-nums text-[var(--on-surface)]">
-                    {item.value}
-                  </span>
-                  <span className="truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
-                    {item.detail}
-                  </span>
-                </div>
+                <item.icon className="w-3.5 h-3.5" />
+                <span>{item.label}</span>
+                <span
+                  className={`text-[10px] font-mono px-1 py-0.2 rounded-full ${
+                    isSelected
+                      ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
+                      : "text-[var(--on-surface-subtle)]"
+                  }`}
+                >
+                  {item.count}
+                </span>
               </button>
             );
           })}
         </div>
-      </section>
+      }
+      filterControls={
+        <>
+          {trendList.length > 0 && (
+            <Select
+              aria-label="Filter by theme / trend"
+              value={trendFilter}
+              onChange={(e) => {
+                setTrendFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[140px] max-w-[180px]"
+              options={[
+                { value: "all", label: `All Themes (${trendList.length})` },
+                ...trendList.map((t) => ({ value: t, label: t })),
+              ]}
+            />
+          )}
 
-      {/* ── 3. Compact Filter Controls (Single h-8 Row) ── */}
-      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-2 sm:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          {/* Search and relevant filters */}
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {/* Search Box */}
-            <div className="relative w-52 sm:w-64 group">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--on-surface-subtle)] group-focus-within:text-[var(--accent-primary)] transition-colors pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search ref, title, brand, designer..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full h-8 pl-8 pr-7 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] shadow-2xs transition-all"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setCurrentPage(1);
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors cursor-pointer"
-                  title="Clear search"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
+          {customerList.length > 0 && (
+            <Select
+              aria-label="Filter by customer"
+              value={customerFilter}
+              onChange={(e) => {
+                setCustomerFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[150px] max-w-[180px]"
+              options={[
+                { value: "all", label: `All Brands (${customerList.length})` },
+                ...customerList.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          )}
 
-            {/* Scope Filter Tabs */}
-            <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5">
-              {[
-                { id: "all" as const, label: "All Scopes", icon: Layers, count: typeCounts.all },
-                { id: "brief" as const, label: "Studio Briefs", icon: Palette, count: typeCounts.brief },
-                { id: "request" as const, label: "Commercial SR", icon: Package, count: typeCounts.request },
-              ].map((item) => {
-                const isSelected = selectedScopeFilter === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedScopeFilter(item.id);
-                      setCurrentPage(1);
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer select-none ${
-                      isSelected
-                        ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
-                        : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
-                    }`}
-                  >
-                    <item.icon className="w-3.5 h-3.5" />
-                    <span>{item.label}</span>
-                    <span
-                      className={`text-[10px] font-mono px-1 py-0.2 rounded-full ${
-                        isSelected
-                          ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
-                          : "text-[var(--on-surface-subtle)]"
-                      }`}
-                    >
-                      {item.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+          {designerList.length > 0 && (
+            <Select
+              aria-label="Filter by designer"
+              value={designerFilter}
+              onChange={(e) => {
+                setDesignerFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="min-w-[150px] max-w-[180px]"
+              options={[
+                { value: "all", label: `All Designers (${designerList.length})` },
+                ...designerList.map((d) => ({ value: d, label: d })),
+              ]}
+            />
+          )}
 
-            {/* Theme / Trend Filter */}
-            {trendList.length > 0 && (
-              <select
-                aria-label="Filter by theme / trend"
-                value={trendFilter}
-                onChange={(e) => {
-                  setTrendFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-8 max-w-[170px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
-                title="Filter by Design Theme or Trend"
-              >
-                <option value="all">All Themes ({trendList.length})</option>
-                {trendList.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Customer Filter */}
-            {customerList.length > 0 && (
-              <select
-                aria-label="Filter by customer"
-                value={customerFilter}
-                onChange={(e) => {
-                  setCustomerFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-8 max-w-[160px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
-                title="Filter by Customer / Brand"
-              >
-                <option value="all">All Brands ({customerList.length})</option>
-                {customerList.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Designer Filter */}
-            {designerList.length > 0 && (
-              <select
-                aria-label="Filter by designer"
-                value={designerFilter}
-                onChange={(e) => {
-                  setDesignerFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-8 max-w-[160px] truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 text-xs font-medium text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] cursor-pointer"
-                title="Filter by Assigned Designer"
-              >
-                <option value="all">All Designers ({designerList.length})</option>
-                {designerList.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Batch Controls & Reset Button */}
-          <div className="flex items-center gap-2 shrink-0 justify-end">
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-1.5 mr-1">
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedIds(new Set());
-                    }}
-                    className="h-8 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition"
-                    title="Clear selected items"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Selected ({selectedIds.size})</span>
-                  </button>
-                )}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              {isAdmin && (
                 <button
                   type="button"
                   onClick={() => setSelectedIds(new Set())}
-                  className="text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] text-[11px] underline px-1 cursor-pointer"
+                  className="h-8 px-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition"
+                  title="Clear selected items"
                 >
-                  Clear ({selectedIds.size})
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Selected ({selectedIds.size})</span>
                 </button>
-              </div>
-            )}
-
-            {/* Clear All Filters */}
-            {hasActiveFilters && (
+              )}
               <button
                 type="button"
-                onClick={handleResetFilters}
-                className="h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-xs text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] flex items-center gap-1 transition-colors cursor-pointer shrink-0"
-                title="Reset all search and dropdown filters"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] text-[11px] underline px-1 cursor-pointer"
               >
-                <X className="w-3 h-3" />
-                <span className="hidden sm:inline">Reset</span>
+                Clear ({selectedIds.size})
               </button>
-            )}
-          </div>
-        </div>
-      </div>
-
+            </div>
+          )}
+        </>
+      }
+      search={{
+        value: searchTerm,
+        onChange: (val) => {
+          setSearchTerm(val);
+          setCurrentPage(1);
+        },
+        placeholder: "Search ref, title, brand, designer...",
+      }}
+      hasActiveFilters={hasActiveFilters}
+      onResetFilters={handleResetFilters}
+      resetFiltersLabel="Reset Filters"
+    >
       {/* ── 4. Main Workspace: Full-Bleed High-Density Table (Exact Marketing Sampling Standard) ── */}
       <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col text-[var(--on-surface)]">
         <div className="flex-1 min-h-0 overflow-auto">
@@ -895,7 +776,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </DeskWorkspaceLayout>
   );
 };
 

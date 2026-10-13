@@ -309,10 +309,12 @@ export async function fetchProductDetailsApi(
 
 /** Load the full read-only specification catalog for one saved product record. */
 export async function fetchProductInspectionDetailsApi(
-  sampleRequestId: number | string
+  sampleRequestId: number | string,
+  catalogLookup = false
 ): Promise<ProductDetailItem[]> {
+  const catalogQuery = catalogLookup ? "?catalog_lookup=true" : "";
   const [rawDetails, characteristics] = await Promise.all([
-    apiFetch<any[]>(`/api/v1/product-characteristics/details/${sampleRequestId}`),
+    apiFetch<any[]>(`/api/v1/product-characteristics/details/${sampleRequestId}${catalogQuery}`),
     fetchAllProductCharacteristics(),
   ]);
   const savedDetails = Array.isArray(rawDetails) ? rawDetails : [];
@@ -454,6 +456,48 @@ export async function fetchBindingHierarchyApi(
   } catch (err) {
     console.error("Error fetching binding hierarchy:", err);
     return { binding1_options: [], hierarchy: {} };
+  }
+}
+
+export interface ProductCatalogFilterCounts {
+  categories: Record<string, number>;
+  sub_categories: Record<string, number>;
+  sub_categories_missing: number;
+  third_categories: Record<string, number>;
+  third_categories_missing: number;
+  binding1: Record<string, number>;
+  binding2: Record<string, number>;
+}
+
+export const MISSING_TAXONOMY_FILTER_VALUE = "__missing__";
+
+export async function fetchProductCatalogFilterCountsApi(
+  category?: string,
+  subCategory?: string,
+  thirdCategory?: string,
+  binding1?: string
+): Promise<ProductCatalogFilterCounts> {
+  const params = new URLSearchParams();
+  if (category?.trim()) params.set("category", category.trim());
+  if (subCategory?.trim()) params.set("sub_category", subCategory.trim());
+  if (thirdCategory?.trim()) params.set("third_category", thirdCategory.trim());
+  if (binding1?.trim()) params.set("b1", binding1.trim());
+  const query = params.toString();
+  try {
+    return await apiFetch<ProductCatalogFilterCounts>(
+      `/api/v1/product-characteristics/catalog-filter-counts${query ? `?${query}` : ""}`
+    );
+  } catch (err) {
+    console.error("Error fetching catalog filter counts:", err);
+    return {
+      categories: {},
+      sub_categories: {},
+      sub_categories_missing: 0,
+      third_categories: {},
+      third_categories_missing: 0,
+      binding1: {},
+      binding2: {},
+    };
   }
 }
 

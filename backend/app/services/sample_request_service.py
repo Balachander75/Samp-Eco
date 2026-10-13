@@ -875,6 +875,23 @@ class SampleRequestService:
             for record, binding1_value, binding2_value in records
         ]
 
+    def catalog_filter_counts(
+        self,
+        *,
+        category: Optional[str] = None,
+        sub_category: Optional[str] = None,
+        third_category: Optional[str] = None,
+        binding1: Optional[str] = None,
+        created_by_user_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        return self.repo.catalog_filter_counts(
+            category=category,
+            sub_category=sub_category,
+            third_category=third_category,
+            binding1=binding1,
+            created_by_user_id=created_by_user_id,
+        )
+
     def get_all_characteristics(self) -> List[Dict[str, Any]]:
         """Return all active master product characteristics sorted by sequence."""
         rows = (

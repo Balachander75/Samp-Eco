@@ -195,6 +195,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Staged product description for sampling item
   const [samplingDescription, setSamplingDescription] = useState("");
+  const [newProductCustomDetails, setNewProductCustomDetails] = useState<NonNullable<StagedProductItem["customDetails"]>>([]);
   const [catalogProductDescription, setCatalogProductDescription] = useState("");
   const [qtyDesignCosting, setQtyDesignCosting] = useState("");
   const [qtyForSampling, setQtyForSampling] = useState("1");
@@ -309,6 +310,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     setSelectedCategory("");
     setSelectedSubCategory("");
     setSelectedThirdCategory("");
+    setNewProductCustomDetails([]);
     setSelectedBinding1("");
     setSelectedBinding2("");
     setSamplingDescription("");
@@ -475,7 +477,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     showToast("Product description and characteristics saved.");
   };
 
-  // Load the shared binding hierarchy; category is not a filter for catalog search.
+  // Load the shared binding hierarchy; category is not a filter for material code search.
   useEffect(() => {
     if (
       !isAddModalOpen ||
@@ -487,7 +489,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     }
     const requestSequence = ++bindingHierarchySequenceRef.current;
     setIsLoadingBindingHierarchy(true);
-    fetchBindingHierarchyApi()
+    const bindingCategory = samplingSearchMode === "binding" ? selectedCategory : undefined;
+    const bindingSubCategory = samplingSearchMode === "binding" ? selectedSubCategory : undefined;
+    const bindingThirdCategory = samplingSearchMode === "binding" ? selectedThirdCategory : undefined;
+    fetchBindingHierarchyApi(bindingCategory, bindingSubCategory, bindingThirdCategory)
       .then((res) => {
         if (bindingHierarchySequenceRef.current !== requestSequence) return;
         setBindingHierarchy(res);
@@ -521,6 +526,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   }, [
     isAddModalOpen,
     addModalStep,
+    samplingSearchMode,
+    selectedCategory,
+    selectedSubCategory,
+    selectedThirdCategory,
   ]);
 
   // Debounced live material code search
@@ -569,7 +578,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       setIsSearchingBinding(false);
       return;
     }
-    if (!selectedBinding1 && !selectedBinding2) {
+    if (!selectedBinding1 && !selectedBinding2 && !selectedCategory && !selectedSubCategory && !selectedThirdCategory) {
       setBindingSearchResults([]);
       setIsSearchingBinding(false);
       return;
@@ -582,7 +591,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       undefined,
       undefined,
       undefined,
-      undefined
+      undefined,
+      selectedCategory || undefined,
+      selectedSubCategory || undefined,
+      selectedThirdCategory || undefined
     )
       .then((res) => {
         if (bindingSearchSequenceRef.current === requestSequence) {
@@ -603,6 +615,9 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   }, [
     selectedBinding1,
     selectedBinding2,
+    selectedCategory,
+    selectedSubCategory,
+    selectedThirdCategory,
     addModalStep,
     samplingSearchMode,
     isAddModalOpen,
@@ -614,13 +629,6 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     const nextCategory = item.product_category || (keepCurrentFilters ? selectedCategory : "");
     const nextSubCategory = item.product_sub_category || (keepCurrentFilters ? selectedSubCategory : "");
     const nextThirdCategory = item.product_third_category || (keepCurrentFilters ? selectedThirdCategory : "");
-    if (
-      nextCategory !== selectedCategory ||
-      nextSubCategory !== selectedSubCategory ||
-      nextThirdCategory !== selectedThirdCategory
-    ) {
-      setIsLoadingBindingHierarchy(true);
-    }
     setSelectedDbSample(item);
     setSamplingDescription(item.product_description || "");
     setSelectedCategory(nextCategory);
@@ -1144,6 +1152,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         scopes: [...selectedScopes],
         requestTypeTimestamps: { ...scopeTimestamps },
         creationMode: samplingSearchMode,
+        customDetails: isNewProduct ? newProductCustomDetails : undefined,
         unitPcPack,
         qtyPerPack: unitPcPack === "Pack" ? qtyPerPack.trim() : "1",
         ...(selectedScopes.includes("sample") && {
@@ -1218,6 +1227,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         scopes: [...selectedScopes],
         requestTypeTimestamps: { ...scopeTimestamps },
         creationMode: samplingSearchMode,
+        customDetails: isNewProduct ? newProductCustomDetails : undefined,
         unitPcPack,
         qtyPerPack: unitPcPack === "Pack" ? qtyPerPack.trim() : "1",
         ...(selectedScopes.includes("sample") && {
@@ -1705,6 +1715,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                 selectedBinding1={selectedBinding1}
                 selectedBinding2={selectedBinding2}
                 productCategories={productCategories}
+                newProductCustomDetails={newProductCustomDetails}
                 selectedCategory={selectedCategory}
                 selectedSubCategory={selectedSubCategory}
                 selectedThirdCategory={selectedThirdCategory}
@@ -1728,6 +1739,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                   setSelectedCategory("");
                   setSelectedSubCategory("");
                   setSelectedThirdCategory("");
+                  setNewProductCustomDetails([]);
                   setSelectedBinding1("");
                   setSelectedBinding2("");
                   setModalError(null);
@@ -1759,8 +1771,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                 onSelectDbSample={handleSelectDbSample}
                 onInspectProduct={setInspectingCatalogProduct}
                 onSelectCategory={(cat) => {
-                  if (selectedDbSample) clearMockupDesignChoice();
-                  setIsLoadingBindingHierarchy(true);
+                  if (selectedDbSample) {
+                    clearMockupDesignChoice();
+                    setSamplingDescription("");
+                  }
                   setBindingSearchResults([]);
                   setSelectedBinding1("");
                   setSelectedBinding2("");
@@ -1768,41 +1782,47 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                   setSelectedSubCategory("");
                   setSelectedThirdCategory("");
                   setSelectedDbSample(null);
-                  setSamplingDescription("");
                 }}
                 onSelectSubCategory={(sub) => {
-                  if (selectedDbSample) clearMockupDesignChoice();
-                  setIsLoadingBindingHierarchy(true);
+                  if (selectedDbSample) {
+                    clearMockupDesignChoice();
+                    setSamplingDescription("");
+                  }
                   setBindingSearchResults([]);
                   setSelectedBinding1("");
                   setSelectedBinding2("");
                   setSelectedSubCategory(sub);
                   setSelectedThirdCategory("");
                   setSelectedDbSample(null);
-                  setSamplingDescription("");
                 }}
                 onSelectThirdCategory={(third) => {
-                  if (selectedDbSample) clearMockupDesignChoice();
-                  setIsLoadingBindingHierarchy(true);
+                  if (selectedDbSample) {
+                    clearMockupDesignChoice();
+                    setSamplingDescription("");
+                  }
                   setBindingSearchResults([]);
                   setSelectedBinding1("");
                   setSelectedBinding2("");
                   setSelectedThirdCategory(third);
                   setSelectedDbSample(null);
-                  setSamplingDescription("");
                 }}
+                onSetNewProductCustomDetails={setNewProductCustomDetails}
                 onSelectBinding1={(b1) => {
-                  if (selectedDbSample) clearMockupDesignChoice();
+                  if (selectedDbSample) {
+                    clearMockupDesignChoice();
+                    setSamplingDescription("");
+                  }
                   setSelectedBinding1(b1);
                   setSelectedBinding2("");
                   setSelectedDbSample(null);
-                  setSamplingDescription("");
                 }}
                 onSelectBinding2={(b2) => {
-                  if (selectedDbSample) clearMockupDesignChoice();
+                  if (selectedDbSample) {
+                    clearMockupDesignChoice();
+                    setSamplingDescription("");
+                  }
                   setSelectedBinding2(b2);
                   setSelectedDbSample(null);
-                  setSamplingDescription("");
                 }}
                 onBackToScopes={() => {
                   setModalError(null);
