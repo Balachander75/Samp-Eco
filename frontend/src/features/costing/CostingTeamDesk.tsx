@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
 import { fetchCostingEstimationsApi, updateCostingEstimationApi } from "@/infrastructure/api/downstreamApi";
 import { DataTable, ColumnDef } from "@/components/erp/DataTable";
@@ -75,7 +76,7 @@ const COSTING_STAGES: { id: string; stepNumber: string; label: string }[] = [
   { id: "won", stepNumber: "05", label: "Won Deals" },
 ];
 
-export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
+export const CostingWorkbench: React.FC<CostingTeamDeskProps> = ({ user }) => {
   const { selectedYear } = useBusinessYear();
   const [costings, setCostings] = useState<CostingItem[]>(INITIAL_COSTINGS);
   const [selectedStageId, setSelectedStageId] = useState<string>("all");
@@ -744,4 +745,20 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
   );
 };
 
+export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
+  const location = useLocation();
+  const activeView: "overview" | "costing" = useMemo(() => {
+    const path = location.pathname.toLowerCase();
+    if (path.includes("/costing") && path !== "/costing-team") return "costing";
+    return "overview";
+  }, [location.pathname]);
+
+  // Both Overview and Costing sections kept blank for now as requested:
+  // "and in the costing section remove all that section just and add the overview and costing even dont design them we will deisgn it later"
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-[var(--surface-base)] text-[var(--on-surface)] overflow-hidden" />
+  );
+};
+
 export default CostingTeamDesk;
+

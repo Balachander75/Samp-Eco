@@ -136,22 +136,28 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
       },
       {
         id: "costing",
-        title: "Costing Team",
+        title: "Costing",
         shortCode: "CO",
         path: "/costing-team",
-        aliases: ["/costing", "/costing-work", "/bom"],
+        aliases: ["/costing", "/costing-work", "/bom", "/costing-team/overview", "/costing-team/costing"],
         departmentKey: "costing",
-        subTeams: ["BOM Pricing", "Substrate & Conversion", "Margin Quotes"],
+        subItems: [
+          { id: "costing-overview", title: "Overview", path: "/costing-team" },
+          { id: "costing-costing", title: "Costing", path: "/costing-team/costing" },
+        ],
+        subTeams: ["Overview", "Costing"],
       },
       {
         id: "plant",
-        title: "Plant Program Review",
+        title: "Plant",
         shortCode: "PL",
         path: "/plant",
         aliases: [
           "/plant-execution",
           "/plant-work",
           "/plants",
+          "/plant/overview",
+          "/plant/sampling",
           "/plant/programs",
           "/plant/production",
           "/plant/qc",
@@ -159,9 +165,11 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
         ],
         departmentKey: "plant",
         subItems: [
+          { id: "plant-overview", title: "Overview", path: "/plant" },
+          { id: "plant-sampling", title: "Sampling", path: "/plant/sampling" },
           { id: "plant-programs", title: "Program Planning", path: "/plant/programs", badgeKey: "plantPrograms" },
         ],
-        subTeams: ["Program Planning Review"],
+        subTeams: ["Overview", "Sampling", "Program Planning"],
       },
       {
         id: "members",
@@ -213,21 +221,12 @@ export function getNavigationGroupsForUser(user: UserProfile): NavigationGroup[]
       allowedDepartments.add("studio");
     }
     if (hasWorkflowTeam(user, "plant")) allowedDepartments.add("plant");
+    if (hasWorkflowTeam(user, "costing")) allowedDepartments.add("costing");
   }
 
   return NAVIGATION_GROUPS.map((group) => ({
     ...group,
-    items: group.items
-      .filter((item) => allowedDepartments.has(item.departmentKey))
-      .map((item) => item.departmentKey === "plant"
-        ? {
-            ...item,
-            title: "Plant Program Review",
-            aliases: ["/plant-execution", "/plant-work", "/plants"],
-            subItems: item.subItems?.filter((sub) => sub.id === "plant-programs"),
-            subTeams: ["Program Planning Review"],
-          }
-        : item),
+    items: group.items.filter((item) => allowedDepartments.has(item.departmentKey)),
   })).filter((group) => group.items.length > 0);
 }
 

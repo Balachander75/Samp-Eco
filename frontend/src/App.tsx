@@ -145,7 +145,9 @@ function ActiveModuleView({
           location.pathname === "/costing-team" ||
           location.pathname === "/costing" ||
           location.pathname === "/costing-work" ||
-          location.pathname === "/bom"
+          location.pathname === "/bom" ||
+          location.pathname.startsWith("/costing-team/") ||
+          location.pathname.startsWith("/costing/")
         ) {
           return <CostingTeamDesk user={user} />;
         }
@@ -263,7 +265,7 @@ function AppShellRouteWrapper({
     (path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`)
   );
   if (isDeferredPlantRoute && (isAdmin(user) || hasWorkflowTeam(user, "plant"))) {
-    return <Navigate to="/plant/programs" replace />;
+    return <Navigate to="/plant" replace />;
   }
   if (!canAccessWorkspacePath(user, normalizedPath)) {
     return <Navigate to={getWorkspaceHome(user)} replace />;

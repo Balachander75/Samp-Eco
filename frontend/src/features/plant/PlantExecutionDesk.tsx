@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
 import { isReadOnlyTeamHead } from "@/features/auth/permissions";
 import { useBusinessYear } from "@/context/BusinessYearContext";
@@ -20,8 +21,16 @@ export interface PlantExecutionDeskProps {
 }
 
 export const PlantExecutionDesk: React.FC<PlantExecutionDeskProps> = ({ user }) => {
+  const location = useLocation();
   const { selectedYear } = useBusinessYear();
   const { selectedPlant } = usePlant();
+
+  const activeView: "overview" | "sampling" | "programs" = useMemo(() => {
+    const path = location.pathname.toLowerCase();
+    if (path.includes("/sampling")) return "sampling";
+    if (path.includes("/programs")) return "programs";
+    return "overview";
+  }, [location.pathname]);
 
   const [requests, setRequests] = useState<SampleRequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +40,6 @@ export const PlantExecutionDesk: React.FC<PlantExecutionDeskProps> = ({ user }) 
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   }, []);
-
 
   // Load requests from backend
   const loadRequests = useCallback(async () => {
@@ -92,28 +100,35 @@ export const PlantExecutionDesk: React.FC<PlantExecutionDeskProps> = ({ user }) 
         </div>
       )}
 
-      {/* Focused Program Planning review workbench */}
-      <PlantProgramPlanningView
-        requests={requests}
-        isLoading={isLoading}
-        selectedPlant={selectedPlant}
-        onInspectRequest={(req) => setSelectedProgramForReview(req)}
-        onRefresh={loadRequests}
-        showToast={showToast}
-      />
+      {activeView === "programs" ? (
+        <>
+          {/* Focused Program Planning review workbench */}
+          <PlantProgramPlanningView
+            requests={requests}
+            isLoading={isLoading}
+            selectedPlant={selectedPlant}
+            onInspectRequest={(req) => setSelectedProgramForReview(req)}
+            onRefresh={loadRequests}
+            showToast={showToast}
+          />
 
-      {/* Program Planning Inspector Modal (Plant Review mode) */}
-      <React.Suspense fallback={null}>
-        <ProgramPlanningInspectorModal
-          request={selectedProgramForReview}
-          isOpen={Boolean(selectedProgramForReview)}
-          onClose={() => setSelectedProgramForReview(null)}
-          mode="plant"
-          userRole={user?.role || "Plant Reviewer"}
-          currentUser={user}
-          readOnly={isReadOnlyTeamHead(user)}
-        />
-      </React.Suspense>
+          {/* Program Planning Inspector Modal (Plant Review mode) */}
+          <React.Suspense fallback={null}>
+            <ProgramPlanningInspectorModal
+              request={selectedProgramForReview}
+              isOpen={Boolean(selectedProgramForReview)}
+              onClose={() => setSelectedProgramForReview(null)}
+              mode="plant"
+              userRole={user?.role || "Plant Reviewer"}
+              currentUser={user}
+              readOnly={isReadOnlyTeamHead(user)}
+            />
+          </React.Suspense>
+        </>
+      ) : (
+        /* Blank workspace for Plant Overview and Plant Sampling for future design */
+        <div className="flex-1 min-h-0 bg-[var(--surface-base)]" />
+      )}
     </div>
   );
 };
