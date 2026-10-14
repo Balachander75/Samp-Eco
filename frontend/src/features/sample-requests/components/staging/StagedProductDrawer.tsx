@@ -1,6 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Copy, Trash2, ExternalLink, Pencil, Check, LoaderCircle, RotateCcw } from "lucide-react";
+import {
+  X,
+  Copy,
+  Trash2,
+  ExternalLink,
+  Pencil,
+  Check,
+  LoaderCircle,
+  RotateCcw,
+  ImageIcon,
+  Lock,
+  Calendar,
+} from "lucide-react";
 import { StagedProductItem, DELIVERABLES } from "../../types/staging";
 import { fetchProductDetailsApi, ProductDetailItem } from "@/infrastructure/api/masterApi";
 import { isMockupCreativeCharacteristic } from "./mockupCreativeFields";
@@ -8,6 +20,11 @@ import { isMockupCreativeCharacteristic } from "./mockupCreativeFields";
 export interface StagedProductDrawerProps {
   inspectingProduct: StagedProductItem | null;
   programYear: string;
+  programContext?: {
+    customer?: string;
+    programName?: string;
+    programYear?: string;
+  };
   onClose: () => void;
   onRemoveProduct: (id: string) => void;
   onDuplicateProduct: (item: StagedProductItem) => void;
@@ -24,6 +41,7 @@ export interface StagedProductDrawerProps {
 export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
   inspectingProduct,
   programYear,
+  programContext,
   onClose,
   onRemoveProduct,
   onDuplicateProduct,
@@ -41,6 +59,32 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
   const [specView, setSpecView] = useState<"configured" | "all">("configured");
   const detailsRequestId = inspectingProduct?.savedRequestId || inspectingProduct?.sourceSampleRequestId;
 
+  const isDesignBrief = Boolean(
+    inspectingProduct &&
+    inspectingProduct.scopes.includes("design") &&
+    (inspectingProduct.scopes.length === 1 || !inspectingProduct.catalogMetadata || Boolean(inspectingProduct.designMetadata))
+  );
+
+  const designDesc = inspectingProduct?.productDescription || "";
+  const designCount = inspectingProduct?.designMetadata?.numberOfDesigns || 1;
+  const designDueDate = inspectingProduct?.designMetadata?.designRequiredDate || inspectingProduct?.sampleRequiredDate || "";
+  const designTrend =
+    inspectingProduct?.designMetadata?.trend ||
+    inspectingProduct?.customDetails?.find(
+      (d) => (d.characteristicName || d.characteristic_name)?.toUpperCase() === "TREND"
+    )?.value ||
+    "";
+  const designAudience =
+    inspectingProduct?.designMetadata?.targetAudience ||
+    inspectingProduct?.customDetails?.find(
+      (d) => (d.characteristicName || d.characteristic_name)?.toUpperCase() === "TARGET AUDIENCE"
+    )?.value ||
+    "";
+  const designRemarks = inspectingProduct?.designMetadata?.remarks || inspectingProduct?.mockupMetadata?.marketingRemark || "";
+  const uploadedImages = inspectingProduct?.designMetadata?.images || [];
+  const webLinks = inspectingProduct?.designMetadata?.webLinks || [];
+  const totalAttachments = uploadedImages.length + webLinks.length;
+
   useEffect(() => {
     setProductDescription(inspectingProduct?.productDescription || "");
     setEditedDescription(inspectingProduct?.productDescription || "");
@@ -52,7 +96,7 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
     setSourceDetails([]);
     setIsEditingDetails(false);
     setDetailsError("");
-    if (!detailsRequestId) return;
+    if (!detailsRequestId || isDesignBrief) return;
 
     setIsLoadingDetails(true);
     // Load the full catalog so the All view can include blank characteristics.
@@ -202,47 +246,282 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
       <div className="fixed inset-0 bg-slate-950/70 transition-opacity" onClick={onClose} />
 
       <div className="flex min-h-full items-center justify-center p-3 sm:p-5">
-        <div className="relative w-full max-w-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden animate-smooth-modal flex flex-col max-h-[90vh]">
+        <div className={`relative w-full ${isDesignBrief ? "max-w-5xl max-h-[92vh]" : "max-w-3xl max-h-[90vh]"} bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden animate-smooth-modal flex flex-col`}>
           {/* Header */}
-          <div className="px-6 py-4 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white flex items-center justify-between shrink-0 border-b border-slate-100 dark:border-white/[0.06]">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="font-mono font-bold text-xs bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 px-2.5 py-0.5 rounded-full border border-[var(--accent-primary)]/20">
-                {inspectingProduct.materialCode}
-              </span>
-              <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight font-display">
-                Staged Product Specification
-              </span>
-            </div>
+          {isDesignBrief ? (
+            <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shrink-0 border-b border-slate-100 dark:border-white/[0.06]">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <ImageIcon className="w-4 h-4 stroke-[2.2]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight font-display">
+                      Creative Design Brief
+                    </h3>
+                    <span className="font-mono font-bold text-xs bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 px-2.5 py-0.5 rounded-full border border-[var(--accent-primary)]/20">
+                      {inspectingProduct.materialCode}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/20 tracking-wider uppercase">
+                      DESIGN SPEC
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                    Review product specifications, creative direction, target due date, and reference artwork
+                  </p>
+                </div>
+              </div>
 
-            <div className="flex shrink-0 items-center gap-2">
-              {isEditingDetails ? (
-                <>
-                  <button type="button" onClick={() => { setIsEditingDetails(false); setEditedValues(initialValues); setEditedDescription(productDescription); setSpecView("configured"); setDetailsError(""); }} disabled={isSavingDetails} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/5">
-                    <RotateCcw className="h-3.5 w-3.5" /> Cancel
+              <div className="flex shrink-0 items-center gap-2">
+                {onEditProduct && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const toEdit = inspectingProduct;
+                      onClose();
+                      onEditProduct(toEdit);
+                    }}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-900/40 cursor-pointer"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span>Edit Brief</span>
                   </button>
-                  <button type="button" onClick={handleSaveDetails} disabled={isSavingDetails || isLoadingDetails} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 text-xs font-semibold text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50">
-                    {isSavingDetails ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                    Save specs
-                  </button>
-                </>
-              ) : onSaveCustomDetails ? (
-                <button type="button" onClick={() => { setIsEditingDetails(true); setSpecView("all"); setEditedDescription(productDescription); }} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-900/40">
-                  <Pencil className="h-3.5 w-3.5" /> Edit specs
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                  aria-label="Close modal"
+                >
+                  <X className="w-4 h-4" />
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={onClose}
-                className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
-                aria-label="Close modal"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="px-6 py-4 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white flex items-center justify-between shrink-0 border-b border-slate-100 dark:border-white/[0.06]">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="font-mono font-bold text-xs bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 px-2.5 py-0.5 rounded-full border border-[var(--accent-primary)]/20">
+                  {inspectingProduct.materialCode}
+                </span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight font-display">
+                  Staged Product Specification
+                </span>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {isEditingDetails ? (
+                  <>
+                    <button type="button" onClick={() => { setIsEditingDetails(false); setEditedValues(initialValues); setEditedDescription(productDescription); setSpecView("configured"); setDetailsError(""); }} disabled={isSavingDetails} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/5">
+                      <RotateCcw className="h-3.5 w-3.5" /> Cancel
+                    </button>
+                    <button type="button" onClick={handleSaveDetails} disabled={isSavingDetails || isLoadingDetails} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 text-xs font-semibold text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50">
+                      {isSavingDetails ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      Save specs
+                    </button>
+                  </>
+                ) : onSaveCustomDetails ? (
+                  <button type="button" onClick={() => { setIsEditingDetails(true); setSpecView("all"); setEditedDescription(productDescription); }} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-900/40">
+                    <Pencil className="h-3.5 w-3.5" /> Edit specs
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                  aria-label="Close modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Body */}
-          <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+          {isDesignBrief ? (
+            <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6 text-xs">
+              <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12 lg:gap-6">
+                {/* LEFT COLUMN: Customer Account, Product Description, Trend & Audience, Remarks */}
+                <div className="space-y-4 lg:col-span-7">
+                  {/* 1. Customer Account & Program */}
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400">
+                      Customer Account &amp; Program
+                    </label>
+                    <div className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-[var(--surface-low)]/70 px-3.5 py-2 text-[13px] font-medium text-slate-900 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-zinc-100">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate font-semibold text-slate-900 dark:text-zinc-100">
+                          {programContext?.customer || inspectingProduct.samplingMetadata?.customerReference || "—"}
+                        </span>
+                        <span className="truncate text-xs text-slate-500 dark:text-zinc-400">
+                          {[programContext?.programName, programContext?.programYear || programYear].filter(Boolean).join(" · ")}
+                        </span>
+                      </div>
+                      <span className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200/80 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-400">
+                        <Lock className="h-3 w-3" /> Locked
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 2. Product Description */}
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400">
+                      Product Description
+                    </label>
+                    <div className="min-h-[88px] w-full rounded-xl border border-slate-200/80 bg-white p-3.5 text-xs leading-relaxed text-slate-900 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-100 whitespace-pre-wrap break-words font-medium">
+                      {designDesc || "No description provided."}
+                    </div>
+                  </div>
+
+                  {/* 3. Trend / Theme & Target Demographic / Audience */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400 truncate">
+                        Trend / Theme
+                      </label>
+                      <div className="flex min-h-10 w-full items-center rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-100 break-words">
+                        {designTrend || <span className="font-normal text-slate-400">Not specified</span>}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400 truncate">
+                        Target Audience
+                      </label>
+                      <div className="flex min-h-10 w-full items-center rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-100 break-words">
+                        {designAudience || <span className="font-normal text-slate-400">Not specified</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4. Remarks / Special Notes */}
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400">
+                      Remarks / Special Notes
+                    </label>
+                    <div className="min-h-[64px] w-full rounded-xl border border-slate-200/80 bg-white p-3 text-xs leading-relaxed text-slate-900 dark:border-white/[0.08] dark:bg-zinc-900 dark:text-zinc-100 whitespace-pre-wrap break-words">
+                      {designRemarks || <span className="font-normal text-slate-400">No special instructions provided.</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: Number of Designs, Design Required Date, Reference Attachments */}
+                <div className="space-y-4 rounded-xl border border-zinc-200/80 bg-slate-50/70 dark:bg-zinc-900/60 p-4 dark:border-white/[0.08] lg:col-span-5">
+                  {/* Number of Designs */}
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                      Number of Designs
+                    </label>
+                    <div className="flex h-10 w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-3.5 dark:border-zinc-700 dark:bg-zinc-950">
+                      <span className="font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                        {designCount}
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        variant{Number(designCount) > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Design Required Date */}
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                      Design Required Date
+                    </label>
+                    <div className="flex h-10 w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 text-xs font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100">
+                      <Calendar className="w-4 h-4 text-zinc-400 shrink-0" />
+                      <span>{designDueDate || <span className="font-normal text-zinc-400">Not set</span>}</span>
+                    </div>
+                  </div>
+
+                  {/* Reference Image / Moodboard */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                        Reference Image / Moodboard
+                      </label>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded font-mono transition-colors ${
+                          totalAttachments > 0
+                            ? "border border-[var(--accent-primary)]/20 bg-emerald-50 text-[var(--accent-primary)] dark:border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                        }`}
+                      >
+                        {uploadedImages.length}/2 images · {webLinks.length}/1 link
+                      </span>
+                    </div>
+
+                    {totalAttachments > 0 ? (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                        {uploadedImages.map((img) => (
+                          <div
+                            key={img.id}
+                            className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/90 text-[11px] shadow-2xs"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <img
+                                src={img.url}
+                                alt={img.name}
+                                className="w-8 h-8 rounded object-cover border border-zinc-200 dark:border-zinc-800 shrink-0 cursor-pointer hover:opacity-85"
+                                onClick={() => window.open(img.url, "_blank")}
+                              />
+                              <span className="shrink-0 rounded border border-[var(--accent-primary)]/20 bg-emerald-50 px-1 py-0.5 text-[10px] font-bold text-[var(--accent-primary)] dark:border-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                IMG
+                              </span>
+                              <span className="truncate font-medium text-zinc-800 dark:text-zinc-200" title={img.name}>
+                                {img.name}
+                              </span>
+                              {img.size && (
+                                <span className="text-[9.5px] text-zinc-400 font-mono shrink-0">
+                                  ({img.size})
+                                </span>
+                              )}
+                            </div>
+                            <a
+                              href={img.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 text-zinc-400 hover:text-[var(--accent-primary)] dark:hover:text-emerald-400"
+                              title="Open full image"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        ))}
+
+                        {webLinks.map((url, idx) => (
+                          <div
+                            key={`link-${idx}`}
+                            className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/90 text-[11px] shadow-2xs"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span className="shrink-0 rounded border border-teal-500/20 bg-teal-50 dark:bg-teal-950/40 px-1 py-0.5 text-[10px] font-bold text-teal-700 dark:text-teal-400 dark:border-teal-300/15 dark:bg-teal-950/40 dark:text-teal-200">
+                                URL
+                              </span>
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex min-w-0 items-center gap-1 truncate font-mono text-[11px] text-[var(--accent-primary)] hover:underline dark:text-emerald-400"
+                                title={url}
+                              >
+                                <span className="truncate">{url}</span>
+                                <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-60" />
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center p-6 rounded-lg border border-dashed border-zinc-200 dark:border-zinc-800 text-center bg-white/50 dark:bg-zinc-900/40">
+                        <ImageIcon className="w-7 h-7 text-zinc-300 dark:text-zinc-600 mb-1.5" />
+                        <span className="text-xs text-zinc-400">No reference images or links attached</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
             {/* Product Title & Metadata Subtitle */}
             <div>
               {isEditingDetails ? (
@@ -626,6 +905,7 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
               </div>
             )}
           </div>
+        )}
 
           {/* Footer */}
           <div className="px-6 py-3.5 border-t border-slate-100 dark:border-white/[0.06] bg-[var(--surface-low)] dark:bg-white/[0.02] flex items-center justify-between shrink-0">
@@ -652,10 +932,10 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
                     onEditProduct(toEdit);
                   }}
                   className="h-8 px-3.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/60 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 border border-blue-200/80 dark:border-blue-800/40"
-                  title="Edit this staged specification"
+                  title={isDesignBrief ? "Edit creative design brief" : "Edit this staged specification"}
                 >
                   <Pencil className="w-3.5 h-3.5" />
-                  <span>Edit setup</span>
+                  <span>{isDesignBrief ? "Edit Brief" : "Edit setup"}</span>
                 </button>
               )}
 

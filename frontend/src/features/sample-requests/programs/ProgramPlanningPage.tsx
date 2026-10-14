@@ -1,19 +1,13 @@
 import React, { useState, useMemo } from "react";
-import { UserProfile } from "@/features/auth";
-import { SampleRequestItem } from "../types";
-import { getRequestTrackType } from "../utils/trackTypes";
 import { useNavigate } from "react-router-dom";
-import {
-  Plus,
-  RefreshCw,
-  Search,
-  X,
-  Trash2,
-  Download,
-} from "lucide-react";
+import { UserProfile } from "@/features/auth";
+import { SampleRequestItem, ProgramMaterialItem } from "../types";
+import { getRequestTrackType } from "../utils/trackTypes";
+import { Plus, Trash2, ChevronRight } from "lucide-react";
+import { isMaterialAddedRecently } from "../utils/dateUtils";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { Select } from "@/components/ui/Select";
-import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
+import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 
 const NewProgramPlanningModal = React.lazy(() =>
@@ -58,18 +52,12 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
   const navigate = useNavigate();
   const [filterTab, setFilterTab] = useState<ProgramStageTab>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPlantFilter, setSelectedPlantFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
-  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
-
-  // Local Modal States
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 30;
-
-  // Only consider program planning requests
+  // Scoped strictly to program planning requests
   const programRequests = useMemo(() => {
     return requests.filter((r) => {
       const mode = String(r.creationMode || "").toLowerCase();
@@ -86,16 +74,17 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
     });
   }, [requests]);
 
-  // Derived Customers List strictly from program planning requests
+  // Derived Customers List strictly from programRequests
   const customerList = useMemo(() => {
+    if (uniqueCustomers && uniqueCustomers.length > 0) return uniqueCustomers;
     const set = new Set<string>();
     programRequests.forEach((r) => {
       if (r.customer && r.customer.trim()) set.add(r.customer.trim());
     });
     return Array.from(set).sort();
-  }, [programRequests]);
+  }, [programRequests, uniqueCustomers]);
 
-  // Derived Plants List strictly from program planning requests
+  // Derived Plants List strictly from programRequests
   const plantList = useMemo(() => {
     const set = new Set<string>();
     programRequests.forEach((r) => {
@@ -104,99 +93,83 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
     return Array.from(set).sort();
   }, [programRequests]);
 
-  // Operational metrics
+  // Program Statistics
   const programStats = useMemo(() => {
-    const totalPrograms = programRequests.length;
-    let awaitingSampCount = 0;
-    let sampOutputCount = 0;
-    let plantOutputCount = 0;
     let totalSkus = 0;
+    let awaitingSamp = 0;
+    let sampAdded = 0;
+    let plantAdded = 0;
 
     programRequests.forEach((r) => {
-      const matCount = r.programMaterials?.length || 1;
-      totalSkus += matCount;
+      const matCount = (r.programMaterials || []).length;
+      totalSkus += matCount > 0 ? matCount : 1;
+      const samp = hasSampOutput(r);
+      const plant = hasPlantOutput(r);
 
-      if (hasSampOutput(r)) sampOutputCount++;
-      else awaitingSampCount++;
-      if (hasPlantOutput(r)) plantOutputCount++;
+      if (!samp) awaitingSamp++;
+      else sampAdded++;
+      if (plant) plantAdded++;
     });
 
     return {
-      totalPrograms,
-      awaitingSampCount,
-      sampOutputCount,
-      plantOutputCount,
+      totalPrograms: programRequests.length,
       totalSkus,
+      awaitingSamp,
+      sampAdded,
+      plantAdded,
     };
   }, [programRequests]);
 
-  // Stage tab counts
-  const stageCounts = useMemo(() => {
-    return {
-      all: programStats.totalPrograms,
-      awaiting_samp: programStats.awaitingSampCount,
-      samp_added: programStats.sampOutputCount,
-      plant_added: programStats.plantOutputCount,
-    };
-  }, [programStats]);
-
-  // Filtered requests
+  // Filtered dataset
   const filteredRequests = useMemo(() => {
     return programRequests.filter((r) => {
-      // Tab filter
       if (filterTab === "awaiting_samp" && hasSampOutput(r)) return false;
       if (filterTab === "samp_added" && !hasSampOutput(r)) return false;
       if (filterTab === "plant_added" && !hasPlantOutput(r)) return false;
 
-      // Customer filter
+      if (selectedPlantFilter !== "all" && r.targetPlant !== selectedPlantFilter) {
+        return false;
+      }
+
       if (customerFilter !== "all" && r.customer !== customerFilter) {
         return false;
       }
 
-      // Plant filter
-      if (selectedPlant !== "ALL") {
-        const p = (r.targetPlant || "").toLowerCase();
-        if (!p.includes(selectedPlant.toLowerCase())) return false;
-      }
-      if (selectedPlantFilter !== "all") {
-        const p = (r.targetPlant || "").toLowerCase();
-        if (!p.includes(selectedPlantFilter.toLowerCase())) return false;
-      }
-
-      // Search query
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
-        const sr = (r.srNumber || "").toLowerCase();
-        const prog = (r.programName || "").toLowerCase();
-        const desc = (r.productDescription || "").toLowerCase();
+        const code = (r.materialCode || r.srNumber || "").toLowerCase();
         const cust = (r.customer || "").toLowerCase();
-        const yr = (r.programYear || "").toLowerCase();
-        return sr.includes(q) || prog.includes(q) || desc.includes(q) || cust.includes(q) || yr.includes(q);
+        const title = (r.programName || r.productDescription || "").toLowerCase();
+        const plant = (r.targetPlant || "").toLowerCase();
+        if (!code.includes(q) && !cust.includes(q) && !title.includes(q) && !plant.includes(q)) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [programRequests, filterTab, customerFilter, selectedPlant, selectedPlantFilter, searchTerm]);
-
-  // Paginated Slice
-  const paginatedRequests = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredRequests.slice(start, start + pageSize);
-  }, [filteredRequests, currentPage, pageSize]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
+  }, [programRequests, filterTab, selectedPlantFilter, customerFilter, searchTerm]);
 
   const clearFilters = () => {
-    setSearchTerm("");
-    setCustomerFilter("all");
-    setSelectedPlantFilter("all");
     setFilterTab("all");
-    setCurrentPage(1);
+    setSearchTerm("");
+    setSelectedPlantFilter("all");
+    setCustomerFilter("all");
   };
 
-  // Selection
-  const handleToggleSelectRow = (id: string | number, e?: React.SyntheticEvent) => {
-    if (e) e.stopPropagation();
+  const handleOpenInspector = (row: SampleRequestItem) => {
+    onInspectRequest(row);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredRequests.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRequests.map((r) => r.id)));
+    }
+  };
+
+  const toggleSelectRow = (id: string | number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -205,33 +178,23 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
     });
   };
 
-  const handleToggleSelectAll = () => {
-    if (selectedIds.size === paginatedRequests.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(paginatedRequests.map((r) => r.id)));
-    }
-  };
-
-  const handleOpenInspector = (req: SampleRequestItem) => {
-    onInspectRequest(req);
-  };
-
   // Export CSV
   const handleExportCSV = () => {
-    if (filteredRequests.length === 0) return;
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = new Date().toISOString().split("T")[0];
     exportRecordsToCsv({
-      filename: `program_planning_${dateStr}.csv`,
+      filename: `Seasonal_Program_Planning_${dateStr}.csv`,
       columns: [
-        { header: "Program ID", accessor: (r) => r.srNumber || `PG-${r.id}` },
-        { header: "Customer", accessor: (r) => r.customer },
-        { header: "Program Title", accessor: (r) => r.programName || r.productDescription },
-        { header: "Year", accessor: (r) => r.programYear || "2026" },
-        { header: "Plant", accessor: (r) => r.targetPlant },
-        { header: "SAMP Note", accessor: (r) => hasSampOutput(r) ? "Added" : "Awaiting" },
-        { header: "Plant Note", accessor: (r) => hasPlantOutput(r) ? "Added" : "Awaiting" },
-        { header: "Total SKUs", accessor: (r) => r.programMaterials?.length || 1 },
+        { header: "Program Code", accessor: (r) => r.materialCode || "" },
+        { header: "SR Number", accessor: (r) => r.srNumber || "" },
+        { header: "Campaign Title", accessor: (r) => r.programName || r.productDescription || "" },
+        { header: "Customer", accessor: (r) => r.customer || "" },
+        { header: "Target Plant", accessor: (r) => r.targetPlant || "" },
+        { header: "Program Year", accessor: (r) => r.programYear || "2026" },
+        { header: "Total SKUs", accessor: (r) => (r.programMaterials || []).length || 1 },
+        { header: "SAMP Remark", accessor: (r) => r.samplingRemark || "Awaiting" },
+        { header: "Plant Remark", accessor: (r) => r.plantRemark || "Awaiting" },
+        { header: "Created By", accessor: (r) => r.createdBy || "Marketing" },
+        { header: "Date Created", accessor: (r) => r.dateRequestCreated || "" },
       ],
       data: filteredRequests,
     });
@@ -239,68 +202,183 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
 
   const kpiItems = [
     {
-      label: "Programs",
-      value: stageCounts.all,
-      detail: "All seasonal plans",
-      color: "bg-[var(--accent-primary)]",
-      isActive: filterTab === "all" && customerFilter === "all" && selectedPlantFilter === "all" && !searchTerm,
-      onClick: clearFilters,
+      label: "All Seasonal Plans",
+      value: programStats.totalPrograms,
+      detail: `${programStats.totalSkus} total SKUs`,
+      color: "bg-indigo-500",
+      isActive: filterTab === "all",
+      onClick: () => setFilterTab("all"),
     },
     {
-      label: "Awaiting SAMP",
-      value: stageCounts.awaiting_samp,
-      detail: "SAMP note needed",
+      label: "Awaiting SAMP Input",
+      value: programStats.awaitingSamp,
+      detail: "Action required by SAMP",
       color: "bg-amber-500",
       isActive: filterTab === "awaiting_samp",
-      onClick: () => {
-        setFilterTab("awaiting_samp");
-        setCurrentPage(1);
-      },
+      onClick: () => setFilterTab("awaiting_samp"),
     },
     {
-      label: "SAMP note added",
-      value: stageCounts.samp_added,
-      detail: "Sampling input received",
-      color: "bg-sky-500",
-      isActive: filterTab === "samp_added",
-      onClick: () => {
-        setFilterTab("samp_added");
-        setCurrentPage(1);
-      },
-    },
-    {
-      label: "Plant note added",
-      value: stageCounts.plant_added,
-      detail: "Plant input received",
+      label: "SAMP Notes Given",
+      value: programStats.sampAdded,
+      detail: "Technical review done",
       color: "bg-emerald-500",
-      isActive: filterTab === "plant_added",
-      onClick: () => {
-        setFilterTab("plant_added");
-        setCurrentPage(1);
-      },
+      isActive: filterTab === "samp_added",
+      onClick: () => setFilterTab("samp_added"),
     },
     {
-      label: "Total SKUs",
-      value: programStats.totalSkus,
-      detail: "Across program plans",
-      color: "bg-violet-500",
+      label: "Plant Feasibility Added",
+      value: programStats.plantAdded,
+      detail: "Factory feedback recorded",
+      color: "bg-teal-500",
+      isActive: filterTab === "plant_added",
+      onClick: () => setFilterTab("plant_added"),
     },
   ];
+
+  const columns = useMemo<ColumnDef<SampleRequestItem>[]>(
+    () => [
+      {
+        id: "program_id",
+        header: "Program ID",
+        width: "w-[140px]",
+        sortable: true,
+        cell: (row) => <CopyBadge text={row.srNumber || row.materialCode || `PG-${row.id}`} />,
+      },
+      {
+        id: "campaign",
+        header: "Campaign Title & Product Scope",
+        cell: (row) => (
+          <div className="max-w-sm">
+            <div className="truncate font-semibold text-xs text-[var(--on-surface)]" title={row.programName || row.programCampaignTitle || "Seasonal Program"}>
+              {row.programName || row.programCampaignTitle || "Seasonal Program"}
+            </div>
+            <div className="mt-0.5 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+              {row.productDescription || "Multi-SKU scholastic program range"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "customer",
+        header: "Customer",
+        width: "w-[160px]",
+        cell: (row) => (
+          <span className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.customer || ""}>
+            {row.customer || "—"}
+          </span>
+        ),
+      },
+      {
+        id: "plant",
+        header: "Plant",
+        width: "w-[100px]",
+        cell: (row) => (
+          <span className="font-mono text-xs text-[var(--on-surface-muted)]">
+            Plant {row.targetPlant || "1505"}
+          </span>
+        ),
+      },
+      {
+        id: "year",
+        header: "Year",
+        width: "w-[90px]",
+        align: "center",
+        cell: (row) => (
+          <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-xs font-bold text-[var(--on-surface-muted)]">
+            {row.programYear || "2026"}
+          </span>
+        ),
+      },
+      {
+        id: "skus",
+        header: "Matrix SKUs",
+        width: "w-[120px]",
+        align: "center",
+        cell: (row) => {
+          const materials = row.programMaterials || [];
+          const skuCount = materials.length > 0 ? materials.length : 1;
+          const hasRecent = materials.some((m) => isMaterialAddedRecently(m.createdAt));
+          return (
+            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center rounded-full bg-[var(--accent-primary-subtle)] px-2 py-0.5 font-mono text-[10.5px] font-bold text-[var(--accent-primary)]">
+                {skuCount} SKU{skuCount !== 1 ? "s" : ""}
+              </span>
+              {hasRecent && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.2 text-[9px] font-semibold uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  New
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "notes",
+        header: "Team Notes",
+        width: "w-[160px]",
+        cell: (row) => {
+          const samp = hasSampOutput(row);
+          const plant = hasPlantOutput(row);
+          return (
+            <div className="flex flex-col gap-1 items-start">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  samp
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
+                }`}
+              >
+                SAMP: {samp ? "Note added" : "Awaiting"}
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  plant
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
+                }`}
+              >
+                Plant: {plant ? "Note added" : "Awaiting"}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: "Commercial Action",
+        align: "right",
+        width: "w-[130px]",
+        cell: (row) => (
+          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => handleOpenInspector(row)}
+              className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
+            >
+              <span>Inspect</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={(e) => onDeleteRequest(row, e)}
+                title="Delete program"
+                className="inline-flex h-7 w-7 select-none items-center justify-center rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        ),
+      },
+    ],
+    [isAdmin, onDeleteRequest]
+  );
 
   return (
     <DeskWorkspaceLayout
       title="Seasonal Program Planning"
-      subtitle="Seasonal campaign plans with SAMP and Plant team notes"
       businessYear={selectedYear}
-      totalCount={programRequests.length}
-      totalLabel="Programs"
-      extraBadges={
-        programStats.totalSkus > 0 ? (
-          <span className="px-2 py-0.5 rounded-md bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)] text-[10px] font-mono font-bold">
-            Total SKUs · {programStats.totalSkus}
-          </span>
-        ) : null
-      }
       primaryAction={
         !isReadOnly
           ? {
@@ -318,28 +396,11 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       kpiItems={kpiItems}
       filterControls={
         <>
-          {selectedIds.size > 0 && isAdmin && (
-            <button
-              type="button"
-              onClick={() => {
-                const target = programRequests.find((r) => selectedIds.has(r.id));
-                if (target) onDeleteRequest(target);
-              }}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700 cursor-pointer shadow-2xs"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete ({selectedIds.size})</span>
-            </button>
-          )}
-
           {customerList.length > 0 && (
             <Select
               aria-label="Filter by customer"
               value={customerFilter}
-              onChange={(e) => {
-                setCustomerFilter(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setCustomerFilter(e.target.value)}
               className="min-w-[160px] max-w-[240px]"
               options={[
                 { value: "all", label: "All Customers" },
@@ -352,10 +413,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
             <Select
               aria-label="Filter by plant"
               value={selectedPlantFilter}
-              onChange={(e) => {
-                setSelectedPlantFilter(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setSelectedPlantFilter(e.target.value)}
               className="min-w-[140px]"
               options={[
                 { value: "all", label: "All Plants" },
@@ -367,210 +425,80 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       }
       search={{
         value: searchTerm,
-        onChange: (val) => {
-          setSearchTerm(val);
-          setCurrentPage(1);
-        },
+        onChange: setSearchTerm,
         placeholder: "Search code, customer, title...",
       }}
       hasActiveFilters={Boolean(
         customerFilter !== "all" || selectedPlantFilter !== "all" || filterTab !== "all" || searchTerm
       )}
       onResetFilters={clearFilters}
-      resetFiltersLabel="Clear filters"
+      resetFiltersLabel="Clear Filters"
     >
-
-      {/* ── 3. Full-Bleed Table Workspace (Seamlessly Blended into Full UI) ── */}
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2 text-xs text-[var(--on-surface-muted)] sm:px-6">
-        <span>Showing <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">{filteredRequests.length}</span> of <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">{programRequests.length}</span> programs</span>
-        <span className="font-mono text-[10px] text-[var(--on-surface-subtle)]">Newest plans first</span>
-      </div>
-      <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col">
-        <table className="w-full min-w-[1180px] text-left text-xs border-collapse">
-          <thead className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--surface-low)]">
-            <tr className="font-mono text-[11px] uppercase tracking-wider text-[var(--on-surface-subtle)] select-none">
-              <th className="py-3 pl-6 pr-3 w-10 text-center">
-                <input
-                  type="checkbox"
-                  checked={
-                    paginatedRequests.length > 0 &&
-                    paginatedRequests.every((r) => selectedIds.has(r.id))
-                  }
-                  onChange={handleToggleSelectAll}
-                  className="cursor-pointer rounded accent-[var(--accent-primary)]"
-                />
-              </th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Program ID</th>
-              <th className="py-3 px-4 font-semibold">Campaign Title & Product Scope</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Customer</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Plant</th>
-              <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Year</th>
-              <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Matrix SKUs</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Team Notes</th>
-              <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Commercial Action</th>
-            </tr>
-          </thead>
-
-              <tbody className="divide-y divide-[var(--border-subtle)]">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={9} className="py-16 text-center font-mono text-[var(--on-surface-subtle)]">
-                      <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin text-[var(--accent-primary)]" />
-                      <span>Loading seasonal program planning matrix...</span>
-                    </td>
-                  </tr>
-                ) : paginatedRequests.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="py-16 text-center">
-                        <div className="max-w-sm mx-auto flex flex-col items-center">
-                        <h3 className="text-sm font-semibold text-[var(--on-surface)]">No seasonal programs</h3>
-                        <p className="mt-1 text-xs text-[var(--on-surface-subtle)]">
-                          {searchTerm || customerFilter !== "all" || filterTab !== "all" || selectedPlantFilter !== "all"
-                            ? "No programs match your search or active filter criteria."
-                            : "There are currently no seasonal program planning requests submitted."}
-                        </p>
-                        {(searchTerm || customerFilter !== "all" || filterTab !== "all" || selectedPlantFilter !== "all") && (
-                          <button
-                            type="button"
-                            onClick={clearFilters}
-                            className="mt-3 text-xs font-semibold text-[var(--accent-primary)] hover:underline cursor-pointer"
-                          >
-                            Reset filters
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedRequests.map((row) => {
-                    const srCode = row.srNumber || `PG-${row.id}`;
-                    const materials = row.programMaterials || [];
-                    const skuCount = materials.length > 0 ? materials.length : 1;
-                    const hasSampNote = hasSampOutput(row);
-                    const hasPlantNote = hasPlantOutput(row);
-                    const isSelected = selectedIds.has(row.id);
-
-                    return (
-                      <tr
-                        key={row.id}
-                        onClick={() => handleOpenInspector(row)}
-                        className={`transition-colors cursor-pointer group ${
-                          isSelected ? "bg-[var(--accent-primary-subtle)]" : "hover:bg-[var(--surface-low)]"
-                        }`}
-                      >
-                        {/* Checkbox */}
-                        <td className="py-3 pl-6 pr-3 text-center" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => handleToggleSelectRow(row.id, e)}
-                            className="cursor-pointer rounded accent-[var(--accent-primary)]"
-                          />
-                        </td>
-
-                        {/* Program ID */}
-                        <td className="py-3 px-4 font-mono font-bold whitespace-nowrap">
-                          <CopyBadge text={srCode} />
-                        </td>
-
-                        {/* Title & Description */}
-                        <td className="py-3 px-4 max-w-sm">
-                          <div className="truncate font-semibold text-[var(--on-surface)]">
-                            {row.programName || row.programCampaignTitle || "Seasonal Program"}
-                          </div>
-                          <div className="mt-0.5 truncate text-[11px] text-[var(--on-surface-subtle)]">
-                            {row.productDescription || "Multi-SKU scholastic program range"}
-                          </div>
-                        </td>
-
-                        {/* Customer */}
-                        <td className="whitespace-nowrap px-4 py-3 font-semibold text-[var(--on-surface)]">
-                          {row.customer || "—"}
-                        </td>
-
-                        {/* Plant */}
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-[var(--on-surface-muted)]">
-                          Plant {row.targetPlant || "1505"}
-                        </td>
-
-                        {/* Program Year */}
-                        <td className="py-3 px-4 text-center font-mono font-bold whitespace-nowrap">
-                          <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 text-[11px] text-[var(--on-surface-muted)]">
-                            {row.programYear || "2026"}
-                          </span>
-                        </td>
-
-                        {/* Matrix SKUs */}
-                        <td className="py-3 px-4 text-center font-mono whitespace-nowrap">
-                          <span className="rounded-full bg-[var(--accent-primary-subtle)] px-2 py-0.5 text-[11px] font-bold text-[var(--accent-primary)]">
-                            {skuCount} SKU{skuCount !== 1 ? "s" : ""}
-                          </span>
-                        </td>
-
-                        {/* Team planning notes */}
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <div className="flex flex-col items-start gap-1">
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${hasSampNote ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"}`}>SAMP: {hasSampNote ? "Note added" : "Awaiting"}</span>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${hasPlantNote ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"}`}>Plant: {hasPlantNote ? "Note added" : "Awaiting"}</span>
-                          </div>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-3 pl-4 pr-6 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenInspector(row)}
-                              className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-low)] px-3 py-1.5 text-xs font-semibold text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-container)] cursor-pointer"
-                              title="Open the program plan and team notes"
-                            >
-                              Inspect plan
-                            </button>
-
-                            {isAdmin && (
-                              <button
-                                type="button"
-                                onClick={(e) => onDeleteRequest(row, e)}
-                                className="rounded-lg p-1.5 text-[var(--on-surface-subtle)] transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 cursor-pointer"
-                                title="Delete record"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-
-            {/* Table Footer Pager */}
-            <div className="mt-auto shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-6 py-2.5">
-              <PaginationBar
-                currentPage={currentPage}
-                totalPages={totalPages}
-                totalCount={filteredRequests.length}
-                pageSize={pageSize}
-                onPageChange={(p) => setCurrentPage(p)}
-                itemLabel="campaigns"
-              />
-            </div>
+      <DataTable
+        data={filteredRequests}
+        columns={columns}
+        keyExtractor={(req) => req.id}
+        isLoading={isLoading}
+        emptyMessage={
+          searchTerm || customerFilter !== "all" || filterTab !== "all" || selectedPlantFilter !== "all"
+            ? "No programs match your search or active filter criteria."
+            : "There are currently no seasonal program planning requests submitted."
+        }
+        onRowClick={handleOpenInspector}
+        enableSelection={isAdmin}
+        selectedIds={selectedIds}
+        onToggleSelectRow={toggleSelectRow}
+        onToggleSelectAll={toggleSelectAll}
+        toolbarLeft={
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="truncate">
+              Showing{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {filteredRequests.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {programRequests.length}
+              </span>{" "}
+              programs
+            </span>
+            {selectedIds.size > 0 && (
+              <span className="shrink-0 rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700 dark:text-indigo-300 font-bold">
+                {selectedIds.size} selected
+              </span>
+            )}
           </div>
+        }
+        toolbarRight={
+          selectedIds.size > 0 && isAdmin ? (
+            <button
+              type="button"
+              onClick={() => {
+                const targets = programRequests.filter((r) => selectedIds.has(r.id));
+                targets.forEach((t) => onDeleteRequest(t));
+                setSelectedIds(new Set());
+              }}
+              className="inline-flex h-7 select-none items-center gap-1 rounded-md bg-rose-600 px-2.5 text-[11px] font-semibold text-white transition-colors hover:bg-rose-700 cursor-pointer shadow-2xs"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete Selected ({selectedIds.size})
+            </button>
+          ) : undefined
+        }
+      />
 
-      {/* ── 4. Modals & Dialogs (Lazy-loaded) ── */}
-      <React.Suspense fallback={null}>
-        <NewProgramPlanningModal
-          isOpen={isNewModalOpen}
-          onClose={() => setIsNewModalOpen(false)}
-          onProceed={(params) => {
-            setIsNewModalOpen(false);
-            navigate("/sample-requests/program-planning", { state: params });
-          }}
-        />
-
-      </React.Suspense>
+      {/* New Seasonal Program Planning Modal */}
+      {isNewModalOpen && (
+        <React.Suspense fallback={null}>
+          <NewProgramPlanningModal
+            isOpen={isNewModalOpen && !isReadOnly}
+            onClose={() => setIsNewModalOpen(false)}
+            onProceed={(params) => {
+              setIsNewModalOpen(false);
+              navigate("/sample-requests/program-planning", { state: params });
+            }}
+          />
+        </React.Suspense>
+      )}
     </DeskWorkspaceLayout>
   );
 };

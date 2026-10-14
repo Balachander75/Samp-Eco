@@ -566,7 +566,6 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
   return (
     <DeskWorkspaceLayout
       title="Feasibility Checks"
-      subtitle="Technical review queue for the SAMP team"
       businessYear={selectedYear}
       totalCount={metrics.total}
       totalLabel="tasks"

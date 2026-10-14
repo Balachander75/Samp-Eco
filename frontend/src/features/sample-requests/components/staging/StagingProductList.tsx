@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Copy, Eye, Layers, Trash2 } from "lucide-react";
+import { Copy, Eye, Layers, Plus, Trash2 } from "lucide-react";
 import { OperationalDatePicker } from "@/components/erp";
 import { StagedProductItem, DELIVERABLES } from "../../types/staging";
 
@@ -227,6 +227,7 @@ const EditableUnit: React.FC<EditableUnitProps> = ({ unit, qtyPerPack, editable,
 
 export interface StagingProductListProps {
   stagedProducts: StagedProductItem[];
+  onOpenAddModal?: () => void;
   onInspectProduct: (item: StagedProductItem) => void;
   onUpdateProduct?: (item: StagedProductItem, updates: Partial<StagedProductItem>) => Promise<boolean | void> | boolean | void;
   onDuplicateProduct: (item: StagedProductItem) => void;
@@ -235,6 +236,7 @@ export interface StagingProductListProps {
 
 export const StagingProductList: React.FC<StagingProductListProps> = ({
   stagedProducts,
+  onOpenAddModal,
   onInspectProduct,
   onUpdateProduct,
   onDuplicateProduct,
@@ -289,28 +291,47 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
 
   if (stagedProducts.length === 0) {
     return (
-      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-[var(--radius-panel)] border border-dashed border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-6 py-14 text-center shadow-sm">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
-          <Layers className="h-7 w-7 stroke-[2]" />
+      <div className="flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-white dark:bg-[#0c0d12] px-6 py-14 text-center shadow-2xs">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-zinc-600 dark:text-zinc-300 shadow-2xs">
+          <Layers className="h-7 w-7 stroke-[1.8]" />
         </div>
-        <h3 className="font-display text-base font-bold tracking-tight text-[var(--on-surface)]">No Products Staged Yet</h3>
-        <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--on-surface-muted)]">
+        <h3 className="font-display text-base font-bold tracking-tight text-zinc-900 dark:text-white">
+          No Products Staged Yet
+        </h3>
+        <p className="mt-1.5 max-w-md text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
           This sample request currently has no staged items. Add product specifications, configure artwork briefs or prototype samples, and assign deliverables.
         </p>
+        {onOpenAddModal && (
+          <button
+            type="button"
+            onClick={onOpenAddModal}
+            className="mt-5 inline-flex h-9 items-center gap-2 rounded-lg px-4 text-xs font-semibold text-white bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] shadow-2xs transition-all cursor-pointer active:scale-98"
+          >
+            <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span>Add First Product</span>
+          </button>
+        )}
+        <span className="mt-3 text-[11px] font-mono text-zinc-400 dark:text-zinc-500">
+          Specs are automatically preserved in Drafts
+        </span>
       </div>
     );
   }
 
   return (
-    <section className="flex flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-lowest)] shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 sm:px-5">
+    <section className="flex flex-col overflow-hidden rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#0c0d12] shadow-2xs">
+      <div className="flex items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <h2 className="truncate font-display text-xs font-bold uppercase tracking-wider text-[var(--on-surface)]">Staged Products Matrix</h2>
-          <span className="shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2 py-0.5 font-mono text-[10px] font-bold text-[var(--on-surface-muted)]">
+          <h2 className="truncate font-display text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+            Staged Products Queue
+          </h2>
+          <span className="shrink-0 rounded-md border border-zinc-200 dark:border-zinc-700/60 bg-white dark:bg-zinc-800 px-2 py-0.5 font-mono text-[10px] font-bold text-zinc-600 dark:text-zinc-300">
             {stagedProducts.length} line item{stagedProducts.length !== 1 ? "s" : ""}
           </span>
         </div>
-        <span className="hidden font-mono text-[10px] text-[var(--on-surface-subtle)] lg:inline">Direct Material &amp; Scope Allocation Queue</span>
+        <span className="hidden font-mono text-[10px] text-zinc-400 dark:text-zinc-500 lg:inline">
+          Direct Material &amp; Scope Allocation · Auto-Persisted
+        </span>
       </div>
 
       <div className="overflow-x-auto">
@@ -421,12 +442,12 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                   {prod.scopes.includes("costing") ? <EditableValue value={prod.qtyDesignCosting || ""} placeholder="Add qty" label="Costing quantity" type="number" editable={editable} onCommit={(value) => updateField(prod, "qtyDesignCosting", value)} /> : "—"}
                 </td>
                 <td className="px-3 py-2.5 text-center align-middle">
-                  <div className="flex items-center justify-center gap-1">
+                  <div className="flex items-center justify-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => onInspectProduct(prod)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-low)] text-[var(--on-surface-muted)] transition-colors hover:bg-[var(--surface-container)] hover:text-[var(--on-surface)]"
-                      title="Inspect"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-zinc-200/80 dark:border-zinc-700/60 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white cursor-pointer shadow-2xs"
+                      title="Inspect specification"
                       aria-label="Inspect staged product"
                     >
                       <Eye className="h-3.5 w-3.5" />
@@ -435,8 +456,8 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                       <button
                         type="button"
                         onClick={() => onDuplicateProduct(prod)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-low)] text-[var(--on-surface-muted)] transition-colors hover:bg-[var(--surface-container)] hover:text-[var(--on-surface)]"
-                        title="Copy"
+                        className="flex h-7 w-7 items-center justify-center rounded-md border border-zinc-200/80 dark:border-zinc-700/60 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white cursor-pointer shadow-2xs"
+                        title="Duplicate item"
                         aria-label="Copy staged product"
                       >
                         <Copy className="h-3.5 w-3.5" />
@@ -445,8 +466,8 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                     <button
                       type="button"
                       onClick={() => onRemoveProduct(prod.id)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100 hover:text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60"
-                      title="Delete"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-rose-200/80 dark:border-rose-900/40 bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 transition-colors hover:bg-rose-100 dark:hover:bg-rose-900/60 hover:text-rose-700 cursor-pointer shadow-2xs"
+                      title="Delete staged product"
                       aria-label="Delete staged product"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

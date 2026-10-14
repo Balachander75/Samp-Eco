@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
 import { fetchCostingEstimationsApi, updateCostingEstimationApi } from "@/infrastructure/api/downstreamApi";
-import { ProcessStageRibbon, StageStep } from "@/components/erp/ProcessStageRibbon";
-import { MetricRibbon, MetricTileItem } from "@/components/erp/MetricRibbon";
 import { DataTable, ColumnDef } from "@/components/erp/DataTable";
 import { DeskWorkspaceLayout } from "@/components/erp";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { Select } from "@/components/ui/Select";
+import { useBusinessYear } from "@/context/BusinessYearContext";
 import {
   Search,
   X,
@@ -57,6 +58,13 @@ interface LegacyCostingItem {
   substrateSpec: string;
 }
 
+interface StageStep {
+  id: string;
+  stepNumber: string;
+  label: string;
+  count: number;
+}
+
 const INITIAL_COSTINGS: CostingItem[] = [];
 
 const COSTING_STAGES: { id: string; stepNumber: string; label: string }[] = [
@@ -68,10 +76,11 @@ const COSTING_STAGES: { id: string; stepNumber: string; label: string }[] = [
   { id: "won", stepNumber: "05", label: "Won Deals" },
 ];
 
-export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
+export const CostingWorkbench: React.FC<CostingTeamDeskProps> = ({ user }) => {
+  const { selectedYear } = useBusinessYear();
   const [costings, setCostings] = useState<CostingItem[]>(INITIAL_COSTINGS);
   const [selectedStageId, setSelectedStageId] = useState<string>("all");
-  const [quickFilter, setQuickFilter] = useState<"none" | "margin_review" | "released" | "won">("none");
+  const [quickFilter, setQuickFilter] = useState<"none" | "intake" | "margin_review" | "released" | "won">("none");
   const [selectedVolumeTier, setSelectedVolumeTier] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -198,11 +207,12 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
     });
   }, [costings]);
 
-  // Metrics
-  const metrics: MetricTileItem[] = useMemo(() => {
+  // Canonical KPI items matching DeskWorkspaceLayout
+  const kpiItems = useMemo(() => {
     const total = costings.length;
     const marginReview = costings.filter((c) => c.status === "Margin Review").length;
     const released = costings.filter((c) => c.status === "Quote Released").length;
+    const wonCount = costings.filter((c) => c.status === "Won Deal").length;
     const wonValue = costings
       .filter((c) => c.status === "Won Deal" || c.status === "Quote Released")
       .reduce((acc, c) => acc + c.totalProjectValue, 0);
@@ -211,11 +221,10 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
 
     return [
       {
-        id: "total",
-        label: "Total Costing Tasks",
+        label: "All Costings",
         value: total,
-        deltaText: "Commercial Pipeline",
-        deltaTone: "neutral",
+        detail: "BOM & Commercial Pipeline",
+        color: "bg-indigo-500",
         isActive: selectedStageId === "all" && quickFilter === "none" && selectedVolumeTier === "all",
         onClick: () => {
           setSelectedStageId("all");
@@ -224,11 +233,20 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         },
       },
       {
-        id: "margin_review",
-        label: "Awaiting Margin Sign-Off",
+        label: "Request Intake",
+        value: costingRequests.length,
+        detail: costingRequests.length > 0 ? `${costingRequests.length} pending review` : "Queue clear",
+        color: "bg-amber-500",
+        isActive: quickFilter === "intake",
+        onClick: () => {
+          setQuickFilter((prev) => (prev === "intake" ? "none" : "intake"));
+        },
+      },
+      {
+        label: "Margin Review",
         value: marginReview,
-        deltaText: marginReview > 0 ? "⚡ Pricing Committee Queue" : "All Approved",
-        deltaTone: marginReview > 0 ? "warning" : "positive",
+        detail: marginReview > 0 ? "Committee queue" : "All approved",
+        color: "bg-rose-500",
         isActive: quickFilter === "margin_review",
         onClick: () => {
           setQuickFilter((prev) => (prev === "margin_review" ? "none" : "margin_review"));
@@ -236,11 +254,10 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         },
       },
       {
-        id: "released",
         label: "Quotations Released",
         value: released,
-        deltaText: "Active with Marketing Desk",
-        deltaTone: "positive",
+        detail: "Active with Marketing Desk",
+        color: "bg-emerald-500",
         isActive: quickFilter === "released",
         onClick: () => {
           setQuickFilter((prev) => (prev === "released" ? "none" : "released"));
@@ -248,11 +265,10 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         },
       },
       {
-        id: "pipeline_val",
-        label: "Quoted Order Value",
-        value: formattedPipelineValue,
-        deltaText: "Gross Revenue In Negotiation",
-        deltaTone: "positive",
+        label: "Won Deals",
+        value: wonCount,
+        detail: `${formattedPipelineValue} Gross revenue`,
+        color: "bg-teal-500",
         isActive: quickFilter === "won",
         onClick: () => {
           setQuickFilter((prev) => (prev === "won" ? "none" : "won"));
@@ -260,7 +276,7 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         },
       },
     ];
-  }, [costings, selectedStageId, quickFilter, selectedVolumeTier]);
+  }, [costings, costingRequests.length, selectedStageId, quickFilter, selectedVolumeTier]);
 
   // Filtering
   const filteredCostings = useMemo(() => {
@@ -603,99 +619,44 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
   return (
     <DeskWorkspaceLayout
       title="Costing & Margin Desk"
-      subtitle="BOM calculations, substrate & conversion costing, and pricing committee sign-off."
-      totalCount={costings.length}
-      totalLabel="Costings"
+      businessYear={selectedYear}
       onRefresh={loadCostings}
       onExportCSV={handleExportCSV}
       exportDisabled={filteredCostings.length === 0}
-      customRibbon={
+      kpiItems={kpiItems}
+      filterControls={
         <>
-          {costingRequests.length > 0 && (
-            <section className="shrink-0 space-y-3 border-b border-teal-900/10 bg-teal-50/35 px-5 py-3.5 dark:border-white/[0.06] dark:bg-teal-950/10 sm:px-8">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-950 dark:text-white font-display">Costing Request Intake</h2>
-                  <p className="mt-0.5 text-xs text-slate-600 dark:text-zinc-400">Review specifications, offer a counter date, and submit the costing output path to Marketing.</p>
-                </div>
-                <span className="rounded-full bg-teal-800/10 px-2.5 py-1 font-mono text-xs font-bold text-teal-900 dark:text-teal-200">{costingRequests.length} open</span>
-              </div>
-              <div className="grid max-h-[30vh] grid-cols-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
-                {costingRequests.map((request) => (
-                  <button key={request.id} type="button" onClick={() => setSelectedCostingRequest(request)} className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] p-3 text-left transition hover:bg-teal-50 dark:hover:bg-teal-950/25 cursor-pointer shadow-2xs">
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs font-bold text-[var(--on-surface)]">{request.productDescription}</span>
-                      <span className="mt-1 block truncate text-[11px] text-[var(--on-surface-muted)]">{request.customer} · {request.srNumber} · Qty {Number(request.qtyDesignCosting || 0).toLocaleString()} {request.unitPcPack || "PC"}{request.unitPcPack === "Pack" ? ` (${request.qtyPerPack || 1} pc/pack)` : ""}</span>
-                      <span className="mt-1 block text-[10px] font-medium text-teal-700 dark:text-teal-300">Required {request.costingRequiredDate || "date missing"}</span>
-                    </span>
-                    <span className="shrink-0 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-bold text-white shadow-2xs">Inspect</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* 1. Process Stage Ribbon */}
-          <ProcessStageRibbon
-            stages={stageSteps}
-            selectedStageId={selectedStageId}
-            onSelectStage={(id) => {
-              setSelectedStageId(id);
+          <Select
+            aria-label="Filter by costing stage"
+            value={selectedStageId}
+            onChange={(e) => {
+              setSelectedStageId(e.target.value);
               setQuickFilter("none");
             }}
+            className="min-w-[150px] max-w-[190px]"
+            options={[
+              { value: "all", label: "All Stages" },
+              { value: "specs", label: "01 · Spec Review" },
+              { value: "substrate", label: "02 · Substrate Pricing" },
+              { value: "margin", label: "03 · Margin Review" },
+              { value: "quote", label: "04 · Quote Released" },
+              { value: "won", label: "05 · Won Deals" },
+            ]}
           />
 
-          {/* 2. High-Density Metric Ribbon */}
-          <MetricRibbon metrics={metrics} />
+          <Select
+            aria-label="Filter by volume tier"
+            value={selectedVolumeTier}
+            onChange={(e) => setSelectedVolumeTier(e.target.value)}
+            className="min-w-[130px] max-w-[170px]"
+            options={[
+              { value: "all", label: "All Volumes" },
+              { value: "small", label: "< 30k pcs" },
+              { value: "medium", label: "30k - 75k pcs" },
+              { value: "large", label: "> 75k pcs" },
+            ]}
+          />
         </>
-      }
-      filterControls={
-        <div className="inline-flex bg-[var(--surface-low)] p-0.5 rounded-lg border border-[var(--border-subtle)] text-xs">
-          <button
-            type="button"
-            onClick={() => setSelectedVolumeTier("all")}
-            className={`h-7 px-3 rounded-md transition-colors text-xs font-semibold cursor-pointer ${
-              selectedVolumeTier === "all"
-                ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
-                : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-            }`}
-          >
-            All Volumes
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedVolumeTier("small")}
-            className={`h-7 px-3 rounded-md transition-colors text-xs font-semibold cursor-pointer ${
-              selectedVolumeTier === "small"
-                ? "bg-[var(--surface-lowest)] text-[var(--accent-primary)] shadow-2xs font-bold"
-                : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-            }`}
-          >
-            &lt; 30k pcs
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedVolumeTier("medium")}
-            className={`h-7 px-3 rounded-md transition-colors text-xs font-semibold cursor-pointer ${
-              selectedVolumeTier === "medium"
-                ? "bg-[var(--surface-lowest)] text-amber-600 shadow-2xs font-bold"
-                : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-            }`}
-          >
-            30k - 75k pcs
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedVolumeTier("large")}
-            className={`h-7 px-3 rounded-md transition-colors text-xs font-semibold cursor-pointer ${
-              selectedVolumeTier === "large"
-                ? "bg-[var(--surface-lowest)] text-emerald-600 shadow-2xs font-bold"
-                : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-            }`}
-          >
-            &gt; 75k pcs
-          </button>
-        </div>
       }
       search={{
         value: searchTerm,
@@ -709,8 +670,33 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
         setSelectedStageId("all");
         setQuickFilter("none");
       }}
-      resetFiltersLabel="Reset"
+      resetFiltersLabel="Clear Filters"
     >
+      {/* If intake filter is selected, render the intake queue cards above table */}
+      {quickFilter === "intake" && costingRequests.length > 0 && (
+        <section className="shrink-0 space-y-3 border-b border-amber-500/20 bg-amber-50/40 px-5 py-3.5 dark:border-amber-500/10 dark:bg-amber-950/20 sm:px-8">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-[var(--on-surface)] font-display">Costing Request Intake Queue</h2>
+              <p className="mt-0.5 text-xs text-[var(--on-surface-muted)]">Review specifications, offer a counter date, and submit the costing output path to Marketing.</p>
+            </div>
+            <span className="rounded-full bg-amber-500/10 px-2.5 py-1 font-mono text-xs font-bold text-amber-700 dark:text-amber-300">{costingRequests.length} open</span>
+          </div>
+          <div className="grid max-h-[30vh] grid-cols-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
+            {costingRequests.map((request) => (
+              <button key={request.id} type="button" onClick={() => setSelectedCostingRequest(request)} className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] p-3 text-left transition hover:bg-amber-50 dark:hover:bg-amber-950/25 cursor-pointer shadow-2xs">
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-bold text-[var(--on-surface)]">{request.productDescription}</span>
+                  <span className="mt-1 block truncate text-[11px] text-[var(--on-surface-muted)]">{request.customer} · {request.srNumber} · Qty {Number(request.qtyDesignCosting || 0).toLocaleString()} {request.unitPcPack || "PC"}</span>
+                  <span className="mt-1 block text-[10px] font-medium text-amber-700 dark:text-amber-300">Required {request.costingRequiredDate || "date missing"}</span>
+                </span>
+                <span className="shrink-0 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-bold text-white shadow-2xs">Inspect</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Toast */}
       {toastMessage && (
         <div className="fixed top-16 right-5 z-[60] flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xl text-[12px] font-semibold border border-zinc-800 dark:border-zinc-200/80 max-w-sm animate-smooth-toast">
@@ -759,4 +745,20 @@ export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
   );
 };
 
+export const CostingTeamDesk: React.FC<CostingTeamDeskProps> = ({ user }) => {
+  const location = useLocation();
+  const activeView: "overview" | "costing" = useMemo(() => {
+    const path = location.pathname.toLowerCase();
+    if (path.includes("/costing") && path !== "/costing-team") return "costing";
+    return "overview";
+  }, [location.pathname]);
+
+  // Both Overview and Costing sections kept blank for now as requested:
+  // "and in the costing section remove all that section just and add the overview and costing even dont design them we will deisgn it later"
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-[var(--surface-base)] text-[var(--on-surface)] overflow-hidden" />
+  );
+};
+
 export default CostingTeamDesk;
+

@@ -445,7 +445,6 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   return (
     <DeskWorkspaceLayout
       title="Commercial Sample Requests"
-      subtitle="Commercial production intake, PMT sampling pipelines, and dispatch tracking."
       businessYear={selectedYear}
       totalCount={samplingRequests.length}
       totalLabel="Total"
