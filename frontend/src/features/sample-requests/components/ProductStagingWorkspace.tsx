@@ -10,6 +10,8 @@ import {
   updateSampleRequestApi,
   releaseSampleRequestIdsApi,
   createDesignBriefFromSampleApi,
+  deleteSampleRequestApi,
+  batchDeleteSampleRequestsApi,
 } from "@/infrastructure/api";
 import { ProductSearchResult, BindingHierarchyResponse, SampleRequestItem } from "../types";
 import { ProductCategoryItem } from "@/types/master";
@@ -1324,20 +1326,47 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       });
   };
 
-  const handleRemoveStagedItem = (id: string) => {
+  const handleRemoveStagedItem = async (id: string) => {
     const item = stagedProducts.find((staged) => staged.id === id);
-    if (item?.savedRequestId || item?.isDraftSaved) {
-      showToast("This item is already saved as a draft. Only an Admin can delete the saved request.", "error");
-      return;
+    const nextProducts = stagedProducts.filter((staged) => staged.id !== id);
+    setStagedProducts(nextProducts);
+    stagedProductsRef.current = nextProducts;
+    try {
+      sessionStorage.setItem("samp_active_staged_products", JSON.stringify(nextProducts));
+    } catch {
+      // ignore
     }
-    setStagedProducts((prev) => prev.filter((item) => item.id !== id));
+    showToast(`Removed "${item?.productDescription || "Product"}" from staging.`);
+
+    if (item?.savedRequestId) {
+      try {
+        await deleteSampleRequestApi(item.savedRequestId);
+      } catch (err) {
+        console.warn("Could not delete draft request from backend:", err);
+      }
+    }
   };
 
-  const handleClearStaging = () => {
-    const savedItems = stagedProducts.filter((item) => item.savedRequestId || item.isDraftSaved);
-    setStagedProducts(savedItems);
-    if (savedItems.length) {
-      showToast(`Kept ${savedItems.length} saved draft(s). Only unsaved staging items were cleared.`, "error");
+  const handleClearStaging = async () => {
+    const savedIds = stagedProducts
+      .map((item) => item.savedRequestId)
+      .filter((savedId): savedId is string | number => Boolean(savedId));
+
+    setStagedProducts([]);
+    stagedProductsRef.current = [];
+    try {
+      sessionStorage.removeItem("samp_active_staged_products");
+    } catch {
+      // ignore
+    }
+    showToast("Cleared all staged products.");
+
+    if (savedIds.length > 0) {
+      try {
+        await batchDeleteSampleRequestsApi(savedIds);
+      } catch (err) {
+        console.warn("Could not delete draft requests from backend:", err);
+      }
     }
   };
 
@@ -1593,7 +1622,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   };
 
   return (
-    <div className="flex-1 flex min-h-0 flex-col overflow-y-auto bg-[var(--bg-app)] text-slate-900 dark:bg-zinc-950 dark:text-zinc-100">
+    <div className="flex-1 flex min-h-0 flex-col overflow-y-auto bg-[var(--surface-base)] text-zinc-900 dark:text-zinc-100 font-sans select-text">
       {/* Main Container */}
       <div className="mx-auto w-full max-w-[1680px] flex-1 space-y-4 px-4 py-4 sm:px-6 lg:px-8">
 
@@ -1616,6 +1645,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         {/* 2. Staged Products Queue & Table */}
         <StagingProductList
           stagedProducts={stagedProducts}
+          onOpenAddModal={handleOpenAddProduct}
           onInspectProduct={(prod) => setInspectingProduct(prod)}
           onUpdateProduct={handleUpdateStagedProduct}
           onDuplicateProduct={handleDuplicateStagedItem}
