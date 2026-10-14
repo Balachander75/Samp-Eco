@@ -26,8 +26,7 @@ import { CopyBadge } from "@/components/ui/CopyBadge";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Select } from "@/components/ui/Select";
-import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
-import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { DataTable, ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 import { releaseSampleToPlantApi, submitSamplingFeedbackApi } from "@/infrastructure/api/sampleRequestsApi";
@@ -348,10 +347,236 @@ export const SamplingReviewQueuePage: React.FC<SamplingReviewQueuePageProps> = (
     },
   ];
 
+  const columns: ColumnDef<SampleRequestItem>[] = useMemo(
+    () => [
+      {
+        id: "srCode",
+        header: "SR Code / Date",
+        cell: (r) => (
+          <div className="whitespace-nowrap font-mono font-bold">
+            <CopyBadge text={r.srNumber || `SR-${r.id}`} />
+            <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+              Intake: {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "product",
+        header: "Product Description & Hierarchy",
+        cell: (r) => {
+          const categoryHierarchy = [
+            r.productCategory,
+            r.productSubCategory,
+            r.productThirdCategory,
+          ]
+            .filter(Boolean)
+            .join(" / ");
+          return (
+            <div className="max-w-sm">
+              <div
+                className="font-semibold text-xs text-[var(--on-surface)] truncate hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                title={r.productDescription || (r as any).opportunityName || "Packaging Deliverable"}
+              >
+                {r.productDescription || (r as any).opportunityName || "Packaging Deliverable"}
+              </div>
+              <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 truncate">
+                {categoryHierarchy || r.materialCode || "Cartonboard Packaging"}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "customer",
+        header: "Customer / Brand",
+        cell: (r) => (
+          <div className="whitespace-nowrap font-semibold text-[var(--on-surface)]">
+            <div className="flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
+              <span className="truncate max-w-[150px]" title={r.customer || ""}>
+                {r.customer || "—"}
+              </span>
+            </div>
+            <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
+              {r.brandName || "Commercial"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "creativeStatus",
+        header: "Creative Status",
+        cell: (r) => {
+          const state = r.mockupWorkflowState;
+          return (
+            <div className="whitespace-nowrap font-mono text-xs">
+              {state?.designNeeded === false ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                  Direct to Studio
+                </span>
+              ) : state?.stage === "marketing" || state?.stage === "studio" ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                  <CheckCircle2 className="w-2.5 h-2.5" />
+                  <span>Creative Done</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                  <Eye className="w-2.5 h-2.5" />
+                  <span>Design In Review</span>
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "studioOutput",
+        header: "Studio CAD Deliverable",
+        cell: (r) => {
+          const studioOutput = r.mockupWorkflowState?.mockupUrl;
+          const isWebUrl =
+            studioOutput &&
+            (studioOutput.startsWith("http://") || studioOutput.startsWith("https://"));
+          return (
+            <div className="max-w-xs" onClick={(e) => e.stopPropagation()}>
+              {studioOutput ? (
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300 truncate max-w-[180px]"
+                    title={studioOutput}
+                  >
+                    {studioOutput}
+                  </span>
+                  <CopyBadge text={studioOutput} label="" />
+                  {isWebUrl && (
+                    <a
+                      href={studioOutput}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 rounded hover:bg-[var(--surface-container)] text-indigo-600 dark:text-indigo-400 transition"
+                      title="Open Output"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                  <Clock className="w-2.5 h-2.5" /> Awaiting CAD
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "plant",
+        header: "Target Plant",
+        cell: (r) => (
+          <span className="font-mono text-xs text-[var(--on-surface-muted)] whitespace-nowrap">
+            {r.targetPlant || "Khaniwade"}
+          </span>
+        ),
+      },
+      {
+        id: "samplingRemarks",
+        header: "Sampling Remarks / Feedback",
+        cell: (r) => {
+          const feedback = r.mockupWorkflowState?.samplingFeedback || r.samplingRemark;
+          return (
+            <div className="max-w-xs" onClick={(e) => e.stopPropagation()}>
+              {feedback ? (
+                <div
+                  className="truncate text-xs font-medium text-slate-700 dark:text-zinc-300"
+                  title={feedback}
+                >
+                  {feedback}
+                </div>
+              ) : (
+                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">—</span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "status",
+        header: "Review Stage",
+        cell: (r) => {
+          const phase = getItemPhase(r);
+          return (
+            <StatusPill
+              status={
+                phase === "ready_to_release"
+                  ? "Ready for Plant"
+                  : phase === "released"
+                  ? "Released to Plant"
+                  : phase === "design_feedback"
+                  ? "Design Review"
+                  : r.status || "In Review"
+              }
+              size="sm"
+              showDot
+            />
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: <span className="block text-right">Actions</span>,
+        align: "right",
+        cell: (r) => {
+          const phase = getItemPhase(r);
+          return (
+            <div
+              className="flex items-center justify-end gap-1.5 whitespace-nowrap"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {phase === "ready_to_release" && !readOnly && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenReleaseModal(r)}
+                  className="inline-flex select-none items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold font-mono transition cursor-pointer shadow-2xs active:scale-98"
+                  title="Release sample to manufacturing plant"
+                >
+                  <Send className="w-3 h-3" />
+                  <span>Release to Plant</span>
+                </button>
+              )}
+
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenFeedbackModal(r)}
+                  className="inline-flex select-none items-center gap-1 rounded-lg border border-teal-500/30 text-teal-700 dark:text-teal-300 hover:bg-teal-500/10 px-2.5 py-1.5 text-[11px] font-semibold transition cursor-pointer"
+                  title="Provide technical feedback"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                  <span>Feedback</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setInspectModalItem(r)}
+                className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
+                title="Inspect Deliverable Details"
+              >
+                <span>Inspect</span>
+                <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
+              </button>
+            </div>
+          );
+        },
+      },
+    ],
+    [readOnly, handleOpenReleaseModal, handleOpenFeedbackModal]
+  );
+
   return (
     <DeskWorkspaceLayout
       title="Sampling Review & Plant Dispatch Queue"
-      subtitle="Inspect marketing designs, review creative artwork & studio CAD links, provide technical remarks, and release approved samples to the manufacturing plant."
       businessYear={selectedYear === "ALL" ? "Consolidated" : selectedYear}
       totalCount={totalCount}
       totalLabel="Deliverables"
@@ -433,236 +658,32 @@ export const SamplingReviewQueuePage: React.FC<SamplingReviewQueuePageProps> = (
       resetFiltersLabel="Reset"
     >
 
-      {/* ── 4. High-Density Full-Bleed Table ── */}
-      <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-lowest)]">
-        <table className="w-full border-collapse text-left text-xs text-[var(--on-surface)] font-normal">
-          <thead className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--surface-low)]/90 backdrop-blur-md text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)]">
-            <tr>
-              <th className="py-3 px-3 font-semibold whitespace-nowrap pl-6">SR Code / Date</th>
-              <th className="py-3 px-4 font-semibold">Product Description &amp; Hierarchy</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Customer / Brand</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Creative Status</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Studio CAD Deliverable</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Target Plant</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Sampling Remarks / Feedback</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Review Stage</th>
-              <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-[var(--border-subtle)]">
-            {isLoading ? (
-              <TableSkeletonRows rows={8} columns={9} />
-            ) : filteredRequests.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="py-16 text-center">
-                  <EmptyState
-                    icon={Beaker}
-                    title="No Sampling Deliverables Found"
-                    description={
-                      hasActiveFilters
-                        ? "No deliverables match your active filter."
-                        : "There are currently no items waiting in the Sampling Review queue."
-                    }
-                    onResetFilters={hasActiveFilters ? handleResetFilters : undefined}
-                    resetLabel="Reset filters"
-                  />
-                </td>
-              </tr>
-            ) : (
-              paginatedRequests.map((r) => {
-                const phase = getItemPhase(r);
-                const state = r.mockupWorkflowState;
-                const studioOutput = state?.mockupUrl;
-                const isWebUrl = studioOutput && (studioOutput.startsWith("http://") || studioOutput.startsWith("https://"));
-                const feedback = state?.samplingFeedback || r.samplingRemark;
-
-                const categoryHierarchy = [
-                  r.productCategory,
-                  r.productSubCategory,
-                  r.productThirdCategory,
-                ]
-                  .filter(Boolean)
-                  .join(" / ");
-
-                return (
-                  <tr
-                    key={r.id}
-                    onClick={() => setInspectModalItem(r)}
-                    className="hover:bg-[var(--surface-low)] transition-colors cursor-pointer group"
-                  >
-                    {/* SR Code / Date */}
-                    <td className="py-3.5 pl-6 pr-3 font-mono font-bold whitespace-nowrap">
-                      <CopyBadge text={r.srNumber || `SR-${r.id}`} />
-                      <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
-                        Intake: {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
-                      </div>
-                    </td>
-
-                    {/* Product Description */}
-                    <td className="py-3.5 px-4 max-w-sm">
-                      <div
-                        className="font-semibold text-xs text-[var(--on-surface)] truncate group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors"
-                        title={r.productDescription || (r as any).opportunityName || "Packaging Deliverable"}
-                      >
-                        {r.productDescription || (r as any).opportunityName || "Packaging Deliverable"}
-                      </div>
-                      <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 truncate">
-                        {categoryHierarchy || r.materialCode || "Cartonboard Packaging"}
-                      </div>
-                    </td>
-
-                    {/* Customer */}
-                    <td className="py-3.5 px-4 font-semibold text-[var(--on-surface)] whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
-                        <span className="truncate max-w-[150px]" title={r.customer || ""}>
-                          {r.customer || "—"}
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
-                        {r.brandName || "Commercial"}
-                      </div>
-                    </td>
-
-                    {/* Creative Status */}
-                    <td className="py-3.5 px-4 whitespace-nowrap font-mono text-xs">
-                      {state?.designNeeded === false ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
-                          Direct to Studio
-                        </span>
-                      ) : state?.stage === "marketing" || state?.stage === "studio" ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                          <CheckCircle2 className="w-2.5 h-2.5" />
-                          <span>Creative Done</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-                          <Eye className="w-2.5 h-2.5" />
-                          <span>Design In Review</span>
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Studio Output */}
-                    <td className="py-3.5 px-4 max-w-xs" onClick={(e) => e.stopPropagation()}>
-                      {studioOutput ? (
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300 truncate max-w-[180px]"
-                            title={studioOutput}
-                          >
-                            {studioOutput}
-                          </span>
-                          <CopyBadge text={studioOutput} label="" />
-                          {isWebUrl && (
-                            <a
-                              href={studioOutput}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-1 rounded hover:bg-[var(--surface-container)] text-indigo-600 dark:text-indigo-400 transition"
-                              title="Open Output"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5" /> Awaiting CAD
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Plant */}
-                    <td className="py-3.5 px-4 font-mono text-xs text-[var(--on-surface-muted)] whitespace-nowrap">
-                      {r.targetPlant || "Khaniwade"}
-                    </td>
-
-                    {/* Sampling Remarks / Feedback */}
-                    <td className="py-3.5 px-4 max-w-xs" onClick={(e) => e.stopPropagation()}>
-                      {feedback ? (
-                        <div className="truncate text-xs font-medium text-slate-700 dark:text-zinc-300" title={feedback}>
-                          {feedback}
-                        </div>
-                      ) : (
-                        <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">—</span>
-                      )}
-                    </td>
-
-                    {/* Review Stage */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <StatusPill
-                        status={
-                          phase === "ready_to_release"
-                            ? "Ready for Plant"
-                            : phase === "released"
-                            ? "Released to Plant"
-                            : phase === "design_feedback"
-                            ? "Design Review"
-                            : r.status || "In Review"
-                        }
-                        size="sm"
-                        showDot
-                      />
-                    </td>
-
-                    {/* Actions */}
-                    <td
-                      className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-end gap-1.5">
-                        {phase === "ready_to_release" && !readOnly && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenReleaseModal(r)}
-                            className="inline-flex select-none items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold font-mono transition cursor-pointer shadow-2xs active:scale-98"
-                            title="Release sample to manufacturing plant"
-                          >
-                            <Send className="w-3 h-3" />
-                            <span>Release to Plant</span>
-                          </button>
-                        )}
-
-                        {!readOnly && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenFeedbackModal(r)}
-                            className="inline-flex select-none items-center gap-1 rounded-lg border border-teal-500/30 text-teal-700 dark:text-teal-300 hover:bg-teal-500/10 px-2.5 py-1.5 text-[11px] font-semibold transition cursor-pointer"
-                            title="Provide technical feedback"
-                          >
-                            <MessageSquare className="w-3 h-3" />
-                            <span>Feedback</span>
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => setInspectModalItem(r)}
-                          className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
-                          title="Inspect Docket Details"
-                        >
-                          <span>Inspect</span>
-                          <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ── 5. Enterprise Pagination Footer ── */}
-      <PaginationBar
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalCount={filteredRequests.length}
-        pageSize={pageSize}
-        onPageChange={setCurrentPage}
+      <DataTable
+        data={filteredRequests}
+        columns={columns}
+        keyExtractor={(r) => r.id}
+        isLoading={isLoading || isRefreshing}
+        emptyMessage={
+          hasActiveFilters
+            ? "No deliverables match your active filter."
+            : "There are currently no items waiting in the Sampling Review queue."
+        }
+        onRowClick={(r) => setInspectModalItem(r)}
+        toolbarLeft={
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="truncate">
+              Showing{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {filteredRequests.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {totalCount}
+              </span>{" "}
+              deliverables
+            </span>
+          </div>
+        }
       />
 
       {/* ── Modal: Release to Plant ── */}

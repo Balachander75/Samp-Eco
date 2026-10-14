@@ -2,16 +2,11 @@ import React, { useState, useMemo } from "react";
 import { UserProfile } from "@/features/auth";
 import { SampleRequestItem } from "@/features/sample-requests/types";
 import { getRequestTrackType } from "@/features/sample-requests/utils/trackTypes";
-import {
-  Search,
-  X,
-  RefreshCw,
-  Download,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { isMaterialAddedRecently } from "@/features/sample-requests/utils/dateUtils";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { Select } from "@/components/ui/Select";
-import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
+import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 
 export interface SamplingProgramPlanningViewProps {
@@ -42,8 +37,6 @@ export const SamplingProgramPlanningView: React.FC<SamplingProgramPlanningViewPr
   const [searchTerm, setSearchTerm] = useState("");
   const [plantFilter, setPlantFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 15;
 
   // Scoped strictly to program planning requests
   const programRequests = useMemo(() => {
@@ -128,18 +121,11 @@ export const SamplingProgramPlanningView: React.FC<SamplingProgramPlanningViewPr
     });
   }, [programRequests, filterTab, plantFilter, customerFilter, searchTerm]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / PAGE_SIZE));
-  const paginatedRequests = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredRequests.slice(start, start + PAGE_SIZE);
-  }, [filteredRequests, currentPage]);
-
   const clearFilters = () => {
     setFilterTab("all");
     setSearchTerm("");
     setPlantFilter("all");
     setCustomerFilter("all");
-    setCurrentPage(1);
   };
 
   // Export CSV
@@ -154,73 +140,197 @@ export const SamplingProgramPlanningView: React.FC<SamplingProgramPlanningViewPr
         { header: "Customer", accessor: (r) => r.customer || "" },
         { header: "Target Plant", accessor: (r) => r.targetPlant || "" },
         { header: "Program Year", accessor: (r) => r.programYear || "2026" },
-        { header: "SAMP Note", accessor: (r) => hasSampNote(r) ? "Added" : "Awaiting" },
-        { header: "Plant Note", accessor: (r) => hasPlantNote(r) ? "Added" : "Awaiting" },
+        { header: "SAMP Note", accessor: (r) => (hasSampNote(r) ? "Added" : "Awaiting") },
+        { header: "Plant Note", accessor: (r) => (hasPlantNote(r) ? "Added" : "Awaiting") },
         { header: "Materials Count", accessor: (r) => (r.programMaterials || []).length },
         { header: "Created By", accessor: (r) => r.createdBy || "Marketing" },
-        { header: "Created Date", accessor: (r) => r.dateRequestCreated || r.createdAt || "" },
+        { header: "Date Created", accessor: (r) => r.dateRequestCreated || "" },
       ],
       data: filteredRequests,
     });
-    showToast(`Exported ${filteredRequests.length} program planning records to CSV`);
+    showToast(`✓ Exported ${filteredRequests.length} program plan(s) to CSV`);
   };
 
   const kpiItems = [
     {
-      label: "Programs",
+      label: "All Programs",
       value: metrics.total,
-      detail: "All assigned plans",
-      color: "bg-[var(--accent-primary)]",
-      isActive: filterTab === "all" && customerFilter === "all" && plantFilter === "all" && !searchTerm,
-      onClick: clearFilters,
+      detail: `${metrics.totalMaterials} SKUs tracked`,
+      color: "bg-indigo-500",
+      isActive: filterTab === "all",
+      onClick: () => setFilterTab("all"),
     },
     {
-      label: "SAMP note needed",
+      label: "Awaiting SAMP Note",
       value: metrics.pending,
-      detail: "Awaiting your input",
+      detail: "Action required by SAMP",
       color: "bg-amber-500",
       isActive: filterTab === "pending_note",
-      onClick: () => {
-        setFilterTab("pending_note");
-        setCurrentPage(1);
-      },
+      onClick: () => setFilterTab("pending_note"),
     },
     {
-      label: "SAMP note added",
+      label: "SAMP Note Added",
       value: metrics.sampNotes,
-      detail: "Your planning input",
-      color: "bg-sky-500",
-      isActive: filterTab === "samp_note_added",
-      onClick: () => {
-        setFilterTab("samp_note_added");
-        setCurrentPage(1);
-      },
-    },
-    {
-      label: "Plant note added",
-      value: metrics.plantNotes,
-      detail: "Plant planning input",
+      detail: "Technical feedback given",
       color: "bg-emerald-500",
-      isActive: filterTab === "plant_note_added",
-      onClick: () => {
-        setFilterTab("plant_note_added");
-        setCurrentPage(1);
-      },
+      isActive: filterTab === "samp_note_added",
+      onClick: () => setFilterTab("samp_note_added"),
     },
     {
-      label: "Material lines",
-      value: metrics.totalMaterials,
-      detail: "Across all plans",
-      color: "bg-sky-500",
+      label: "Plant Note Added",
+      value: metrics.plantNotes,
+      detail: "Plant feedback verified",
+      color: "bg-teal-500",
+      isActive: filterTab === "plant_note_added",
+      onClick: () => setFilterTab("plant_note_added"),
     },
   ];
+
+  const columns = useMemo<ColumnDef<SampleRequestItem>[]>(
+    () => [
+      {
+        id: "program_id",
+        header: "Program ID",
+        width: "w-[140px]",
+        sortable: true,
+        cell: (r) => <CopyBadge text={r.materialCode || r.srNumber || `PG-${r.id}`} />,
+      },
+      {
+        id: "campaign",
+        header: "Campaign Title & Scope",
+        cell: (r) => (
+          <div className="max-w-xs">
+            <div className="truncate font-semibold text-xs text-[var(--on-surface)]" title={r.programName || r.productDescription || "Seasonal Program"}>
+              {r.programName || r.productDescription || "Seasonal Program"}
+            </div>
+            <div className="mt-0.5 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+              {r.productDescription || "Multi-SKU range"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "customer",
+        header: "Customer",
+        width: "w-[160px]",
+        cell: (r) => (
+          <span className="font-semibold text-xs text-[var(--on-surface)] truncate" title={r.customer || ""}>
+            {r.customer || "—"}
+          </span>
+        ),
+      },
+      {
+        id: "plant",
+        header: "Plant",
+        width: "w-[100px]",
+        cell: (r) => (
+          <span className="font-mono text-xs text-[var(--on-surface-muted)]">
+            Plant {r.targetPlant || "1505"}
+          </span>
+        ),
+      },
+      {
+        id: "year",
+        header: "Year",
+        width: "w-[90px]",
+        align: "center",
+        cell: (r) => (
+          <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-xs font-bold text-[var(--on-surface-muted)]">
+            {r.programYear || "2026"}
+          </span>
+        ),
+      },
+      {
+        id: "skus",
+        header: "Matrix SKUs",
+        width: "w-[120px]",
+        align: "center",
+        cell: (r) => {
+          const materialCount = (r.programMaterials || []).length;
+          const hasRecent = (r.programMaterials || []).some((m) => isMaterialAddedRecently(m.createdAt));
+          return (
+            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center rounded-full bg-[var(--accent-primary-subtle)] px-2 py-0.5 font-mono text-[10.5px] font-bold text-[var(--accent-primary)]">
+                {materialCount} SKU{materialCount !== 1 ? "s" : ""}
+              </span>
+              {hasRecent && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.2 text-[9px] font-semibold uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  New
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "notes",
+        header: "Team Notes",
+        width: "w-[160px]",
+        cell: (r) => {
+          const sampNoteAdded = hasSampNote(r);
+          const plantNoteAdded = hasPlantNote(r);
+          return (
+            <div className="flex flex-col gap-1 items-start">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  sampNoteAdded
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
+                }`}
+              >
+                SAMP: {sampNoteAdded ? "Note added" : "Awaiting"}
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  plantNoteAdded
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
+                }`}
+              >
+                Plant: {plantNoteAdded ? "Note added" : "Awaiting"}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        id: "submitter",
+        header: "Submitter",
+        width: "w-[130px]",
+        cell: (r) => (
+          <div className="font-mono text-xs text-[var(--on-surface-muted)]">
+            <div>{r.createdBy || "Marketing"}</div>
+            <div className="text-[10px] text-[var(--on-surface-subtle)]">
+              {r.dateRequestCreated || "Recent"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "actions",
+        header: "Action",
+        align: "right",
+        width: "w-[100px]",
+        cell: (r) => (
+          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => onInspectRequest(r)}
+              className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
+            >
+              <span>Inspect</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [onInspectRequest]
+  );
 
   return (
     <DeskWorkspaceLayout
       title="Program Planning"
-      subtitle="Review Marketing plans and add SAMP planning notes"
-      totalCount={metrics.total}
-      totalLabel="Programs"
       onRefresh={onRefresh}
       isRefreshing={isLoading}
       onExportCSV={handleExportCSV}
@@ -232,28 +342,23 @@ export const SamplingProgramPlanningView: React.FC<SamplingProgramPlanningViewPr
             <Select
               aria-label="Filter by customer"
               value={customerFilter}
-              onChange={(e) => {
-                setCustomerFilter(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setCustomerFilter(e.target.value)}
               className="min-w-[160px] max-w-[240px]"
               options={[
-                { value: "all", label: "All customers" },
+                { value: "all", label: "All Customers" },
                 ...customerList.map((customer) => ({ value: customer, label: customer })),
               ]}
             />
           )}
+
           {plantList.length > 0 && (
             <Select
               aria-label="Filter by plant"
               value={plantFilter}
-              onChange={(e) => {
-                setPlantFilter(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setPlantFilter(e.target.value)}
               className="min-w-[140px]"
               options={[
-                { value: "all", label: "All plants" },
+                { value: "all", label: "All Plants" },
                 ...plantList.map((plant) => ({ value: plant, label: `Plant ${plant}` })),
               ]}
             />
@@ -262,183 +367,42 @@ export const SamplingProgramPlanningView: React.FC<SamplingProgramPlanningViewPr
       }
       search={{
         value: searchTerm,
-        onChange: (val) => {
-          setSearchTerm(val);
-          setCurrentPage(1);
-        },
+        onChange: setSearchTerm,
         placeholder: "Search code, campaign, customer...",
       }}
       hasActiveFilters={Boolean(
         customerFilter !== "all" || plantFilter !== "all" || filterTab !== "all" || searchTerm
       )}
       onResetFilters={clearFilters}
-      resetFiltersLabel="Clear filters"
+      resetFiltersLabel="Clear Filters"
     >
-
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-5 py-2 text-xs text-[var(--on-surface-muted)] sm:px-6"><span>Showing <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">{filteredRequests.length}</span> of <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">{programRequests.length}</span> programs</span><span className="font-mono text-[10px] text-[var(--on-surface-subtle)]">Newest plans first</span></div>
-      <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col">
-        <table className="w-full min-w-[1120px] text-left text-xs border-collapse">
-          <thead className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--surface-low)]">
-            <tr className="font-mono text-[11px] uppercase tracking-wider text-[var(--on-surface-subtle)] select-none">
-              <th className="py-3 pl-6 pr-3 w-12 text-center">#</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Program ID</th>
-              <th className="py-3 px-4 font-semibold">Campaign Title & Scope</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Customer</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Plant</th>
-              <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Year</th>
-              <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Material lines</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Team Notes</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Submitter</th>
-              <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Action</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-[var(--border-subtle)]">
-            {isLoading ? (
-              <tr>
-                <td colSpan={10} className="py-16 text-center font-mono text-[var(--on-surface-subtle)]">
-                  <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin text-[var(--accent-primary)]" />
-                  Loading program plans...
-                </td>
-              </tr>
-            ) : filteredRequests.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="py-16 text-center">
-                  <div className="mx-auto flex max-w-sm flex-col items-center">
-                    <h3 className="text-sm font-semibold text-[var(--on-surface)]">No programs to review</h3>
-                    <p className="mt-1 text-xs text-[var(--on-surface-subtle)]">
-                      {searchTerm || customerFilter !== "all" || filterTab !== "all" || plantFilter !== "all"
-                        ? "No programs match your search or active filter criteria."
-                        : "There are currently no seasonal program planning requests submitted."}
-                    </p>
-                    {(searchTerm || customerFilter !== "all" || filterTab !== "all" || plantFilter !== "all") && (
-                      <button
-                        type="button"
-                        onClick={clearFilters}
-                        className="mt-3 text-xs font-semibold text-[var(--accent-primary)] hover:underline cursor-pointer"
-                      >
-                        Reset filters
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              paginatedRequests.map((req, idx) => {
-                const rowNumber = (currentPage - 1) * PAGE_SIZE + idx + 1;
-                const materialCount = (req.programMaterials || []).length;
-                const sampNoteAdded = hasSampNote(req);
-                const plantNoteAdded = hasPlantNote(req);
-                const hasRecent = (req.programMaterials || []).some((m) =>
-                  isMaterialAddedRecently(m.createdAt)
-                );
-
-                return (
-                  <tr
-                    key={req.id}
-                    onClick={() => onInspectRequest(req)}
-                    className="group cursor-pointer transition-colors hover:bg-[var(--surface-low)]"
-                  >
-                    {/* 1. # */}
-                    <td className="py-3.5 pl-6 pr-3 text-center font-mono text-[11px] font-semibold text-[var(--on-surface-subtle)]">
-                      {String(rowNumber).padStart(2, "0")}
-                    </td>
-
-                    {/* 2. Program ID */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-xs whitespace-nowrap">
-                      <CopyBadge text={req.materialCode || req.srNumber} />
-                    </td>
-
-                    {/* 3. Campaign Title & Scope */}
-                    <td className="py-3.5 px-4 max-w-xs">
-                      <div className="truncate font-semibold text-[var(--on-surface)]">
-                        {req.programName || req.programCampaignTitle || "Seasonal Program"}
-                      </div>
-                      <div className="mt-0.5 truncate text-[11px] text-[var(--on-surface-subtle)]">
-                        {req.productDescription || "Multi-SKU range"}
-                      </div>
-                    </td>
-
-                    {/* 4. Customer */}
-                    <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-[var(--on-surface)]">
-                      <div className="flex items-center gap-1.5">
-                        <span>{req.customer || "—"}</span>
-                      </div>
-                    </td>
-
-                    {/* 5. Plant */}
-                    <td className="whitespace-nowrap px-4 py-3.5 font-mono text-[var(--on-surface-muted)]">
-                      Plant {req.targetPlant || "1505"}
-                    </td>
-
-                    {/* 6. Year */}
-                    <td className="py-3.5 px-4 text-center font-mono text-xs whitespace-nowrap">
-                      <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-bold text-[var(--on-surface-muted)]">
-                        {req.programYear || "2026"}
-                      </span>
-                    </td>
-
-                    {/* 7. Matrix SKUs */}
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                        <span className="inline-flex items-center rounded-full bg-[var(--accent-primary-subtle)] px-2 py-0.5 font-mono text-[10.5px] font-bold text-[var(--accent-primary)]">
-                          {materialCount} SKU{materialCount !== 1 ? "s" : ""}
-                        </span>
-                        {hasRecent && (
-                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.2 text-[9px] font-semibold uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                            New
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* 8. Team note status */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex flex-col gap-1 items-start">
-                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${sampNoteAdded ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"}`}>
-                          SAMP: {sampNoteAdded ? "Note added" : "Awaiting"}
-                        </span>
-                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${plantNoteAdded ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"}`}>
-                          Plant: {plantNoteAdded ? "Note added" : "Awaiting"}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* 9. Submitter */}
-                    <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs text-[var(--on-surface-muted)]">
-                      <div>{req.createdBy || "Marketing"}</div>
-                      <div className="text-[10px] text-[var(--on-surface-subtle)]">{req.dateRequestCreated || "Recent"}</div>
-                    </td>
-
-                    {/* 10. Actions */}
-                    <td className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => onInspectRequest(req)}
-                        className="inline-flex items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-low)] px-3 py-1.5 text-xs font-semibold text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-container)] cursor-pointer"
-                      >
-                        Inspect plan
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-
-        {/* Table Footer Pager */}
-        <div className="mt-auto shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-6 py-2.5">
-          <PaginationBar
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalCount={filteredRequests.length}
-            pageSize={PAGE_SIZE}
-            onPageChange={(p) => setCurrentPage(p)}
-            itemLabel="campaigns"
-          />
-        </div>
-      </div>
+      <DataTable
+        data={filteredRequests}
+        columns={columns}
+        keyExtractor={(req) => req.id}
+        isLoading={isLoading}
+        emptyMessage={
+          searchTerm || customerFilter !== "all" || filterTab !== "all" || plantFilter !== "all"
+            ? "No programs match your search or active filter criteria."
+            : "There are currently no seasonal program planning requests submitted."
+        }
+        onRowClick={onInspectRequest}
+        toolbarLeft={
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="truncate">
+              Showing{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {filteredRequests.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {programRequests.length}
+              </span>{" "}
+              programs
+            </span>
+          </div>
+        }
+      />
     </DeskWorkspaceLayout>
   );
 };

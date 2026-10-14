@@ -20,8 +20,7 @@ import { SampleRequestItem } from "@/features/sample-requests/types";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
-import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { Select } from "@/components/ui/Select";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
@@ -381,10 +380,179 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
     },
   ];
 
+  const columns = useMemo<ColumnDef<SampleRequestItem>[]>(
+    () => [
+      {
+        id: "sr_number",
+        header: "SR Code",
+        width: "w-[150px]",
+        sortable: true,
+        cell: (r) => (
+          <div>
+            <CopyBadge text={r.srNumber || `SR-${r.id}`} />
+            <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+              Raised {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "product",
+        header: "Deliverable & Category",
+        cell: (r) => {
+          const categoryHierarchy = [
+            r.productCategory,
+            r.productSubCategory,
+            r.productThirdCategory,
+          ]
+            .filter(Boolean)
+            .join(" / ");
+          return (
+            <div className="max-w-xs">
+              <div
+                className="font-semibold text-xs text-[var(--on-surface)] truncate"
+                title={r.productDescription || (r as any).opportunityName || "Deliverable"}
+              >
+                {r.productDescription || (r as any).opportunityName || "Deliverable"}
+              </div>
+              <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 truncate">
+                {categoryHierarchy || r.materialCode || "Packaging"}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "customer",
+        header: "Customer / Brand",
+        width: "w-[160px]",
+        cell: (r) => (
+          <div>
+            <div className="flex items-center gap-1.5 font-semibold text-[var(--on-surface)]">
+              <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
+              <span className="truncate max-w-[140px]" title={r.customer || ""}>
+                {r.customer || "—"}
+              </span>
+            </div>
+            <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
+              {r.brandName || "Commercial Account"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "scopes",
+        header: "Deliverable Scopes",
+        width: "w-[150px]",
+        cell: (r) => {
+          const scopes = r.requestTypes || [];
+          const hasMockup = scopes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes";
+          const hasSample = scopes.includes("sample");
+          return (
+            <div className="flex items-center gap-1 flex-wrap">
+              {hasMockup && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
+                  <Box className="w-2.5 h-2.5" />
+                  CAD
+                </span>
+              )}
+              {hasSample && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                  <FlaskConical className="w-2.5 h-2.5" />
+                  Sample
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "qty",
+        header: "Mockup / Qty",
+        width: "w-[110px]",
+        align: "center",
+        cell: (r) => {
+          const scopes = r.requestTypes || [];
+          const hasMockup = scopes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes";
+          const qty = Number((r as any).quantity || r.qtyForSampling || 1);
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-mono font-bold text-[11px] bg-[var(--surface-low)] text-[var(--on-surface)] tabular-nums border border-[var(--border-subtle)]">
+              {hasMockup ? "CAD + " : ""}
+              {qty} units
+            </span>
+          );
+        },
+      },
+      {
+        id: "plant",
+        header: "Plant",
+        width: "w-[110px]",
+        cell: (r) => (
+          <span className="font-mono text-xs text-[var(--on-surface-muted)]">
+            {r.targetPlant || "Khaniwade"}
+          </span>
+        ),
+      },
+      {
+        id: "sla",
+        header: "Target SLA Date",
+        width: "w-[130px]",
+        cell: (r) => (
+          <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--on-surface-muted)]">
+            <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
+            <span>{r.sampleRequiredDate ? formatOdooDate(r.sampleRequiredDate) : "Standard SLA"}</span>
+          </div>
+        ),
+      },
+      {
+        id: "status",
+        header: "Workflow Status",
+        width: "w-[130px]",
+        cell: (r) => <StatusPill status={r.status || "Creative"} size="sm" showDot />,
+      },
+      {
+        id: "actions",
+        header: "Action",
+        align: "right",
+        width: "w-[120px]",
+        cell: (r) => {
+          const isCreativeAwaiting =
+            !r.mockupWorkflowState ||
+            ["creative", "creative_approval"].includes(r.mockupWorkflowState.stage);
+          return (
+            <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+              {isCreativeAwaiting && !readOnly ? (
+                <button
+                  type="button"
+                  onClick={() => onInspectRequest(r)}
+                  className="inline-flex select-none items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold font-mono transition cursor-pointer shadow-2xs active:scale-98"
+                  title="Claim & Submit CAD Mockup"
+                >
+                  <span>Claim &amp; Submit</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onInspectRequest(r)}
+                  className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
+                  title="Inspect Deliverable Details"
+                >
+                  <span>Inspect</span>
+                  <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
+                </button>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    [onInspectRequest, readOnly]
+  );
+
   return (
     <DeskWorkspaceLayout
       title="Sampling & CAD Mockup Deliverables"
-      subtitle="Physical prototypes, 3D CAD simulations, structural mockups, and plant fabrication handoffs."
       businessYear={selectedYear === "ALL" ? "Consolidated" : selectedYear}
       totalCount={samplingMockupItems.length}
       extraBadges={
@@ -515,247 +683,42 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       resetFiltersLabel="Reset Filters"
     >
 
-      {/* ── 4. Main Workspace: Full-Bleed High-Density Table (Exact Marketing Sampling Standard) ── */}
-      <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-base)] flex flex-col text-[var(--on-surface)]">
-        <div className="flex-1 min-h-0 overflow-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 z-10 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
-              <tr className="text-[var(--on-surface-muted)] font-mono text-[11px] uppercase tracking-wider select-none">
-                <th className="py-3 pl-6 pr-3 w-8">
-                  <input
-                    type="checkbox"
-                    checked={
-                      paginatedItems.length > 0 &&
-                      paginatedItems.every((r) => selectedIds.has(r.id))
-                    }
-                    onChange={handleToggleSelectAll}
-                    className="rounded accent-[var(--accent-primary)] cursor-pointer"
-                    aria-label="Select all deliverables"
-                  />
-                </th>
-                <th className="py-3 px-4 font-semibold whitespace-nowrap">SR Code</th>
-                <th className="py-3 px-4 font-semibold">Deliverable &amp; Category</th>
-                <th className="py-3 px-4 font-semibold whitespace-nowrap">Customer / Brand</th>
-                <th className="py-3 px-4 font-semibold whitespace-nowrap">Deliverable Scopes</th>
-                <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Mockup / Qty</th>
-                <th className="py-3 px-4 font-semibold whitespace-nowrap">Plant</th>
-                <th className="py-3 px-4 font-semibold whitespace-nowrap">Target SLA Date</th>
-                <th className="py-3 px-4 font-semibold whitespace-nowrap">Workflow Status</th>
-                <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-[var(--border-subtle)]">
-              {isLoading || isRefreshing ? (
-                <TableSkeletonRows rows={8} columns={10} />
-              ) : paginatedItems.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="py-16 text-center">
-                    <EmptyState
-                      icon={Box}
-                      title="No Sampling Deliverables Found"
-                      description={
-                        hasActiveFilters
-                          ? "No sample or mockup requests match your search criteria or active filter."
-                          : "There are currently no sampling or CAD mockup requests in the queue."
-                      }
-                      onResetFilters={hasActiveFilters ? handleResetFilters : undefined}
-                      resetLabel="Reset filters"
-                    />
-                  </td>
-                </tr>
-              ) : (
-                paginatedItems.map((r) => {
-                  const scopes = r.requestTypes || [];
-                  const hasMockup =
-                    scopes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes";
-                  const hasSample = scopes.includes("sample");
-                  const hasDesign = scopes.includes("design");
-                  const qty = (r as any).quantity || r.qtyForSampling || 1;
-                  const isSelected = selectedIds.has(r.id);
-                  const isCreativeAwaiting =
-                    hasMockup && (!r.mockupWorkflowState || ["creative", "creative_approval"].includes(r.mockupWorkflowState.stage));
-                  const categoryHierarchy = [
-                    r.productCategory,
-                    r.productSubCategory,
-                    r.productThirdCategory,
-                  ]
-                    .filter(Boolean)
-                    .join(" / ");
-
-                  return (
-                    <tr
-                      key={r.id}
-                      onClick={() => onInspectRequest(r)}
-                      className={`hover:bg-[var(--surface-low)] transition-colors cursor-pointer group ${
-                        isSelected ? "bg-[var(--accent-primary-subtle)]" : ""
-                      }`}
-                    >
-                      {/* Checkbox */}
-                      <td
-                        className="py-3.5 pl-6 pr-3 w-8"
-                        onClick={(e) => handleToggleSelectRow(r.id, e)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => {}}
-                          className="rounded accent-[var(--accent-primary)] cursor-pointer"
-                          aria-label={`Select request ${r.srNumber || r.id}`}
-                        />
-                      </td>
-
-                      {/* SR Code */}
-                      <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
-                        <CopyBadge text={r.srNumber || `SR-${r.id}`} />
-                        <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
-                          Raised {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
-                        </div>
-                      </td>
-
-                      {/* Deliverable Description & Hierarchy */}
-                      <td className="py-3.5 px-4 max-w-sm">
-                        <div
-                          className="font-semibold text-xs text-[var(--on-surface)] truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors"
-                          title={r.productDescription || (r as any).opportunityName || "Commercial Sample Dummy"}
-                        >
-                          {r.productDescription || (r as any).opportunityName || "Commercial Sample Dummy"}
-                        </div>
-                        <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] flex items-center gap-1.5 mt-1">
-                          <span className="truncate" title={categoryHierarchy || r.materialCode || ""}>
-                            {categoryHierarchy || r.materialCode || "Cartonboard Packaging"}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Customer / Brand */}
-                      <td className="py-3.5 px-4 font-semibold text-[var(--on-surface)] whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
-                          <span className="truncate max-w-[180px]" title={r.customer || ""}>
-                            {r.customer || "—"}
-                          </span>
-                        </div>
-                        <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
-                          {r.brandName || "Commercial Account"}
-                        </div>
-                      </td>
-
-                      {/* Scopes */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {hasDesign && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-                              <Palette className="w-2.5 h-2.5 text-purple-600" />
-                              <span>Design</span>
-                            </span>
-                          )}
-                          {hasMockup && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
-                              <Box className="w-2.5 h-2.5 text-teal-600" />
-                              <span>Mockup</span>
-                            </span>
-                          )}
-                          {hasSample && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                              <FlaskConical className="w-2.5 h-2.5 text-emerald-600" />
-                              <span>Sample</span>
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Mockup / Quantity Specs */}
-                      <td className="py-3.5 px-4 text-center font-mono whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full font-mono font-bold text-[11px] bg-[var(--surface-low)] text-[var(--on-surface)] tabular-nums border border-[var(--border-subtle)]">
-                          {hasMockup ? "CAD + " : ""}
-                          {qty} units
-                        </span>
-                      </td>
-
-                      {/* Plant */}
-                      <td className="py-3.5 px-4 font-mono text-xs text-[var(--on-surface-muted)] whitespace-nowrap">
-                        {r.targetPlant || "Khaniwade"}
-                      </td>
-
-                      {/* Target SLA Date */}
-                      <td className="py-3.5 px-4 whitespace-nowrap font-mono text-[var(--on-surface-muted)]">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
-                          <span>
-                            {r.sampleRequiredDate
-                              ? formatOdooDate(r.sampleRequiredDate)
-                              : "Standard SLA"}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Workflow Status */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <StatusPill status={r.status || "Creative"} size="sm" showDot />
-                      </td>
-
-                      {/* Actions */}
-                      <td
-                        className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {isCreativeAwaiting && !readOnly ? (
-                          <button
-                            type="button"
-                            onClick={() => onInspectRequest(r)}
-                            className="inline-flex select-none items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold font-mono transition cursor-pointer shadow-2xs active:scale-98"
-                            title="Claim & Submit CAD Mockup"
-                          >
-                            <span>Claim &amp; Submit</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => onInspectRequest(r)}
-                            className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
-                            title="Inspect Deliverable Details"
-                          >
-                            <span>Inspect</span>
-                            <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Table Footer with Pagination */}
-        <div className="mt-auto px-6 py-2.5 bg-[var(--surface-lowest)] border-t border-[var(--border-subtle)] text-[var(--on-surface-subtle)] flex items-center justify-between text-xs font-mono shrink-0">
-          <span>
-            Showing {filteredItems.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
-            {filteredItems.length > 0 && (
-              <> – {Math.min(filteredItems.length, currentPage * pageSize)}</>
-            )}{" "}
-            of {filteredItems.length} deliverables
-          </span>
-          <div className="flex items-center gap-4">
-            <span className="hidden sm:flex items-center gap-1.5 text-[var(--on-surface-subtle)]">
-              <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse" />
-              Sorted by Latest Intake
+      <DataTable
+        data={filteredItems}
+        columns={columns}
+        keyExtractor={(req) => req.id}
+        isLoading={isLoading || isRefreshing}
+        emptyMessage={
+          hasActiveFilters
+            ? "No sample or mockup requests match your search criteria or active filter."
+            : "There are currently no sampling or CAD mockup requests in the queue."
+        }
+        onRowClick={onInspectRequest}
+        enableSelection={true}
+        selectedIds={selectedIds}
+        onToggleSelectRow={(id) => handleToggleSelectRow(id)}
+        onToggleSelectAll={handleToggleSelectAll}
+        toolbarLeft={
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="truncate">
+              Showing{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {filteredItems.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {samplingMockupItems.length}
+              </span>{" "}
+              deliverables
             </span>
-            <PaginationBar
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalCount={filteredItems.length}
-              pageSize={pageSize}
-              onPageChange={(p) => setCurrentPage(p)}
-              itemLabel="deliverables"
-              className="border-t-0 p-0"
-            />
+            {selectedIds.size > 0 && (
+              <span className="shrink-0 rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700 dark:text-indigo-300 font-bold">
+                {selectedIds.size} selected
+              </span>
+            )}
           </div>
-        </div>
-      </div>
+        }
+      />
     </DeskWorkspaceLayout>
   );
 };

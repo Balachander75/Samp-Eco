@@ -1,27 +1,17 @@
 import React, { useMemo, useState } from "react";
 import {
   Scissors,
-  Search,
-  RefreshCw,
-  Download,
-  X,
   ChevronRight,
-  ArrowRight,
   Building2,
   Calendar,
-  Layers,
   Clock,
-  CheckCircle2,
   ExternalLink,
   Activity,
-  Layers3,
 } from "lucide-react";
 import type { SampleRequestItem } from "@/features/sample-requests/types";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { PaginationBar, DeskWorkspaceLayout } from "@/components/erp";
-import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { Select } from "@/components/ui/Select";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
@@ -59,10 +49,6 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
   const [selectedKpiFilter, setSelectedKpiFilter] = useState<"all" | "pending" | "submitted">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 40;
 
   // Filter requests based on target plant prop
   const baseRequests = useMemo(() => {
@@ -110,46 +96,52 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
     return Array.from(set).sort();
   }, [baseRequests]);
 
-  // Filtered requests
+  // Main filtered dataset
   const filteredRequests = useMemo(() => {
     return baseRequests.filter((r) => {
+      // 1. KPI Filter
       const hasOutput = Boolean(r.mockupWorkflowState?.mockupUrl);
-
-      // KPI filter
       if (selectedKpiFilter === "pending" && hasOutput) return false;
       if (selectedKpiFilter === "submitted" && !hasOutput) return false;
 
-      // Dropdown filters
-      if (categoryFilter !== "all" && (r.productCategory || "").trim() !== categoryFilter) return false;
-      if (customerFilter !== "all" && (r.customer || "").trim() !== customerFilter) return false;
-      if (plantFilter !== "all" && (r.targetPlant || "").trim() !== plantFilter) return false;
+      // 2. Category
+      if (categoryFilter !== "all" && r.productCategory !== categoryFilter) {
+        return false;
+      }
 
-      // Search term
+      // 3. Customer
+      if (customerFilter !== "all" && r.customer !== customerFilter) {
+        return false;
+      }
+
+      // 4. Plant
+      if (plantFilter !== "all" && r.targetPlant !== plantFilter) {
+        return false;
+      }
+
+      // 5. Search
       if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase().trim();
-        const outputVal = (r.mockupWorkflowState?.mockupUrl || "").toLowerCase();
-        return (
-          (r.srNumber || "").toLowerCase().includes(q) ||
-          (r.materialCode || "").toLowerCase().includes(q) ||
-          (r.productDescription || "").toLowerCase().includes(q) ||
-          (r.customer || "").toLowerCase().includes(q) ||
-          (r.targetPlant || "").toLowerCase().includes(q) ||
-          (r.productCategory || "").toLowerCase().includes(q) ||
-          outputVal.includes(q)
-        );
+        const query = searchTerm.toLowerCase();
+        const matchesSr = (r.srNumber || "").toLowerCase().includes(query);
+        const matchesDesc = (r.productDescription || "").toLowerCase().includes(query);
+        const matchesCust = (r.customer || "").toLowerCase().includes(query);
+        const matchesCode = (r.materialCode || "").toLowerCase().includes(query);
+        const matchesUrl = (r.mockupWorkflowState?.mockupUrl || "").toLowerCase().includes(query);
+        if (!matchesSr && !matchesDesc && !matchesCust && !matchesCode && !matchesUrl) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [baseRequests, selectedKpiFilter, categoryFilter, customerFilter, plantFilter, searchTerm]);
-
-  // Paginated requests
-  const paginatedRequests = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredRequests.slice(start, start + pageSize);
-  }, [filteredRequests, currentPage, pageSize]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
+  }, [
+    baseRequests,
+    selectedKpiFilter,
+    categoryFilter,
+    customerFilter,
+    plantFilter,
+    searchTerm,
+  ]);
 
   const handleResetFilters = () => {
     setSearchTerm("");
@@ -157,7 +149,6 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
     setCustomerFilter("all");
     setPlantFilter("all");
     setSelectedKpiFilter("all");
-    setCurrentPage(1);
   };
 
   const hasActiveFilters = Boolean(
@@ -204,10 +195,10 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === paginatedRequests.length) {
+    if (selectedIds.size === filteredRequests.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(paginatedRequests.map((r) => r.id)));
+      setSelectedIds(new Set(filteredRequests.map((r) => r.id)));
     }
   };
 
@@ -220,23 +211,14 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
     });
   };
 
-  const handleRowClick = (req: SampleRequestItem) => {
-    if (onInspectRequest) {
-      onInspectRequest(req);
-    }
-  };
-
   const kpiItems = [
     {
-      label: "All Sampling Deliverables",
+      label: "All Deliverables",
       value: totalCount,
       detail: "Technical CAD & prototypes",
       color: "bg-indigo-500",
       isActive: selectedKpiFilter === "all",
-      onClick: () => {
-        setSelectedKpiFilter("all");
-        setCurrentPage(1);
-      },
+      onClick: () => setSelectedKpiFilter("all"),
     },
     {
       label: "Awaiting Link / Path",
@@ -244,10 +226,7 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
       detail: "Pending deliverable link",
       color: "bg-amber-500",
       isActive: selectedKpiFilter === "pending",
-      onClick: () => {
-        setSelectedKpiFilter("pending");
-        setCurrentPage(1);
-      },
+      onClick: () => setSelectedKpiFilter("pending"),
     },
     {
       label: "Output Submitted",
@@ -255,28 +234,169 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
       detail: "CAD & sampling published",
       color: "bg-emerald-500",
       isActive: selectedKpiFilter === "submitted",
-      onClick: () => {
-        setSelectedKpiFilter("submitted");
-        setCurrentPage(1);
-      },
+      onClick: () => setSelectedKpiFilter("submitted"),
     },
   ];
+
+  const columns = useMemo<ColumnDef<SampleRequestItem>[]>(
+    () => [
+      {
+        id: "sr_number",
+        header: "SR Code / Date",
+        width: "w-[150px]",
+        sortable: true,
+        cell: (r) => (
+          <div>
+            <CopyBadge text={r.srNumber || `SR-${r.id}`} />
+            <div className="mt-0.5 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+              {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "product",
+        header: "Product Description & Category",
+        cell: (r) => {
+          const categoryHierarchy = [
+            r.productCategory,
+            r.productSubCategory,
+            r.productThirdCategory,
+          ]
+            .filter(Boolean)
+            .join(" / ");
+          return (
+            <div className="max-w-xs">
+              <div
+                className="font-semibold text-xs text-[var(--on-surface)] truncate"
+                title={r.productDescription || (r as any).opportunityName || "Sampling Deliverable"}
+              >
+                {r.productDescription || (r as any).opportunityName || "Sampling Deliverable"}
+              </div>
+              <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 truncate">
+                {categoryHierarchy || r.materialCode || "Cartonboard Packaging"}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "customer",
+        header: "Customer / Brand",
+        width: "w-[160px]",
+        cell: (r) => (
+          <div>
+            <div className="flex items-center gap-1.5 font-semibold text-[var(--on-surface)]">
+              <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
+              <span className="truncate max-w-[140px]" title={r.customer || ""}>
+                {r.customer || "—"}
+              </span>
+            </div>
+            <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
+              {r.brandName || "Commercial Account"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "plant",
+        header: "Target Plant",
+        width: "w-[110px]",
+        cell: (r) => (
+          <span className="font-mono text-xs text-[var(--on-surface-muted)]">
+            {r.targetPlant || "Khaniwade"}
+          </span>
+        ),
+      },
+      {
+        id: "sla",
+        header: "Required SLA Date",
+        width: "w-[130px]",
+        cell: (r) => (
+          <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--on-surface-muted)]">
+            <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
+            <span>{r.sampleRequiredDate ? formatOdooDate(r.sampleRequiredDate) : "Standard SLA"}</span>
+          </div>
+        ),
+      },
+      {
+        id: "output",
+        header: "Studio Output (Link / File Path)",
+        cell: (r) => {
+          const outputUrl = r.mockupWorkflowState?.mockupUrl;
+          const isWebUrl =
+            outputUrl && (outputUrl.startsWith("http://") || outputUrl.startsWith("https://"));
+          if (!outputUrl) {
+            return (
+              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded">
+                <Clock className="w-3 h-3" />
+                <span>Awaiting Link / Path</span>
+              </span>
+            );
+          }
+          return (
+            <div className="flex items-center gap-1.5 max-w-xs" onClick={(e) => e.stopPropagation()}>
+              <span
+                className="font-mono text-xs font-semibold text-[var(--accent-primary)] truncate max-w-[180px]"
+                title={outputUrl}
+              >
+                {outputUrl}
+              </span>
+              <CopyBadge text={outputUrl} label="" />
+              {isWebUrl && (
+                <a
+                  href={outputUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-1 rounded hover:bg-[var(--surface-container)] text-[var(--accent-primary)] transition"
+                  title="Open Link"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "status",
+        header: "Workflow Status",
+        width: "w-[130px]",
+        cell: (r) => {
+          const outputUrl = r.mockupWorkflowState?.mockupUrl;
+          return outputUrl ? (
+            <StatusPill status="Submitted" tone="success" size="xs" />
+          ) : (
+            <StatusPill status="In Review" tone="warning" size="xs" />
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: "Action",
+        align: "right",
+        width: "w-[100px]",
+        cell: (r) => (
+          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => onInspectRequest?.(r)}
+              className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
+            >
+              <span>Inspect</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [onInspectRequest]
+  );
 
   return (
     <DeskWorkspaceLayout
       title="Studio Sampling & CAD Deliverables"
-      subtitle="Inspect technical product dockets and provide CAD dieline or sampling output link or network file path to Marketing."
       businessYear={selectedYear === "ALL" ? "Consolidated" : selectedYear}
-      totalCount={totalCount}
-      totalLabel="Deliverables"
-      extraBadges={
-        pendingCount > 0 ? (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0">
-            <Activity className="w-3 h-3 text-amber-500 animate-pulse" />
-            <span>{pendingCount} Awaiting Link/Path</span>
-          </span>
-        ) : null
-      }
       onRefresh={handleRefreshClick}
       isRefreshing={isRefreshing || isLoading}
       onExportCSV={handleExportCSVClick}
@@ -288,10 +408,7 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
           <Select
             aria-label="Filter deliverables by status"
             value={selectedKpiFilter}
-            onChange={(e) => {
-              setSelectedKpiFilter(e.target.value as "all" | "pending" | "submitted");
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSelectedKpiFilter(e.target.value as "all" | "pending" | "submitted")}
             className="min-w-[150px] max-w-[190px]"
             options={[
               { value: "all", label: "Status: All Deliverables" },
@@ -304,10 +421,7 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
             <Select
               aria-label="Filter deliverables by category"
               value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setCategoryFilter(e.target.value)}
               className="min-w-[150px] max-w-[180px]"
               options={[
                 { value: "all", label: `Category: All (${uniqueCategories.length})` },
@@ -320,10 +434,7 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
             <Select
               aria-label="Filter deliverables by customer"
               value={customerFilter}
-              onChange={(e) => {
-                setCustomerFilter(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setCustomerFilter(e.target.value)}
               className="min-w-[150px] max-w-[180px]"
               options={[
                 { value: "all", label: `Customer: All (${uniqueCustomers.length})` },
@@ -336,10 +447,7 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
             <Select
               aria-label="Filter deliverables by plant"
               value={plantFilter}
-              onChange={(e) => {
-                setPlantFilter(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setPlantFilter(e.target.value)}
               className="min-w-[130px] max-w-[160px]"
               options={[
                 { value: "all", label: "Plant: All Plants" },
@@ -351,241 +459,48 @@ export const StudioArtworkPage: React.FC<StudioArtworkPageProps> = ({
       }
       search={{
         value: searchTerm,
-        onChange: (val) => {
-          setSearchTerm(val);
-          setCurrentPage(1);
-        },
+        onChange: setSearchTerm,
         placeholder: "Search SR, product, customer, link/path...",
       }}
       hasActiveFilters={hasActiveFilters}
       onResetFilters={handleResetFilters}
-      resetFiltersLabel="Reset"
+      resetFiltersLabel="Clear Filters"
     >
-
-      {/* ── 4. High-Density Full-Bleed Table ── */}
-      <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-lowest)]">
-        <table className="w-full border-collapse text-left text-xs text-[var(--on-surface)] font-normal">
-          <thead className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--surface-low)]/90 backdrop-blur-md text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)]">
-            <tr>
-              <th className="py-3 pl-6 pr-3 w-10">
-                <input
-                  type="checkbox"
-                  aria-label="Select all deliverables"
-                  checked={
-                    paginatedRequests.length > 0 &&
-                    selectedIds.size === paginatedRequests.length
-                  }
-                  onChange={toggleSelectAll}
-                  className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--accent-primary)] cursor-pointer"
-                />
-              </th>
-              <th className="py-3 px-3 font-semibold whitespace-nowrap">SR Code / Date</th>
-              <th className="py-3 px-4 font-semibold">Product Description &amp; Category</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Customer / Brand</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Target Plant</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Required SLA Date</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Studio Output (Link / File Path)</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">Workflow Status</th>
-              <th className="py-3 pl-4 pr-6 font-semibold text-right whitespace-nowrap">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-[var(--border-subtle)]">
-            {isLoading ? (
-              <TableSkeletonRows rows={8} columns={9} />
-            ) : filteredRequests.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="py-16 text-center">
-                  <EmptyState
-                    icon={Scissors}
-                    title="No Sampling Deliverables Found"
-                    description={
-                      hasActiveFilters
-                        ? "No sampling deliverables match your active filter."
-                        : "There are currently no sampling deliverables assigned to Studio."
-                    }
-                    onResetFilters={hasActiveFilters ? handleResetFilters : undefined}
-                    resetLabel="Reset filters"
-                  />
-                </td>
-              </tr>
-            ) : (
-              paginatedRequests.map((r) => {
-                const isSelected = selectedIds.has(r.id);
-                const state = r.mockupWorkflowState;
-                const outputUrl = state?.mockupUrl;
-                const isPending = !outputUrl;
-                const isSubmitted = Boolean(outputUrl);
-
-                const categoryHierarchy = [
-                  r.productCategory,
-                  r.productSubCategory,
-                  r.productThirdCategory,
-                ]
-                  .filter(Boolean)
-                  .join(" / ");
-
-                const isWebUrl =
-                  outputUrl && (outputUrl.startsWith("http://") || outputUrl.startsWith("https://"));
-
-                return (
-                  <tr
-                    key={r.id}
-                    onClick={() => handleRowClick(r)}
-                    className={`hover:bg-[var(--surface-low)] transition-colors cursor-pointer group ${
-                      isSelected ? "bg-indigo-500/5 dark:bg-indigo-900/10" : ""
-                    }`}
-                  >
-                    {/* Checkbox */}
-                    <td className="py-3.5 pl-6 pr-3" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select deliverable ${r.srNumber || r.id}`}
-                        checked={isSelected}
-                        onChange={() => toggleSelectRow(r.id)}
-                        className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--accent-primary)] cursor-pointer"
-                      />
-                    </td>
-
-                    {/* SR Code / Date */}
-                    <td className="py-3.5 px-3 font-mono font-bold whitespace-nowrap">
-                      <CopyBadge text={r.srNumber || `SR-${r.id}`} />
-                      <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
-                        Intake: {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
-                      </div>
-                    </td>
-
-                    {/* Product Description & Category */}
-                    <td className="py-3.5 px-4 max-w-sm">
-                      <div
-                        className="font-semibold text-xs text-[var(--on-surface)] truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"
-                        title={r.productDescription || (r as any).opportunityName || "Sampling Deliverable"}
-                      >
-                        {r.productDescription || (r as any).opportunityName || "Sampling Deliverable"}
-                      </div>
-                      <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 truncate">
-                        {categoryHierarchy || r.materialCode || "Cartonboard Packaging"}
-                      </div>
-                    </td>
-
-                    {/* Customer / Brand */}
-                    <td className="py-3.5 px-4 font-semibold text-[var(--on-surface)] whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
-                        <span className="truncate max-w-[160px]" title={r.customer || ""}>
-                          {r.customer || "—"}
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
-                        {r.brandName || "Commercial Account"}
-                      </div>
-                    </td>
-
-                    {/* Plant */}
-                    <td className="py-3.5 px-4 font-mono text-xs text-[var(--on-surface-muted)] whitespace-nowrap">
-                      {r.targetPlant || "Khaniwade"}
-                    </td>
-
-                    {/* Required SLA Date */}
-                    <td className="py-3.5 px-4 whitespace-nowrap font-mono text-[var(--on-surface-muted)]">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
-                        <span>
-                          {r.sampleRequiredDate
-                            ? formatOdooDate(r.sampleRequiredDate)
-                            : "Standard SLA"}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Studio Output (Link / File Path) */}
-                    <td className="py-3.5 px-4 max-w-xs" onClick={(e) => e.stopPropagation()}>
-                      {outputUrl ? (
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300 truncate max-w-[200px]"
-                            title={outputUrl}
-                          >
-                            {outputUrl}
-                          </span>
-                          <CopyBadge text={outputUrl} label="" />
-                          {isWebUrl && (
-                            <a
-                              href={outputUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-1 rounded hover:bg-[var(--surface-container)] text-indigo-600 dark:text-indigo-400 transition"
-                              title="Open Link"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-mono font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                          <Clock className="w-2.5 h-2.5" />
-                          <span>Awaiting Link / Path</span>
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Workflow Status */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <StatusPill
-                        status={
-                          isSubmitted
-                            ? "Output Submitted"
-                            : isPending
-                            ? "CAD Action"
-                            : r.status || "In Review"
-                        }
-                        size="sm"
-                        showDot
-                      />
-                    </td>
-
-                    {/* Actions */}
-                    <td
-                      className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {isPending && !readOnly ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRowClick(r)}
-                          className="inline-flex select-none items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold font-mono transition cursor-pointer shadow-2xs active:scale-98"
-                          title="Provide Output Link or File Path"
-                        >
-                          <span>Provide Link / Path</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleRowClick(r)}
-                          className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
-                          title="Inspect Docket Details"
-                        >
-                          <span>Inspect</span>
-                          <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
+      <DataTable
+        data={filteredRequests}
+        columns={columns}
+        keyExtractor={(req) => req.id}
+        isLoading={isLoading}
+        emptyMessage={
+          hasActiveFilters
+            ? "No sampling deliverables match your active filter."
+            : "There are currently no sampling deliverables assigned to Studio."
+        }
+        onRowClick={onInspectRequest}
+        enableSelection={true}
+        selectedIds={selectedIds}
+        onToggleSelectRow={toggleSelectRow}
+        onToggleSelectAll={toggleSelectAll}
+        toolbarLeft={
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="truncate">
+              Showing{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {filteredRequests.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+                {totalCount}
+              </span>{" "}
+              deliverables
+            </span>
+            {selectedIds.size > 0 && (
+              <span className="shrink-0 rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700 dark:text-indigo-300 font-bold">
+                {selectedIds.size} selected
+              </span>
             )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ── 5. Enterprise Pagination Footer ── */}
-      <PaginationBar
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalCount={filteredRequests.length}
-        pageSize={pageSize}
-        onPageChange={setCurrentPage}
+          </div>
+        }
       />
     </DeskWorkspaceLayout>
   );
