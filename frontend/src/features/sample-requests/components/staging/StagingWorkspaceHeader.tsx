@@ -176,17 +176,17 @@ export const StagingWorkspaceHeader: React.FC<StagingWorkspaceHeaderProps> = ({
             <span>Add Product</span>
           </button>
 
-          {/* Release to Pipeline (when applicable) */}
-          {programContext.openedFromDraft && onReleaseRequest && (
+          {/* Release to Pipeline */}
+          {onReleaseRequest && (
             <button
               type="button"
               onClick={onReleaseRequest}
-              disabled={isReleasing || isSubmittingAll}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 text-xs font-semibold text-white transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
-              title="Release draft request to active team pipelines"
+              disabled={isReleasing || isSubmittingAll || (stagedProducts.length === 0 && !programContext.parentRequestId)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 px-3.5 text-xs font-semibold text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-98"
+              title="Release staged products directly to workflow pipelines"
             >
               <Send className="h-3.5 w-3.5" />
-              <span>{isReleasing ? "Releasing…" : "Release to Pipeline"}</span>
+              <span>{isReleasing ? "Releasing…" : "Release"}</span>
             </button>
           )}
 

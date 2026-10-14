@@ -1529,9 +1529,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Explicitly release the staged draft request to active PMT or Creative workflow
   const handleReleaseRequest = async () => {
-    if (!programContext.openedFromDraft) return;
     if (!programContext.customer && !programContext.parentRequestId) {
-      showToast("Customer account is required.", "error");
+      showToast("Customer account is required before releasing.", "error");
       return;
     }
     if (stagedProducts.length === 0 && !programContext.parentRequestId) {
@@ -1597,9 +1596,11 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       const isDesign = destinations.includes("Creative");
       const isStudio = destinations.includes("Studio");
 
-      // 4. Clear staging session storage
+      // 4. Clear staging session storage and in-memory list
       sessionStorage.removeItem("samp_active_program_form");
       sessionStorage.removeItem("samp_active_staged_products");
+      sessionStorage.removeItem("samp_active_staged_items");
+      setStagedProducts([]);
 
       const label = targetSrNumber ? `Request ${targetSrNumber}` : "Draft request";
       showToast(`✓ ${label} released into ${newStatus}!`);
