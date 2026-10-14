@@ -373,6 +373,32 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Table edits for mockups stay focused on the three handoff fields.
   const handleEditProduct = (item: StagedProductItem, mockupOnly = false) => {
+    if (item.scopes.includes("design") && (item.scopes.length === 1 || item.designMetadata)) {
+      setEditingProduct(item);
+      setSelectedScopes([...item.scopes]);
+      setDesignDesc(item.productDescription || "");
+      setDesignCount(item.designMetadata?.numberOfDesigns || 1);
+      setDesignDueDate(item.designMetadata?.designRequiredDate || item.sampleRequiredDate || "");
+      setDesignTrend(
+        item.designMetadata?.trend ||
+        item.customDetails?.find((d) => (d.characteristicName || d.characteristic_name)?.toUpperCase() === "TREND")?.value ||
+        ""
+      );
+      setDesignAudience(
+        item.designMetadata?.targetAudience ||
+        item.customDetails?.find((d) => (d.characteristicName || d.characteristic_name)?.toUpperCase() === "TARGET AUDIENCE")?.value ||
+        ""
+      );
+      setDesignRemarks(item.designMetadata?.remarks || item.mockupMetadata?.marketingRemark || "");
+      setUploadedImages(item.designMetadata?.images ? [...item.designMetadata.images] : []);
+      setWebLinks(item.designMetadata?.webLinks ? [...item.designMetadata.webLinks] : []);
+      setLinkInput("");
+      setMediaTab("files");
+      setModalError(null);
+      setAddModalStep("design_brief");
+      setIsAddModalOpen(true);
+      return;
+    }
     setEditingDetailsProduct(item);
     setEditingMockupOnly(mockupOnly);
   };
@@ -1871,6 +1897,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       <StagedProductDrawer
         inspectingProduct={inspectingProduct}
         programYear={programContext.programYear}
+        programContext={programContext}
         onClose={() => setInspectingProduct(null)}
         onRemoveProduct={(id) => {
           setInspectingProduct(null);
