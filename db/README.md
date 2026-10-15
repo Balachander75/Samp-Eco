@@ -9,7 +9,9 @@ This directory contains the complete database setup for **Navneet SAMP ERP** (Po
 
 ## Quick Setup Instructions
 
-The backend applies numbered upgrades from `backend/app/migrations.py` once at startup and records them in `schema_migrations`; a PostgreSQL advisory lock serializes concurrent app workers. Keep new schema changes in a numbered migration instead of running the legacy `ensure_*` DDL on every restart.
+The active `backend-new` app applies numbered upgrades from `backend-new/app/migrations.py` when automatic schema migration is enabled and records them in `schema_migrations`; a PostgreSQL advisory lock serializes concurrent workers. Production deployments with `AUTO_SCHEMA_MIGRATION=false` run `python -m app.migrations` from `backend-new` before deploying workers, followed by the documented additive schema and index scripts. Keep new schema changes in numbered migrations instead of running legacy one-off scripts.
+
+`backend-new` provisions the Seasonal Program Planning tables (`program_requests`, `program_material_specifications`, and `program_activity_logs`), workflow tables, and downstream Studio/Creative/Costing tables in its configured `DATABASE_URL` at startup when automatic schema migration is enabled. The corresponding one-time scripts can prepare these schemas before a production deploy.
 
 The schema includes `sample_request_activity_logs` for durable request history, preserves Feasibility activity rows with a request-code snapshot when a request is deleted, and includes `schema_migrations` for applied upgrades.
 

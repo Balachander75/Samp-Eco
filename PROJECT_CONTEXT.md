@@ -98,25 +98,25 @@ d:/Projects/samp/
 ├── .agents/
 │   └── skills/
 │       └── samp-ui-design-system/     # Production UI Design System specification
-├── backend/
+├── backend-new/
 │   ├── app/
 │   │   ├── auth/                      # Security, JWT tokens, RBAC permissions & plant filters
-│   │   ├── database.py                # Engine, SessionLocal, auto-migrations & column checks
+│   │   ├── database.py                # Engine, SessionLocal, schema helpers, versioned migrations & column checks
 │   │   ├── config.py                  # Pydantic BaseSettings, JWT keys, pool configurations
 │   │   ├── main.py                    # Lifespan tasks, background workers, CORS, router mounts
 │   │   ├── models/                    # SQLAlchemy ORM models (master, sample_request, feasibility, program, downstream)
-│   │   ├── routers/                   # HTTP endpoints (auth, master, sample_requests, feasibility, program_requests)
+│   │   ├── routers/                   # HTTP endpoints (auth, master, sample, downstream, feasibility, programs)
 │   │   ├── schemas/                   # Pydantic request/response validation schemas
 │   │   ├── services/                  # Core domain logic (SampleRequestService, FeasibilityService, etc.)
 │   │   └── utils/                     # Business year calculations, date rules, rate limiters
-│   ├── scripts/                       # Migration and historical database synchronization scripts
+│   ├── scripts/                       # Versioned schema and query-index migration scripts
 │   ├── requirements.txt               # Python package dependencies
 │   └── run.py                         # Local backend server runner (port 8001)
 ├── db/
 │   ├── README.md                      # Database setup instructions
 │   ├── schema.sql                     # Canonical DDL schema (16 tables, triggers, sequences)
 │   └── seed_data.sql                  # Seed data (admin user, plants, 199 customers, characteristics)
-├── frontend/
+├── frontend-new/
 │   ├── public/                        # Static brand assets and logo
 │   ├── src/
 │   │   ├── App.tsx                    # Root router, lazy chunk splitting, route guards & autosave
@@ -125,12 +125,10 @@ d:/Projects/samp/
 │   │   ├── features/                  # Domain-driven feature modules:
 │   │   │   ├── auth/                  # SignInPage, user credentials, permission helpers
 │   │   │   ├── dashboard/             # OperationsOverview (executive telemetry, KPI ribbon)
-│   │   │   ├── sample-requests/       # Marketing intake, staging, drafts, sampling, feasibility, programs
-│   │   │   ├── creative/              # Creative briefs, artwork variants, Shutterstock submission
-│   │   │   ├── studio/                # Structural CAD, dielines, calipers, 3D simulation
-│   │   │   ├── costing/               # BOM pricing, unit cost, interactive margin simulator
+│   │   │   ├── sample-requests/       # Marketing intake, drafts, Sampling, Costing, feasibility, programs
+│   │   │   ├── creative/              # Creative briefs, artwork, and Studio CAD/dielines
 │   │   │   ├── samp-team/             # Sampling Lab desk, feasibility technical review
-│   │   │   ├── plant/                 # Plant execution, program planning review, floor/QC/dispatch
+│   │   │   ├── plant/                 # Program review; floor/QC/dispatch remain placeholders
 │   │   │   ├── members/               # Teams, enterprise users, plant assignments, governance
 │   │   │   └── settings/              # SettingsPage (13 selectable enterprise theme palettes)
 │   │   ├── components/
@@ -295,7 +293,7 @@ psql -U postgres -h localhost -d navneet_samp -f db/seed_data.sql
 
 ### 8.3 Running Backend
 ```bash
-cd backend
+cd backend-new
 
 # Create & activate virtual environment (Windows PowerShell)
 python -m venv .venv
@@ -311,7 +309,7 @@ python run.py
 
 ### 8.4 Running Frontend
 ```bash
-cd frontend
+cd frontend-new
 
 # Install packages
 npm install
@@ -329,18 +327,18 @@ npm run build
 
 | If you need to modify... | Target File / Directory |
 |---|---|
-| **Marketing Request intake, wizard or staging drawer** | `frontend/src/features/sample-requests/components/staging/` |
-| **Draft workspace, bulk release, or autosave logic** | `frontend/src/features/sample-requests/components/DraftWorkspacePage.tsx` |
-| **Sample requests table columns, status pills, or filters** | `frontend/src/features/sample-requests/sampling/SamplingRequestsPage.tsx` |
-| **Sample request inspection sheet tabs** | `frontend/src/features/sample-requests/components/inspector/` |
-| **Feasibility review tabs, counter-dates, or verdicts** | `frontend/src/features/sample-requests/components/FeasibilityInspectorModal.tsx` |
-| **Seasonal Program Planning dual review & material matrix** | `frontend/src/features/sample-requests/components/ProgramPlanningWorkspace.tsx` |
-| **Creative artwork brief submissions or Shutterstock links** | `frontend/src/features/creative/CreativeDesignOutputModal.tsx` |
-| **Studio CAD dielines, calipers, or 3D view** | `frontend/src/features/studio/StudioWorkDesk.tsx` |
-| **Costing BOM pricing or interactive margin slider** | `frontend/src/features/costing/components/CostingInspectorModal.tsx` |
-| **Plant program review or assigned manufacturing plants** | `frontend/src/features/plant/` & `context/PlantContext.tsx` |
-| **Enterprise members, teams, or plant assignments** | `frontend/src/features/members/` |
-| **Backend API endpoints or domain validation** | `backend/app/routers/` & `backend/app/services/` |
-| **Database models or new table columns** | `backend/app/models/` & `backend/app/database.py` |
-| **Global navigation items, routes, or sidebar badges** | `frontend/src/layouts/navigation.ts` & `frontend/src/App.tsx` |
-| **Design tokens, themes, or appearance settings** | `frontend/src/context/ThemeContext.tsx` & `frontend/src/styles.css` |
+| **Marketing Request intake, wizard or staging drawer** | `frontend-new/src/features/sample-requests/components/staging/` |
+| **Draft workspace, bulk release, or autosave logic** | `frontend-new/src/features/sample-requests/components/DraftWorkspacePage.tsx` |
+| **Sample requests table columns, status pills, or filters** | `frontend-new/src/features/sample-requests/sampling/` |
+| **Sample request inspection sheet tabs** | `frontend-new/src/features/sample-requests/components/inspector/` |
+| **Feasibility review tabs, counter-dates, or verdicts** | `frontend-new/src/features/sample-requests/components/FeasibilityInspectorModal.tsx` |
+| **Seasonal Program Planning dual review & material matrix** | `frontend-new/src/features/sample-requests/components/ProgramPlanningWorkspace.tsx` |
+| **Creative artwork brief submissions** | `frontend-new/src/features/creative/CreativeDesignOutputModal.tsx` |
+| **Studio CAD dielines, calipers, or 3D view** | `frontend-new/src/features/creative/StudioWorkDesk.tsx` |
+| **Costing workflow and pricing review** | `frontend-new/src/features/sample-requests/components/WorkflowOperationsDesk.tsx` |
+| **Plant program review or assigned manufacturing plants** | `frontend-new/src/features/plant/` & `frontend-new/src/context/PlantContext.tsx` |
+| **Enterprise members, teams, or plant assignments** | `frontend-new/src/features/members/` |
+| **Backend API endpoints or domain validation** | `backend-new/app/routers/` & `backend-new/app/services/` |
+| **Database models or new table columns** | `backend-new/app/models/` & `backend-new/app/database.py` |
+| **Global navigation items, routes, or sidebar badges** | `frontend-new/src/layouts/navigation.ts` & `frontend-new/src/App.tsx` |
+| **Design tokens, themes, or appearance settings** | `frontend-new/src/context/ThemeContext.tsx` & `frontend-new/src/styles.css` |

@@ -25,6 +25,8 @@ pnpm-debug.log*
 
 # Local database exports (may contain sensitive application data)
 database_dumps/
+*.dump
+db/*.dump
 
 # OS files
 .DS_Store

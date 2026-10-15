@@ -4,7 +4,7 @@
 
 Navneet SAMP Operations is an internal web application for coordinating packaging and sampling work. It gives Marketing and operational teams a shared view of request intake, specifications, feasibility review, seasonal programs, and departmental work queues.
 
-The intended workflow spans Marketing, Creative, Studio/CAD, Costing, SAMP, and plant execution. The repository currently implements several of those workspaces in the frontend; the existence of a screen or navigation item does not by itself mean that its data is persisted by a dedicated backend workflow.
+The intended workflow spans Marketing, Creative, Studio/CAD, Costing, SAMP, and plant planning. Most request and downstream desk data is persisted by the active backend; plant execution screens beyond program review remain placeholders.
 
 ## Users and operating context
 
@@ -26,14 +26,14 @@ Plant, Analytics & SLA, Members & Plants, System Settings, Help & Support, and N
 
 ## Technology and architecture
 
-- Frontend: React 18, TypeScript, Vite, React Router 6, Tailwind CSS, and Lucide icons (`frontend/`).
-- Backend: FastAPI, Pydantic, SQLAlchemy, and PostgreSQL (`backend/`).
-- Frontend modules live in `frontend/src/features/`; shared primitives and ERP blocks live in `components/ui/` and `components/erp/`; app shell and navigation live in `layouts/`.
-- Backend HTTP routers, schemas, models, auth helpers, and database setup live under `backend/app/`.
+- Frontend: React 18, TypeScript, Vite, React Router 6, Tailwind CSS, and Lucide icons (`frontend-new/`).
+- Backend: FastAPI, Pydantic, SQLAlchemy, and PostgreSQL (`backend-new/`).
+- Frontend modules live in `frontend-new/src/features/`; shared primitives and ERP blocks live in `frontend-new/src/components/ui/` and `frontend-new/src/components/erp/`; app shell and navigation live in `frontend-new/src/layouts/`.
+- Backend HTTP routers, schemas, models, auth helpers, database setup, and versioned migrations live under `backend-new/app/`.
 - `VITE_API_URL` configures the frontend API origin. When unset, the frontend uses the current origin; the current Vite config does not define a development API proxy.
 - `DATABASE_URL` configures the backend database. Its development default points to a local PostgreSQL database named `navneet_samp`.
 
-The backend persists authentication, master, feasibility, program, and sample-request data in PostgreSQL. The sample-request router also contains JSON-file storage helpers for design-request records. The Creative, Studio, and Costing work desks include frontend workflow data and interactions; verify their backing data path before treating changes there as persisted operational records.
+The active backend persists authentication, master, feasibility, program, sample-request, Creative brief, Studio dieline, and Costing estimation data in PostgreSQL. Some plant execution screens remain placeholders; verify each workflow's API before treating it as operational.
 
 ## Product principles
 
@@ -46,6 +46,6 @@ The backend persists authentication, master, feasibility, program, and sample-re
 
 ## Source of truth and scope
 
-The checked-in implementation under `frontend/` and `backend/`, their configuration, and the project documentation are the source of truth for current behavior. Do not assume mock-only architecture: the current frontend calls a FastAPI backend, while some department desks still use local/static workflow data. No external customer claims or production deployment guarantees are implied.
+The active implementation under `frontend-new/` and `backend-new/`, their configuration, and the project documentation are the source of truth for current behavior. The frontend calls a FastAPI backend; some plant screens remain local placeholders. No external customer claims or production deployment guarantees are implied.
 
 This document describes the current repository state, which is evolving. Update it when workflows, integrations, or route coverage change.
