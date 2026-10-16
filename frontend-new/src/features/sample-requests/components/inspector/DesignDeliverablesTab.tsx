@@ -40,7 +40,7 @@ function isHttpLink(value: string): boolean {
 
 export interface DesignDeliverablesTabProps {
   activeRequest: SampleRequestItem;
-  mode: "marketing" | "creative";
+  mode: "marketing" | "creative" | "sampling";
   deliveredCount: number;
   requestedCount: number;
   remainingCount: number;

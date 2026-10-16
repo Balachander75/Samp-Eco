@@ -52,14 +52,20 @@ class DesignRequestService:
         """Update creative design request fields."""
         return self.repo.update_record(item_id, updates)
 
-    def mutate(self, item_id: int, mutator: Callable[[DesignRequest], None]) -> Optional[Dict[str, Any]]:
+    def mutate(
+        self,
+        item_id: int,
+        mutator: Callable[[DesignRequest], None],
+        *,
+        actor_user_id: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Apply a workflow transition while holding the design request row lock."""
-        return self.repo.mutate_record(item_id, mutator)
+        return self.repo.mutate_record(item_id, mutator, actor_user_id=actor_user_id)
 
     def delete(self, item_id: int) -> bool:
         """Delete creative design request."""
         return self.repo.delete_record(item_id)
 
-    def sync_sample_request(self, sample_req: Dict[str, Any], is_delete: bool = False):
+    def sync_sample_request(self, sample_req: Dict[str, Any], is_delete: bool = False, *, commit: bool = True):
         """Sync design request from sample request creation/deletion."""
-        return self.repo.sync_sample_request_design(sample_req, is_delete=is_delete)
+        return self.repo.sync_sample_request_design(sample_req, is_delete=is_delete, commit=commit)

@@ -19,7 +19,7 @@ function formatDate(val?: string | null): string {
 
 export interface DesignMetadataStripProps {
   activeRequest: SampleRequestItem;
-  mode: "marketing" | "creative";
+  mode: "marketing" | "creative" | "sampling";
   requestedCount: number;
   isCounterDatePending: boolean;
   slaStatus: {

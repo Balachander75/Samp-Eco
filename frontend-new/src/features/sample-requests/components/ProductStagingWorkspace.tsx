@@ -14,11 +14,14 @@ import {
   fetchProductDetailsApi,
 } from "@/infrastructure/api";
 import { ProductSearchResult, BindingHierarchyResponse, SampleRequestItem } from "../types";
+import type { DesignFollowupArtwork } from "../types";
 import { ProductCategoryItem } from "@/types/master";
 import { useMasterData } from "../hooks/useMasterData";
 import { getCurrentBusinessYear } from "@/lib/businessYear";
+import { compressReferenceImage } from "@/lib/referenceImage";
 import { autoSaveStagedProductsToDraft } from "../utils/autoSaveDraft";
 import { isMockupCreativeCharacteristic } from "./staging/mockupCreativeFields";
+import { requestPostDesignDeliverablesApi } from "@/infrastructure/api/sampleRequestsApi";
 
 // Re-export domain types and helpers for backward compatibility
 export type { DeliverableScopeId, DeliverableDefinition, StagedProductItem } from "../types/staging";
@@ -46,6 +49,20 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   const location = useLocation();
   const { customers, plants, error: masterDataError } = useMasterData();
   const marketingPlantCode = plants.find((plant) => String(plant.code) === "1505")?.code || "1505";
+  const routeState = location.state as {
+    designMockupHandoff?: {
+      designRequestId: number;
+      sourceSrNumber?: string;
+      designs: DesignFollowupArtwork[];
+    };
+  } | null;
+  const designMockupHandoff = routeState?.designMockupHandoff;
+  const stagedProductsStorageKey = designMockupHandoff
+    ? "samp_design_mockup_handoff_products:" + designMockupHandoff.designRequestId
+    : "samp_active_staged_products";
+  const programContextStorageKey = designMockupHandoff
+    ? "samp_design_mockup_handoff_program:" + designMockupHandoff.designRequestId
+    : "samp_active_program_form";
 
   // Load Program Setup from location state or cached session
   const [programContext, setProgramContext] = useState(() => {
@@ -63,19 +80,19 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       openedFromDraft?: boolean;
     } | null;
 
-    if (state?.customer || state?.programName) {
+    if (designMockupHandoff || state?.customer || state?.programName) {
       return {
-        customer: state.customer || "",
-        programName: state.programName || "",
-        programYear: state.programYear || "2026",
-        year: state.year || getCurrentBusinessYear(),
-        targetPlant: state.targetPlant || "",
-        parentRequestId: state.parentRequestId,
-        parentSrNumber: state.parentSrNumber || "",
-        parentRequestTypes: state.parentRequestTypes || [],
-        parentMockupWorkflowState: state.parentMockupWorkflowState,
-        parentCreationMode: state.parentCreationMode,
-        openedFromDraft: Boolean(state.openedFromDraft),
+        customer: state?.customer || "",
+        programName: state?.programName || "",
+        programYear: state?.programYear || "2026",
+        year: state?.year || getCurrentBusinessYear(),
+        targetPlant: state?.targetPlant || "",
+        parentRequestId: state?.parentRequestId,
+        parentSrNumber: state?.parentSrNumber || "",
+        parentRequestTypes: state?.parentRequestTypes || [],
+        parentMockupWorkflowState: state?.parentMockupWorkflowState,
+        parentCreationMode: state?.parentCreationMode,
+        openedFromDraft: Boolean(state?.openedFromDraft),
       };
     }
 
@@ -119,7 +136,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   // Staged Products in current batch (persisted across page reloads)
   const [stagedProducts, setStagedProducts] = useState<StagedProductItem[]>(() => {
     try {
-      const cached = sessionStorage.getItem("samp_active_staged_products");
+      const cached = sessionStorage.getItem(stagedProductsStorageKey);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) return parsed;
@@ -132,15 +149,15 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Sync stagedProducts to sessionStorage whenever updated
   useEffect(() => {
-    sessionStorage.setItem("samp_active_staged_products", JSON.stringify(stagedProducts));
-  }, [stagedProducts]);
+    sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(stagedProducts));
+  }, [stagedProducts, stagedProductsStorageKey]);
 
   // Add Product Modal & Flow State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(Boolean(designMockupHandoff));
   const [addModalStep, setAddModalStep] = useState<
     "scopes" | "design_brief" | "sampling_config" | "product_search"
-  >("scopes");
-  const [selectedScopes, setSelectedScopes] = useState<DeliverableScopeId[]>([]);
+  >(designMockupHandoff ? "sampling_config" : "scopes");
+  const [selectedScopes, setSelectedScopes] = useState<DeliverableScopeId[]>(designMockupHandoff ? ["mockup"] : []);
   const [scopeTimestamps, setScopeTimestamps] = useState<Record<string, string>>({});
 
   // Design Fields
@@ -160,9 +177,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Sampling / Specification Configuration State
   const [sampleType, setSampleType] = useState<"full" | "partial">("full");
+  const [isResample, setIsResample] = useState(false);
   const [partialRequirements, setPartialRequirements] = useState("");
-  const [samplingSearchMode, setSamplingSearchMode] = useState<"new" | "material_code" | "binding">("new");
-  const [designNeeded, setDesignNeeded] = useState<boolean | null>(null);
+  const [samplingSearchMode, setSamplingSearchMode] = useState<"new" | "material_code" | "binding">(designMockupHandoff ? "material_code" : "new");
+  const [designNeeded, setDesignNeeded] = useState<boolean | null>(designMockupHandoff ? false : null);
   const [marketingShutterstockNo, setMarketingShutterstockNo] = useState("");
   const [marketingMockupRemark, setMarketingMockupRemark] = useState("");
 
@@ -213,6 +231,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   // Toast / Notifications
   const [toastMsg, setToastMsg] = useState<{ text: string; tone: "success" | "error" } | null>(null);
   const [isSubmittingAll, setIsSubmittingAll] = useState(false);
+  const [isCompressingReferenceImages, setIsCompressingReferenceImages] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
   const [inspectingProduct, setInspectingProduct] = useState<StagedProductItem | null>(null);
   const [inspectingCatalogProduct, setInspectingCatalogProduct] = useState<ProductSearchResult | null>(null);
@@ -236,14 +255,14 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Sync to sessionStorage
   useEffect(() => {
-    sessionStorage.setItem("samp_active_program_form", JSON.stringify(programContext));
-  }, [programContext]);
+    sessionStorage.setItem(programContextStorageKey, JSON.stringify(programContext));
+  }, [programContext, programContextStorageKey]);
 
   // If user navigates away / unmounts with staged products that haven't been saved yet, auto-save to draft
   useEffect(() => {
     return () => {
       if (!hasAutoSavedRef.current && stagedProductsRef.current.length > 0) {
-        const cached = sessionStorage.getItem("samp_active_staged_products");
+        const cached = sessionStorage.getItem(stagedProductsStorageKey);
         if (cached) {
           hasAutoSavedRef.current = true;
           autoSaveStagedProductsToDraft(
@@ -252,8 +271,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
             user
           ).then((res) => {
             if (res.success) {
-              sessionStorage.removeItem("samp_active_staged_products");
-              sessionStorage.removeItem("samp_active_program_form");
+              sessionStorage.removeItem(stagedProductsStorageKey);
+              sessionStorage.removeItem(programContextStorageKey);
               window.dispatchEvent(
                 new CustomEvent("app:show-toast", {
                   detail: {
@@ -273,7 +292,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         }
       }
     };
-  }, [user]);
+  }, [user, stagedProductsStorageKey, programContextStorageKey]);
 
   // Master data fallback only when context is empty
   useEffect(() => {
@@ -328,6 +347,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     setCostingRequiredDate("");
     setCreativeInputNeeded(false);
     setCreativeInputRemark("");
+    setIsResample(false);
     setBindingSearchResults([]);
     setModalError(null);
   };
@@ -347,7 +367,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   };
 
   const clearMockupDesignChoice = () => {
-    if (!selectedScopes.includes("mockup")) return;
+    if (designMockupHandoff || !selectedScopes.includes("mockup")) return;
     setDesignNeeded(null);
     setMarketingShutterstockNo("");
     setMarketingMockupRemark("");
@@ -706,52 +726,11 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   };
 
 
-  // Compress image file to JPEG before storing
-  const compressImageFile = (file: File, maxDim = 800, quality = 0.5): Promise<{ url: string; sizeKb: number }> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new window.Image();
-        img.onload = () => {
-          let width = img.width;
-          let height = img.height;
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL("image/jpeg", quality);
-            const sizeKb = Math.max(1, Math.round((dataUrl.length * 3) / 4 / 1024));
-            resolve({ url: dataUrl, sizeKb });
-          } else {
-            const rawUrl = (e.target?.result as string) || "";
-            resolve({ url: rawUrl, sizeKb: Math.round(file.size / 1024) });
-          }
-        };
-        img.onerror = () => {
-          const rawUrl = (e.target?.result as string) || "";
-          resolve({ url: rawUrl, sizeKb: Math.round(file.size / 1024) });
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.onerror = () => resolve({ url: "", sizeKb: 0 });
-      reader.readAsDataURL(file);
-    });
-  };
-
   // Reference Image Upload Handler
   const handleMultipleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    const input = e.currentTarget;
+    const files = Array.from(input.files || []);
+    input.value = "";
     if (!files.length) return;
     const remainingSlots = 2 - uploadedImages.length;
     if (remainingSlots <= 0) {
@@ -765,21 +744,26 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       setModalError(null);
     }
 
-    for (const file of filesToProcess) {
-      const { url, sizeKb } = await compressImageFile(file);
-      if (!url) continue;
-      setUploadedImages((prev) => {
-        if (prev.length >= 2) return prev;
-        return [
-          ...prev,
-          {
-            id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            url,
-            name: file.name,
-            size: `${sizeKb} KB`,
-          },
-        ];
-      });
+    setIsCompressingReferenceImages(true);
+    try {
+      for (const file of filesToProcess) {
+        try {
+          const { url, sizeKb } = await compressReferenceImage(file);
+          setUploadedImages((prev) => prev.length >= 2 ? prev : [
+            ...prev,
+            {
+              id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              url,
+              name: file.name,
+              size: `${sizeKb} KB`,
+            },
+          ]);
+        } catch (uploadError: any) {
+          setModalError(uploadError?.message || `${file.name} could not be compressed.`);
+        }
+      }
+    } finally {
+      setIsCompressingReferenceImages(false);
     }
   };
 
@@ -878,6 +862,11 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   // Step 2: Submit Design Brief and Stage Product
   const handleStageDesignBrief = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isCompressingReferenceImages) {
+      setModalError("Wait for the reference images to finish processing before continuing.");
+      return;
+    }
 
     if (!designDesc.trim()) {
       setModalError("Product description is mandatory.");
@@ -995,7 +984,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   // Stage the selected catalog product for Mockup or Costing (with the design brief when paired).
 
   // Step 3: Submit Sampling Configuration and Stage Product
-  const handleStageSamplingProduct = () => {
+  const handleStageSamplingProduct = async () => {
 
     if (selectedScopes.includes("costing")) {
       if (!qtyDesignCosting.trim() || !Number.isInteger(Number(qtyDesignCosting)) || Number(qtyDesignCosting) < 1) {
@@ -1022,16 +1011,24 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         setModalError("Choose a required date for the Mockup request.");
         return;
       }
-      if (!Number.isInteger(Number(qtyForMockup)) || Number(qtyForMockup) < 1) {
+      if (designMockupHandoff && (!selectedDbSample || !selectedDbSample.id || !selectedDbSample.material_code?.trim())) {
+        setModalError("Select an existing Material Code or Binding product before creating these Mockup requests.");
+        return;
+      }
+      if (!designMockupHandoff && (!Number.isInteger(Number(qtyForMockup)) || Number(qtyForMockup) < 1)) {
         setModalError("Enter a whole-number Mockup quantity (minimum 1).");
         return;
       }
-      if (designNeeded === null) {
+      if (!designMockupHandoff && designNeeded === null) {
         setModalError("Choose whether a new design is needed.");
         return;
       }
-      if (designNeeded && !marketingShutterstockNo.trim() && !marketingMockupRemark.trim()) {
+      if (!designMockupHandoff && designNeeded && !marketingShutterstockNo.trim() && !marketingMockupRemark.trim()) {
         setModalError("Enter a Shutterstock number or remark when design is needed.");
+        return;
+      }
+      if (designMockupHandoff && !designMockupHandoff.designs.length) {
+        setModalError("No selected designs were found for this Mockup handoff.");
         return;
       }
     }
@@ -1214,8 +1211,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           },
         }),
         ...(selectedScopes.includes("sample") && {
+          isResample,
           samplingMetadata: {
             sampleType,
+            isResample,
             partialRequirements: partialRequirements.trim() || undefined,
             searchMode: samplingSearchMode,
             sourceSampleId: selectedDbSample?.id,
@@ -1238,6 +1237,57 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       };
       nextProducts = [...stagedProducts, nextItem];
       showToast(`Added "${nextItem.productDescription}" to Product Staging.`);
+    }
+
+    if (designMockupHandoff) {
+      const handoffItems = designMockupHandoff.designs.map((artwork) => ({
+        ...nextItem,
+        id: "design-mockup-" + designMockupHandoff.designRequestId + "-" + encodeURIComponent(artwork.designNumber),
+        productDescription: desc + " · " + artwork.designNumber,
+        scopes: ["mockup"] as DeliverableScopeId[],
+        qtyForMockup: "1",
+        mockupRequiredDate: mockupRequiredDate.trim(),
+        mockupMetadata: {
+          designNeeded: false,
+          marketingShutterstockNo: artwork.shutterstockNo.trim(),
+          marketingRemark: artwork.remarks.trim(),
+          qtyForMockup: "1",
+          requiredDate: mockupRequiredDate.trim(),
+          designArtwork: artwork,
+        },
+      }));
+      setStagedProducts(handoffItems);
+      stagedProductsRef.current = handoffItems;
+      sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(handoffItems));
+      setIsSubmittingAll(true);
+      try {
+        const saved = await autoSaveStagedProductsToDraft(handoffItems, programContext, user);
+        if (!saved.success || !saved.savedIds || saved.savedIds.length !== handoffItems.length) {
+          throw new Error(saved.error || "Some per-design Mockup drafts could not be saved.");
+        }
+        await requestPostDesignDeliverablesApi(
+          designMockupHandoff.designRequestId,
+          ["mockup"],
+          { mockup: designMockupHandoff.designs.map((design) => design.designNumber) },
+          { mockupRequiredDate: mockupRequiredDate.trim(), mockupRequestIds: saved.savedIds },
+        );
+        sessionStorage.removeItem(stagedProductsStorageKey);
+        sessionStorage.removeItem(programContextStorageKey);
+        stagedProductsRef.current = [];
+        setStagedProducts([]);
+        setIsAddModalOpen(false);
+        navigate("/sample-requests", { state: { refresh: Date.now(), stage: "studio" } });
+        window.dispatchEvent(new CustomEvent("app:show-toast", {
+          detail: { message: saved.savedIds.length + " Mockup request(s) sent directly to Studio.", tone: "success" },
+        }));
+      } catch (error: any) {
+        setStagedProducts(handoffItems);
+        stagedProductsRef.current = handoffItems;
+        showToast(error?.message || "Could not release these Mockup requests. Their saved draft details remain here.", "error");
+      } finally {
+        setIsSubmittingAll(false);
+      }
+      return;
     }
 
     setStagedProducts(nextProducts);
@@ -1392,8 +1442,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       showToast(`Auto-saving ${stagedProducts.length} product(s) directly to Drafts...`);
       autoSaveStagedProductsToDraft(stagedProducts, programContext, user).then((res) => {
         if (res.success) {
-          sessionStorage.removeItem("samp_active_staged_products");
-          sessionStorage.removeItem("samp_active_program_form");
+          sessionStorage.removeItem(stagedProductsStorageKey);
+          sessionStorage.removeItem(programContextStorageKey);
           navigate("/sample-requests", { state: { refresh: Date.now(), stage: "draft" } });
           window.dispatchEvent(
             new CustomEvent("app:show-toast", {
@@ -1411,6 +1461,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         }
       });
       return;
+    }
+    if (designMockupHandoff) {
+      sessionStorage.removeItem(stagedProductsStorageKey);
+      sessionStorage.removeItem(programContextStorageKey);
     }
     navigate("/sample-requests");
   };
@@ -1557,8 +1611,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       const directCostingCount = stagedProducts.filter((item) => item.scopes.includes("costing") && item.costingCreativeInputNeeded !== true).length;
       const mockupStudioCount = stagedProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === false).length;
       const mockupCreativeCount = stagedProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === true).length;
-      const samplingDirectPlantCount = stagedProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
-        && !item.hasCreativeChanges && !item.creativeCharacteristicsCleared && !item.creativePendingCharacteristicKeys?.length && !item.variantNumber).length;
+      const samplingResampleDirectPlantCount = stagedProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
+        && Boolean(item.isResample || item.samplingMetadata?.isResample)).length;
+      const samplingReviewCount = stagedProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
+        && !item.isResample && !item.samplingMetadata?.isResample && !item.hasCreativeChanges && !item.creativeCharacteristicsCleared && !item.creativePendingCharacteristicKeys?.length && !item.variantNumber).length;
       const samplingCreativeCount = stagedProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
         && (item.hasCreativeChanges || item.creativeCharacteristicsCleared || item.creativePendingCharacteristicKeys?.length || item.variantNumber)).length;
       const otherScopeCount = stagedProducts.filter((item) => item.scopes.some((scope) => scope !== "costing" && scope !== "mockup" && scope !== "sample")).length;
@@ -1567,14 +1623,15 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         directCostingCount ? `${directCostingCount} directly to Costing` : "",
         mockupStudioCount ? `${mockupStudioCount} Mockup request(s) directly to Studio` : "",
         mockupCreativeCount ? `${mockupCreativeCount} Mockup request(s) to Creative` : "",
-        samplingDirectPlantCount ? `${samplingDirectPlantCount} unchanged Sampling resample(s) directly to Plant` : "",
+        samplingReviewCount ? `${samplingReviewCount} Sampling request(s) to Sampling Team review` : "",
+        samplingResampleDirectPlantCount ? `${samplingResampleDirectPlantCount} Resample(s) directly to Plant` : "",
         samplingCreativeCount ? `${samplingCreativeCount} changed/variant Sampling request(s) to Creative first` : "",
         otherScopeCount ? "other selected scopes to their workflows" : "",
       ].filter(Boolean).join("; ");
       showToast(`✓ ${label} released${routes ? `: ${routes}` : ` into ${newStatus}`}!`);
 
       const isStudio = destinations.includes("Studio") || mockupStudioCount > 0;
-      const isPlant = destinations.includes("Released to Plant");
+      const isPlant = destinations.includes("Released to Plant") || samplingResampleDirectPlantCount > 0;
       const isDesign = mockupCreativeCount > 0 || creativeFirstCount > 0
         || (destinations.includes("Creative") && mockupStudioCount === 0);
 
@@ -1630,7 +1687,11 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
           <div
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsAddModalOpen(false)}
+            onClick={() => {
+              if (isSubmittingAll) return;
+              if (designMockupHandoff) void handleReturnToDesk();
+              else setIsAddModalOpen(false);
+            }}
           />
 
           <div className="flex min-h-full items-center justify-center p-3 sm:p-5">
@@ -1665,6 +1726,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                 mediaTab={mediaTab}
                 modalError={modalError}
                 isSubmitting={isSubmittingAll}
+                isCompressingImages={isCompressingReferenceImages}
                 onSetDesignDesc={setDesignDesc}
                 onSetDesignCount={setDesignCount}
                 onSetDesignDueDate={setDesignDueDate}
@@ -1693,8 +1755,12 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
             {(addModalStep === "sampling_config" || addModalStep === "product_search") && (
               <AddProductSamplingStep
+                designMockupHandoff={Boolean(designMockupHandoff)}
+                designHandoffDesigns={designMockupHandoff?.designs}
                 selectedScopes={selectedScopes}
                 modalError={modalError}
+                isResample={isResample}
+                onSetIsResample={setIsResample}
                 sampleType={sampleType}
                 partialRequirements={partialRequirements}
                 samplingSearchMode={samplingSearchMode}
@@ -1834,10 +1900,16 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                   setSelectedDbSample(null);
                 }}
                 onBackToScopes={() => {
+                  if (isSubmittingAll) return;
                   setModalError(null);
-                  setAddModalStep("scopes");
+                  if (designMockupHandoff) void handleReturnToDesk();
+                  else setAddModalStep("scopes");
                 }}
-                onClose={() => setIsAddModalOpen(false)}
+                onClose={() => {
+                  if (isSubmittingAll) return;
+                  if (designMockupHandoff) void handleReturnToDesk();
+                  else setIsAddModalOpen(false);
+                }}
                 onSubmit={handleStageSamplingProduct}
               />
             )}

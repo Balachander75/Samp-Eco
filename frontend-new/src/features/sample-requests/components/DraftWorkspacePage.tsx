@@ -19,8 +19,6 @@ import { UserProfile } from "@/features/auth";
 import { SampleRequestItem } from "../types";
 import {
   fetchDraftMarketingRequestsApi,
-  fetchDesignRequestsApi,
-  mapDesignRequestToSampleRequest,
   updateSampleRequestApi,
   updateDesignRequestApi,
   deleteAnyRequestApi,
@@ -31,7 +29,7 @@ import {
   releaseDraftRequestsApi,
   ProductDetailItem,
 } from "@/infrastructure/api";
-import { DraftPackageGroup } from "./DraftPackagesView";
+import type { DraftPackageContext } from "./DraftPackagesView";
 import { getDraftReleaseStatus, isDesignRequest } from "../utils/trackTypes";
 
 export interface DraftWorkspacePageProps {
@@ -48,8 +46,8 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
   const navigate = useNavigate();
   const location = useLocation();
   // Load package group from router state or session storage
-  const [packageContext] = useState<DraftPackageGroup | null>(() => {
-    const state = location.state as { package?: DraftPackageGroup } | null;
+  const [packageContext] = useState<DraftPackageContext | null>(() => {
+    const state = location.state as { package?: DraftPackageContext } | null;
     if (state?.package) return state.package;
     try {
       const cached = sessionStorage.getItem("samp_active_draft_group");
@@ -104,21 +102,18 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
     if (!packageContext) return;
     setIsLoading(true);
     try {
-      const allRequests = packageContext.requestKind === "design"
-        ? (await fetchDesignRequestsApi(packageContext.year || undefined, true)).map(mapDesignRequestToSampleRequest)
-        : await fetchDraftMarketingRequestsApi(packageContext.year || undefined);
-      const targetCustomer = packageContext.customer.toLowerCase().trim();
-      const targetProgram = packageContext.programName.toLowerCase().trim();
+      const allRequests = await fetchDraftMarketingRequestsApi(packageContext.year || undefined);
+      const normalizePackageValue = (value: string) => value.replace(/\s+/g, " ").toLowerCase().trim();
+      const targetCustomer = normalizePackageValue(packageContext.customer);
+      const targetProgram = normalizePackageValue(packageContext.programName);
       const targetYear = String(packageContext.programYear).replace(/BTS/gi, "").trim();
 
       const matched = allRequests.filter((r) => {
         const s = String(r.status || "").toLowerCase();
         const isDraft = s.includes("draft") || s.includes("smt");
         if (!isDraft) return false;
-        if ((r.requestKind || "sample") !== packageContext.requestKind) return false;
-
-        const c = String(r.customer || "").toLowerCase().trim();
-        const p = String(r.programName || r.programCampaignTitle || "").toLowerCase().trim();
+        const c = normalizePackageValue(String(r.customer || ""));
+        const p = normalizePackageValue(String(r.programName || r.programCampaignTitle || ""));
         const y = String(r.programYear || r.year || "").replace(/BTS/gi, "").trim();
 
         return c === targetCustomer && p === targetProgram && (y === targetYear || !targetYear);
@@ -144,6 +139,17 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
   useEffect(() => {
     loadPackageData();
   }, [loadPackageData]);
+
+  const handleReturnToDraftQueue = () => {
+    try {
+      sessionStorage.removeItem("samp_active_draft_group");
+    } catch {
+      // Navigation can continue if storage is unavailable.
+    }
+    navigate("/sample-requests/sampling", {
+      state: { refresh: Date.now(), stage: "draft" },
+    });
+  };
 
   // Handle multi-select toggle
   const handleToggleSelectAll = () => {
@@ -397,9 +403,15 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
 
       // If all items were released, return to sample requests desk
       if (selectedIds.size === 0 || selectedIds.size === packageItems.length) {
-        sessionStorage.removeItem("samp_active_draft_group");
+        try {
+          sessionStorage.removeItem("samp_active_draft_group");
+        } catch {
+          // The released drafts are already persisted; continue to the queue.
+        }
         setTimeout(() => {
-          navigate("/sample-requests", { state: { refresh: Date.now() } });
+          navigate("/sample-requests/sampling", {
+            state: { refresh: Date.now(), stage: "draft" },
+          });
         }, 800);
       } else {
         loadPackageData();
@@ -418,7 +430,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
       <div className="p-12 text-center">
         <p className="text-zinc-500 text-sm">No active draft package selected.</p>
         <button
-          onClick={() => navigate("/sample-requests")}
+          onClick={handleReturnToDraftQueue}
           className="mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg"
         >
           Return to Sample Requests Desk
@@ -430,8 +442,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
   const itemsToRelease = selectedIds.size > 0 ? packageItems.filter((item) => selectedIds.has(item.id)) : packageItems;
   const itemsToReleaseCount = itemsToRelease.length;
   const releaseDestinations = Array.from(new Set(itemsToRelease.map(getDraftReleaseStatus)));
-  const isDesignPackage = packageContext.requestKind === "design" ||
-    (packageItems.length > 0 && packageItems.every(isDesignRequest));
+  const isDesignPackage = packageContext.requestKind === "design";
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-zinc-950 overflow-hidden">
@@ -452,7 +463,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
           <div className="flex items-start gap-3">
             <button
               type="button"
-              onClick={() => navigate("/sample-requests")}
+              onClick={handleReturnToDraftQueue}
               className="mt-0.5 p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition cursor-pointer"
               title="Return to Sample Requests"
             >

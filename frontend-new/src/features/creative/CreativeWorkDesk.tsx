@@ -21,6 +21,19 @@ const DesignRequestInspectorModal = React.lazy(() =>
   }))
 );
 
+const hasMockupScope = (request: SampleRequestItem) =>
+  (request.requestTypes || []).includes("mockup") || String(request.mockupRequired || "").toLowerCase() === "yes";
+
+const isMockupRoutedAwayFromCreative = (request: SampleRequestItem) => {
+  if (!hasMockupScope(request)) return false;
+
+  const state = request.mockupWorkflowState;
+  if (state?.designNeeded === false || state?.creativeBypassed === true) return true;
+
+  const stage = String(state?.stage || "").toLowerCase();
+  return Boolean(stage) && !["creative", "creative_approval"].includes(stage);
+};
+
 export interface CreativeWorkDeskProps {
   user?: UserProfile | null;
 }
@@ -153,11 +166,12 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
       }
       const scopes = r.requestTypes || [];
       const s = String(r.status || "").toLowerCase();
-      if (scopes.includes("costing") && !scopes.includes("design") && r.requestKind !== "design") return false;
+      const hasExplicitDesignRequest = scopes.includes("design") || Number(r.designRequestId) > 0;
+      // Creative's Design queue only contains Design-scoped work or a linked Design request.
+      if (!hasExplicitDesignRequest) return false;
       // Exclude unreleased drafts - only show once released to Creative
       if (s.includes("draft") || s.includes("smt") || s.includes("pending allocation")) return false;
 
-      const code = String(r.materialCode || "");
       const designState = String(r.designRequestStatus || r.status || "").toLowerCase();
       if (
         r.marketingDesignDecision === "awaiting_marketing_review" ||
@@ -166,14 +180,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
       ) {
         return false;
       }
-      return (
-        scopes.includes("design") ||
-        s.includes("creative") ||
-        s.includes("counter proposed") ||
-        Boolean(r.isCounterDateActive) ||
-        code.startsWith("DSG-") ||
-        r.requestKind === "design"
-      );
+      return true;
     });
   }, [allRequests]);
 
@@ -199,10 +206,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
       const scopes = r.requestTypes || [];
       const hasMockup = scopes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes";
       const hasSample = scopes.includes("sample");
-      const mockupStage = String(r.mockupWorkflowState?.stage || "").toLowerCase();
-      if (hasMockup && !hasSample && mockupStage && !["creative", "creative_approval"].includes(mockupStage)) {
-        return false;
-      }
+      if (hasMockup && isMockupRoutedAwayFromCreative(r)) return false;
       return hasMockup || hasSample;
     });
   }, [allRequests]);

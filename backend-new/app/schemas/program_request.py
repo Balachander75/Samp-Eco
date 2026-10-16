@@ -62,6 +62,10 @@ class ProgramOutputSubmit(BaseModel):
     remark: str = Field(min_length=1, max_length=4000)
 
 
+class ProgramClaimSubmit(BaseModel):
+    department: Literal["sampling", "plant"]
+
+
 class ProgramSeenSubmit(BaseModel):
     department: str = Field(..., description="'sampling' or 'plant'")
     actor_name: Optional[str] = None

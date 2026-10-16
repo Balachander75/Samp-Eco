@@ -157,12 +157,16 @@ export interface ProgramRequestRecord {
   samplingRemark?: string | null;
   samplingSignedAt?: string | null;
   samplingSignedBy?: string | null;
+  samplingClaimedByUserId?: number | null;
+  samplingClaimedBy?: string | null;
   plantSeenAt?: string | null;
   plantSeenBy?: string | null;
   plantVerdict?: string | null;
   plantRemark?: string | null;
   plantSignedAt?: string | null;
   plantSignedBy?: string | null;
+  plantClaimedByUserId?: number | null;
+  plantClaimedBy?: string | null;
   createdAt: string;
   updatedAt: string;
   materials: ProgramMaterialItem[];
@@ -181,6 +185,10 @@ export interface CreateProgramRequestPayload {
 export interface ProgramOutputPayload {
   department: "sampling" | "plant";
   remark: string;
+}
+
+export interface ProgramClaimPayload {
+  department: "sampling" | "plant";
 }
 
 export interface ProgramActivityReplyPayload {
@@ -228,12 +236,16 @@ export interface SampleRequestItem {
   samplingRemark?: string | null;
   samplingSignedAt?: string | null;
   samplingSignedBy?: string | null;
+  samplingClaimedByUserId?: number | null;
+  samplingClaimedBy?: string | null;
   plantSeenAt?: string | null;
   plantSeenBy?: string | null;
   plantVerdict?: string | null;
   plantRemark?: string | null;
   plantSignedAt?: string | null;
   plantSignedBy?: string | null;
+  plantClaimedByUserId?: number | null;
+  plantClaimedBy?: string | null;
   requestTypes?: RequestType[];
   requestKind?: "sample" | "design" | "feasibility" | "program";
   updatedAt?: string;
@@ -349,9 +361,29 @@ export interface MockupWorkflowEvent {
   remark?: string | null;
 }
 
+export type DesignFollowupScope = "mockup" | "sample";
+
+export interface DesignFollowupArtwork {
+  designNumber: string;
+  description: string;
+  shutterstockNo: string;
+  remarks: string;
+  designFileUrl: string;
+  submittedAt: string;
+}
+
+export interface DesignFollowupSelection {
+  designs: DesignFollowupArtwork[];
+  requestedAt?: string;
+  requestedBy?: string;
+}
+
 export interface MockupWorkflowState {
   stage: "marketing" | "awaiting_design_acceptance" | "creative" | "studio" | "creative_approval" | "sampling_review" | "awaiting_marketing_acceptance" | "awaiting_marketing_direction" | "done" | string;
   designNeeded?: boolean;
+  isResample?: boolean;
+  creativeBypassed?: boolean;
+  designFollowups?: Partial<Record<DesignFollowupScope, DesignFollowupSelection>>;
   creativeInputNeeded?: boolean;
   marketingShutterstockNo?: string;
   marketingRemark?: string;
@@ -378,6 +410,7 @@ export interface MockupWorkflowState {
   samplingRouting?: {
     stage?: "marketing" | "creative" | "studio" | "creative_approval" | "sampling_review" | "plant" | string;
     creativeChangesRequired?: boolean;
+    isResample?: boolean;
     isDesignVariant?: boolean;
     variantNumber?: number;
     creativePendingCharacteristicKeys?: Array<{ className: string; characteristicName: string }>;

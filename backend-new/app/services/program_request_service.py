@@ -18,6 +18,7 @@ from app.schemas.program_request import (
     ProgramSeenSubmit,
 )
 from app.utils.business_year import get_current_business_year
+from app.auth.permissions import is_admin
 
 
 class ProgramRequestService:
@@ -387,6 +388,7 @@ class ProgramRequestService:
                 "caliper_wt": mat.caliper_wt,
                 "quantity": mat.quantity,
                 "unit": mat.unit,
+                "remark": mat.remark,
                 "created_at": mat.created_at.isoformat() if mat.created_at else None,
             },
             actor_id=actor_id,
@@ -508,9 +510,77 @@ class ProgramRequestService:
         self.db.refresh(item)
         return self.serialize(item)
 
+    def claim_task(
+        self,
+        request_id: int,
+        department: str,
+        current_user: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Claim a program planning review task for Sampling Team or Plant Team."""
+        item = self.repo.get_for_update(request_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Program planning request was not found")
+
+        dept = department.strip().casefold()
+        if dept not in {"sampling", "plant"}:
+            raise HTTPException(status_code=422, detail="Department must be sampling or plant")
+
+        actor_id, actor_name, _ = self._get_actor_info(current_user)
+        is_admin_user = is_admin(current_user) if current_user else False
+        now = datetime.now(timezone.utc)
+
+        if dept == "sampling":
+            current_id = item.sampling_claimed_by_user_id
+            current_name = item.sampling_claimed_by
+            if current_id and current_id != actor_id and not is_admin_user:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"This Sampling review is already claimed by {current_name or 'another team member'}",
+                )
+            if current_id == actor_id and item.sampling_claimed_by:
+                return self.serialize(item)
+
+            item.sampling_claimed_by_user_id = actor_id
+            item.sampling_claimed_by = actor_name
+            if not item.sampling_seen_at:
+                item.sampling_seen_at = now
+                item.sampling_seen_by = actor_name
+            action = "SAMP_TASK_CLAIMED"
+            actor_dept = "SAMP Team"
+        else:
+            current_id = item.plant_claimed_by_user_id
+            current_name = item.plant_claimed_by
+            if current_id and current_id != actor_id and not is_admin_user:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"This Plant review is already claimed by {current_name or 'another team member'}",
+                )
+            if current_id == actor_id and item.plant_claimed_by:
+                return self.serialize(item)
+
+            item.plant_claimed_by_user_id = actor_id
+            item.plant_claimed_by = actor_name
+            if not item.plant_seen_at:
+                item.plant_seen_at = now
+                item.plant_seen_by = actor_name
+            action = "PLANT_TASK_CLAIMED"
+            actor_dept = f"Plant ({item.target_plant})"
+
+        self.repo.add_activity_log(
+            program_request_id=item.id,
+            actor_name=actor_name,
+            actor_department=actor_dept,
+            action=action,
+            payload={"claimed_by": actor_name, "claimed_by_user_id": actor_id, "department": dept},
+            actor_id=actor_id,
+        )
+        self.db.commit()
+        self.db.refresh(item)
+        return self.serialize(item)
+
     @staticmethod
     def _claim_team_task(item: ProgramRequest, department: str, current_user: Optional[Any]) -> None:
-        """Persist one owner per SAMP/Plant review lane while the request row is locked."""
+        """Ensure the user has claimed the SAMP/Plant review lane before submitting remarks."""
         if not current_user:
             return
         field_prefix = "sampling" if department == "sampling" else "plant"
@@ -519,14 +589,18 @@ class ProgramRequestService:
         actor_id, actor_name, _ = ProgramRequestService._actor_info_for_claim(current_user)
         current_id = getattr(item, id_field)
         current_name = getattr(item, name_field)
-        is_admin = str(getattr(current_user, "role", "")).strip().casefold() in {"admin", "administrator"}
-        if current_id and current_id != actor_id and not is_admin:
-            raise HTTPException(status_code=409, detail=f"This {department} review is already being handled by {current_name or 'another team member'}")
-        if current_name and not current_id and current_name.casefold() != actor_name.casefold() and not is_admin:
-            raise HTTPException(status_code=409, detail=f"This {department} review is already being handled by {current_name}")
-        if not current_id and not is_admin:
-            setattr(item, id_field, actor_id)
-            setattr(item, name_field, actor_name)
+        is_admin_user = is_admin(current_user) if current_user else False
+
+        if not current_id and not is_admin_user:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Please claim this {department} review task before submitting observations or line remarks."
+            )
+        if current_id and current_id != actor_id and not is_admin_user:
+            raise HTTPException(
+                status_code=409,
+                detail=f"This {department} review is already claimed by {current_name or 'another team member'}."
+            )
 
     @staticmethod
     def _actor_info_for_claim(current_user: Any) -> Tuple[Optional[int], str, str]:

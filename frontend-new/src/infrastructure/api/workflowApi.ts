@@ -14,7 +14,7 @@ export interface RequestWorkflowLog {
 }
 
 export interface RequestWorkflowRecord {
-  workflow_type: "costing" | "mockup";
+  workflow_type: "costing" | "mockup" | "sample" | "design";
   workflow_id: number;
   sample_request_id: number;
   sr_number: string;
@@ -37,6 +37,8 @@ export interface RequestWorkflowRecord {
   costing_notes?: string | null;
   reviewer_status: string;
   reviewer_notes?: string | null;
+  reviewer_name?: string | null;
+  reviewed_at?: string | null;
   marketing_decision?: string | null;
   logs: RequestWorkflowLog[];
 }

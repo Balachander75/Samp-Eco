@@ -88,7 +88,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             return None
         return self.db.query(DesignRequest).filter(DesignRequest.sr_number == sr_number).first()
 
-    def create_record(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_record(self, data: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
         """Create a design request in PostgreSQL using its sequence-generated ID."""
         now = datetime.now(timezone.utc)
         number_of_designs = int(data.get("number_of_designs") or 1)
@@ -159,8 +159,35 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             item.request_code = data.get("request_code") or f"DSG-{item.id:04d}"
             if not data.get("sr_number"):
                 item.sr_number = f"SR-{now.year % 100:02d}-DSG-{item.id:03d}"
-            self.db.commit()
-            self.db.refresh(item)
+            linked_sample = (
+                self.db.query(CreateSampleRequest)
+                .filter(CreateSampleRequest.sr_number == item.sr_number)
+                .first()
+                if item.sr_number
+                else None
+            )
+            self.db.add(
+                SampleRequestActivityLog(
+                    sample_request_id=linked_sample.id if linked_sample else None,
+                    request_sr_number=item.sr_number,
+                    actor_user_id=data.get("created_by_user_id"),
+                    actor_name=str(item.created_by or "Marketing")[:255],
+                    actor_department="Marketing",
+                    action="DESIGN_REQUEST_CREATED",
+                    from_status=None,
+                    to_status=item.status,
+                    payload={
+                        "design_request_id": item.id,
+                        "request_code": item.request_code,
+                        "number_of_designs": number_of_designs,
+                        "event": workflow_state["events"][0],
+                    },
+                    created_at=now,
+                )
+            )
+            if commit:
+                self.db.commit()
+                self.db.refresh(item)
             return self.to_dict(item)
         except Exception:
             self.db.rollback()
@@ -226,7 +253,13 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             state["events"] = events[:500]
             item.workflow_state = state
 
-    def mutate_record(self, item_id: int, mutator: Callable[[DesignRequest], None]) -> Optional[Dict[str, Any]]:
+    def mutate_record(
+        self,
+        item_id: int,
+        mutator: Callable[[DesignRequest], None],
+        *,
+        actor_user_id: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Lock, mutate, and persist one workflow row in a single transaction."""
         item = (
             self.db.query(DesignRequest)
@@ -282,7 +315,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
                     SampleRequestActivityLog(
                         sample_request_id=sample_request_id,
                         request_sr_number=item.sr_number,
-                        actor_user_id=None,
+                        actor_user_id=actor_user_id,
                         actor_name=str(event.get("actorName") or item.created_by or "System")[:255],
                         actor_department=str(event.get("actorDepartment") or "Creative Studio")[:100],
                         action=str(event.get("action") or "DESIGN_EVENT")[:64],
@@ -309,7 +342,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
         self.db.commit()
         return True
 
-    def sync_sample_request_design(self, sample_req: Dict[str, Any], is_delete: bool = False):
+    def sync_sample_request_design(self, sample_req: Dict[str, Any], is_delete: bool = False, *, commit: bool = True):
         """Sync design requests whenever a sample request with 'design' scope is created, updated, or deleted."""
         sr_number = sample_req.get("sr_number")
         if not sr_number:
@@ -319,7 +352,8 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             item = self.get_model_by_sr_number(sr_number)
             if item:
                 self.db.delete(item)
-                self.db.commit()
+                if commit:
+                    self.db.commit()
             return None
 
         trend = sample_req.get("trend")
@@ -378,7 +412,8 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
                     "created_by": sample_req.get("created_by") or "",
                     "created_by_user_id": sample_req.get("created_by_user_id"),
                     "workflow_state": {},
-                }
+                },
+                commit=commit,
             )
 
         updates: Dict[str, Any] = {}
@@ -413,8 +448,9 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
 
         self._apply_updates(current, updates)
         current.updated_at = datetime.now(timezone.utc)
-        self.db.commit()
-        self.db.refresh(current)
+        if commit:
+            self.db.commit()
+            self.db.refresh(current)
         return self.to_dict(current)
 
     @staticmethod

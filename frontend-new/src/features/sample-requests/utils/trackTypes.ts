@@ -68,8 +68,14 @@ export function isDesignRequest(r?: Partial<SampleRequestItem> | null): boolean 
 /** Choose the first owner for a Marketing draft when it is released. */
 export function getDraftReleaseStatus(r: Partial<SampleRequestItem>): string {
   const requestTypes = r.requestTypes || [];
+  const state = ((r.mockupWorkflowState || {}) as Record<string, any>);
+  const routing = ((state.samplingRouting || {}) as Record<string, any>);
+  const isResample = Boolean((r as any)?.isResample || state.isResample || routing.isResample);
+
   if (requestTypes.length === 1 && requestTypes[0] === "sample") {
-    return r.mockupWorkflowState?.samplingRouting?.creativeChangesRequired ? "Creative" : "Released to Plant";
+    if (isResample) return "Released to Plant";
+    if (routing.creativeChangesRequired) return "Creative";
+    return "Sampling Review (PMT)";
   }
   return "Creative";
 }

@@ -1,5 +1,14 @@
 export type DeliverableScopeId = "design" | "mockup" | "sample" | "costing";
 
+export interface StagedDesignArtwork {
+  designNumber: string;
+  description: string;
+  shutterstockNo: string;
+  remarks: string;
+  designFileUrl: string;
+  submittedAt: string;
+}
+
 export interface DeliverableDefinition {
   id: DeliverableScopeId;
   label: string;
@@ -42,6 +51,8 @@ export interface StagedProductItem {
   variantNumber?: number;
   requestTypeTimestamps?: Record<string, string | null>;
   plant?: string;
+  isResample?: boolean;
+  resampleReason?: string;
   unitPcPack?: string;
   qtyForSampling?: string;
   qtyDesignCosting?: string;
@@ -75,9 +86,12 @@ export interface StagedProductItem {
     marketingRemark?: string;
     qtyForMockup?: string;
     requiredDate?: string;
+    designArtwork?: StagedDesignArtwork;
   };
   samplingMetadata?: {
     sampleType: "full" | "partial";
+    isResample?: boolean;
+    resampleReason?: string;
     partialRequirements?: string;
     searchMode: "material_code" | "binding" | "new";
     sourceSampleId?: number;

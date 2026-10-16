@@ -443,13 +443,17 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                   )}
                   {prod.scopes.length === 1 && prod.scopes.includes("sample") && (
                     <div className="mt-1">
-                      {prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length || prod.variantNumber ? (
+                      {prod.isResample || prod.samplingMetadata?.isResample ? (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-semibold text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                          Resample to Plant
+                        </span>
+                      ) : prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length || prod.variantNumber ? (
                         <span className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[9px] font-semibold text-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                          Creative then Plant
+                          Creative then Sampling
                         </span>
                       ) : (
                         <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-                          Resample to Plant
+                          To Sampling Team Review
                         </span>
                       )}
                     </div>

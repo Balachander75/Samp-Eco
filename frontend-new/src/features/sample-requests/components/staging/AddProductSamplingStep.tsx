@@ -24,8 +24,19 @@ import type { StagedProductItem } from "../../types/staging";
 type CustomProductDetail = NonNullable<StagedProductItem["customDetails"]>[number];
 
 export interface AddProductSamplingStepProps {
+  designMockupHandoff?: boolean;
+  designHandoffDesigns?: Array<{
+    designNumber: string;
+    description: string;
+    shutterstockNo: string;
+    remarks: string;
+    designFileUrl: string;
+    submittedAt: string;
+  }>;
   selectedScopes?: DeliverableScopeId[];
   modalError: string | null;
+  isResample?: boolean;
+  onSetIsResample?: (val: boolean) => void;
   sampleType: "full" | "partial";
   partialRequirements: string;
   samplingSearchMode: "new" | "material_code" | "binding";
@@ -244,8 +255,12 @@ const BindingProductResults: React.FC<{
 };
 
 export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
+  designMockupHandoff = false,
+  designHandoffDesigns = [],
   selectedScopes = ["sample"],
   modalError,
+  isResample = false,
+  onSetIsResample,
   sampleType,
   partialRequirements,
   samplingSearchMode,
@@ -416,19 +431,23 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
   };
 
   const handleConfirmMockupDetails = () => {
+    if (designMockupHandoff && (!selectedDbSample || !selectedDbSample.id || !selectedDbSample.material_code?.trim())) {
+      setMockupDetailsError("Select an existing Material Code or Binding product before setting the required date.");
+      return;
+    }
     if (!mockupRequiredDate.trim()) {
       setMockupDetailsError("Choose a required date for the Mockup request.");
       return;
     }
-    if (!Number.isInteger(Number(qtyForMockup)) || Number(qtyForMockup) < 1) {
+    if (!designMockupHandoff && (!Number.isInteger(Number(qtyForMockup)) || Number(qtyForMockup) < 1)) {
       setMockupDetailsError("Enter a whole-number Mockup quantity (minimum 1).");
       return;
     }
-    if (designNeeded === null) {
+    if (!designMockupHandoff && designNeeded === null) {
       setMockupDetailsError("Choose whether a new design is needed.");
       return;
     }
-    if (designNeeded === false && !marketingShutterstockNo.trim() && !marketingMockupRemark.trim()) {
+    if (!designMockupHandoff && designNeeded === false && !marketingShutterstockNo.trim() && !marketingMockupRemark.trim()) {
       setMockupDetailsError("Enter a Shutterstock number or a remark when no new design is needed.");
       return;
     }
@@ -594,6 +613,71 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
       {/* Form Body */}
       <form onSubmit={handleFormSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto px-6 py-5 sm:px-7 sm:py-6 space-y-4 text-xs">
+          {/* Workflow & Routing: Standard Sample (Sampling Team Review) vs Direct Resample (Plant) */}
+          {includesSample && (
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans">
+                Sample Request Routing <span className="text-rose-500">*</span>
+              </label>
+
+              <div className="grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* Standard Sample */}
+                <div
+                  onClick={() => onSetIsResample?.(false)}
+                  className={`min-h-[3.5rem] p-3 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between gap-3 ${
+                    !isResample
+                      ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/5 ring-1 ring-[var(--accent-primary)]/30 text-zinc-900 dark:text-zinc-100"
+                      : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/60 hover:border-[var(--accent-primary)]/40"
+                  }`}
+                >
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                      New / Standard Sample
+                      <span className="rounded bg-emerald-100 dark:bg-emerald-950/60 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-800 dark:text-emerald-300">Sampling Team Review</span>
+                    </span>
+                    <span className="text-[10.5px] text-slate-500 dark:text-zinc-400">Sampling Team reviews specifications first, then releases to Plant</span>
+                  </div>
+                  <div
+                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                      !isResample
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
+                        : "border-zinc-300 dark:border-zinc-600"
+                    }`}
+                  >
+                    {!isResample && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                  </div>
+                </div>
+
+                {/* Direct Resample */}
+                <div
+                  onClick={() => onSetIsResample?.(true)}
+                  className={`min-h-[3.5rem] p-3 rounded-xl border transition-all cursor-pointer select-none flex items-center justify-between gap-3 ${
+                    isResample
+                      ? "border-blue-600 bg-blue-50/50 dark:bg-blue-950/20 ring-1 ring-blue-500/30 text-zinc-900 dark:text-zinc-100"
+                      : "border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/60 hover:border-blue-500/40"
+                  }`}
+                >
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                      Repeat Resample
+                      <span className="rounded bg-blue-100 dark:bg-blue-950/60 px-1.5 py-0.5 text-[9px] font-semibold text-blue-800 dark:text-blue-300">Direct to Plant</span>
+                    </span>
+                    <span className="text-[10.5px] text-slate-500 dark:text-zinc-400">Unchanged repeat sample; releases directly to Plant execution</span>
+                  </div>
+                  <div
+                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                      isResample
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-zinc-300 dark:border-zinc-600"
+                    }`}
+                  >
+                    {isResample && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Scope Selection: Full Sample vs Partial Sample */}
           {includesSample && (
             <div className="space-y-1.5">
@@ -732,9 +816,10 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
               Product Source
             </label>
 
-            <div className="grid w-full max-w-3xl grid-cols-3 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-white/[0.06]">
+            <div className={designMockupHandoff ? "grid w-full max-w-3xl grid-cols-2 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-white/[0.06]" : "grid w-full max-w-3xl grid-cols-3 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-white/[0.06]"}>
               <button
                 type="button"
+                hidden={designMockupHandoff}
                 aria-pressed={samplingSearchMode === "new"}
                 onClick={() => onSetSamplingSearchMode("new")}
                 className={`min-h-9 px-1.5 py-2 rounded-lg text-center text-[10px] leading-tight font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] sm:px-3 sm:text-xs ${
@@ -1309,7 +1394,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>
-                {includesMockup ? "Continue to Mockup Details" : includesCosting ? "Continue to Costing Details" : "Stage Product"}
+                {includesMockup ? (designMockupHandoff ? "Continue to required date" : "Continue to Mockup Details") : includesCosting ? "Continue to Costing Details" : "Stage Product"}
               </span>
             </button>
           </div>
@@ -1321,10 +1406,28 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
             <header className="border-b border-slate-100 px-5 py-4 dark:border-zinc-800 sm:px-6">
               <h3 id="mockup-details-title" className="text-sm font-bold text-slate-900 dark:text-zinc-100">Mockup details</h3>
               <p className="mt-1 truncate text-xs text-slate-600 dark:text-zinc-400">{selectedDbSample?.material_code ? `${selectedDbSample.material_code} · ` : ""}{productDescription || selectedDbSample?.product_description}</p>
-              <p className="mt-1 text-[11px] text-slate-500 dark:text-zinc-400">Mockup quantity, required date, and design choice are needed to continue.</p>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-zinc-400">
+                {designMockupHandoff
+                  ? "Each selected design will become a separate Mockup request and go directly to Studio."
+                  : "Mockup quantity, required date, and design choice are needed to continue."}
+              </p>
             </header>
             <div className="space-y-4 px-5 py-4 sm:px-6">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {designMockupHandoff && (
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/60">
+                  <p className="text-[11px] font-semibold text-slate-700 dark:text-zinc-200">Accepted designs and Creative references</p>
+                  {designHandoffDesigns.map((design) => (
+                    <div key={design.designNumber} className="rounded-lg bg-white px-3 py-2 dark:bg-zinc-900">
+                      <p className="text-xs font-semibold text-slate-900 dark:text-zinc-100">{design.designNumber}{design.description ? " · " + design.description : ""}</p>
+                      <p className="mt-1 text-[10px] text-slate-600 dark:text-zinc-400">
+                        {design.shutterstockNo ? "Shutterstock " + design.shutterstockNo : "No Shutterstock number"}
+                        {design.remarks ? " · " + design.remarks : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className={designMockupHandoff ? "hidden" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
                 <label className="space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                   <span>Mockup quantity <span className="text-rose-500">*</span></span>
                   <input autoFocus required min="1" step="1" type="number" inputMode="numeric" value={qtyForMockup} onChange={(event) => { onSetQtyForMockup(event.target.value); setMockupDetailsError(""); }} placeholder="e.g. 1" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
@@ -1338,7 +1441,17 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                   calendarAlign="right"
                 />
               </div>
-              <fieldset className="space-y-2">
+              {designMockupHandoff && (
+                <OperationalDatePicker
+                  label="Mockup required date"
+                  required
+                  value={mockupRequiredDate}
+                  onChange={(value) => { onSetMockupRequiredDate(value); setMockupDetailsError(""); }}
+                  placeholder="Select required date..."
+                  calendarAlign="right"
+                />
+              )}
+              <fieldset className={designMockupHandoff ? "hidden" : "space-y-2"}>
                 <legend className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300">Is a new design needed? <span className="text-rose-500">*</span></legend>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {[true, false].map((needed) => (
@@ -1375,7 +1488,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
             {mockupDetailsError && <p role="alert" className="mx-5 mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 sm:mx-6">{mockupDetailsError}</p>}
             <footer className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3 dark:border-zinc-800 sm:px-6">
               <button type="button" onClick={() => { setShowMockupDetailsDialog(false); setMockupDetailsError(""); }} className="h-9 rounded-xl bg-slate-100 px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700">Back</button>
-              <button type="button" disabled={isSubmittingAll} onClick={handleConfirmMockupDetails} className="h-9 rounded-xl bg-[var(--accent-primary)] px-4 text-xs font-bold text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:opacity-50">{includesCosting ? "Continue to Costing" : "Add Product to Staging"}</button>
+              <button type="button" disabled={isSubmittingAll} onClick={handleConfirmMockupDetails} className="h-9 rounded-xl bg-[var(--accent-primary)] px-4 text-xs font-bold text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:opacity-50">{includesCosting ? "Continue to Costing" : designMockupHandoff ? "Create requests and send to Studio" : "Add Product to Staging"}</button>
             </footer>
           </section>
         </div>

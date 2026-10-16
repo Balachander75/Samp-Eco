@@ -78,6 +78,13 @@ export interface SampleRequestsDeskProps {
   user?: UserProfile | null;
 }
 
+const isMockupWorkflowRequest = (request?: Partial<SampleRequestItem> | null) =>
+  Boolean(
+    request &&
+      ((request.requestTypes || []).includes("mockup") ||
+        String(request.mockupRequired || "").toLowerCase() === "yes")
+  );
+
 export type MarketingSubView = "overview" | "sampling" | "feasibility" | "programs";
 
 export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) => {
@@ -114,7 +121,9 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
   const [requests, setRequests] = useState<SampleRequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const requestsLoadSequence = useRef(0);
-  const [samplingDraftOnly, setSamplingDraftOnly] = useState(false);
+  const [samplingDraftOnly, setSamplingDraftOnly] = useState(
+    () => (location.state as { stage?: string } | null)?.stage === "draft",
+  );
 
   // The Marketing team shares its workflow queue; the API applies role ownership.
   const visibleRequests = requests;
@@ -270,7 +279,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
       return;
     }
     setSelectedRequest(req);
-    if (isDesignRequest(req)) {
+    if (isDesignRequest(req) && !isMockupWorkflowRequest(req)) {
       setIsDesignRequestInspectorOpen(true);
       return;
     }
@@ -700,7 +709,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
 
       {/* Master Detail Inspector Drawer & Dialog Modals */}
       <React.Suspense fallback={null}>
-        {selectedRequest && isDesignRequest(selectedRequest) ? (
+        {selectedRequest && isDesignRequest(selectedRequest) && !isMockupWorkflowRequest(selectedRequest) ? (
           <DesignRequestInspectorModal
             request={selectedRequest}
             isOpen={isDesignRequestInspectorOpen || isDesignReviewOpen}

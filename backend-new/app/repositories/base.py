@@ -28,12 +28,15 @@ class BaseRepository(Generic[ModelType]):
         self.db.refresh(entity)
         return entity
 
-    def update(self, db_obj: ModelType, update_data: Dict[str, Any]) -> ModelType:
+    def update(self, db_obj: ModelType, update_data: Dict[str, Any], *, commit: bool = True) -> ModelType:
         for field, value in update_data.items():
             if hasattr(db_obj, field):
                 setattr(db_obj, field, value)
-        self.db.commit()
-        self.db.refresh(db_obj)
+        if commit:
+            self.db.commit()
+            self.db.refresh(db_obj)
+        else:
+            self.db.flush()
         return db_obj
 
     def delete(self, id: Any) -> bool:

@@ -70,6 +70,10 @@ export function mapProgramResponse(item: Record<string, unknown>): ProgramReques
     plantRemark: typeof item.plant_remark === "string" ? item.plant_remark : null,
     plantSignedAt: typeof item.plant_signed_at === "string" ? item.plant_signed_at : null,
     plantSignedBy: typeof item.plant_signed_by === "string" ? item.plant_signed_by : null,
+    samplingClaimedByUserId: item.sampling_claimed_by_user_id != null ? Number(item.sampling_claimed_by_user_id) : null,
+    samplingClaimedBy: typeof item.sampling_claimed_by === "string" ? item.sampling_claimed_by : null,
+    plantClaimedByUserId: item.plant_claimed_by_user_id != null ? Number(item.plant_claimed_by_user_id) : null,
+    plantClaimedBy: typeof item.plant_claimed_by === "string" ? item.plant_claimed_by : null,
     createdAt: String(item.created_at || ""),
     updatedAt: String(item.updated_at || ""),
     materials: rawMaterials.map((m: any) => mapProgramMaterial(m)),
@@ -111,12 +115,16 @@ export function mapProgramRequestToSampleRequest(record: ProgramRequestRecord): 
     samplingRemark: record.samplingRemark,
     samplingSignedAt: record.samplingSignedAt,
     samplingSignedBy: record.samplingSignedBy,
+    samplingClaimedByUserId: record.samplingClaimedByUserId,
+    samplingClaimedBy: record.samplingClaimedBy,
     plantSeenAt: record.plantSeenAt,
     plantSeenBy: record.plantSeenBy,
     plantVerdict: record.plantVerdict,
     plantRemark: record.plantRemark,
     plantSignedAt: record.plantSignedAt,
     plantSignedBy: record.plantSignedBy,
+    plantClaimedByUserId: record.plantClaimedByUserId,
+    plantClaimedBy: record.plantClaimedBy,
     samplingFeasibilityResponse: record.samplingVerdict ? (record.samplingVerdict.toLowerCase().includes("feasible") ? "Yes" : record.samplingVerdict.toLowerCase().includes("not") ? "No" : "Maybe") : null,
     samplingFeasibilityRemark: record.samplingRemark,
     samplingFeasibilityApprovedBy: record.samplingSignedBy,
@@ -348,3 +356,21 @@ export async function markProgramSeenApi(
   dispatchProgramRequestChanged(record);
   return record;
 }
+
+export async function claimProgramTaskApi(
+  requestId: number | string,
+  department: "sampling" | "plant"
+): Promise<ProgramRequestRecord> {
+  const cleanId = String(requestId).replace(/^program-/, "");
+  const data = await apiFetch<Record<string, unknown>>(
+    `/api/v1/program-requests/${cleanId}/claim`,
+    {
+      method: "POST",
+      jsonBody: { department },
+    }
+  );
+  const record = mapProgramResponse(data);
+  dispatchProgramRequestChanged(record);
+  return record;
+}
+

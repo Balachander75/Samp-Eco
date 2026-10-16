@@ -36,6 +36,7 @@ export interface AddProductDesignStepProps {
   mediaTab: "files" | "links";
   modalError: string | null;
   isSubmitting?: boolean;
+  isCompressingImages?: boolean;
   onSetDesignDesc: (val: string) => void;
   onSetDesignCount: (val: number | "") => void;
   onSetDesignDueDate: (val: string) => void;
@@ -71,6 +72,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
   mediaTab,
   modalError,
   isSubmitting = false,
+  isCompressingImages = false,
   onSetDesignDesc,
   onSetDesignCount,
   onSetDesignDueDate,
@@ -351,12 +353,14 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
                       type="file"
                       multiple
                       accept="image/*"
+                      disabled={isSubmitting || isCompressingImages}
                       onChange={onMultipleImageUpload}
                       className="hidden"
                     />
                     {uploadedImages.length < 2 ? (
                       <button
                         type="button"
+                        disabled={isSubmitting || isCompressingImages}
                         onClick={() => fileInputRef.current?.click()}
                         className="group flex min-h-10 w-full items-center justify-between gap-3 rounded-md border border-dashed border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:border-[var(--accent-primary)]/50 hover:bg-emerald-50/40 hover:text-[var(--accent-primary)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-950/20 dark:hover:text-emerald-300"
                       >
@@ -510,7 +514,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isCompressingImages}
             className="inline-flex h-10 items-center gap-1.5 rounded-xl px-5 text-xs font-bold text-white shadow-[0_2px_10px_rgba(0,109,50,0.25)] hover:shadow-[0_4px_14px_rgba(0,109,50,0.35)] transition-all cursor-pointer disabled:cursor-wait disabled:opacity-60 active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
           >
             {selectedScopes.includes("mockup") ? (
@@ -526,7 +530,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
             ) : selectedScopes.length === 1 && selectedScopes[0] === "design" ? (
               <>
                 <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>{isSubmitting ? "Staging to Draft…" : "Create Design Request"}</span>
+                <span>{isCompressingImages ? "Processing images…" : isSubmitting ? "Staging to Draft…" : "Create Design Request"}</span>
               </>
             ) : (
               <>

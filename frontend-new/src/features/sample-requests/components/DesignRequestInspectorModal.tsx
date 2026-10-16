@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import {
   X,
   Copy,
@@ -8,11 +9,12 @@ import {
   Clock,
   FileText,
   Layers,
+  Palette,
   ChevronRight,
   ShieldCheck,
   ExternalLink,
 } from "lucide-react";
-import { SampleRequestItem } from "../types";
+import { DesignFollowupArtwork, DesignFollowupScope, DesignFollowupSelection, SampleRequestItem } from "../types";
 import {
   submitCreativeDesignOutputApi,
   recordMarketingDesignDecisionApi,
@@ -46,7 +48,7 @@ export interface DesignRequestInspectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRefresh?: () => Promise<void> | void;
-  mode?: "marketing" | "creative";
+  mode?: "marketing" | "creative" | "sampling";
   showToast?: (message: string) => void;
 }
 
@@ -107,6 +109,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   mode = "marketing",
   showToast,
 }) => {
+  const navigate = useNavigate();
   // ── HOOKS DECLARED UNCONDITIONALLY AT THE TOP ──
   const [activeTab, setActiveTab] = useState<TabType>("specs");
   const [copiedCode, setCopiedCode] = useState(false);
@@ -124,7 +127,9 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     setActiveTab("specs");
     setIsCounterDateModalOpen(false);
     setSelectedFollowups([]);
+    setSelectedFollowupDesigns({ mockup: [], sample: [] });
     setFollowupError(null);
+    setMockupHandoffDialog(null);
     requestUpdatedAtRef.current = request?.updatedAt;
   }, [request?.id]);
 
@@ -206,9 +211,14 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   // Marketing Decision State
   const [isDeciding, setIsDeciding] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
-  const [selectedFollowups, setSelectedFollowups] = useState<Array<"mockup" | "sample">>([]);
+  const [selectedFollowups, setSelectedFollowups] = useState<DesignFollowupScope[]>([]);
+  const [selectedFollowupDesigns, setSelectedFollowupDesigns] = useState<Record<DesignFollowupScope, string[]>>({
+    mockup: [],
+    sample: [],
+  });
   const [isAddingFollowups, setIsAddingFollowups] = useState(false);
   const [followupError, setFollowupError] = useState<string | null>(null);
+  const [mockupHandoffDialog, setMockupHandoffDialog] = useState<"missing_stock" | "product_required" | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const [isPostingNote, setIsPostingNote] = useState(false);
@@ -760,22 +770,82 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     }
   };
 
-  const handleToggleFollowup = (val: "mockup" | "sample") => {
+  const handleToggleFollowup = (val: DesignFollowupScope) => {
     setFollowupError(null);
     setSelectedFollowups((current) =>
       current.includes(val) ? current.filter((v) => v !== val) : [...current, val]
     );
   };
 
+  const handleToggleFollowupDesign = (scope: DesignFollowupScope, designNumber: string) => {
+    setFollowupError(null);
+    setSelectedFollowupDesigns((current) => {
+      const selected = current[scope];
+      return {
+        ...current,
+        [scope]: selected.includes(designNumber)
+          ? selected.filter((value) => value !== designNumber)
+          : [...selected, designNumber],
+      };
+    });
+  };
+
+  const handleSetFollowupDesigns = (scope: DesignFollowupScope, designNumbers: string[]) => {
+    setFollowupError(null);
+    setSelectedFollowupDesigns((current) => ({
+      ...current,
+      [scope]: [...new Set(designNumbers)],
+    }));
+  };
+
   const handleAddFollowups = async () => {
     if (!activeRequest || !effectiveDesignId || selectedFollowups.length === 0 || isAddingFollowups) return;
+    const selectedDesignsByScope: Partial<Record<DesignFollowupScope, string[]>> = {};
+    selectedFollowups.forEach((scope) => {
+      selectedDesignsByScope[scope] = selectedFollowupDesigns[scope];
+    });
+    if (selectedFollowups.some((scope) => !selectedDesignsByScope[scope]?.length)) {
+      setFollowupError("Select at least one design for each chosen follow-up.");
+      return;
+    }
+    if (selectedFollowups.includes("mockup")) {
+      const selectedNumbers = new Set(selectedFollowupDesigns.mockup);
+      const missingStock = availableDesigns.filter((design) => selectedNumbers.has(design.designNumber) && !design.shutterstockNo.trim());
+      if (missingStock.some((design) => !design.remarks.trim())) {
+        const withoutReference = missingStock.filter((design) => !design.remarks.trim()).map((design) => design.designNumber);
+        setFollowupError("Creative has not provided a Shutterstock number or remark for " + withoutReference.join(", ") + ". Ask Creative to add a reference before continuing.");
+        return;
+      }
+      setFollowupError(null);
+      setMockupHandoffDialog(missingStock.length ? "missing_stock" : "product_required");
+      return;
+    }
     setIsAddingFollowups(true);
     setFollowupError(null);
     try {
-      const saved = await requestPostDesignDeliverablesApi(effectiveDesignId, selectedFollowups);
+      await requestPostDesignDeliverablesApi(effectiveDesignId, selectedFollowups, selectedDesignsByScope);
       const addedTypes = selectedFollowups.filter((scope) => !(includedFollowups as string[]).includes(scope));
-      setLocalOverride({ ...activeRequest, ...saved, id: activeRequest.id, requestKind: activeRequest.requestKind || "sample" });
+      const selectedArtworkByScope: Partial<Record<DesignFollowupScope, DesignFollowupSelection>> = {};
+      selectedFollowups.forEach((scope) => {
+        selectedArtworkByScope[scope] = {
+          designs: availableDesigns.filter((design) => selectedFollowupDesigns[scope].includes(design.designNumber)),
+          requestedAt: new Date().toISOString(),
+        };
+      });
+      setLocalOverride({
+        ...activeRequest,
+        requestTypes: [...new Set([...(activeRequest.requestTypes || []), ...selectedFollowups])],
+        mockupWorkflowState: {
+          ...activeRequest.mockupWorkflowState,
+          stage: activeRequest.mockupWorkflowState?.stage || "creative",
+          designFollowups: {
+            ...activeRequest.mockupWorkflowState?.designFollowups,
+            ...selectedArtworkByScope,
+          },
+        },
+      });
       setSelectedFollowups([]);
+      setSelectedFollowupDesigns({ mockup: [], sample: [] });
       if (showToast) {
         showToast(addedTypes.length
           ? `${addedTypes.map((scope) => scope === "mockup" ? "Mockup" : "Sampling").join(" and ")} added to this request.`
@@ -796,6 +866,36 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   };
 
   // ── EARLY RETURN AFTER ALL HOOKS ──
+  const handleContinueToProductStaging = async () => {
+    if (!activeRequest || !effectiveDesignId || isAddingFollowups) return;
+    const artwork = availableDesigns.filter((design) => selectedFollowupDesigns.mockup.includes(design.designNumber));
+    setIsAddingFollowups(true);
+    setFollowupError(null);
+    try {
+      if (selectedFollowups.includes("sample")) {
+        await requestPostDesignDeliverablesApi(effectiveDesignId, ["sample"], { sample: selectedFollowupDesigns.sample });
+      }
+      navigate("/sample-requests/product-staging", {
+        state: {
+          customer: activeRequest.customer || "",
+          programName: activeRequest.programName || "",
+          programYear: activeRequest.programYear || "2026",
+          year: activeRequest.year || "",
+          targetPlant: activeRequest.targetPlant || "",
+          designMockupHandoff: {
+            designRequestId: effectiveDesignId,
+            sourceSrNumber: activeRequest.srNumber || "",
+            designs: artwork,
+          },
+        },
+      });
+    } catch (error: any) {
+      setFollowupError(error?.message || "Could not start Product Staging for these designs.");
+    } finally {
+      setIsAddingFollowups(false);
+    }
+  };
+
   if (!isOpen || !activeRequest) return null;
 
   const isAwaitingReview =
@@ -804,6 +904,16 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const isClosed = activeStage === 3;
   const isAcceptedByMarketing = mode === "marketing" && activeRequest.marketingDesignDecision === "accepted";
   const includedFollowups = (activeRequest.requestTypes || []) as string[];
+  const availableDesigns: DesignFollowupArtwork[] = (activeRequest.creativeSubmissions || []).flatMap((batch: any) =>
+    (Array.isArray(batch?.rows) ? batch.rows : []).map((row: any, index: number) => ({
+      designNumber: String(row.designNumber || `D${index + 1}`),
+      description: String(row.description || ""),
+      shutterstockNo: String(row.shutterstockNo || ""),
+      remarks: String(row.remarks || ""),
+      designFileUrl: String(batch.designFileUrl || ""),
+      submittedAt: String(batch.submittedAt || ""),
+    })),
+  );
   const isCounterDatePending = Boolean(
     activeRequest.isCounterDateActive || activeRequest.counterDateDecision === "pending"
   );
@@ -924,7 +1034,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                     </span>
                     <span className="text-zinc-300 dark:text-zinc-700">/</span>
                     <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
-                      Design Request
+                      {mode === "sampling" ? "Sampling PMT Technical Review" : "Design Request"}
                     </span>
                   </div>
                 </div>
@@ -937,7 +1047,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         {activeRequest.customer || ""}
                       </h1>
                       <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-                        {activeRequest.createdBy ? <>Initiated by <span className="font-semibold text-slate-800 dark:text-zinc-200">{activeRequest.createdBy}</span></> : ""}
+                        {activeRequest.productDescription || "Commercial Creative Design Brief"}
+                        {activeRequest.createdBy ? <> · Initiated by <span className="font-semibold text-slate-800 dark:text-zinc-200">{activeRequest.createdBy}</span></> : ""}
                         {activeRequest.createdBy && (activeRequest.dateRequestCreated || activeRequest.createdAt) ? " · " : ""}
                         {formatDate(activeRequest.dateRequestCreated || activeRequest.createdAt)}
                       </p>
@@ -945,8 +1056,13 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
                     {/* Context Badges */}
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-[var(--accent-primary)] dark:bg-emerald-950/50 dark:text-emerald-300 border border-[var(--accent-primary)]/20">
-                        Design Request
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border ${
+                        mode === "sampling"
+                          ? "bg-purple-50 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 border-purple-500/20"
+                          : "bg-emerald-50 text-[var(--accent-primary)] dark:bg-emerald-950/50 dark:text-emerald-300 border-[var(--accent-primary)]/20"
+                      }`}>
+                        <Palette className="w-3.5 h-3.5" />
+                        <span>{mode === "sampling" ? "Sampling Review (Design Brief)" : "Design Request"}</span>
                       </span>
                       <StatusPill
                         status={activeRequest.designRequestStatus || activeRequest.status || "Creative"}
@@ -954,6 +1070,20 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                       />
                     </div>
                   </div>
+
+                  {mode === "sampling" && (
+                    <div className="mt-4 p-3.5 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/70 dark:bg-purple-950/20 flex items-start gap-3">
+                      <Palette className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                      <div className="space-y-0.5 text-xs">
+                        <p className="font-bold text-purple-950 dark:text-purple-200">
+                          Sampling PMT Feasibility &amp; Technical Reference View
+                        </p>
+                        <p className="text-purple-900/80 dark:text-purple-300/80">
+                          Review design trends, target audience, moodboard assets, and submitted artwork variants to prepare tooling, color separations, and die estimations.
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* 4-Point Metadata Strip (Memoized Component) */}
                   <DesignMetadataStrip
@@ -1159,7 +1289,11 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                     refCode={refCode}
                     includedFollowups={includedFollowups}
                     selectedFollowups={selectedFollowups}
+                    selectedDesigns={selectedFollowupDesigns}
+                    availableDesigns={availableDesigns}
                     onToggleFollowup={handleToggleFollowup}
+                    onToggleDesign={handleToggleFollowupDesign}
+                    onSetDesigns={handleSetFollowupDesigns}
                     isAddingFollowups={isAddingFollowups}
                     followupError={followupError}
                     onAddFollowups={handleAddFollowups}
@@ -1195,6 +1329,49 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
           slaLabel={slaStatus.label}
           onSubmitCounterDate={handleProposeCounterDate}
         />
+      )}
+
+      {mockupHandoffDialog === "missing_stock" && (
+        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-slate-950/60 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="mockup-stock-confirm-title" className="w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 shadow-2xl">
+            <h3 id="mockup-stock-confirm-title" className="text-sm font-bold text-[var(--on-surface)]">Continue without a Shutterstock number?</h3>
+            <p className="mt-2 text-xs leading-5 text-[var(--on-surface-muted)]">
+              Creative left a remark for the selected design(s), but no Shutterstock number. If you continue, Product Staging will let you choose a Material Code or Binding, then each selected design will be sent as its own Mockup request directly to Studio.
+            </p>
+            <div className="mt-3 space-y-2">
+              {availableDesigns.filter((design) => selectedFollowupDesigns.mockup.includes(design.designNumber) && !design.shutterstockNo.trim()).map((design) => (
+                <div key={design.designNumber} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-3 py-2">
+                  <p className="text-xs font-semibold text-[var(--on-surface)]">{design.designNumber}{design.description ? " · " + design.description : ""}</p>
+                  <p className="mt-1 text-[11px] text-[var(--on-surface-muted)]">{design.remarks}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" disabled={isAddingFollowups} onClick={() => setMockupHandoffDialog(null)} className="h-9 rounded-lg border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] disabled:opacity-50">Go back</button>
+              <button type="button" disabled={isAddingFollowups} onClick={handleContinueToProductStaging} className="h-9 rounded-lg bg-[var(--accent-primary)] px-3.5 text-xs font-semibold text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50">
+                {isAddingFollowups ? "Opening Product Staging…" : "Yes, continue"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {mockupHandoffDialog === "product_required" && (
+        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-slate-950/60 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="mockup-product-required-title" className="w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 shadow-2xl">
+            <h3 id="mockup-product-required-title" className="text-sm font-bold text-[var(--on-surface)]">Choose the product for each Mockup</h3>
+            <p className="mt-2 text-xs leading-5 text-[var(--on-surface-muted)]">
+              {selectedFollowupDesigns.mockup.length} separate Mockup request(s) will be created. Select a Material Code or Binding product in Product Staging, then set the required date. Each request will include its selected product and Creative reference before going to Studio.
+            </p>
+            {followupError && <p role="alert" className="mt-3 text-xs font-medium text-rose-700 dark:text-rose-300">{followupError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" disabled={isAddingFollowups} onClick={() => setMockupHandoffDialog(null)} className="h-9 rounded-lg border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] disabled:opacity-50">Cancel</button>
+              <button type="button" disabled={isAddingFollowups} onClick={handleContinueToProductStaging} className="h-9 rounded-lg bg-[var(--accent-primary)] px-3.5 text-xs font-semibold text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50">
+                {isAddingFollowups ? "Opening Product Staging…" : "Choose product"}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
 
       {/* Lightbox Image Preview Modal */}

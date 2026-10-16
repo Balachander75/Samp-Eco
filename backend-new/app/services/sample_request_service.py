@@ -605,7 +605,7 @@ class SampleRequestService:
         self.db.add(entry)
         return entry
 
-    def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
         """Create single sample request entity."""
         try:
             draft_key = str(payload.get("client_draft_key") or "").strip() or None
@@ -613,8 +613,9 @@ class SampleRequestService:
             if existing:
                 if self._is_draft(existing):
                     self._refresh_draft_snapshot(existing, payload)
-                    self.db.commit()
-                    self.db.refresh(existing)
+                    if commit:
+                        self.db.commit()
+                        self.db.refresh(existing)
                 return self.serialize(existing)
 
             req = self._build_entity(payload)
@@ -638,8 +639,9 @@ class SampleRequestService:
                 payload={"request_types": list(req.request_types or []), "creation_mode": req.creation_mode},
             )
 
-            self.db.commit()
-            self.db.refresh(req)
+            if commit:
+                self.db.commit()
+                self.db.refresh(req)
             return self.serialize(req)
         except IntegrityError:
             self.db.rollback()
@@ -647,15 +649,16 @@ class SampleRequestService:
             if existing:
                 if self._is_draft(existing):
                     self._refresh_draft_snapshot(existing, payload)
-                    self.db.commit()
-                    self.db.refresh(existing)
+                    if commit:
+                        self.db.commit()
+                        self.db.refresh(existing)
                 return self.serialize(existing)
             raise
         except Exception as e:
             self.db.rollback()
             raise e
 
-    def batch_create(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def batch_create(self, items: List[Dict[str, Any]], *, commit: bool = True) -> List[Dict[str, Any]]:
         """Atomically create each staged product payload supplied by the batch endpoint."""
         if not items:
             return []
@@ -694,9 +697,10 @@ class SampleRequestService:
                     )
                     created_records.append(req)
 
-                self.db.commit()
-                for rec in created_records:
-                    self.db.refresh(rec)
+                if commit:
+                    self.db.commit()
+                    for rec in created_records:
+                        self.db.refresh(rec)
                 return [self.serialize(r) for r in created_records]
             except IntegrityError:
                 self.db.rollback()
@@ -707,7 +711,7 @@ class SampleRequestService:
                 raise
         return []
 
-    def update(self, id: int, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, id: int, payload: Dict[str, Any], *, commit: bool = True) -> Optional[Dict[str, Any]]:
         record = self.repo.get_for_update(id)
         if not record:
             return None
@@ -775,7 +779,7 @@ class SampleRequestService:
                 } if "request_types" in changed_fields else {}),
             },
         )
-        updated = self.repo.update(record, update_fields)
+        updated = self.repo.update(record, update_fields, commit=commit)
         return self.serialize(updated)
 
     def batch_update_status(self, ids: List[int], status: str) -> int:

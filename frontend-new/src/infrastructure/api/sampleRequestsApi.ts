@@ -7,6 +7,7 @@ import {
   DesignRequest,
   DesignRequestForm,
 } from "@/features/sample-requests/types";
+import type { DesignFollowupScope } from "@/features/sample-requests/types";
 import { getBusinessYearForDate, normalizeToBusinessYear } from "@/lib/businessYear";
 import { readAuthUser } from "@/lib/session";
 import { getRequestTrackType } from "@/features/sample-requests/utils/trackTypes";
@@ -82,6 +83,7 @@ export function mapDesignRequest(item: Record<string, unknown>): DesignRequest {
     counterDateDecisionNotes: workflow.counterDateDecisionNotes || workflow.counter_date_decision_notes || null,
     workflowEvents: Array.isArray(workflow.events) ? workflow.events : [],
     workflowNotes: Array.isArray(workflow.notes) ? workflow.notes : [],
+    workflowState: workflow,
     status: String(item.status || "Draft (Pre-SMT)"),
     createdBy: designText(item.created_by ?? item.createdBy, ["Marketing Specialist", "Marketing Team (Corporate)", "Marketing", "Admin"]),
     updatedBy: String(item.updated_by || item.updatedBy || ""),
@@ -135,7 +137,14 @@ export function mapDesignRequestToSampleRequest(item: DesignRequest): SampleRequ
     designRequestStatus: item.status,
     targetArtworkDateCreative: item.designRequiredDate || undefined,
     createdAt: item.createdAt,
-    requestTypes: ["design"],
+    requestTypes: [
+      "design",
+      ...(item.workflowState?.followupRequests?.mockup?.status === "completed" ? (["mockup"] as const) : []),
+      ...(item.workflowState?.followupRequests?.sample?.status === "completed" ? (["sample"] as const) : []),
+    ],
+    mockupWorkflowState: item.workflowState?.followupRequests?.mockup
+      ? { stage: "studio", designFollowups: { mockup: item.workflowState.followupRequests.mockup } }
+      : undefined,
     creationMode: "marketing_request",
   };
 }
@@ -364,14 +373,20 @@ export async function recordMarketingDesignDecisionApi(id: number, decision: "ac
 
 export async function requestPostDesignDeliverablesApi(
   id: number,
-  deliverables: Array<"mockup" | "sample">,
-): Promise<SampleRequestItem> {
-  const data = await apiFetch<ApiSampleRequest>(`/api/v1/design-requests/${id}/request-followup`, {
+  deliverables: DesignFollowupScope[],
+  designSelections: Partial<Record<DesignFollowupScope, string[]>>,
+  options?: { mockupRequiredDate?: string; mockupRequestIds?: Array<string | number> },
+): Promise<void> {
+  await apiFetch<Record<string, unknown>>(`/api/v1/design-requests/${id}/request-followup`, {
     method: "POST",
-    jsonBody: { deliverables },
+    jsonBody: {
+      deliverables,
+      design_selections: designSelections,
+      mockup_required_date: options?.mockupRequiredDate,
+      mockup_request_ids: options?.mockupRequestIds,
+    },
   });
   notifyDesignWorkflowUpdated(id);
-  return mapSampleRequest(data);
 }
 
 export async function claimDesignRequestApi(id: number, designerName: string): Promise<DesignRequest> {
@@ -753,6 +768,7 @@ function mergeSampleAndDesignRequests(
     const design = sample.srNumber ? designBySrNumber.get(sample.srNumber) : undefined;
     return design ? {
       ...sample,
+      requestTypes: [...new Set([...(sample.requestTypes || []), ...(design.requestTypes || []).filter((type) => type !== "design")])],
       status: design.marketingDesignDecision === "accepted" &&
         (sample.requestTypes || []).some((type) => type === "mockup" || type === "sample")
         ? sample.status

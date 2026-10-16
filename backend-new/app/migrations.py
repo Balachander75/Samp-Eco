@@ -345,6 +345,78 @@ def _add_costing_creative_handoff_fields() -> None:
         ))
 
 
+def _backfill_design_request_creation_activity() -> None:
+    """Ensure each existing Design request has a normalized creation audit row."""
+    with engine.begin() as connection:
+        connection.execute(text("""
+            INSERT INTO sample_request_activity_logs (
+                sample_request_id, request_sr_number, actor_user_id, actor_name,
+                actor_department, action, from_status, to_status, payload, created_at
+            )
+            SELECT sample.id,
+                   design.sr_number,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM users WHERE users.id = design.created_by_user_id
+                   ) THEN design.created_by_user_id ELSE NULL END,
+                   COALESCE(NULLIF(design.created_by, ''), 'Legacy import'),
+                   'Marketing',
+                   'DESIGN_REQUEST_CREATED',
+                   NULL,
+                   design.status,
+                   jsonb_build_object(
+                       'design_request_id', design.id,
+                       'request_code', design.request_code,
+                       'number_of_designs', design.number_of_designs,
+                       'legacy_backfill', true
+                   ),
+                   design.created_at
+            FROM design_requests AS design
+            LEFT JOIN create_sample_requests AS sample ON sample.sr_number = design.sr_number
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM sample_request_activity_logs AS history
+                WHERE history.action = 'DESIGN_REQUEST_CREATED'
+                  AND history.payload->>'design_request_id' = design.id::text
+            )
+        """))
+
+
+def _backfill_unambiguous_activity_actor_ids() -> None:
+    """Attach historical activity rows to users only when the name is unique."""
+    with engine.begin() as connection:
+        connection.execute(text("""
+            UPDATE sample_request_activity_logs AS activity
+            SET actor_user_id = matching_user.id
+            FROM (
+                SELECT id, lower(trim(name)) AS normalized_name
+                FROM users
+                WHERE NULLIF(trim(name), '') IS NOT NULL
+            ) AS matching_user
+            WHERE activity.actor_user_id IS NULL
+              AND lower(trim(COALESCE(activity.actor_name, ''))) = matching_user.normalized_name
+              AND 1 = (
+                  SELECT count(*)
+                  FROM users AS candidate
+                  WHERE lower(trim(COALESCE(candidate.name, ''))) = matching_user.normalized_name
+              )
+        """))
+
+
+def _add_high_concurrency_indexes() -> None:
+    """Add covering and composite indexes to eliminate table scans under high concurrency."""
+    statements = (
+        "CREATE INDEX IF NOT EXISTS ix_create_sample_requests_updated_id ON create_sample_requests (updated_at DESC, id DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_create_sample_requests_status ON create_sample_requests (status)",
+        "CREATE INDEX IF NOT EXISTS ix_create_sample_requests_status_updated ON create_sample_requests (status, updated_at DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_create_sample_requests_year_status ON create_sample_requests (year, status, id DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_product_details_sample_request_char_name ON product_details (sample_request_id, characteristic_name)",
+        "CREATE INDEX IF NOT EXISTS ix_design_requests_updated_id ON design_requests (updated_at DESC, id DESC)",
+    )
+    with engine.begin() as connection:
+        for stmt in statements:
+            connection.execute(text(stmt))
+
+
 MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0001_legacy_schema_bootstrap", "Record and run existing schema upgrades", _bootstrap_existing_schema),
     ("0002_feasibility_conversion_relations", "Connect Feasibility conversions to sample requests", _link_feasibility_conversions),
@@ -354,6 +426,9 @@ MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0006_preserve_feasibility_activity_history", "Retain feasibility audit history when its request is deleted", _preserve_feasibility_activity_history),
     ("0007_costing_creative_handoff", "Persist conditional Creative routing and its SLA deadline", _add_costing_creative_handoff_fields),
     ("0008_complete_costing_creative_handoff_columns", "Ensure all Costing Creative handoff fields exist", _add_costing_creative_handoff_fields),
+    ("0009_backfill_design_creation_activity", "Normalize creation history for existing Design requests", _backfill_design_request_creation_activity),
+    ("0010_backfill_activity_actor_ids", "Attribute historical workflow logs to unambiguous users", _backfill_unambiguous_activity_actor_ids),
+    ("0011_high_concurrency_database_indexes", "Add composite and covering indexes for 1000+ concurrency", _add_high_concurrency_indexes),
 ]
 
 

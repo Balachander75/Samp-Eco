@@ -1,10 +1,11 @@
 """Dedicated Costing and Mockup workflow APIs with append-only audit history."""
 
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, String
 from sqlalchemy.orm import Session
 
 from app.auth.permissions import is_team_head, require_any_team, require_team, user_has_team
@@ -16,7 +17,9 @@ from app.models.request_workflows import (
     MockupWorkflow,
     MockupWorkflowLog,
 )
-from app.models.sample_request import CreateSampleRequest, ProductCharacteristic, ProductDetail
+from app.models.sample_request import CreateSampleRequest, DesignRequest, ProductCharacteristic, ProductDetail
+from app.routers.sample_requests import decide_mockup_marketing_acceptance
+from app.services.sample_request_service import SampleRequestService
 from app.utils.business_year import get_business_year_date_range
 from app.utils.operational_workdays import india_operational_deadline
 
@@ -237,6 +240,8 @@ def _serialize_workflow(db, workflow, request, kind: str, log_model, logs=None):
             "costing_notes": workflow.costing_notes,
             "reviewer_status": workflow.reviewer_status,
             "reviewer_notes": workflow.reviewer_notes,
+            "reviewer_name": workflow.reviewer_name,
+            "reviewed_at": workflow.reviewed_at.isoformat() if workflow.reviewed_at else None,
         })
     return data
 
@@ -499,15 +504,124 @@ def complete_costing_work(sample_request_id: int, payload: Dict[str, Any] = Body
     return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog)
 
 
+def _list_sample_requests_for_sampling(db, year, limit):
+    query = db.query(CreateSampleRequest).filter(
+        or_(
+            CreateSampleRequest.request_types.contains(["sample"]),
+            CreateSampleRequest.status.ilike("%sampling%"),
+            CreateSampleRequest.status == "Released to Plant",
+        )
+    )
+    if year and year.strip().upper() != "ALL":
+        clean_year = year.strip()
+        date_range = get_business_year_date_range(clean_year)
+        if date_range:
+            range_start, range_end = (value.isoformat() for value in date_range)
+            second_year = clean_year.split("-", 1)[1] if "-" in clean_year else clean_year
+            query = query.filter(or_(
+                CreateSampleRequest.year == clean_year,
+                and_(CreateSampleRequest.year == second_year,
+                     CreateSampleRequest.date_request_created >= range_start,
+                     CreateSampleRequest.date_request_created < range_end),
+            ))
+        else:
+            query = query.filter(CreateSampleRequest.year == clean_year)
+    rows = query.order_by(CreateSampleRequest.updated_at.desc(), CreateSampleRequest.id.desc()).limit(limit).all()
+    results = []
+    for req in rows:
+        state = dict(req.mockup_workflow_state or {})
+        routing = dict(state.get("samplingRouting") or {})
+        is_resample = bool(state.get("isResample") or routing.get("isResample") or req.creation_mode == "resample")
+        stage = state.get("stage") or routing.get("stage") or ("plant" if req.status == "Released to Plant" else "sampling_review")
+        results.append({
+            "workflow_type": "sample",
+            "workflow_id": req.id,
+            "sample_request_id": req.id,
+            "sr_number": req.sr_number,
+            "customer": req.customer,
+            "brand_name": req.brand_name,
+            "material_code": req.material_code,
+            "product_description": req.product_description,
+            "status": req.status,
+            "current_stage": stage,
+            "request_types": req.request_types or ["sample"],
+            "created_at": req.created_at.isoformat() if req.created_at else None,
+            "updated_at": req.updated_at.isoformat() if req.updated_at else None,
+            "closed_at": state.get("plantReleasedAt"),
+            "request_data": {
+                "required_date": str(req.sample_required_date) if req.sample_required_date else None,
+                "quantity": req.qty_for_sampling or "1",
+                "unit": req.unit_pc_pack or "PC",
+                "target_plant": req.target_plant,
+                "is_resample": is_resample,
+            },
+            "workflow_data": {
+                **state,
+                "isResample": is_resample,
+                "claimedBy": state.get("claimedBy"),
+                "plantReleaseTarget": state.get("plantReleaseTarget") or req.target_plant,
+            },
+            "reviewer_status": "approved" if req.status == "Released to Plant" else "not_started" if req.status == "Sampling Review (PMT)" else "in_progress",
+            "reviewer_notes": state.get("samplingRemark") or state.get("samplingFeedback"),
+            "reviewer_name": state.get("samplingFeedbackBy") or state.get("plantReleasedBy"),
+            "reviewed_at": state.get("samplingFeedbackAt") or state.get("plantReleasedAt"),
+            "logs": [],
+        })
+    return results
+
+
+def _list_design_requests_for_sampling(db, year, limit):
+    query = db.query(DesignRequest)
+    if year and year.strip().upper() != "ALL":
+        clean_year = year.strip()
+        query = query.filter(or_(
+            DesignRequest.program_year == clean_year,
+            DesignRequest.program_year == (clean_year.split("-", 1)[1] if "-" in clean_year else clean_year)
+        ))
+    rows = query.order_by(DesignRequest.updated_at.desc(), DesignRequest.id.desc()).limit(limit).all()
+    results = []
+    for d in rows:
+        state = dict(d.workflow_state or {})
+        results.append({
+            "workflow_type": "design",
+            "workflow_id": d.id,
+            "sample_request_id": d.id,
+            "sr_number": d.sr_number or d.request_code,
+            "customer": d.customer_name,
+            "brand_name": d.program_name,
+            "material_code": f"DSG-{d.id}",
+            "product_description": d.product_description or "Creative Design Brief",
+            "status": d.status,
+            "current_stage": "design_review",
+            "request_types": ["design"],
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+            "request_data": {
+                "required_date": d.design_required_date,
+                "number_of_designs": d.number_of_designs,
+                "trend": d.trend,
+                "target_audience": d.target_audience,
+            },
+            "workflow_data": state,
+            "reviewer_status": "pending",
+            "reviewer_notes": d.design_remarks,
+            "reviewer_name": None,
+            "reviewed_at": None,
+            "logs": [],
+        })
+    return results
+
+
 @router.get("/api/v1/workflows/reviews", summary="List items awaiting Sampling review")
 def list_sampling_workflow_reviews(year: Optional[str] = None,
                                    limit: int = Query(500, ge=1, le=2000),
                                    db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    require_team(current_user, "samp")
-    return (
-        _list_workflows(db, MockupWorkflow, MockupWorkflowLog, "mockup", year, "sampling_review", limit)
-        + _list_workflows(db, CostingWorkflow, CostingWorkflowLog, "costing", year, "sampling_review", limit)
-    )
+    require_any_team(current_user, ("samp", "admin"))
+    mockups = _list_workflows(db, MockupWorkflow, MockupWorkflowLog, "mockup", year, None, limit)
+    costings = _list_workflows(db, CostingWorkflow, CostingWorkflowLog, "costing", year, None, limit)
+    samples = _list_sample_requests_for_sampling(db, year, limit)
+    designs = _list_design_requests_for_sampling(db, year, limit)
+    return samples + designs + mockups + costings
 
 
 @router.post("/api/v1/workflows/{workflow_type}/{sample_request_id}/review", summary="Approve or return a workflow from Sampling review")
@@ -599,94 +713,16 @@ def review_workflow(workflow_type: str, sample_request_id: int, payload: Dict[st
 @router.post("/api/v1/workflows/mockup/{sample_request_id}/marketing-decision", summary="Record Marketing's final mockup decision")
 def marketing_mockup_decision(sample_request_id: int, payload: Dict[str, Any] = Body(...),
                               db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    require_team(current_user, "marketing")
+    # Keep the legacy URL as a compatibility alias while sharing the single
+    # Marketing transition used by the Mockup request inspector.
+    decide_mockup_marketing_acceptance(
+        sample_id=sample_request_id,
+        body=payload,
+        service=SampleRequestService(db),
+        current_user=current_user,
+    )
     request = _get_request(db, sample_request_id)
     workflow = _get_workflow(db, MockupWorkflow, sample_request_id)
     if not workflow:
         raise HTTPException(status_code=404, detail="Mockup workflow not found")
-    state = dict(workflow.workflow_data or request.mockup_workflow_state or {})
-    if workflow.current_stage not in {"awaiting_marketing_acceptance", "awaiting_marketing_direction"}:
-        raise HTTPException(status_code=409, detail="Mockup is not awaiting a Marketing decision")
-    _require_claim(state, current_user, workflow.current_stage)
-    decision = str(payload.get("decision") or "").strip().casefold()
-    remark = str(payload.get("remark") or "").strip()
-    old_stage, old_status = workflow.current_stage, workflow.status
-    direction_stage = old_stage == "awaiting_marketing_direction"
-    allowed = {"request_new_mockup", "close"} if direction_stage else {"accept", "request_revision"}
-    if decision not in allowed:
-        raise HTTPException(status_code=422, detail="Choose a valid Marketing decision for this stage")
-    if decision == "request_revision" and not remark:
-        raise HTTPException(status_code=422, detail="A revision note is required when returning the mockup")
-    workflow.marketing_decision = decision
-    workflow.marketing_decided_at = _now()
-    if decision in {"accept", "close"}:
-        workflow.current_stage = "done"
-        workflow.status = "Approved / Closed" if decision == "accept" else "Closed by Marketing"
-        workflow.closed_at = _now()
-    else:
-        workflow.current_stage = "studio"
-        workflow.status = "Studio Revision Requested" if decision == "request_revision" else "Studio"
-        workflow.closed_at = None
-    workflow.updated_at = _now()
-    state["stage"] = workflow.current_stage
-    state["marketingDecision"] = decision
-    state["marketingDecisionAt"] = _now().isoformat()
-    if decision == "accept":
-        state["marketingAcceptedAt"] = _now().isoformat()
-        state.pop("marketingRevisionRemark", None)
-    elif decision == "request_revision":
-        state["marketingRevisionRemark"] = remark
-        state["studioRevisionRequestedAt"] = _now().isoformat()
-    elif decision == "request_new_mockup":
-        previous_outputs = list(state.get("mockupRevisionHistory") or [])
-        if state.get("mockupUrl"):
-            previous_outputs.append({
-                "url": state.get("mockupUrl"),
-                "submittedAt": state.get("submittedAt"),
-                "submittedBy": state.get("submittedBy"),
-                "archivedAt": _now().isoformat(),
-            })
-        state["mockupRevisionHistory"] = previous_outputs[-20:]
-        state["mockupRevisionNumber"] = int(state.get("mockupRevisionNumber") or 1) + 1
-        state["mockupUrl"] = ""
-        state.pop("submittedAt", None)
-        state.pop("submittedBy", None)
-        state["marketingRevisionRemark"] = remark or "Marketing requested a new mockup"
-        state.pop("studioRevisionRejectRemark", None)
-    else:
-        state["closedAt"] = _now().isoformat()
-        state["closedBy"] = _actor(current_user)
-        state["marketingCloseRemark"] = remark or None
-    _clear_claim(state)
-    events = list(state.get("events") or [])
-    events.append({
-        "id": f"marketing-{workflow.id}-{int(_now().timestamp())}",
-        "action": {
-            "accept": "MARKETING_ACCEPTED_MOCKUP",
-            "request_revision": "MARKETING_REQUESTED_STUDIO_REVISION",
-            "request_new_mockup": "MARKETING_REQUESTED_NEW_MOCKUP",
-            "close": "MARKETING_CLOSED_MOCKUP",
-        }[decision],
-        "title": {
-            "accept": "Marketing accepted mockup",
-            "request_revision": "Marketing requested a Studio revision",
-            "request_new_mockup": "Marketing requested a new mockup from Studio",
-            "close": "Marketing closed the mockup request",
-        }[decision],
-        "actorName": _actor(current_user),
-        "actorDepartment": "Marketing",
-        "timestamp": _now().isoformat(),
-        "remark": remark or None,
-    })
-    state["events"] = events[-100:]
-    workflow.workflow_data = state
-    request.mockup_workflow_state = state
-    request.status = workflow.status if "sample" not in (request.request_types or []) or decision != "accept" else "Sampling Review (PMT)"
-    request.updated_at = _now()
-    _write_log(db, MockupWorkflowLog, workflow, request, current_user,
-               state["events"][-1]["action"],
-               old_stage, workflow.current_stage, old_status, workflow.status,
-               {"decision": decision, "remark": remark})
-    db.commit()
-    db.refresh(workflow)
     return _serialize_workflow(db, workflow, request, "mockup", MockupWorkflowLog)

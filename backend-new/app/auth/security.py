@@ -222,7 +222,11 @@ def get_current_user(
                 detail="Invalid token payload.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        # User is a SQLAlchemy ORM object tied to this request's Session.
+        # Never cache it across requests: a write commit expires its attributes,
+        # and the next request would read the detached object and look unauthenticated.
         user = db.query(User).filter(User.id == int(user_id)).first()
+
         if user is None or not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -232,7 +236,14 @@ def get_current_user(
         return user
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        # If DB connection times out, report 503 Service Unavailable instead of misleading 401
+        err_msg = str(exc).lower()
+        if "timeout" in err_msg or "pool" in err_msg:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database connection pool busy. Please retry shortly.",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials.",

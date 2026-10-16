@@ -6,9 +6,33 @@ import {
   updateAuthSessionTokens,
 } from "@/lib/session";
 
-export const API_BASE_URL = (
-  import.meta.env.VITE_API_URL?.trim() || import.meta.env.VITE_API_BASE_URL?.trim() || ""
-).replace(/\/+$/, "");
+function getEffectiveApiBaseUrl(): string {
+  const configured = (
+    import.meta.env.VITE_API_URL?.trim() || import.meta.env.VITE_API_BASE_URL?.trim() || ""
+  ).replace(/\/+$/, "");
+
+  if (typeof window === "undefined") {
+    return configured;
+  }
+
+  // When accessing over the local network (e.g. mobile or another PC on LAN),
+  // a 'localhost' / '127.0.0.1' base URL will fail on the remote device.
+  // In that case, fallback to same-origin (Vite dev proxy) to guarantee seamless network sharing.
+  if (configured && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    try {
+      const parsed = new URL(configured, window.location.origin);
+      if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+        return "";
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return configured;
+}
+
+export const API_BASE_URL = getEffectiveApiBaseUrl();
 
 interface RefreshedSession {
   access_token?: string;
@@ -18,7 +42,91 @@ interface RefreshedSession {
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const AUTH_TIMEOUT_MS = 12_000;
+const AUTH_REFRESH_LOCK_KEY = "samp.auth-refresh.lock";
+const AUTH_REFRESH_LOCK_NAME = "samp-auth-refresh";
+const AUTH_REFRESH_LOCK_LEASE_MS = AUTH_TIMEOUT_MS + 8_000;
+const AUTH_REFRESH_LOCK_WAIT_MS = AUTH_TIMEOUT_MS + 5_000;
 let refreshInFlight: Promise<string | null> | null = null;
+
+interface LocalRefreshLock {
+  owner: string;
+  expiresAt: number;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createRefreshLockOwner(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function readLocalRefreshLock(): LocalRefreshLock | null {
+  try {
+    const raw = localStorage.getItem(AUTH_REFRESH_LOCK_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<LocalRefreshLock>;
+    return typeof value.owner === "string" && typeof value.expiresAt === "number"
+      ? { owner: value.owner, expiresAt: value.expiresAt }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Serialize rotating refresh-token requests across tabs sharing localStorage. */
+async function withCrossTabRefreshLock<T>(work: () => Promise<T>): Promise<T> {
+  const browserLocks = typeof navigator === "undefined"
+    ? undefined
+    : (navigator as unknown as {
+        locks?: { request: <R>(name: string, callback: () => Promise<R>) => Promise<R> };
+      }).locks;
+
+  if (browserLocks) {
+    return browserLocks.request(AUTH_REFRESH_LOCK_NAME, work);
+  }
+
+  if (typeof window === "undefined") return work();
+
+  // Web Locks are not available in every supported browser. Use a short
+  // localStorage lease as a fallback; the owner check prevents a tab from
+  // releasing another tab's lock.
+  const owner = createRefreshLockOwner();
+  const deadline = Date.now() + AUTH_REFRESH_LOCK_WAIT_MS;
+  while (Date.now() < deadline) {
+    const current = readLocalRefreshLock();
+    if (!current || current.expiresAt <= Date.now()) {
+      try {
+        localStorage.setItem(AUTH_REFRESH_LOCK_KEY, JSON.stringify({
+          owner,
+          expiresAt: Date.now() + AUTH_REFRESH_LOCK_LEASE_MS,
+        } satisfies LocalRefreshLock));
+      } catch {
+        // Storage may be disabled. Continue with same-tab single-flight behavior.
+        return work();
+      }
+      if (readLocalRefreshLock()?.owner === owner) {
+        try {
+          return await work();
+        } finally {
+          try {
+            if (readLocalRefreshLock()?.owner === owner) {
+              localStorage.removeItem(AUTH_REFRESH_LOCK_KEY);
+            }
+          } catch {
+            // Let the lease expire if storage becomes unavailable mid-refresh.
+          }
+        }
+      }
+    }
+    await sleep(60 + Math.floor(Math.random() * 90));
+  }
+
+  throw new Error("Another tab is refreshing the session. Please retry shortly.");
+}
 
 function resolveApiUrl(endpoint: string): URL {
   const base = API_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost");
@@ -54,9 +162,16 @@ async function fetchWithTimeout(url: URL, init: RequestInit, timeoutMs: number):
   }
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+async function refreshAccessToken(failedAccessToken: string): Promise<string | null> {
   if (!refreshInFlight) {
-    refreshInFlight = (async () => {
+    refreshInFlight = withCrossTabRefreshLock(async () => {
+      // A different request or tab may have refreshed while this request was
+      // waiting for the lock. Reuse that access token instead of rotating again.
+      const latestAccessToken = readAuthToken();
+      if (latestAccessToken && latestAccessToken !== failedAccessToken) {
+        return latestAccessToken;
+      }
+
       const refreshToken = readAuthRefreshToken();
       if (!refreshToken) return null;
 
@@ -69,13 +184,20 @@ async function refreshAccessToken(): Promise<string | null> {
       if (response.status === 429 || response.status >= 500) {
         throw new Error("Session refresh is temporarily unavailable.");
       }
-      if (!response.ok) return null;
+      if (!response.ok) {
+        // If another tab rotated the token just before this refresh reached the
+        // server, keep using its session instead of clearing a valid login.
+        const tokenAfterFailure = readAuthToken();
+        return tokenAfterFailure && tokenAfterFailure !== failedAccessToken
+          ? tokenAfterFailure
+          : null;
+      }
 
       const session = (await response.json()) as RefreshedSession;
       if (!session.access_token || !session.refresh_token) return null;
       updateAuthSessionTokens(session.access_token, session.refresh_token, session.user);
       return session.access_token;
-    })().finally(() => {
+    }).finally(() => {
       refreshInFlight = null;
     });
   }
@@ -164,7 +286,9 @@ export async function apiRawFetch(endpoint: string, options: ApiRequestInit = {}
     !url.pathname.endsWith("/api/auth/refresh")
   ) {
     try {
-      const refreshedToken = await refreshAccessToken();
+      const sentAuthorization = headers.get("Authorization") || "";
+      const sentAccessToken = sentAuthorization.replace(/^Bearer\s+/i, "");
+      const refreshedToken = await refreshAccessToken(sentAccessToken);
       if (refreshedToken) {
         const retryHeaders = new Headers(config.headers);
         retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);

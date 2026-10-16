@@ -18,6 +18,7 @@ import { FEASIBILITY_TYPES } from "../utils/feasibilityParsers";
 import { FeasibilityRequestPayload } from "../types";
 import { useMasterData } from "../hooks/useMasterData";
 import { CustomerItem } from "@/types/master";
+import { compressReferenceImage } from "@/lib/referenceImage";
 
 export interface NewFeasibilityModalProps {
   isOpen: boolean;
@@ -65,13 +66,14 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
   const [mediaTab, setMediaTab] = useState<"files" | "links">("files");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCompressingImages, setIsCompressingImages] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const totalAttachments = uploadedImages.length + webLinks.length;
 
-  const handleMultipleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMultipleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -82,25 +84,33 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
     }
 
     const filesToUpload = Array.from(files).slice(0, availableSlots);
-    for (const file of filesToUpload) {
-      if (!file.type.startsWith("image/")) {
-        setError("Only image files (PNG, JPG, WEBP) are supported.");
-        continue;
-      }
-      const sizeKb = Math.round(file.size / 1024);
-      const url = URL.createObjectURL(file);
-      setUploadedImages((prev) => [
-        ...prev,
-        {
-          id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          url,
-          name: file.name,
-          size: `${sizeKb} KB`,
-        },
-      ]);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = "";
     setError(null);
+    setIsCompressingImages(true);
+    try {
+      for (const file of filesToUpload) {
+        if (!file.type.startsWith("image/")) {
+          setError("Only image files are supported.");
+          continue;
+        }
+        try {
+          const { url, sizeKb } = await compressReferenceImage(file);
+          setUploadedImages((prev) => prev.length >= 2 ? prev : [
+            ...prev,
+            {
+              id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              url,
+              name: file.name,
+              size: `${sizeKb} KB`,
+            },
+          ]);
+        } catch (uploadError: any) {
+          setError(uploadError?.message || `${file.name} could not be compressed.`);
+        }
+      }
+    } finally {
+      setIsCompressingImages(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleRemoveImage = (id: string) => {
@@ -128,6 +138,10 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    if (isCompressingImages) {
+      setError("Wait for the reference images to finish processing before submitting.");
+      return;
+    }
 
     if (!customer.trim()) {
       setError("Please select a customer account.");
@@ -463,6 +477,7 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
                               type="file"
                               multiple
                               accept="image/*"
+                              disabled={isCompressingImages}
                               onChange={handleMultipleImageUpload}
                               className="hidden"
                             />
@@ -624,15 +639,15 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
                   </span>
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isCompressingImages}
                     className="h-9 px-5 rounded-xl text-white text-xs font-bold cursor-pointer transition-all shadow-2xs hover:shadow-md flex items-center gap-2 disabled:opacity-60 disabled:cursor-wait active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
                   >
-                    {isSubmitting ? (
+                    {isSubmitting || isCompressingImages ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <CheckCircle2 className="w-4 h-4" />
                     )}
-                    <span>{isSubmitting ? "Submitting..." : "Submit Feasibility Check"}</span>
+                    <span>{isCompressingImages ? "Processing images..." : isSubmitting ? "Submitting..." : "Submit Feasibility Check"}</span>
                   </button>
                 </div>
               </div>

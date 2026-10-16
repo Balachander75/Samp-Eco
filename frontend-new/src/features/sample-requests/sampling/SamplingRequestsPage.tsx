@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
 import { SampleRequestItem } from "../types";
 import { getStageIdForRequest } from "../utils/trackTypes";
@@ -17,6 +17,7 @@ import {
 import { Select } from "@/components/ui/Select";
 import { DeskWorkspaceLayout } from "@/components/erp";
 import { SamplingRequestsTable } from "./components/SamplingRequestsTable";
+import { DraftPackagesView } from "../components/DraftPackagesView";
 import { getRequestTypes } from "./utils/requestTypeUtils";
 
 export interface SamplingRequestsPageProps {
@@ -73,7 +74,10 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   onExportCSV,
   onDraftModeChange,
 }) => {
-  const [selectedStageTab, setSelectedStageTab] = useState<SamplingFilterTab>("all");
+  const location = useLocation();
+  const [selectedStageTab, setSelectedStageTab] = useState<SamplingFilterTab>(
+    () => ((location.state as { stage?: string } | null)?.stage === "draft" ? "draft" : "all"),
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomerFilter, setSelectedCustomerFilter] = useState<string>("all");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
@@ -89,6 +93,11 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   useEffect(() => {
     onDraftModeChange?.(selectedStageTab === "draft");
   }, [selectedStageTab, onDraftModeChange]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setCurrentPage(1);
+  }, [selectedStageTab]);
 
   const handleOpenDraftInStaging = (row: SampleRequestItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -342,6 +351,10 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   }, [filteredRequests, currentPage, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
+  const matchingDraftRequestIds = useMemo(
+    () => new Set(filteredRequests.map((request) => String(request.id))),
+    [filteredRequests],
+  );
 
   // Selection
   const handleToggleSelectRow = (id: string | number, e?: React.SyntheticEvent) => {
@@ -541,7 +554,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
           )}
 
           {/* Batch Controls */}
-          {selectedIds.size > 0 && (
+          {selectedIds.size > 0 && selectedStageTab !== "draft" && (
             <div className="flex items-center gap-1.5 ml-auto">
               {selectedDraftsCount > 0 && (
                 <button
@@ -588,28 +601,39 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       onResetFilters={handleResetFilters}
       resetFiltersLabel="Reset"
     >
-      <SamplingRequestsTable
-        paginatedRequests={paginatedRequests}
-        filteredRequestsCount={filteredRequests.length}
-        isLoading={isLoading}
-        selectedIds={selectedIds}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        totalPages={totalPages}
-        isAdmin={isAdmin}
-        isDraftView={selectedStageTab === "draft"}
-        hasActiveFilters={hasActiveFilters}
-        selectedTypeFilter={selectedTypeFilter}
-        onToggleSelectAll={handleToggleSelectAll}
-        onToggleSelectRow={handleToggleSelectRow}
-        onOpenDraftInStaging={handleOpenDraftInStaging}
-        onInspectRequest={onInspectRequest}
-        onReleaseDraft={onReleaseDraft}
-        onDeleteRequest={onDeleteRequest}
-        onPageChange={(p) => setCurrentPage(p)}
-        onOpenNewModal={onOpenNewModal}
-        onResetFilters={handleResetFilters}
-      />
+      {selectedStageTab === "draft" ? (
+        <DraftPackagesView
+          requests={samplingRequests}
+          matchingRequestIds={matchingDraftRequestIds}
+          isLoading={isLoading}
+          selectedYear={selectedYear}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
+      ) : (
+        <SamplingRequestsTable
+          paginatedRequests={paginatedRequests}
+          filteredRequestsCount={filteredRequests.length}
+          isLoading={isLoading}
+          selectedIds={selectedIds}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalPages={totalPages}
+          isAdmin={isAdmin}
+          hasActiveFilters={hasActiveFilters}
+          selectedTypeFilter={selectedTypeFilter}
+          onToggleSelectAll={handleToggleSelectAll}
+          onToggleSelectRow={handleToggleSelectRow}
+          onOpenDraftInStaging={handleOpenDraftInStaging}
+          onInspectRequest={onInspectRequest}
+          onReleaseDraft={onReleaseDraft}
+          onDeleteRequest={onDeleteRequest}
+          onPageChange={(p) => setCurrentPage(p)}
+          onOpenNewModal={onOpenNewModal}
+          onResetFilters={handleResetFilters}
+        />
+      )}
     </DeskWorkspaceLayout>
   );
 };

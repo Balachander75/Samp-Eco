@@ -110,9 +110,19 @@ export async function autoSaveStagedProductsToDraft(
             requiredDate: prod.mockupMetadata?.requiredDate || prod.mockupRequiredDate || "",
             creativePendingCharacteristicKeys: prod.creativePendingCharacteristicKeys || [],
             events: [],
+            ...(prod.mockupMetadata?.designArtwork ? {
+              designFollowups: {
+                mockup: {
+                  designs: [prod.mockupMetadata.designArtwork],
+                  requestedAt: new Date().toISOString(),
+                },
+              },
+            } : {}),
+            isResample: Boolean(prod.isResample || prod.samplingMetadata?.isResample),
             ...(prod.scopes.includes("sample") ? {
               samplingRouting: {
                 stage: "marketing",
+                isResample: Boolean(prod.isResample || prod.samplingMetadata?.isResample),
                 creativeChangesRequired: Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
                 isDesignVariant: Boolean(prod.variantNumber),
                 variantNumber: prod.variantNumber,
@@ -120,8 +130,10 @@ export async function autoSaveStagedProductsToDraft(
               },
             } : {}),
           } : prod.scopes.includes("sample") ? {
+            isResample: Boolean(prod.isResample || prod.samplingMetadata?.isResample),
             samplingRouting: {
               stage: "marketing",
+              isResample: Boolean(prod.isResample || prod.samplingMetadata?.isResample),
               creativeChangesRequired: Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
               isDesignVariant: Boolean(prod.variantNumber),
               variantNumber: prod.variantNumber,
@@ -273,6 +285,14 @@ export async function autoSaveStagedProductsToDraft(
         requiredDate: prod.mockupMetadata?.requiredDate || prod.mockupRequiredDate || "",
         creativePendingCharacteristicKeys: prod.creativePendingCharacteristicKeys || [],
         events: [],
+        ...(prod.mockupMetadata?.designArtwork ? {
+          designFollowups: {
+            mockup: {
+              designs: [prod.mockupMetadata.designArtwork],
+              requestedAt: new Date().toISOString(),
+            },
+          },
+        } : {}),
         ...(prod.scopes.includes("sample") ? {
           samplingRouting: {
             stage: "marketing",

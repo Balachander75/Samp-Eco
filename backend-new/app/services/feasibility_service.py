@@ -88,7 +88,7 @@ class FeasibilityService:
         image_bytes: bytes,
         original_content_type: str,
         max_dimension: int = 1600,
-        quality: int = 80,
+        quality: int = 70,
     ) -> Tuple[str, bytes]:
         """Compress image binary using Pillow to optimize database storage and delivery speed."""
         if Image is None or ImageOps is None:

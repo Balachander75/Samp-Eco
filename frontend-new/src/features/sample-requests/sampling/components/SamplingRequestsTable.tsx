@@ -64,7 +64,10 @@ function renderDeliverableCell(row: SampleRequestItem, typeFilter: string): Reac
   const samplePackInfo = sampleUnit === "Pack" && row.qtyPerPack ? ` (${row.qtyPerPack} pcs/pk)` : "";
 
   const reqDesigns = Number(row.designsCustomerCreative || row.productArtworkNos || row.numberOfDesigns) || 1;
-  const recDesigns = (row.creativeSubmissions || []).length;
+  const recDesigns = (row.creativeSubmissions || []).reduce(
+    (total, batch) => total + (Array.isArray(batch?.rows) ? batch.rows.length : 0),
+    0,
+  );
 
   const mockupQty = quantityLabel((row as any).qtyForMockup || (row as any).mockupQty || (row.mockupWorkflowState as any)?.qtyForMockup) || "1";
   const mockupStage = row.mockupWorkflowState?.stage

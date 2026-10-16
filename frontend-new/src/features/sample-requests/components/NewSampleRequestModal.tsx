@@ -30,6 +30,7 @@ import { CustomerCombobox, OperationalDatePicker } from "@/components/erp";
 import { Select } from "@/components/ui";
 import { formatYMD, isDateRestricted } from "@/lib/holidayUtils";
 import { getBusinessYearInfo } from "@/lib/businessYear";
+import { compressReferenceImage } from "@/lib/referenceImage";
 import { SampleRequestItem } from "../types";
 import { useMasterData } from "../hooks/useMasterData";
 import { fetchProgramRequestsApi } from "@/infrastructure/api/programsApi";
@@ -362,6 +363,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
   const [selectedTrack, setSelectedTrack] = useState<"marketing_request" | "feasibility_check" | "program_planning">(() => resolveTrack(initialTrack));
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCompressingImages, setIsCompressingImages] = useState(false);
   const {
     customers,
     plants,
@@ -459,52 +461,6 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
     if (isOpen && masterDataError) setError(masterDataError);
   }, [isOpen, masterDataError]);
 
-  // Compress to a database-safe JPEG size before including the image in the create request.
-  const compressImageFile = (file: File, maxDim = 800): Promise<{ url: string; sizeKb: number }> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          let width = img.width;
-          let height = img.height;
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            for (const quality of [0.5, 0.4, 0.3]) {
-              const dataUrl = canvas.toDataURL("image/jpeg", quality);
-              const encoded = dataUrl.slice(dataUrl.indexOf(",") + 1);
-              const sizeBytes = Math.floor(encoded.length * 3 / 4);
-              if (sizeBytes <= 1_048_576) {
-                resolve({ url: dataUrl, sizeKb: Math.max(1, Math.ceil(sizeBytes / 1024)) });
-                return;
-              }
-            }
-            resolve({ url: "", sizeKb: 0 });
-          } else {
-            resolve({ url: "", sizeKb: 0 });
-          }
-        };
-        img.onerror = () => resolve({ url: "", sizeKb: 0 });
-        img.src = e.target?.result as string;
-      };
-      reader.onerror = () => resolve({ url: "", sizeKb: 0 });
-      reader.readAsDataURL(file);
-    });
-  };
-
   // Allow up to 2 compressed images and 1 web link per feasibility request.
   const handleMultipleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -522,26 +478,32 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
       setError(null);
     }
 
-    for (const file of filesToProcess) {
-      const { url, sizeKb } = await compressImageFile(file);
-      if (!url) {
-        setError(`${file.name} could not be compressed below the 1 MB image limit. Try a smaller image.`);
-        continue;
+    setIsCompressingImages(true);
+    try {
+      for (const file of filesToProcess) {
+        try {
+          if (!file.type.startsWith("image/")) {
+            setError("Only image files are supported.");
+            continue;
+          }
+          const { url, sizeKb } = await compressReferenceImage(file);
+          setUploadedImages((prev) => prev.length >= 2 ? prev : [
+            ...prev,
+            {
+              id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              url,
+              name: file.name,
+              size: `${sizeKb} KB`,
+            },
+          ]);
+        } catch (uploadError: any) {
+          setError(uploadError?.message || `${file.name} could not be compressed.`);
+        }
       }
-      setUploadedImages((prev) => {
-        if (prev.length >= 2) return prev;
-        return [
-          ...prev,
-          {
-            id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            url,
-            name: file.name,
-            size: `${sizeKb} KB`,
-          },
-        ];
-      });
+    } finally {
+      setIsCompressingImages(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleRemoveImage = (id: string) => {
@@ -613,6 +575,10 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
   const handleSubmitFeasibility = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    if (isCompressingImages) {
+      setError("Wait for the reference images to finish processing before submitting.");
+      return;
+    }
     if (!customer.trim()) {
       setError("Please select a customer account.");
       return;
@@ -1055,6 +1021,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                 type="file"
                                 multiple
                                 accept="image/*"
+                                disabled={isCompressingImages}
                                 onChange={handleMultipleImageUpload}
                                 className="hidden"
                               />
@@ -1216,15 +1183,15 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                     </span>
                     <button
                       type="submit"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || isCompressingImages}
                       className="h-9 px-5 rounded-xl text-white text-xs font-bold cursor-pointer transition-all shadow-2xs hover:shadow-md flex items-center gap-2 disabled:opacity-60 disabled:cursor-wait active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
                     >
-                      {isSubmitting ? (
+                      {isSubmitting || isCompressingImages ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <CheckCircle2 className="w-4 h-4" />
                       )}
-                      <span>{isSubmitting ? "Submitting..." : "Submit Feasibility Check"}</span>
+                      <span>{isCompressingImages ? "Processing images..." : isSubmitting ? "Submitting..." : "Submit Feasibility Check"}</span>
                     </button>
                   </div>
                 </div>
@@ -1315,7 +1282,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                   <div className="flex items-center gap-3">
                     <button
                       type="submit"
-                      disabled={isSubmitting || !marketingCustomer.trim() || !marketingProgramName.trim()}
+                      disabled={isSubmitting || isCompressingImages || !marketingCustomer.trim() || !marketingProgramName.trim()}
                       className="h-10 px-6 rounded-xl text-white text-xs font-bold cursor-pointer transition-all shadow-2xs hover:shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-98 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
                     >
                       {isSubmitting ? (

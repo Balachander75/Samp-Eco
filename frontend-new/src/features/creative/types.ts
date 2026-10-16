@@ -44,6 +44,7 @@ export interface DesignRequest {
   counterDateRequestedBy?: string | null;
   workflowEvents?: Array<Record<string, any>>;
   workflowNotes?: Array<Record<string, any>>;
+  workflowState?: Record<string, any>;
   status: string;
   createdBy: string;
   updatedBy: string;

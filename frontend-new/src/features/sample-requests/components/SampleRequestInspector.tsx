@@ -188,6 +188,11 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   // Lightbox Preview Image state
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeHandlerRef = useRef(onClose);
+  const selectedPreviewImageRef = useRef(selectedPreviewImage);
+  closeHandlerRef.current = onClose;
+  selectedPreviewImageRef.current = selectedPreviewImage;
 
   // Reset and synchronize on request id change
   useEffect(() => {
@@ -255,21 +260,46 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     setTargetPlant(activeRequest.targetPlant || ws.plantReleaseTarget || "Khaniwade");
   }, [activeRequest]);
 
-  // Keyboard navigation: Escape to close
+  // Keep keyboard focus inside the inspector and return it to the opener.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !activeRequest) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    dialog?.focus();
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (selectedPreviewImage) {
+        if (selectedPreviewImageRef.current) {
           setSelectedPreviewImage(null);
         } else {
-          onClose();
+          closeHandlerRef.current();
         }
+        return;
+      }
+      if (e.key !== "Tab" || !dialog) return;
+      const focusableSelector = "button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [contenteditable='true'], [tabindex]:not([tabindex='-1'])";
+      const focusables = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector))
+        .filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true" && element.getClientRects().length > 0);
+      if (!focusables.length) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog || !dialog.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        e.preventDefault();
+        first.focus();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, selectedPreviewImage]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [isOpen, activeRequest?.id]);
 
   const handleCopyCode = () => {
     if (!activeRequest) return;
@@ -358,6 +388,12 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     return s.includes("released to plant") || Boolean(ws?.plantReleasedAt);
   }, [activeRequest, ws]);
   const isPlantSampleTask = hasSampleScope && isReleasedToPlant;
+  const isResample = Boolean(
+    (activeRequest as any)?.isResample ||
+    ws?.isResample ||
+    ws?.samplingRouting?.isResample ||
+    activeRequest?.creationMode === "resample"
+  );
 
   const visibleTabs = useMemo(() => {
     const tabs: Array<{ id: InspectorTab; label: string; icon: LucideIcon; badge?: string; count?: number }> = [
@@ -368,17 +404,19 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     }
     tabs.push({ id: "studio", label: "Studio Prepress & CAD", icon: Box, badge: isStudioDone ? "CAD Ready" : "Pending" });
     if (!isMockupOnly) {
-      tabs.push({ id: "sampling", label: "Sampling Team Review", icon: Beaker, badge: isReleasedToPlant ? "Released" : "Review" });
+      tabs.push({ id: "sampling", label: isResample ? "Plant Resample Route" : "Sampling Team Review", icon: Beaker, badge: isReleasedToPlant ? "Released" : "Review" });
       tabs.push({ id: "plant", label: "Plant Execution", icon: Factory, badge: "Open" });
     }
     return tabs;
-  }, [isCreativeBypassed, isCreativeDone, isMockupOnly, isReleasedToPlant, isStudioDone, productDetails.length]);
+  }, [isCreativeBypassed, isCreativeDone, isMockupOnly, isReleasedToPlant, isResample, isStudioDone, productDetails.length]);
 
   useEffect(() => {
     if (visibleTabs.some((tab) => tab.id === activeTab)) return;
-    const fallbackTab = isCreativeBypassed ? "studio" : "specs";
+    const fallbackTab = (role === "sampling" && visibleTabs.some((tab) => tab.id === "sampling"))
+      ? "sampling"
+      : isCreativeBypassed ? "studio" : "specs";
     setActiveTab(visibleTabs.some((tab) => tab.id === fallbackTab) ? fallbackTab : "specs");
-  }, [activeTab, isCreativeBypassed, visibleTabs]);
+  }, [activeTab, isCreativeBypassed, role, visibleTabs]);
 
   // Claim Status Logic
   const isTaskClaimed = Boolean(ws.claimedByUserId != null || ws.claimedBy);
@@ -392,25 +430,32 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
       : actorName && claimedBy?.trim().toLocaleLowerCase() === actorName.trim().toLocaleLowerCase()
   ));
 
+  const activeWorkflowStage = ws.stage || (isPlantSampleTask ? "plant" : "");
+  const isTaskClaimedForActiveStage = Boolean(
+    isTaskClaimed && (ws.claimedStage ? ws.claimedStage === activeWorkflowStage : true)
+  );
+
   // Field Editing Permissions:
   // - Creative can enter Shutterstock No / Remarks once claimed when stage is creative.
   // - Studio can enter the prepress CAD URL once claimed when stage is studio.
   const canCreativeEdit = (role === "creative" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "creative";
   const canStudioEdit = (role === "studio" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "studio";
+  const isSamplingStage = ws.stage === "sampling_review" || ws.stage === "sampling" || String(activeRequest?.status || "").toLowerCase().includes("sampling") || (!isReleasedToPlant && (activeRequest?.requestTypes || []).includes("sample"));
+  const canSamplingReleaseVariant = (role === "sampling" || isAdmin) && !readOnly && (!isTaskClaimedForActiveStage || isClaimedByMe) && isSamplingStage && !isReleasedToPlant;
   const canCreativeApproveSampleArtwork = (role === "creative" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "creative_approval";
-  const canSamplingReleaseVariant = (role === "sampling" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "sampling_review";
   const creativeDueAt = ws.samplingRouting?.creativeDueAt ? new Date(ws.samplingRouting.creativeDueAt) : null;
   const creativeIsLate = Boolean(ws.stage === "creative" && creativeDueAt && Date.now() > creativeDueAt.getTime());
   const isMarketingDecisionStage = ws.stage === "awaiting_marketing_acceptance" || ws.stage === "awaiting_marketing_direction";
-  const canMarketingDecide = (role === "marketing" || isAdmin) && !readOnly && isClaimedByMe && isMarketingDecisionStage;
-  const activeWorkflowStage = ws.stage || (isPlantSampleTask ? "plant" : "");
-  const claimableStage = ["creative", "creative_approval", "studio", "sampling_review", "plant", "awaiting_marketing_acceptance", "awaiting_marketing_direction"].includes(String(activeWorkflowStage));
-  const roleOwnsClaimableStage = isAdmin ||
-    ((role === "creative") && ["creative", "creative_approval"].includes(String(activeWorkflowStage))) ||
-    ((role === "studio") && activeWorkflowStage === "studio") ||
-    ((role === "sampling") && activeWorkflowStage === "sampling_review") ||
-    ((role === "plant") && activeWorkflowStage === "plant") ||
-    ((role === "marketing") && isMarketingDecisionStage);
+  // Marketing owns the decision stage directly; claims are reserved for shared operational queues.
+  const canMarketingDecide = (role === "marketing" || isAdmin) && !readOnly && isMarketingDecisionStage;
+  const claimableStage = ["creative", "creative_approval", "studio", "sampling_review", "plant"].includes(String(activeWorkflowStage));
+  const roleOwnsClaimableStage = role !== "marketing" && (
+    isAdmin ||
+    (role === "creative" && ["creative", "creative_approval"].includes(String(activeWorkflowStage))) ||
+    (role === "studio" && activeWorkflowStage === "studio") ||
+    (role === "sampling" && activeWorkflowStage === "sampling_review") ||
+    (role === "plant" && activeWorkflowStage === "plant")
+  );
   const hasMockupClaimTask = (isMockupRequest || isSamplingCreativeTask || isPlantSampleTask) && claimableStage && roleOwnsClaimableStage;
   const studioPreviewHref = /^https?:\/\//i.test(studioMockupUrl.trim()) ? studioMockupUrl.trim() : "";
 
@@ -744,6 +789,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
       }}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="sample-inspector-title"
@@ -853,6 +900,11 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         <CheckCircle2 className="w-3 h-3" />
                         <span>{isCreativeBypassed ? "Direct to Studio CAD" : "Creative → Studio CAD"}</span>
                       </span>
+                    ) : isResample ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-500/20">
+                        <Factory className="w-3 h-3 text-blue-600" />
+                        <span>Direct Plant Resample Route</span>
+                      </span>
                     ) : isDirectCatalogSample ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-500/20">
                         <CheckCircle2 className="w-3 h-3" />
@@ -933,7 +985,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                 </div>
               </div>
 
-              {/* ── OPERATIONAL TASK CLAIM BANNER (REQUIRED FOR EDITING) ── */}
+              {/* ── OPERATIONAL TASK CLAIM BANNER ── */}
               {hasMockupClaimTask && <div className="px-4 sm:px-8 pt-4">
                 {isTaskClaimed ? (
                   <div className="p-3 rounded-xl border border-emerald-200/90 bg-emerald-50/70 dark:border-emerald-800/40 dark:bg-emerald-950/20 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -984,8 +1036,6 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                             ? ws.stage === "creative_approval" ? "Creative must claim this review before accepting the artwork or returning it to Studio." : "Creative must claim this task before completing specifications and sending it to Studio."
                             : role === "studio"
                             ? isSamplingCreativeTask ? "Studio must claim this task, attach the artwork path, and send it to Creative for approval." : "Studio must claim this task to provide its CAD output."
-                            : role === "marketing"
-                            ? "Marketing must claim this task before recording an acceptance, revision, or close decision."
                             : role === "sampling"
                             ? "Sampling must claim this review before recording remarks and releasing the approved sample to Plant."
                             : role === "plant"
@@ -1012,6 +1062,134 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                   </div>
                 )}
               </div>}
+
+              {/* ── SAMPLING PMT ACTION & PLANT DISPATCH CONSOLE ── */}
+              {(role === "sampling" || isAdmin) && !isMockupOnly && (
+                <div className="px-4 sm:px-8 pt-3">
+                  {isResample ? (
+                    <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/25 flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Factory className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-blue-950 dark:text-blue-200">
+                              Direct Repeat Resample Route · Bypassed PMT Review
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-100 text-blue-900 dark:bg-blue-900/60 dark:text-blue-200">
+                              DIRECT TO PLANT
+                            </span>
+                          </div>
+                          <p className="text-xs text-blue-800/80 dark:text-blue-300/80 mt-1">
+                            Repeat order without creative modifications. Dispatched directly to <strong>{targetPlant || activeRequest.targetPlant || "Khaniwade"}</strong>.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : isReleasedToPlant ? (
+                    <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/25 flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-emerald-950 dark:text-emerald-200">
+                              Sample Successfully Released to Plant ({targetPlant})
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200">
+                              PRODUCTION IN PROGRESS
+                            </span>
+                          </div>
+                          <p className="text-xs text-emerald-800/80 dark:text-emerald-300/80 mt-0.5">
+                            Technical verification complete. Dispatched to plant manufacturing line queue.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/60 dark:bg-teal-950/20 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Beaker className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold text-teal-950 dark:text-teal-200 uppercase tracking-wider font-mono">
+                            Sampling PMT Technical Verification &amp; Plant Dispatch
+                          </h3>
+                          <p className="text-[11px] text-teal-800/80 dark:text-teal-300/80">
+                            Assign manufacturing plant, input machine guidelines, and officially release this sample to production.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-bold text-[var(--on-surface)] uppercase font-mono">
+                            Target Plant Destination
+                          </label>
+                          <select
+                            value={targetPlant}
+                            disabled={readOnly}
+                            onChange={(e) => setTargetPlant(e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-xs text-[var(--on-surface)] focus:ring-1 focus:ring-teal-500 focus:outline-none"
+                          >
+                            <option value="Khaniwade">Khaniwade Plant (Standard &amp; Books)</option>
+                            <option value="Palghar">Palghar Plant (Exports &amp; Formats)</option>
+                            <option value="Daman">Daman Plant (Specialty &amp; Packaging)</option>
+                            <option value="Silvassa">Silvassa Plant (Hardcase Binding)</option>
+                          </select>
+                        </div>
+
+                        <div className="md:col-span-2 space-y-1">
+                          <label className="block text-[11px] font-bold text-[var(--on-surface)] uppercase font-mono">
+                            Sampling Machine Guidelines &amp; Remarks
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              disabled={readOnly}
+                              value={samplingRemark}
+                              onChange={(e) => setSamplingRemark(e.target.value)}
+                              placeholder="Tooling notes, board GSM adjustments, cylinder code, etc."
+                              className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-xs text-[var(--on-surface)] focus:ring-1 focus:ring-teal-500 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              disabled={isSavingSamplingFeedback || !samplingRemark.trim() || !canSamplingReleaseVariant}
+                              onClick={handleSaveSamplingFeedback}
+                              className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-low)] text-xs font-semibold text-[var(--on-surface)] transition cursor-pointer disabled:opacity-50"
+                            >
+                              {isSavingSamplingFeedback ? "Saving…" : "Save Notes"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isReleasingToPlant || !canSamplingReleaseVariant}
+                              onClick={handleReleaseToPlant}
+                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+                            >
+                              <Factory className="w-3.5 h-3.5" />
+                              <span>{isReleasingToPlant ? "Releasing…" : "Release to Plant"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {samplingFeedbackMessage && (
+                        <div className={`p-2 rounded-lg text-xs font-medium flex items-center gap-1.5 ${
+                          samplingFeedbackMessage.startsWith("✓")
+                            ? "bg-emerald-100/70 text-emerald-900 border border-emerald-300"
+                            : "bg-rose-100/70 text-rose-900 border border-rose-300"
+                        }`}>
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          <span>{samplingFeedbackMessage}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ── TAB CONTENT BODY ── */}
               <div className="p-4 sm:p-8 space-y-6">
@@ -1047,7 +1225,6 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                             <textarea rows={2} maxLength={1000} value={mockupDecisionRemark} onChange={(event) => setMockupDecisionRemark(event.target.value)} disabled={!canMarketingDecide} placeholder="Describe what Studio should change..." className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 disabled:opacity-60" />
                           </label>
                         )}
-                        {!canMarketingDecide && <p className="text-[11px] text-amber-800 dark:text-amber-200">Claim the Marketing task above to record a decision.</p>}
                         {mockupDecisionFeedback && <p role="status" className="text-xs text-[var(--on-surface-muted)]">{mockupDecisionFeedback}</p>}
                         <div className="flex flex-wrap justify-end gap-2">
                           {ws.stage === "awaiting_marketing_direction" ? <>

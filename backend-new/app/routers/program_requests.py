@@ -14,6 +14,7 @@ from app.schemas.program_request import (
     ProgramMaterialCreate,
     ProgramNoteCreate,
     ProgramOutputSubmit,
+    ProgramClaimSubmit,
     ProgramRequestCreate,
     ProgramRequestOut,
     ProgramRequestUpdate,
@@ -287,6 +288,36 @@ def reply_to_program_output(
     require_team(current_user, "marketing")
     _require_marketing_request_owner(request_id, service, current_user)
     return service.reply_to_output(request_id, activity_id, payload.remark, current_user=current_user)
+
+
+@router.post(
+    "/{request_id}/claim",
+    response_model=ProgramRequestOut,
+    summary="Claim a Program Planning review task (Sampling or Plant)",
+)
+def claim_program_task(
+    request_id: int,
+    payload: ProgramClaimSubmit,
+    service: ProgramRequestService = Depends(get_program_service),
+    current_user=Depends(get_current_user),
+):
+    """Claim the review task for Sampling Team or Plant Team before responding."""
+    department = payload.department.strip().casefold()
+    if department in {"sampling", "samp", "samp team"}:
+        require_team(current_user, "samp")
+        dept = "sampling"
+    elif department == "plant":
+        require_team(current_user, "plant")
+        existing = service.get_by_id(request_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Program planning request was not found")
+        require_plant_access(current_user, existing.get("target_plant"), service.db)
+        dept = "plant"
+    else:
+        raise HTTPException(status_code=422, detail="Department must be sampling or plant")
+
+    _require_program_request_visibility(request_id, service, current_user)
+    return service.claim_task(request_id, dept, current_user=current_user)
 
 
 @router.post(

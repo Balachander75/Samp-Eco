@@ -59,9 +59,16 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
   onSaveNewRow,
 }) => {
   const requestTypes = getRequestTypes(activeRequest);
+  const submittedDesignCount = (activeRequest.creativeSubmissions || []).reduce(
+    (total, batch) => total + (Array.isArray(batch?.rows) ? batch.rows.length : 0),
+    0,
+  );
+  const designFollowups = activeRequest.mockupWorkflowState?.designFollowups;
   const savedProductId = Number(String(activeRequest.id).replace(/^sample-/, ""));
+  const isMockupRequest =
+    requestTypes.includes("mockup") || String(activeRequest.mockupRequired || "").toLowerCase() === "yes";
 
-  if (trackType !== "program_planning" && requestTypes.includes("mockup")) {
+  if (trackType !== "program_planning" && isMockupRequest) {
     const mockup = activeRequest.mockupWorkflowState;
     const designNeeded = mockup?.designNeeded ?? requestTypes.includes("design");
     const mockupFields = [
@@ -70,10 +77,8 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
       ["Mockup required date", mockup?.requiredDate || "—"],
       ["Brand", activeRequest.brandName || "—"],
       ["Customer SKU", activeRequest.customerProductCode || "—"],
-      ...(designNeeded ? [
-        ["Shutterstock No.", mockup?.marketingShutterstockNo || "—"],
-        ["Marketing remark", mockup?.marketingRemark || "—"],
-      ] : []),
+      ["Marketing Shutterstock No.", mockup?.marketingShutterstockNo || "—"],
+      ["Marketing remark for Studio", mockup?.marketingRemark || "—"],
     ];
 
     return (
@@ -146,8 +151,14 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
                 {requestTypes.includes("design") ? "Required" : "Not Required"}
               </div>
               <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                {activeRequest.numberOfDesigns || activeRequest.designsCustomerCreative || 1} Req · {(activeRequest.creativeSubmissions || []).length} Rec
+                {activeRequest.numberOfDesigns || activeRequest.designsCustomerCreative || 1} Req · {submittedDesignCount} Submitted
               </div>
+              {designFollowups?.mockup?.designs?.length ? (
+                <div className="text-[10px] text-slate-500 mt-1">Mockup: {designFollowups.mockup.designs.map((design) => design.designNumber).join(", ")}</div>
+              ) : null}
+              {designFollowups?.sample?.designs?.length ? (
+                <div className="text-[10px] text-slate-500">Sampling: {designFollowups.sample.designs.map((design) => design.designNumber).join(", ")}</div>
+              ) : null}
             </div>
 
             <div className="p-3.5 rounded-2xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
