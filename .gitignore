@@ -27,6 +27,7 @@ pnpm-debug.log*
 database_dumps/
 *.dump
 db/*.dump
+db/backup_*.sql
 
 # OS files
 .DS_Store

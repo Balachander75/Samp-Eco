@@ -359,10 +359,13 @@ export const AppShell: React.FC<AppShellProps> = ({
           </div>
         )}
 
-        {/* Main Routed View */}
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        {/* Main Routed View with Silky Smooth Hardware-Accelerated Transitions */}
+        <main
+          key={currentPath}
+          className="flex-1 min-h-0 overflow-hidden flex flex-col page-transition-root"
+        >
           {children}
-        </div>
+        </main>
       </div>
     </div>
   );

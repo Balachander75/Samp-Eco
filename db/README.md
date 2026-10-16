@@ -23,11 +23,11 @@ Request creator IDs are persisted on Marketing sample, design, program, and feas
 
 ```bash
 # 1. Create database
-createdb -U postgres -h localhost navneet_samp
+createdb -U postgres -h localhost samp_enterprise_db
 
 # 2. Run schema queries
-psql -U postgres -h localhost -d navneet_samp -f db/schema.sql
+psql -U postgres -h localhost -d samp_enterprise_db -f db/schema.sql
 
 # 3. Seed master data
-psql -U postgres -h localhost -d navneet_samp -f db/seed_data.sql
+psql -U postgres -h localhost -d samp_enterprise_db -f db/seed_data.sql
 ```

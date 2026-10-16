@@ -1347,5 +1347,28 @@
   --tw-gradient-to: var(--accent-primary-fill-end) var(--tw-gradient-to-position);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   HIGH-PERFORMANCE BUTTERY SMOOTH PAGE & WORKSPACE TRANSITIONS
+   Hardware-accelerated (transform & opacity only), sub-200ms
+   ══════════════════════════════════════════════════════════════════════ */
+@keyframes workspacePageEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
+.page-transition-root {
+  animation: workspacePageEnter 170ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
 
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-root {
+    animation: none !important;
+  }
+}
