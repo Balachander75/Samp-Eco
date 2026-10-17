@@ -102,7 +102,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
     if (hour >= 4 && hour < 12) {
       return { greetingText: "Good morning", GreetingIcon: Sunrise };
     }
-    if (hour >= 12 && hour < 17) {
+    if (hour >= 12 && hour < 16) {
       return { greetingText: "Good afternoon", GreetingIcon: Sun };
     }
     return { greetingText: "Good evening", GreetingIcon: Moon };
@@ -708,16 +708,14 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                   key={section.id}
                   type="button"
                   onClick={() => scrollToSection(section.id)}
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
-                    isActive
-                      ? "bg-[var(--surface-container)] text-[var(--on-surface)] font-bold shadow-2xs border border-[var(--border-strong)]"
-                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] border border-transparent font-medium"
-                  }`}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${isActive
+                    ? "bg-[var(--surface-container)] text-[var(--on-surface)] font-bold shadow-2xs border border-[var(--border-strong)]"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] border border-transparent font-medium"
+                    }`}
                 >
                   <Icon
-                    className={`w-3.5 h-3.5 transition-colors ${
-                      isActive ? "text-[var(--accent-primary)]" : "text-[var(--on-surface-subtle)]"
-                    }`}
+                    className={`w-3.5 h-3.5 transition-colors ${isActive ? "text-[var(--accent-primary)]" : "text-[var(--on-surface-subtle)]"
+                      }`}
                   />
                   <span>{section.label}</span>
                   {isWatchlist && telemetry.totalDelayed > 0 && (
@@ -788,11 +786,10 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               setWatchlistFilter("drafts");
               scrollToSection("creative-watchlist");
             }}
-            className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${
-              telemetry.totalDrafts > 0
-                ? "border-amber-300 dark:border-amber-900/60 hover:border-amber-400"
-                : "border-[var(--border-subtle)] hover:border-amber-400/50"
-            }`}
+            className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${telemetry.totalDrafts > 0
+              ? "border-amber-300 dark:border-amber-900/60 hover:border-amber-400"
+              : "border-[var(--border-subtle)] hover:border-amber-400/50"
+              }`}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
@@ -842,11 +839,10 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               setWatchlistFilter("review");
               scrollToSection("creative-watchlist");
             }}
-            className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${
-              telemetry.totalClientReview > 0
-                ? "border-indigo-300 dark:border-indigo-900/60 hover:border-indigo-400"
-                : "border-[var(--border-subtle)] hover:border-indigo-400/50"
-            }`}
+            className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${telemetry.totalClientReview > 0
+              ? "border-indigo-300 dark:border-indigo-900/60 hover:border-indigo-400"
+              : "border-[var(--border-subtle)] hover:border-indigo-400/50"
+              }`}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
@@ -1143,9 +1139,8 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                       x={pt.x}
                       y={svgCurve.height - 4}
                       textAnchor="middle"
-                      className={`text-[11px] font-mono select-none ${
-                        isHovered ? "fill-[var(--accent-primary)] font-bold" : "fill-[var(--on-surface-subtle)]"
-                      }`}
+                      className={`text-[11px] font-mono select-none ${isHovered ? "fill-[var(--accent-primary)] font-bold" : "fill-[var(--on-surface-subtle)]"
+                        }`}
                     >
                       {pt.label}
                     </text>
@@ -1225,11 +1220,10 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                       <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
                       <td className="py-2 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
                       <td className="py-2 px-3 text-right tabular-nums">
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                          m.slaRate >= 90
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-500/20"
-                            : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-500/20"
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${m.slaRate >= 90
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-500/20"
+                          : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-500/20"
+                          }`}>
                           {m.slaRate}%
                         </span>
                       </td>
@@ -1293,9 +1287,8 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                       return (
                         <tr
                           key={member.name}
-                          className={`hover:bg-[var(--surface-low)] transition-colors ${
-                            isSelected ? "bg-[var(--accent-primary-subtle)]/40" : ""
-                          }`}
+                          className={`hover:bg-[var(--surface-low)] transition-colors ${isSelected ? "bg-[var(--accent-primary-subtle)]/40" : ""
+                            }`}
                         >
                           <td className="py-3 px-3 font-semibold text-[var(--on-surface)] flex items-center gap-2.5 font-sans">
                             <span className="w-6 h-6 rounded-full bg-[var(--surface-low)] border border-[var(--border-subtle)] font-bold text-[10px] flex items-center justify-center text-[var(--accent-primary)]">
@@ -1324,22 +1317,20 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                             <div className="flex items-center gap-2 w-36">
                               <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
                                 <div
-                                  className={`h-full rounded-full ${
-                                    member.slaRate >= 90
-                                      ? "bg-emerald-500"
-                                      : member.slaRate >= 75
+                                  className={`h-full rounded-full ${member.slaRate >= 90
+                                    ? "bg-emerald-500"
+                                    : member.slaRate >= 75
                                       ? "bg-amber-500"
                                       : "bg-rose-500"
-                                  }`}
+                                    }`}
                                   style={{ width: `${member.slaRate}%` }}
                                 />
                               </div>
                               <span
-                                className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
-                                  member.slaRate >= 90
-                                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                    : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                                }`}
+                                className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${member.slaRate >= 90
+                                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                  : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                                  }`}
                               >
                                 {member.slaRate}%
                               </span>
@@ -1351,11 +1342,10 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                               onClick={() =>
                                 setSelectedMemberFilter(isSelected ? "all" : member.name)
                               }
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-sans font-semibold border cursor-pointer transition-colors ${
-                                isSelected
-                                  ? "bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-2xs"
-                                  : "bg-[var(--surface-low)] text-[var(--on-surface)] border-[var(--border-subtle)] hover:bg-[var(--surface-container)]"
-                              }`}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-sans font-semibold border cursor-pointer transition-colors ${isSelected
+                                ? "bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-2xs"
+                                : "bg-[var(--surface-low)] text-[var(--on-surface)] border-[var(--border-subtle)] hover:bg-[var(--surface-container)]"
+                                }`}
                             >
                               {isSelected ? "Filtered ✓" : "Scope"}
                             </button>
@@ -1424,11 +1414,10 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                             />
                           </div>
                           <span
-                            className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
-                              account.onTimeRate >= 90
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                            }`}
+                            className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${account.onTimeRate >= 90
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                              }`}
                           >
                             {account.onTimeRate}%
                           </span>
@@ -1465,55 +1454,50 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("all")}
-                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
-                    watchlistFilter === "all"
-                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${watchlistFilter === "all"
+                    ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
                 >
                   All ({telemetry.total})
                 </button>
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("drafts")}
-                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
-                    watchlistFilter === "drafts"
-                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs border border-amber-500/20"
-                      : "text-[var(--on-surface-muted)] hover:text-amber-600"
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${watchlistFilter === "drafts"
+                    ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs border border-amber-500/20"
+                    : "text-[var(--on-surface-muted)] hover:text-amber-600"
+                    }`}
                 >
                   Drafts ({telemetry.totalDrafts})
                 </button>
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("concept")}
-                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
-                    watchlistFilter === "concept"
-                      ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-bold shadow-2xs border border-purple-500/20"
-                      : "text-[var(--on-surface-muted)] hover:text-purple-600"
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${watchlistFilter === "concept"
+                    ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-bold shadow-2xs border border-purple-500/20"
+                    : "text-[var(--on-surface-muted)] hover:text-purple-600"
+                    }`}
                 >
                   In Production ({telemetry.totalInProduction})
                 </button>
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("review")}
-                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
-                    watchlistFilter === "review"
-                      ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold shadow-2xs border border-indigo-500/20"
-                      : "text-[var(--on-surface-muted)] hover:text-indigo-600"
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${watchlistFilter === "review"
+                    ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold shadow-2xs border border-indigo-500/20"
+                    : "text-[var(--on-surface-muted)] hover:text-indigo-600"
+                    }`}
                 >
                   Needs Action ({telemetry.totalClientReview})
                 </button>
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("delayed")}
-                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
-                    watchlistFilter === "delayed"
-                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs border border-rose-500/20"
-                      : "text-[var(--on-surface-muted)] hover:text-rose-600"
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${watchlistFilter === "delayed"
+                    ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs border border-rose-500/20"
+                    : "text-[var(--on-surface-muted)] hover:text-rose-600"
+                    }`}
                 >
                   Delayed ({telemetry.totalDelayed})
                 </button>

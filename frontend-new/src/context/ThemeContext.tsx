@@ -48,14 +48,14 @@ export const APP_THEMES: AppTheme[] = [
     badge: "Recommended",
     category: "enterprise",
     preview: {
-      canvas: "#f3f6f4",
-      sidebar: "#e2ebe5",
+      canvas: "#f7faf9",
+      sidebar: "#eef5f1",
       surface: "#ffffff",
-      accent: "#107555",
+      accent: "#059669",
       accentSoft: "#d1fae5",
       accentSecondary: "#2563eb",
-      accentTertiary: "#c2944b",
-      text: "#13251e",
+      accentTertiary: "#d97706",
+      text: "#0f291e",
       border: "#cbdad0"
     }
   },
@@ -68,14 +68,14 @@ export const APP_THEMES: AppTheme[] = [
     badge: "Popular",
     category: "enterprise",
     preview: {
-      canvas: "#f0f5fa",
-      sidebar: "#dce8f4",
+      canvas: "#f4f7fb",
+      sidebar: "#eaf0f9",
       surface: "#ffffff",
       accent: "#2563eb",
       accentSoft: "#dbeafe",
       accentSecondary: "#06b6d4",
       accentTertiary: "#eab308",
-      text: "#0f1e36",
+      text: "#0c192c",
       border: "#c6d8eb"
     }
   },
@@ -88,14 +88,14 @@ export const APP_THEMES: AppTheme[] = [
     badge: "Studio Choice",
     category: "creative",
     preview: {
-      canvas: "#f5f2fa",
-      sidebar: "#e8def5",
+      canvas: "#f8f6fc",
+      sidebar: "#f0ebf8",
       surface: "#ffffff",
       accent: "#7c3aed",
       accentSoft: "#ede9fe",
       accentSecondary: "#db2777",
       accentTertiary: "#f59e0b",
-      text: "#26143d",
+      text: "#1e1035",
       border: "#d8c8ee"
     }
   },
@@ -107,14 +107,14 @@ export const APP_THEMES: AppTheme[] = [
     vibe: "Warm Editorial",
     category: "minimal",
     preview: {
-      canvas: "#f8f6f0",
-      sidebar: "#ede9dd",
+      canvas: "#faf7f2",
+      sidebar: "#f2ede4",
       surface: "#ffffff",
       accent: "#b45309",
       accentSoft: "#fef3c7",
-      accentSecondary: "#c2410c",
+      accentSecondary: "#ea580c",
       accentTertiary: "#0284c7",
-      text: "#2b2416",
+      text: "#261e14",
       border: "#ded7c5"
     }
   },
@@ -126,14 +126,14 @@ export const APP_THEMES: AppTheme[] = [
     vibe: "Modern Minimal",
     category: "creative",
     preview: {
-      canvas: "#faf4f5",
-      sidebar: "#f2e4e7",
+      canvas: "#fcf6f7",
+      sidebar: "#f6eaed",
       surface: "#ffffff",
       accent: "#e11d48",
       accentSoft: "#ffe4e6",
-      accentSecondary: "#4f46e5",
+      accentSecondary: "#6366f1",
       accentTertiary: "#d97706",
-      text: "#33141b",
+      text: "#2d1219",
       border: "#e9d0d5"
     }
   },
@@ -147,7 +147,7 @@ export const APP_THEMES: AppTheme[] = [
     category: "minimal",
     preview: {
       canvas: "#faf9f5",
-      sidebar: "#f3f0e6",
+      sidebar: "#f2efe4",
       surface: "#ffffff",
       accent: "#facc15",
       accentSoft: "#fef9c3",
@@ -165,14 +165,14 @@ export const APP_THEMES: AppTheme[] = [
     vibe: "Glacial Clean",
     category: "enterprise",
     preview: {
-      canvas: "#f1f6fa",
-      sidebar: "#e0edf7",
+      canvas: "#f2f7fb",
+      sidebar: "#e5eff7",
       surface: "#ffffff",
       accent: "#0284c7",
       accentSoft: "#e0f2fe",
       accentSecondary: "#0d9488",
       accentTertiary: "#f59e0b",
-      text: "#0a1c2e",
+      text: "#081a2e",
       border: "#c2daf0"
     }
   },
@@ -184,14 +184,14 @@ export const APP_THEMES: AppTheme[] = [
     vibe: "Warm Sandstone",
     category: "minimal",
     preview: {
-      canvas: "#f8f4ee",
-      sidebar: "#ece4d8",
+      canvas: "#f9f5ee",
+      sidebar: "#efe6da",
       surface: "#ffffff",
       accent: "#ea580c",
       accentSoft: "#ffedd5",
       accentSecondary: "#65a30d",
       accentTertiary: "#0284c7",
-      text: "#2d1c13",
+      text: "#29180f",
       border: "#dfd2c0"
     }
   },
@@ -204,15 +204,15 @@ export const APP_THEMES: AppTheme[] = [
     badge: "OLED Dark",
     category: "dark_oled",
     preview: {
-      canvas: "#0b0e17",
-      sidebar: "#121624",
-      surface: "#181e30",
+      canvas: "#060810",
+      sidebar: "#090d18",
+      surface: "#0c101d",
       accent: "#818cf8",
-      accentSoft: "#272942",
+      accentSoft: "#182036",
       accentSecondary: "#38bdf8",
-      accentTertiary: "#f59e0b",
-      text: "#f1f5f9",
-      border: "#2e3650"
+      accentTertiary: "#fbbf24",
+      text: "#f8fafc",
+      border: "#222a42"
     }
   },
   {
@@ -223,15 +223,15 @@ export const APP_THEMES: AppTheme[] = [
     vibe: "Nordic Night",
     category: "dark_oled",
     preview: {
-      canvas: "#091211",
-      sidebar: "#10201e",
-      surface: "#162a27",
+      canvas: "#040b09",
+      sidebar: "#071310",
+      surface: "#0a1714",
       accent: "#34d399",
-      accentSoft: "#17332c",
+      accentSoft: "#152e28",
       accentSecondary: "#fbbf24",
       accentTertiary: "#60a5fa",
       text: "#ecfdf5",
-      border: "#274742"
+      border: "#1b3831"
     }
   },
   {
@@ -243,15 +243,15 @@ export const APP_THEMES: AppTheme[] = [
     badge: "Vibrant Dark",
     category: "creative",
     preview: {
-      canvas: "#120914",
-      sidebar: "#1c1020",
-      surface: "#27182c",
+      canvas: "#08040d",
+      sidebar: "#0d0616",
+      surface: "#12091c",
       accent: "#c084fc",
-      accentSoft: "#331c3a",
+      accentSoft: "#241535",
       accentSecondary: "#2dd4bf",
       accentTertiary: "#f43f5e",
       text: "#faf5ff",
-      border: "#43294c"
+      border: "#341c45"
     }
   },
   {
@@ -263,15 +263,15 @@ export const APP_THEMES: AppTheme[] = [
     badge: "High Tech",
     category: "dark_oled",
     preview: {
-      canvas: "#06070a",
-      sidebar: "#0c0e14",
-      surface: "#121620",
+      canvas: "#030408",
+      sidebar: "#05070e",
+      surface: "#080c14",
       accent: "#00f0ff",
-      accentSoft: "#09333d",
+      accentSoft: "#151e32",
       accentSecondary: "#ff007a",
       accentTertiary: "#a855f7",
-      text: "#f8fafc",
-      border: "#1d273a"
+      text: "#ffffff",
+      border: "#162033"
     }
   },
   {
@@ -283,15 +283,15 @@ export const APP_THEMES: AppTheme[] = [
     badge: "Pro Stealth",
     category: "dark_oled",
     preview: {
-      canvas: "#090a0d",
-      sidebar: "#101117",
-      surface: "#181a22",
+      canvas: "#06070a",
+      sidebar: "#090a0f",
+      surface: "#0d0f15",
       accent: "#3b82f6",
-      accentSoft: "#182740",
+      accentSoft: "#1a1e2a",
       accentSecondary: "#94a3b8",
       accentTertiary: "#38bdf8",
       text: "#f8fafc",
-      border: "#272a38"
+      border: "#202430"
     }
   },
 ];

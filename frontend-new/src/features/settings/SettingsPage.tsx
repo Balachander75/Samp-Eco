@@ -14,6 +14,9 @@ import {
   Sliders,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
+  Search,
+  Layout,
 } from "lucide-react";
 import { APP_THEMES, useTheme } from "@/context/ThemeContext";
 import { readAuthUser } from "@/lib/session";
@@ -67,10 +70,21 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
 
   // ── Appearance Filter State ──
   const [themeModeFilter, setThemeModeFilter] = useState<"all" | "light" | "dark">("all");
+  const [themeCategoryFilter, setThemeCategoryFilter] = useState<string>("all");
+  const [themeSearchQuery, setThemeSearchQuery] = useState("");
 
   const filteredThemes = APP_THEMES.filter((t) => {
-    if (themeModeFilter === "light") return t.mode === "light";
-    if (themeModeFilter === "dark") return t.mode === "dark";
+    if (themeModeFilter === "light" && t.mode !== "light") return false;
+    if (themeModeFilter === "dark" && t.mode !== "dark") return false;
+    if (themeCategoryFilter !== "all" && t.category !== themeCategoryFilter) return false;
+    if (themeSearchQuery.trim()) {
+      const q = themeSearchQuery.toLowerCase();
+      return (
+        t.name.toLowerCase().includes(q) ||
+        t.vibe.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q)
+      );
+    }
     return true;
   });
 
@@ -535,50 +549,151 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
           </section>
         )}
 
-        {/* ═══ TAB 3: Appearance (Themes by Name) ═══ */}
+        {/* ═══ TAB 3: Appearance (Themes Studio) ═══ */}
         {activeTab === "appearance" && (
-          <section className="w-full rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#0c0d12] shadow-2xs overflow-hidden">
-            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>Workspace Theme</span>
-                </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Select your theme by name. Changes apply immediately across all desks and tables.
-                </p>
+          <section className="w-full rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#0c0d12] shadow-sm overflow-hidden">
+            {/* Header & Controls */}
+            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
+                      <Palette className="w-4 h-4" />
+                    </span>
+                    <span>Workspace Theme Studio</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-semibold">
+                      13 Curated Palettes
+                    </span>
+                  </h2>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    Select your bespoke theme. Changes apply instantly across all desks, tables, top navigation, and inspection modals with zero reload.
+                  </p>
+                </div>
+
+                {/* Mode Filter Toggle */}
+                <div className="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-mono shadow-inner">
+                  {[
+                    { id: "all", label: `All (${APP_THEMES.length})`, icon: Layout },
+                    { id: "light", label: `Light (${APP_THEMES.filter((t) => t.mode === "light").length})`, icon: Sun },
+                    { id: "dark", label: `Dark OLED (${APP_THEMES.filter((t) => t.mode === "dark").length})`, icon: Moon },
+                  ].map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setThemeModeFilter(item.id as any)}
+                        className={`px-3 py-1.5 rounded-lg transition-all font-medium cursor-pointer flex items-center gap-1.5 ${
+                          themeModeFilter === item.id
+                            ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-bold shadow-xs ring-1 ring-black/5 dark:ring-white/10"
+                            : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
+                        }`}
+                      >
+                        {ItemIcon && <ItemIcon className="w-3.5 h-3.5" />}
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Mode Filter Toggle */}
-              <div className="inline-flex p-1 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono">
-                {[
-                  { id: "all", label: `All (${APP_THEMES.length})`, icon: null },
-                  { id: "light", label: `Light (${APP_THEMES.filter((t) => t.mode === "light").length})`, icon: Sun },
-                  { id: "dark", label: `Dark (${APP_THEMES.filter((t) => t.mode === "dark").length})`, icon: Moon },
-                ].map((item) => {
-                  const ItemIcon = item.icon;
-                  return (
+              {/* Category Pills & Quick Search Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+                  {[
+                    { id: "all", label: "All Collections" },
+                    { id: "enterprise", label: "Enterprise Swiss" },
+                    { id: "creative", label: "Studio Creative" },
+                    { id: "dark_oled", label: "Dark OLED & Cyber" },
+                    { id: "minimal", label: "Editorial & Brutal" },
+                  ].map((cat) => (
                     <button
-                      key={item.id}
+                      key={cat.id}
                       type="button"
-                      onClick={() => setThemeModeFilter(item.id as any)}
-                      className={`px-3 py-1.5 rounded-md transition font-medium cursor-pointer flex items-center gap-1.5 ${
-                        themeModeFilter === item.id
-                          ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-bold shadow-2xs"
-                          : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
+                      onClick={() => setThemeCategoryFilter(cat.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] transition-all cursor-pointer ${
+                        themeCategoryFilter === cat.id
+                          ? "bg-[var(--accent-primary)] text-white font-bold shadow-xs"
+                          : "bg-zinc-100 dark:bg-zinc-900/60 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200/60 dark:border-zinc-800/60"
                       }`}
                     >
-                      {ItemIcon && <ItemIcon className="w-3.5 h-3.5" />}
-                      <span>{item.label}</span>
+                      {cat.label}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+
+                <div className="relative min-w-[200px]">
+                  <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={themeSearchQuery}
+                    onChange={(e) => setThemeSearchQuery(e.target.value)}
+                    placeholder="Search themes by name or vibe..."
+                    className="w-full pl-8 pr-3 py-1 rounded-lg text-xs bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
+                  />
+                  {themeSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setThemeSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 text-[10px] font-mono cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Clean Grid of Themes by Name */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+              {/* ── Active Theme Spotlight Showcase ── */}
+              <div className="p-4 rounded-xl border border-[var(--accent-primary)]/30 bg-gradient-to-r from-[var(--accent-primary)]/5 via-transparent to-[var(--accent-teal)]/5 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-black/10 dark:border-white/10"
+                    style={{ backgroundColor: selectedTheme.preview.accent }}
+                  >
+                    <Sparkles className="w-6 h-6 text-white stroke-[2.2]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                        {selectedTheme.name}
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30">
+                        {selectedTheme.vibe}
+                      </span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                        {selectedTheme.mode === "dark" ? "OLED Dark" : "Light Porcelain"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      {selectedTheme.description}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Active Swatches Strip */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-mono">
+                    <span className="text-zinc-400">Primary:</span>
+                    <span className="w-3.5 h-3.5 rounded-full shadow-2xs border border-black/10" style={{ backgroundColor: selectedTheme.preview.accent }} />
+                    <span className="font-bold text-zinc-800 dark:text-zinc-200">{selectedTheme.preview.accent}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-mono">
+                    <span className="text-zinc-400">Secondary:</span>
+                    <span className="w-3.5 h-3.5 rounded-full shadow-2xs border border-black/10" style={{ backgroundColor: selectedTheme.preview.accentSecondary }} />
+                    <span className="font-bold text-zinc-800 dark:text-zinc-200">{selectedTheme.preview.accentSecondary}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-mono">
+                    <span className="text-zinc-400">Canvas:</span>
+                    <span className="w-3.5 h-3.5 rounded-full shadow-2xs border border-black/10" style={{ backgroundColor: selectedTheme.preview.canvas }} />
+                    <span className="font-bold text-zinc-800 dark:text-zinc-200">{selectedTheme.preview.canvas}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Modern Interactive Theme Cards Grid ── */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredThemes.map((option) => {
                   const isSelected = theme === option.id;
 
@@ -591,56 +706,122 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
                       onClick={() => {
                         void setTheme(option.id);
                       }}
-                      className={`p-4 rounded-xl border text-left transition-all duration-150 cursor-pointer select-none flex items-center justify-between gap-3 ${
+                      className={`group relative rounded-xl border text-left transition-all duration-200 cursor-pointer select-none overflow-hidden flex flex-col ${
                         isSelected
-                          ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500 shadow-xs"
-                          : "bg-white dark:bg-[#0c0d12] border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30"
+                          ? "bg-[var(--accent-primary)]/5 dark:bg-[var(--accent-primary)]/10 border-[var(--accent-primary)] ring-2 ring-[var(--accent-primary)]/40 shadow-md translate-y-[-1px]"
+                          : "bg-white dark:bg-[#0e1118] border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-400 dark:hover:border-zinc-600 hover:shadow-sm hover:translate-y-[-1px]"
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {/* Theme Primary Swatch Dot */}
-                        <div className="relative shrink-0 flex items-center">
-                          <span
-                            className="w-4 h-4 rounded-full border border-black/10 dark:border-white/10 shadow-2xs"
-                            style={{ backgroundColor: option.preview.accent }}
-                          />
-                          <span
-                            className="w-2.5 h-2.5 rounded-full border border-black/10 dark:border-white/10 -ml-1.5 shadow-2xs"
-                            style={{ backgroundColor: option.preview.surface }}
-                          />
+                      {/* Mini Live UI Workspace Mockup */}
+                      <div
+                        className="w-full h-20 p-2.5 flex gap-2 relative overflow-hidden border-b border-black/5 dark:border-white/5 transition-opacity group-hover:opacity-95"
+                        style={{ backgroundColor: option.preview.canvas }}
+                      >
+                        {/* Mini Sidebar */}
+                        <div
+                          className="w-8 h-full rounded-md flex flex-col justify-between p-1 shrink-0 shadow-2xs"
+                          style={{ backgroundColor: option.preview.sidebar }}
+                        >
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: option.preview.accent }} />
+                          <div className="space-y-1">
+                            <div className="w-full h-1 rounded" style={{ backgroundColor: option.preview.accent, opacity: 0.8 }} />
+                            <div className="w-3/4 h-1 rounded bg-black/20 dark:bg-white/20" />
+                            <div className="w-1/2 h-1 rounded bg-black/20 dark:bg-white/20" />
+                          </div>
                         </div>
 
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
-                              {option.name}
-                            </span>
-                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200/60 dark:border-zinc-700/60">
-                              {option.mode === "dark" ? "Dark" : "Light"}
-                            </span>
+                        {/* Mini Content Area */}
+                        <div className="flex-1 flex flex-col justify-between min-w-0">
+                          {/* Mini Topbar */}
+                          <div className="flex items-center justify-between gap-1 pb-1">
+                            <div className="h-1.5 w-14 rounded-full bg-black/15 dark:bg-white/15" />
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: option.preview.accentSecondary }} />
                           </div>
-                          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
-                            {option.vibe || option.description}
+
+                          {/* Mini KPI Cards row */}
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div
+                              className="p-1 rounded shadow-2xs flex flex-col justify-between"
+                              style={{ backgroundColor: option.preview.surface }}
+                            >
+                              <div className="w-3 h-1 rounded" style={{ backgroundColor: option.preview.accent }} />
+                              <div className="w-5 h-1.5 rounded font-bold mt-1" style={{ backgroundColor: option.preview.accent }} />
+                            </div>
+                            <div
+                              className="p-1 rounded shadow-2xs flex flex-col justify-between"
+                              style={{ backgroundColor: option.preview.surface }}
+                            >
+                              <div className="w-3 h-1 rounded" style={{ backgroundColor: option.preview.accentTertiary }} />
+                              <div className="w-4 h-1.5 rounded mt-1" style={{ backgroundColor: option.preview.accentSecondary }} />
+                            </div>
                           </div>
                         </div>
+
+                        {/* Subtle theme mode badge overlay */}
+                        <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-black/60 dark:bg-black/80 text-white backdrop-blur-sm">
+                          {option.mode === "dark" ? "OLED" : "LIGHT"}
+                        </span>
                       </div>
 
-                      {/* Active Status Badge */}
-                      {isSelected ? (
-                        <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 text-[10px] font-mono font-bold">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                          <span>Active</span>
-                        </span>
-                      ) : (
-                        <span className="w-3.5 h-3.5 rounded-full border border-zinc-300 dark:border-zinc-700 shrink-0" />
-                      )}
+                      {/* Card Content & Details */}
+                      <div className="p-3.5 flex-1 flex flex-col justify-between gap-3">
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-xs font-bold text-zinc-900 dark:text-white truncate group-hover:text-[var(--accent-primary)] transition-colors">
+                              {option.name}
+                            </h3>
+                            {isSelected ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-bold shrink-0">
+                                <Check className="w-3 h-3 stroke-[3]" />
+                                <span>Active</span>
+                              </span>
+                            ) : option.badge ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 shrink-0">
+                                {option.badge}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mt-0.5 flex items-center gap-1.5">
+                            <span>{option.vibe}</span>
+                          </div>
+
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 line-clamp-1 mt-1">
+                            {option.description}
+                          </p>
+                        </div>
+
+                        {/* Palette Color Dots Preview */}
+                        <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            {[
+                              { color: option.preview.accent, title: "Primary Accent" },
+                              { color: option.preview.accentSecondary, title: "Secondary Accent" },
+                              { color: option.preview.accentTertiary, title: "Tertiary Accent" },
+                              { color: option.preview.surface, title: "Card Surface" },
+                              { color: option.preview.canvas, title: "Workspace Canvas" },
+                            ].map((swatch, idx) => (
+                              <span
+                                key={idx}
+                                title={swatch.title}
+                                className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10 shadow-2xs transition-transform group-hover:scale-110"
+                                style={{ backgroundColor: swatch.color }}
+                              />
+                            ))}
+                          </div>
+
+                          <span className="text-[10px] font-mono text-zinc-400 uppercase">
+                            {option.id}
+                          </span>
+                        </div>
+                      </div>
                     </button>
                   );
                 })}
               </div>
 
               {/* Status Footer */}
-              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-900 flex items-center justify-between text-xs font-mono text-zinc-500 dark:text-zinc-400">
+              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-zinc-500 dark:text-zinc-400">
                 <span className="flex items-center gap-2">
                   <span
                     className={`w-2 h-2 rounded-full ${
@@ -648,19 +829,19 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
                         ? "bg-rose-500"
                         : saveStatus === "saving"
                         ? "bg-amber-500 animate-pulse"
-                        : "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
+                        : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
                     }`}
                   />
                   <span>
                     {saveStatus === "saved"
-                      ? "Theme synchronized to user account."
+                      ? "Theme synchronized to your account across all sessions."
                       : saveStatus === "saving"
-                      ? "Synchronizing theme to account..."
-                      : "Theme changes preview instantly."}
+                      ? "Synchronizing theme preference..."
+                      : "Theme changes preview and render instantly."}
                   </span>
                 </span>
                 <span className="text-[11px] text-zinc-400">
-                  Active Palette: {selectedTheme.name}
+                  Active Palette: <strong className="text-zinc-700 dark:text-zinc-200">{selectedTheme.name}</strong> ({selectedTheme.vibe})
                 </span>
               </div>
             </div>
