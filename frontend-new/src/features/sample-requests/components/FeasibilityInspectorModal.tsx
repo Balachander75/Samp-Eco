@@ -404,11 +404,12 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     try {
       const converter = user?.name || user?.userid || "Marketing Team";
       const result = await convertFeasibilityToSamplingApi(activeRequest.id, requestTypes);
-      if (result && result.sampleSrNumber) {
+      if (result && result.sampleRequestId) {
         setLocalOverride({
           ...activeRequest,
           convertedSampleRequestId: result.sampleRequestId,
           convertedSrNumber: result.sampleSrNumber,
+          convertedRequestCode: result.sampleRequestCode,
           convertedRequestTypes: result.requestTypes,
           convertedBy: converter,
           convertedAt: new Date().toISOString(),
@@ -542,10 +543,10 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
-                    <span>3. Commercial Decision &amp; Sampling</span>
-                    {activeRequest.convertedSrNumber ? (
+                    <span>3. Commercial Decision &amp; Request</span>
+                    {activeRequest.convertedRequestCode || activeRequest.convertedSrNumber ? (
                       <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--border-subtle)]">
-                        ✓ {activeRequest.convertedSrNumber}
+                        ✓ {activeRequest.convertedRequestCode || activeRequest.convertedSrNumber}
                       </span>
                     ) : activeRequest.marketingDecision ? (
                       <span

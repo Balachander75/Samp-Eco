@@ -8,6 +8,7 @@ from app.models.sample_request import (
     DesignRequest,
     SampleRequestType,
     SampleRequestActivityLog,
+    SampleRequestReferenceImage,
 )
 from app.models.request_workflows import (
     MockupWorkflow,
@@ -16,6 +17,7 @@ from app.models.request_workflows import (
     CostingWorkflowLog,
 )
 from app.models.downstream import StudioDieline, CreativeBrief, CostingEstimation
+from app.models.request_code_sequence import RequestCodeSequence
 
 __all__ = [
     "User",
@@ -35,6 +37,7 @@ __all__ = [
     "DesignRequest",
     "SampleRequestType",
     "SampleRequestActivityLog",
+    "SampleRequestReferenceImage",
     "MockupWorkflow",
     "MockupWorkflowLog",
     "CostingWorkflow",
@@ -42,4 +45,5 @@ __all__ = [
     "StudioDieline",
     "CreativeBrief",
     "CostingEstimation",
+    "RequestCodeSequence",
 ]

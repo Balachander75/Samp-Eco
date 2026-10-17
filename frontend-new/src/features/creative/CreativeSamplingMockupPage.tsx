@@ -1,14 +1,13 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Box,
-  ChevronRight,
   Sparkles,
   Layers,
   Building2,
   FlaskConical,
-  ArrowRight,
   Activity,
-  Calendar,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { SampleRequestItem } from "@/features/sample-requests/types";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -42,7 +41,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
   selectedYear,
   selectedPlant,
   isLoading = false,
-  readOnly = false,
+  readOnly: _readOnly = false,
   onInspectRequest,
   onExportCSV,
   onRefresh,
@@ -60,14 +59,30 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 40;
 
+  const now = useMemo(() => new Date(), []);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Global '/' keyboard shortcut to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Filter requests that have sample or mockup scopes (excluding pure programs)
   const samplingMockupItems = useMemo(() => {
     return requests.filter((r) => {
-      const srCode = String(r.srNumber || "").toUpperCase();
+      const srCode = String(r.requestCodes?.mockup || r.requestCode || r.srNumber || "").toUpperCase();
       const materialCode = String(r.materialCode || "").toUpperCase();
       if (
         r.requestKind === "program" ||
         r.creationMode === "program_planning" ||
+        String(r.requestCode || "").toUpperCase().startsWith("PP-") ||
         srCode.includes("-PG-") ||
         srCode.startsWith("PG-") ||
         materialCode.startsWith("PG-")
@@ -201,7 +216,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
         return (
-          (r.srNumber || "").toLowerCase().includes(q) ||
+          (r.requestCodes?.mockup || r.requestCode || r.srNumber || "").toLowerCase().includes(q) ||
           (r.materialCode || "").toLowerCase().includes(q) ||
           (r.productDescription || "").toLowerCase().includes(q) ||
           (r.customer || "").toLowerCase().includes(q) ||
@@ -280,7 +295,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
     exportRecordsToCsv({
       filename: `sampling_mockup_queue_${dateStr}.csv`,
       columns: [
-        { header: "SR Code", accessor: (r) => r.srNumber || r.id },
+        { header: "Mockup Code", accessor: (r) => r.requestCodes?.mockup || r.requestCode || r.srNumber || r.id },
         { header: "Sample Description", accessor: (r) => r.productDescription },
         { header: "Customer / Brand", accessor: (r) => r.customer },
         {
@@ -319,7 +334,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       label: "All Active",
       value: isLoading ? "—" : totalCombined,
       detail: "Active deliverables queue",
-      color: "bg-[var(--accent-primary)]",
+      color: "bg-[#245942]",
       isActive: selectedStageTab === "all",
       onClick: () => {
         setSelectedStageTab("all");
@@ -376,12 +391,12 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
     () => [
       {
         id: "sr_number",
-        header: "SR Code",
+        header: "Mockup Code",
         width: "w-[150px]",
         sortable: true,
         cell: (r) => (
           <div>
-            <CopyBadge text={r.srNumber || `SR-${r.id}`} />
+            <CopyBadge text={r.requestCodes?.mockup || r.requestCode || r.srNumber || `MR-${r.id}`} />
             <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
               Raised {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
             </div>
@@ -489,12 +504,46 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
         id: "sla",
         header: "Target SLA Date",
         width: "w-[130px]",
-        cell: (r) => (
-          <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--on-surface-muted)]">
-            <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
-            <span>{r.sampleRequiredDate ? formatOdooDate(r.sampleRequiredDate) : "Standard SLA"}</span>
-          </div>
-        ),
+        cell: (r) => {
+          let isOverdue = false;
+          if (
+            r.sampleRequiredDate &&
+            !["approved", "delivered", "completed", "cancelled"].includes(
+              String(r.status || "").toLowerCase()
+            )
+          ) {
+            const dt = new Date(r.sampleRequiredDate);
+            if (!isNaN(dt.getTime()) && dt < now) {
+              isOverdue = true;
+            }
+          }
+          return (
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--on-surface)]">
+                <Clock
+                  className={`w-3.5 h-3.5 shrink-0 ${
+                    isOverdue ? "text-rose-500" : "text-[var(--on-surface-subtle)]"
+                  }`}
+                />
+                <span
+                  className={
+                    isOverdue
+                      ? "font-semibold text-rose-600 dark:text-rose-400"
+                      : "text-[var(--on-surface-muted)]"
+                  }
+                >
+                  {r.sampleRequiredDate ? formatOdooDate(r.sampleRequiredDate) : "Standard SLA"}
+                </span>
+              </div>
+              {isOverdue && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
+                  <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                  <span>Overdue</span>
+                </span>
+              )}
+            </div>
+          );
+        },
       },
       {
         id: "status",
@@ -502,44 +551,8 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
         width: "w-[130px]",
         cell: (r) => <StatusPill status={r.status || "Creative"} size="sm" showDot />,
       },
-      {
-        id: "actions",
-        header: "Action",
-        align: "right",
-        width: "w-[120px]",
-        cell: (r) => {
-          const isCreativeAwaiting =
-            !r.mockupWorkflowState ||
-            ["creative", "creative_approval"].includes(r.mockupWorkflowState.stage);
-          return (
-            <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-              {isCreativeAwaiting && !readOnly ? (
-                <button
-                  type="button"
-                  onClick={() => onInspectRequest(r)}
-                  className="inline-flex select-none items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold font-mono transition cursor-pointer shadow-2xs active:scale-98"
-                  title="Claim & Submit CAD Mockup"
-                >
-                  <span>Claim &amp; Submit</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onInspectRequest(r)}
-                  className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
-                  title="Inspect Deliverable Details"
-                >
-                  <span>Inspect</span>
-                  <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
-                </button>
-              )}
-            </div>
-          );
-        },
-      },
     ],
-    [onInspectRequest, readOnly]
+    [now]
   );
 
   return (
@@ -560,6 +573,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       onExportCSV={handleExportClick}
       exportDisabled={filteredItems.length === 0}
       kpiItems={kpiItems}
+      kpiGridCols="grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5"
       extraFilterControls={
         <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5">
           {[

@@ -19,6 +19,7 @@ import { FeasibilityRequestPayload } from "../types";
 import { useMasterData } from "../hooks/useMasterData";
 import { CustomerItem } from "@/types/master";
 import { compressReferenceImage } from "@/lib/referenceImage";
+import { getBusinessYearInfo } from "@/lib/businessYear";
 
 export interface NewFeasibilityModalProps {
   isOpen: boolean;
@@ -40,6 +41,7 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
   existingCustomers = [],
   defaultPlant = "Navneet - Khaniwade",
 }) => {
+  const requestCodeYear = String(getBusinessYearInfo().startYear).slice(-2);
   const { customers: dbCustomers } = useMasterData(isOpen);
 
   const customerItems: CustomerItem[] = useMemo(() => {
@@ -216,7 +218,7 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
                     Technical Feasibility Check
                   </h3>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/20 tracking-wider uppercase">
-                    FC-0001
+                    {`FC-${requestCodeYear}-001`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-normal">

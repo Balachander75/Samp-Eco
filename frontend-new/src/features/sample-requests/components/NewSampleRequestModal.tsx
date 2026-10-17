@@ -352,6 +352,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
   requestCreatedBy,
 }) => {
   const navigate = useNavigate();
+  const requestCodeYear = String(getBusinessYearInfo().startYear).slice(-2);
 
   const resolveTrack = (track?: TrackType): "marketing_request" | "feasibility_check" | "program_planning" => {
     if (track === "marketing_request" || track === "feasibility_check" || track === "program_planning") {
@@ -717,7 +718,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                     {selectedTrack === "program_planning" && "Seasonal Program Planning"}
                   </h3>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/20 tracking-wider uppercase">
-                    {selectedTrack === "feasibility_check" ? "FC-0001" : selectedTrack === "program_planning" ? "PLN-2026" : "SR-2026"}
+                    {selectedTrack === "feasibility_check" ? `FC-${requestCodeYear}-001` : selectedTrack === "program_planning" ? `PP-${requestCodeYear}-001` : `SR-${requestCodeYear}-001`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-normal">

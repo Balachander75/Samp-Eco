@@ -3,11 +3,7 @@ import { UserProfile } from "@/features/auth";
 import { hasWorkflowTeam, isAdmin } from "@/features/auth/permissions";
 import { getNavigationGroupsForUser, NavigationItem, NavigationSubItem } from "./navigation";
 import { useBusinessYear } from "@/context/BusinessYearContext";
-import {
-  fetchFeasibilityRequestsApi,
-  fetchProgramRequestsApi,
-  fetchCostingWorkflowsApi,
-} from "@/infrastructure/api";
+import { fetchSidebarBadges } from "./sidebarBadges";
 import logoImg from "@/assets/logo.png";
 import {
   CircleGauge,
@@ -64,15 +60,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [badgeRefreshVersion, setBadgeRefreshVersion] = useState(0);
   const navigationGroups = user ? getNavigationGroupsForUser(user) : [];
   const admin = isAdmin(user);
-  const canSeeRequests = Boolean(
-    user && (
-      admin ||
-      hasWorkflowTeam(user, "marketing") ||
-      hasWorkflowTeam(user, "samp") ||
-      hasWorkflowTeam(user, "plant")
-    )
-  );
-  const canSeeCreativeCosting = Boolean(user && (admin || hasWorkflowTeam(user, "creative_studio")));
+  const canSeeMarketing = Boolean(user && (admin || hasWorkflowTeam(user, "marketing")));
+  const canSeeSamp = Boolean(user && (admin || hasWorkflowTeam(user, "samp")));
+  const canSeeCreativeStudio = Boolean(user && (admin || hasWorkflowTeam(user, "creative_studio")));
+  const canSeeCosting = Boolean(user && (admin || hasWorkflowTeam(user, "costing")));
+  const canSeePlant = Boolean(user && (admin || hasWorkflowTeam(user, "plant")));
 
   // Sidebar width collapsed rail state (persisted in localStorage)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -151,65 +143,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     const refreshBadges = () => setBadgeRefreshVersion((version) => version + 1);
     window.addEventListener("samp:requests-changed", refreshBadges);
+    window.addEventListener("samp:design-workflow-updated", refreshBadges);
     window.addEventListener("focus", refreshBadges);
     return () => {
       window.removeEventListener("samp:requests-changed", refreshBadges);
+      window.removeEventListener("samp:design-workflow-updated", refreshBadges);
       window.removeEventListener("focus", refreshBadges);
     };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-
-    if (!canSeeRequests) {
+    const access = {
+      marketing: canSeeMarketing,
+      samp: canSeeSamp,
+      creativeStudio: canSeeCreativeStudio,
+      costing: canSeeCosting,
+      plant: canSeePlant,
+    };
+    if (!Object.values(access).some(Boolean)) {
       setDynamicBadges({});
       return () => { cancelled = true; };
     }
 
-    Promise.all([
-      fetchFeasibilityRequestsApi({ year: selectedYear }).catch(() => []),
-      fetchProgramRequestsApi(selectedYear).catch(() => []),
-    ]).then(([feasibilityRequests, programRequests]) => {
-      if (cancelled) return;
-
-      const feasibilityCount = feasibilityRequests.length;
-      const programCount = programRequests.length;
-      const totalRequestCount = feasibilityCount + programCount;
-
-      setDynamicBadges({
-        marketing: totalRequestCount,
-        pendingFeas: feasibilityCount,
-        programs: programCount,
-        samp: totalRequestCount,
-        sampFeasibility: feasibilityCount,
-        sampPrograms: programCount,
-        plant: programCount,
-        plantPrograms: programCount,
-      });
-    });
-
-    return () => { cancelled = true; };
-  }, [badgeRefreshVersion, canSeeRequests, selectedYear]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!canSeeCreativeCosting) {
-      setDynamicBadges((current) => {
-        if (!("creativeCosting" in current)) return current;
-        const next = { ...current };
-        delete next.creativeCosting;
-        return next;
-      });
-      return () => { cancelled = true; };
-    }
-
-    fetchCostingWorkflowsApi(selectedYear, "creative").then((requests) => {
-      if (!cancelled) setDynamicBadges((current) => ({ ...current, creativeCosting: requests.length }));
+    void fetchSidebarBadges(selectedYear, access).then((badges) => {
+      if (!cancelled) setDynamicBadges(badges);
     }).catch(() => {
-      if (!cancelled) setDynamicBadges((current) => ({ ...current, creativeCosting: 0 }));
+      if (!cancelled) setDynamicBadges({});
     });
+
     return () => { cancelled = true; };
-  }, [badgeRefreshVersion, canSeeCreativeCosting, selectedYear]);
+  }, [
+    badgeRefreshVersion,
+    canSeeMarketing,
+    canSeeSamp,
+    canSeeCreativeStudio,
+    canSeeCosting,
+    canSeePlant,
+    selectedYear,
+  ]);
 
   // Escape to close mobile
   useEffect(() => {

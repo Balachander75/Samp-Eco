@@ -7,12 +7,14 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
 )
@@ -40,7 +42,8 @@ class CreateSampleRequest(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    sr_number = Column(String(50), nullable=False, unique=True, index=True)
+    sr_number = Column(String(50), nullable=True, unique=True, index=True)
+    request_codes = Column(JSONB, nullable=False, default=dict, server_default="{}")
     client_draft_key = Column(String(160), nullable=True, unique=True, index=True)
     year = Column(String(50), nullable=False, index=True)
     product_description = Column(Text, nullable=False)
@@ -120,6 +123,47 @@ class CreateSampleRequest(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    scope_reference_image_records = relationship(
+        "SampleRequestReferenceImage",
+        back_populates="sample_request",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="SampleRequestReferenceImage.scope, SampleRequestReferenceImage.sort_order",
+    )
+
+
+class SampleRequestReferenceImage(Base):
+    """Compressed Sample, Mockup, or Costing reference image stored as binary data."""
+
+    __tablename__ = "sample_request_reference_images"
+    __table_args__ = (
+        CheckConstraint("scope IN ('sample', 'mockup', 'costing')", name="ck_sample_request_reference_image_scope"),
+        CheckConstraint("sort_order IN (0, 1)", name="ck_sample_request_reference_image_sort_order"),
+        Index(
+            "uq_sample_request_reference_image_scope_order",
+            "sample_request_id",
+            "scope",
+            "sort_order",
+            unique=True,
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    sample_request_id = Column(
+        Integer,
+        ForeignKey("create_sample_requests.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    scope = Column(String(16), nullable=False)
+    original_name = Column(String(255), nullable=False, default="Reference image")
+    content_type = Column(String(64), nullable=False)
+    original_size_bytes = Column(Integer, nullable=True)
+    image_data = Column(LargeBinary, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    sample_request = relationship("CreateSampleRequest", back_populates="scope_reference_image_records")
 
 
 class ProductCharacteristic(Base):

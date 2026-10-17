@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { UserProfile } from "@/features/auth";
 import { isAdmin as checkIsAdmin, hasWorkflowTeam } from "@/features/auth/permissions";
 import { usePlant } from "@/context/PlantContext";
@@ -10,7 +10,12 @@ import {
   Trash2,
   Clock,
   AlertTriangle,
-  ChevronRight,
+  Search,
+  X,
+  Layers,
+  CheckCircle2,
+  Check,
+  ArrowRight,
 } from "lucide-react";
 import { CopyBadge, StatusPill, Select } from "@/components/ui";
 import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
@@ -22,6 +27,7 @@ import {
   deleteFeasibilityRequestApi,
 } from "@/infrastructure/api";
 import { useMasterData } from "../hooks/useMasterData";
+import { getFeasibilityTypeDisplay } from "../utils/feasibilityParsers";
 
 export type MarketingFeasibilityTab =
   | "all"
@@ -65,6 +71,24 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
   const [searchTerm, setSearchTerm] = useState("");
   const [customerFilter, setCustomerFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Global '/' keyboard shortcut to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Reset selection when stage or outcome filter changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filterTab, outcomeFilter]);
 
   // Modal states
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -157,7 +181,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
       if (dec === "rejected" || status.includes("rejected") || status.includes("closed")) {
         rejected++;
       }
-      if (Boolean(r.convertedSrNumber || r.convertedSampleRequestId)) {
+      if (Boolean(r.convertedRequestCode || r.convertedSrNumber || r.convertedSampleRequestId)) {
         converted++;
       }
     });
@@ -223,7 +247,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
         const st = (r.status || "").toLowerCase();
         if (dec !== "accepted" && !st.includes("approved")) return false;
       } else if (outcomeFilter === "converted") {
-        if (!r.convertedSrNumber && !r.convertedSampleRequestId) return false;
+        if (!r.convertedRequestCode && !r.convertedSrNumber && !r.convertedSampleRequestId) return false;
       } else if (outcomeFilter === "rejected") {
         const dec = (r.marketingDecision || "").toLowerCase();
         const st = (r.status || "").toLowerCase();
@@ -243,7 +267,9 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
         const samp = (r.takenBySamp || "").toLowerCase();
         const requester = (r.createdBy || "").toLowerCase();
         const cat = (r.customFeasibilityType || r.feasibilityType || "").toLowerCase();
+        const convertedCode = (r.convertedRequestCode || r.convertedSrNumber || "").toLowerCase();
         return (
+          convertedCode.includes(q) ||
           mat.includes(q) ||
           desc.includes(q) ||
           cust.includes(q) ||
@@ -390,300 +416,252 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
   };
 
   // Columns definition
-  const columns: ColumnDef<SampleRequestItem>[] = [
-    {
-      id: "request",
-      header: "Request",
-      width: "w-[130px]",
-      cell: (req) => (
-        <div className="min-w-0">
-          <CopyBadge text={req.materialCode || `FC-${String(req.id).padStart(4, "0")}`} />
-          <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
-            Raised{" "}
-            {req.dateRequestCreated
-              ? formatOdooDate(req.dateRequestCreated)
-              : req.createdAt
-              ? formatOdooDate(req.createdAt)
-              : "—"}
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: "customer",
-      header: "Customer",
-      width: "w-[170px]",
-      cell: (req) => (
-        <div className="min-w-0">
-          <div
-            className="truncate font-semibold text-xs text-[var(--on-surface)]"
-            title={req.customer || "Customer not set"}
-          >
-            {req.customer || "—"}
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: "category",
-      header: "Category",
-      width: "w-[140px]",
-      cell: (req) => {
-        const category =
-          req.customFeasibilityType ||
-          (req.feasibilityType
-            ? req.feasibilityType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-            : "Feasibility Check");
-        return (
+  // Columns definition (Concise, Beautifully Clubbed, Zero Horizontal Scroll)
+  const columns: ColumnDef<SampleRequestItem>[] = useMemo(
+    () => [
+      {
+        id: "request",
+        header: "Request",
+        width: "w-[130px]",
+        cell: (req) => (
           <div className="min-w-0">
-            <span
-              className="inline-block max-w-[130px] truncate rounded-md border border-[var(--border-subtle)] bg-[var(--surface-low)] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[var(--on-surface)]"
-              title={category}
-            >
-              {category}
-            </span>
-          </div>
-        );
-      },
-    },
-    {
-      id: "description",
-      header: "Description / Scope",
-      width: "min-w-[220px]",
-      cell: (req) => {
-        const desc =
-          req.productDescription ||
-          req.descriptionNotes ||
-          req.feasibilityDescription ||
-          "—";
-        return (
-          <div className="min-w-0">
-            <span
-              className="text-xs text-[var(--on-surface-muted)] truncate block max-w-sm"
-              title={desc}
-            >
-              {desc}
-            </span>
-          </div>
-        );
-      },
-    },
-    {
-      id: "required_date",
-      header: "Required Date",
-      width: "w-[150px]",
-      cell: (req) => {
-        const isFinalDecision =
-          Boolean(req.marketingDecision) ||
-          (req.status || "").toLowerCase().includes("approved") ||
-          (req.status || "").toLowerCase().includes("rejected") ||
-          (req.status || "").toLowerCase().includes("closed");
-
-        let isPastDue = false;
-        if (!isFinalDecision && req.sampleRequiredDate) {
-          const reqTime = new Date(req.sampleRequiredDate).setHours(0, 0, 0, 0);
-          const todayTime = new Date().setHours(0, 0, 0, 0);
-          if (!isNaN(reqTime) && reqTime < todayTime) {
-            isPastDue = true;
-          }
-        }
-
-        const isDelayed = isPastDue || req.isRespondedOnTime === false;
-
-        return (
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 whitespace-nowrap font-mono text-xs tabular-nums text-[var(--on-surface)]">
-              <Clock
-                className={`w-3.5 h-3.5 shrink-0 ${
-                  isDelayed ? "text-rose-500" : "text-[var(--on-surface-subtle)]"
-                }`}
-              />
-              <span className={isDelayed ? "font-semibold text-rose-600 dark:text-rose-400" : ""}>
-                {req.sampleRequiredDate ? formatOdooDate(req.sampleRequiredDate) : "—"}
-              </span>
+            <CopyBadge text={req.materialCode || `FC-${String(req.id).padStart(4, "0")}`} />
+            <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+              Raised{" "}
+              {req.dateRequestCreated
+                ? formatOdooDate(req.dateRequestCreated)
+                : req.createdAt
+                ? formatOdooDate(req.createdAt)
+                : "—"}
             </div>
-
-            {req.counterDateDecision === "pending" && req.sampCounterDate ? (
-              <div className="flex items-center gap-1">
-                <span
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60"
-                  title={`Sampling proposed revised date awaiting Marketing review: ${req.sampCounterDate}`}
-                >
-                  <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span>Proposed: {formatOdooDate(req.sampCounterDate)}</span>
-                </span>
-              </div>
-            ) : isPastDue ? (
-              <div className="flex items-center gap-1">
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
-                  <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
-                  <span>Overdue</span>
-                </span>
-              </div>
-            ) : null}
           </div>
-        );
+        ),
       },
-    },
-    {
-      id: "raised_by",
-      header: "Requester",
-      width: "w-[130px]",
-      cell: (req) => (
-        <div className="min-w-0">
-          <div
-            className="truncate font-medium text-xs text-[var(--on-surface)]"
-            title={req.createdBy?.trim() || "Marketing"}
-          >
-            {req.createdBy?.trim() || "Marketing"}
+      {
+        id: "customer",
+        header: "Customer",
+        width: "w-[150px]",
+        cell: (req) => (
+          <div className="min-w-0">
+            <div
+              className="truncate font-semibold text-xs text-[var(--on-surface)]"
+              title={req.customer || "Customer not set"}
+            >
+              {req.customer || "—"}
+            </div>
           </div>
-        </div>
-      ),
-    },
-    {
-      id: "samp_review",
-      header: "Sampling Team Review",
-      width: "w-[175px]",
-      cell: (req) => {
-        const verdict = req.samplingFeasibilityResponse;
-        const isAssigned = Boolean(req.takenBySamp);
-
-        if (!isAssigned && !verdict) {
+        ),
+      },
+      {
+        id: "feasibility_type",
+        header: "Feasibility Type",
+        width: "w-[145px]",
+        cell: (req) => {
+          const typeLabel = getFeasibilityTypeDisplay(req);
           return (
-            <div className="space-y-0.5">
-              <span className="font-mono text-xs text-[var(--on-surface-subtle)] block">
-                Unassigned
-              </span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200/90 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                <span>Awaiting Claim</span>
+            <div className="min-w-0">
+              <span
+                className="inline-block max-w-[135px] truncate rounded border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-[10.5px] font-semibold text-[var(--on-surface)]"
+                title={typeLabel}
+              >
+                {typeLabel}
               </span>
             </div>
           );
-        }
+        },
+      },
+      {
+        id: "description",
+        header: "Scope / Description",
+        width: "min-w-[220px]",
+        cell: (req) => {
+          const desc =
+            req.productDescription ||
+            req.descriptionNotes ||
+            req.feasibilityDescription ||
+            "—";
 
-        const tone =
-          verdict === "Yes"
-            ? "success"
-            : verdict === "No"
-            ? "danger"
-            : verdict === "Maybe"
-            ? "info"
-            : "warning";
-        const label =
-          verdict === "Yes"
-            ? "Feasible"
-            : verdict === "No"
-            ? "Not Feasible"
-            : verdict === "Maybe"
-            ? "Conditional"
-            : "In Review";
-
-        return (
-          <div className="space-y-0.5">
-            <div
-              className="font-mono text-xs font-semibold text-[var(--on-surface)] truncate"
-              title={req.takenBySamp || ""}
-            >
-              {req.takenBySamp || "Sampling Team"}
+          return (
+            <div className="min-w-0">
+              <span
+                className="text-xs text-[var(--on-surface-muted)] truncate block leading-normal font-normal"
+                title={desc}
+              >
+                {desc}
+              </span>
             </div>
-            <StatusPill status={label} tone={tone} size="xs" />
-          </div>
-        );
+          );
+        },
       },
-    },
-    {
-      id: "marketing_status",
-      header: "Marketing Decision",
-      width: "w-[160px]",
-      cell: (req) => {
-        const finalStatus = (req.status || "").toLowerCase();
-        const isFinalDecision =
-          Boolean(req.marketingDecision) ||
-          finalStatus.includes("approved") ||
-          finalStatus.includes("rejected") ||
-          finalStatus.includes("closed");
-        const needsDateDecision = !isFinalDecision && req.counterDateDecision === "pending";
-        const needsSignoff = !isFinalDecision && Boolean(req.samplingFeasibilityResponse);
+      {
+        id: "target_date",
+        header: "Target Date",
+        width: "w-[130px]",
+        cell: (req) => {
+          const isFinalDecision =
+            Boolean(req.marketingDecision) ||
+            (req.status || "").toLowerCase().includes("approved") ||
+            (req.status || "").toLowerCase().includes("rejected") ||
+            (req.status || "").toLowerCase().includes("closed");
 
-        if (req.marketingDecision === "Accepted" || finalStatus.includes("approved"))
-          return <StatusPill status="Approved" tone="success" size="sm" />;
-        if (
-          req.marketingDecision === "Rejected" ||
-          finalStatus.includes("rejected") ||
-          finalStatus.includes("closed")
-        )
-          return <StatusPill status="Dropped" tone="danger" size="sm" />;
-        if (needsDateDecision)
-          return <StatusPill status="Date Decision Needed" tone="warning" size="sm" />;
-        if (needsSignoff)
-          return <StatusPill status="Sign-Off Needed" tone="warning" size="sm" />;
-        return <StatusPill status="In Evaluation" tone="info" size="sm" />;
+          let isPastDue = false;
+          if (!isFinalDecision && req.sampleRequiredDate) {
+            const reqTime = new Date(req.sampleRequiredDate).setHours(0, 0, 0, 0);
+            const todayTime = new Date().setHours(0, 0, 0, 0);
+            if (!isNaN(reqTime) && reqTime < todayTime) {
+              isPastDue = true;
+            }
+          }
+
+          const isDelayed = isPastDue || req.isRespondedOnTime === false;
+
+          return (
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 whitespace-nowrap font-mono text-xs tabular-nums text-[var(--on-surface)]">
+                <Clock
+                  className={`w-3.5 h-3.5 shrink-0 ${
+                    isDelayed ? "text-rose-500" : "text-[var(--on-surface-subtle)]"
+                  }`}
+                />
+                <span className={isDelayed ? "font-semibold text-rose-600 dark:text-rose-400" : ""}>
+                  {req.sampleRequiredDate ? formatOdooDate(req.sampleRequiredDate) : "—"}
+                </span>
+              </div>
+
+              {req.counterDateDecision === "pending" && req.sampCounterDate ? (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60"
+                  title={`Sampling proposed revised date: ${req.sampCounterDate}`}
+                >
+                  <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>Prop: {formatOdooDate(req.sampCounterDate)}</span>
+                </span>
+              ) : isPastDue ? (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
+                  <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                  <span>Overdue</span>
+                </span>
+              ) : null}
+            </div>
+          );
+        },
       },
-    },
-    {
-      id: "actions",
-      header: "Action",
-      align: "right",
-      width: "w-[110px]",
-      cell: (req) => {
-        const finalStatus = (req.status || "").toLowerCase();
-        const isFinalDecision =
-          Boolean(req.marketingDecision) ||
-          finalStatus.includes("approved") ||
-          finalStatus.includes("rejected") ||
-          finalStatus.includes("closed");
-        const needsDateDecision = !isFinalDecision && req.counterDateDecision === "pending";
-        const needsSignoff = !isFinalDecision && Boolean(req.samplingFeasibilityResponse);
+      {
+        id: "samp_verdict",
+        header: "SAMP Verdict",
+        width: "w-[150px]",
+        cell: (req) => {
+          const verdict = req.samplingFeasibilityResponse;
+          const isAssigned = Boolean(req.takenBySamp);
 
-        return (
-          <div
-            className="flex items-center justify-end gap-1.5"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {req.convertedSrNumber ? (
-              <StatusPill
-                status={`SR: ${req.convertedSrNumber}`}
-                tone="info"
-                size="xs"
-              />
-            ) : needsDateDecision ? (
-              <button
-                type="button"
-                onClick={() => handleInspectRequest(req)}
-                className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
+          if (!isAssigned && !verdict) {
+            return (
+              <div className="space-y-0.5">
+                <StatusPill status="Awaiting Claim" tone="warning" size="xs" />
+                <span className="font-mono text-[10px] text-[var(--on-surface-subtle)] block">
+                  Unassigned
+                </span>
+              </div>
+            );
+          }
+
+          const tone =
+            verdict === "Yes"
+              ? "success"
+              : verdict === "No"
+              ? "danger"
+              : verdict === "Maybe"
+              ? "info"
+              : "warning";
+          const label =
+            verdict === "Yes"
+              ? "Feasible"
+              : verdict === "No"
+              ? "Not Feasible"
+              : verdict === "Maybe"
+              ? "Conditional"
+              : "In Review";
+
+          return (
+            <div className="space-y-0.5">
+              <StatusPill status={label} tone={tone} size="xs" />
+              <div
+                className="font-mono text-[10.5px] text-[var(--on-surface-muted)] truncate"
+                title={req.takenBySamp || "Sampling Team"}
               >
-                <span>Review Date</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
-            ) : needsSignoff ? (
-              <button
-                type="button"
-                onClick={() => handleInspectRequest(req)}
-                className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
-              >
-                <span>Sign-Off</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
-            ) : null}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={(event) => handleDeleteRequest(req, event)}
-                aria-label={`Delete feasibility request ${req.materialCode || req.id}`}
-                title="Delete request"
-                className="inline-flex h-7 w-7 select-none items-center justify-center rounded-lg text-[var(--on-surface-subtle)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        );
+                {req.takenBySamp || "Sampling Team"}
+              </div>
+            </div>
+          );
+        },
       },
-    },
-  ];
+      {
+        id: "marketing_decision",
+        header: "Marketing Decision",
+        width: "w-[145px]",
+        cell: (req) => {
+          const finalStatus = (req.status || "").toLowerCase();
+          const isFinalDecision =
+            Boolean(req.marketingDecision) ||
+            finalStatus.includes("approved") ||
+            finalStatus.includes("rejected") ||
+            finalStatus.includes("closed");
+          const needsDateDecision = !isFinalDecision && req.counterDateDecision === "pending";
+          const needsSignoff = !isFinalDecision && Boolean(req.samplingFeasibilityResponse);
 
-  // 5 KPI strip items
+          const convertedCode = req.convertedRequestCode || req.convertedSrNumber;
+          if (convertedCode) {
+            return (
+              <div className="space-y-0.5">
+                <StatusPill status="Converted" tone="success" size="xs" />
+                <span
+                  className="block font-mono text-[10px] font-bold text-[var(--accent-primary)] truncate"
+                  title={`Converted to ${convertedCode}`}
+                >
+                  Code: {convertedCode}
+                </span>
+              </div>
+            );
+          }
+          if (req.marketingDecision === "Accepted" || finalStatus.includes("approved"))
+            return <StatusPill status="Approved" tone="success" size="xs" />;
+          if (
+            req.marketingDecision === "Rejected" ||
+            finalStatus.includes("rejected") ||
+            finalStatus.includes("closed")
+          )
+            return <StatusPill status="Dropped" tone="danger" size="xs" />;
+          if (needsDateDecision)
+            return <StatusPill status="Review Date" tone="warning" size="xs" />;
+          if (needsSignoff)
+            return <StatusPill status="Sign-Off Needed" tone="warning" size="xs" />;
+          return <StatusPill status="In Evaluation" tone="info" size="xs" />;
+        },
+      },
+      ...(isAdmin
+        ? [
+            {
+              id: "raised_by",
+              header: "Raised By",
+              width: "w-[120px]",
+              cell: (req: SampleRequestItem) => (
+                <div className="min-w-0">
+                  <div
+                    className="truncate font-medium text-xs text-[var(--on-surface)]"
+                    title={req.createdBy?.trim() || "Marketing"}
+                  >
+                    {req.createdBy?.trim() || "Marketing"}
+                  </div>
+                </div>
+              ),
+            },
+          ]
+        : []),
+    ],
+    [isAdmin]
+  );
+
+  // 5 KPI strip items (Stage Filtering)
   const kpiItems = [
     {
       label: "All Feasibility",
@@ -757,42 +735,86 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
         kpiItems={kpiItems}
         filterControls={
           <>
+            {/* Quick Outcome Segmented Tabs (Compact) */}
+            <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5 shadow-2xs shrink-0">
+              {[
+                { id: "all", label: "All Outcomes", icon: Layers, count: metrics.total },
+                { id: "feasible", label: "Feasible", icon: CheckCircle2, count: metrics.feasible },
+                { id: "conditional", label: "Conditional", icon: AlertTriangle, count: metrics.conditional },
+                { id: "approved", label: "Approved", icon: Check, count: metrics.approved },
+                { id: "converted", label: "Converted", icon: ArrowRight, count: metrics.converted },
+              ].map((item) => {
+                const isSelected = outcomeFilter === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setOutcomeFilter(item.id as MarketingFeasibilityOutcome);
+                    }}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all duration-150 cursor-pointer select-none active:scale-95 ${
+                      isSelected
+                        ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold border border-[var(--border-subtle)]"
+                        : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50"
+                    }`}
+                  >
+                    <item.icon className={`w-3 h-3 ${isSelected ? "text-[var(--accent-primary)]" : "opacity-70"}`} />
+                    <span>{item.label}</span>
+                    <span
+                      className={`text-[9.5px] font-mono px-1 py-0.2 rounded-full tabular-nums ${
+                        isSelected
+                          ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
+                          : "text-[var(--on-surface-subtle)] bg-[var(--surface-lowest)]/60"
+                      }`}
+                    >
+                      {item.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Integrated Search Input right next to Outcome Tabs on Top Row */}
+            <div className="group relative min-w-[180px] flex-1 max-w-[280px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--on-surface-subtle)] transition-colors group-focus-within:text-[var(--accent-primary)]" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search code, customer, scope... ('/')"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] pl-8 pr-7 text-xs text-[var(--on-surface)] outline-none transition-all placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Customer Filter Dropdown */}
             {customerList.length > 0 && (
               <Select
                 aria-label="Filter by customer"
                 value={customerFilter}
                 onChange={(e) => setCustomerFilter(e.target.value)}
-                className="min-w-[160px] max-w-[220px]"
+                className="min-w-[130px] max-w-[170px]"
                 options={[
-                  { value: "all", label: `All Customers (${customerList.length})` },
+                  { value: "all", label: `Customers (${customerList.length})` },
                   ...customerList.map((c) => ({ value: c, label: c })),
                 ]}
               />
             )}
-
-            <Select
-              aria-label="Filter by outcome"
-              value={outcomeFilter}
-              onChange={(e) => setOutcomeFilter(e.target.value as MarketingFeasibilityOutcome)}
-              className="min-w-[140px]"
-              options={[
-                { value: "all", label: "All Outcomes" },
-                { value: "feasible", label: "Feasible (Sampling Approved)" },
-                { value: "conditional", label: "Conditional Feasibility" },
-                { value: "approved", label: "Approved by Marketing" },
-                { value: "converted", label: "Converted to Sampling" },
-                { value: "rejected", label: "Dropped / Rejected" },
-              ]}
-            />
           </>
         }
-        search={{
-          value: searchTerm,
-          onChange: setSearchTerm,
-          placeholder: "Search code, customer, requester...",
-        }}
         hasActiveFilters={hasActiveFilters}
         onResetFilters={clearFilters}
+        resetFiltersLabel="Clear Filters"
       >
         <DataTable
           data={filteredRequests}

@@ -45,7 +45,8 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
     if (trackType === "feasibility_check") {
       const isReviewDone = Boolean(activeRequest.samplingFeasibilityResponse);
       const isDecisionDone = Boolean(activeRequest.marketingDecision);
-      const isConvertedDone = Boolean(activeRequest.convertedSrNumber);
+      const convertedCode = activeRequest.convertedRequestCode || activeRequest.convertedSrNumber;
+      const isConvertedDone = Boolean(convertedCode || activeRequest.convertedSampleRequestId);
 
       return [
         { label: "1. Scope & Intake", status: "done" as const },
@@ -63,8 +64,8 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
         },
         {
           label: isConvertedDone
-            ? `4. Sample: ${activeRequest.convertedSrNumber}`
-            : "4. Sampling Project",
+            ? `4. Commercial Request: ${convertedCode || "Created"}`
+            : "4. Commercial Request",
           status: isConvertedDone
             ? ("done" as const)
             : isDecisionDone && activeRequest.marketingDecision === "Accepted"
@@ -180,14 +181,14 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
         {/* Feasibility Conversion Shortcut */}
         {!readOnly && trackType === "feasibility_check" &&
           activeRequest.marketingDecision === "Accepted" &&
-          !activeRequest.convertedSrNumber && (
+          !activeRequest.convertedRequestCode && !activeRequest.convertedSrNumber && !activeRequest.convertedSampleRequestId && (
             <button
               type="button"
               onClick={onConvertToSampling}
               disabled={isConverting}
               className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-1.5 rounded-xl text-xs font-display font-semibold flex items-center space-x-1.5 shadow-2xs transition active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              <span>{isConverting ? "Creating Sample..." : "Convert to Commercial Sample"}</span>
+              <span>{isConverting ? "Creating Request..." : "Convert to Commercial Request"}</span>
             </button>
           )}
 

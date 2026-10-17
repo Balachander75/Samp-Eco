@@ -37,7 +37,7 @@ export interface DraftWorkspacePageProps {
 }
 
 const isStandaloneDesignItem = (item: SampleRequestItem) =>
-  String(item.id).startsWith("design-") || (item.requestKind === "design" && Boolean(item.designRequestId));
+  String(item.id).startsWith("design-");
 
 const designRequestId = (item: SampleRequestItem) =>
   item.designRequestId || Number(String(item.id).replace(/^design-/, ""));

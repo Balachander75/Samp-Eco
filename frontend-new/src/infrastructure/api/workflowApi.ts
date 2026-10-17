@@ -17,7 +17,8 @@ export interface RequestWorkflowRecord {
   workflow_type: "costing" | "mockup" | "sample" | "design";
   workflow_id: number;
   sample_request_id: number;
-  sr_number: string;
+  request_code: string;
+  sr_number: string | null;
   customer: string;
   brand_name?: string | null;
   material_code: string;

@@ -153,7 +153,7 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
             },
           });
         } else if (act.action === "CONVERTED_TO_SAMPLING") {
-          const srNum = payload.sample_sr_number || activeRequest.convertedSrNumber || "";
+          const srNum = payload.sample_request_code || activeRequest.convertedRequestCode || activeRequest.convertedSrNumber || "";
           const scopes = (Array.isArray(payload.request_types) ? payload.request_types : activeRequest.convertedRequestTypes || [])
             .map((scope: string) => scope === "costing" ? "Costing" : "Sampling");
           events.push({
@@ -164,7 +164,7 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
             title: "Commercial request created",
             summary: [srNum, scopes.join(" + ")].filter(Boolean).join(" · ") || "Converted from feasibility",
             timestamp: act.createdAt || activeRequest.convertedAt || "",
-            badge: { text: srNum ? `SR: ${srNum}` : "Converted", variant: "emerald" },
+            badge: { text: srNum ? `Code: ${srNum}` : "Converted", variant: "emerald" },
           });
         } else if (act.action === "NOTE_ADDED") {
           const dept = (act.actorDepartment || "").toLowerCase();
@@ -244,7 +244,7 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
       });
     }
 
-    if (!recordedActions.has("CONVERTED_TO_SAMPLING") && activeRequest.convertedSrNumber) {
+    if (!recordedActions.has("CONVERTED_TO_SAMPLING") && (activeRequest.convertedRequestCode || activeRequest.convertedSrNumber || activeRequest.convertedSampleRequestId)) {
       events.push({
         id: "synth-converted",
         kind: "system_event",
@@ -252,11 +252,11 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
         actorDepartment: "Operations",
         title: "Commercial request created",
         summary: [
-          activeRequest.convertedSrNumber,
+          activeRequest.convertedRequestCode || activeRequest.convertedSrNumber,
           (activeRequest.convertedRequestTypes || []).map((scope) => scope === "costing" ? "Costing" : "Sampling").join(" + "),
         ].filter(Boolean).join(" · "),
         timestamp: activeRequest.convertedAt || "",
-        badge: { text: `SR: ${activeRequest.convertedSrNumber}`, variant: "emerald" },
+        badge: { text: `Code: ${activeRequest.convertedRequestCode || activeRequest.convertedSrNumber || "Created"}`, variant: "emerald" },
       });
     }
 

@@ -76,6 +76,7 @@ def ensure_program_schema():
         "ALTER TABLE program_activity_logs ADD COLUMN IF NOT EXISTS pinned_by_marketing BOOLEAN NOT NULL DEFAULT FALSE",
         "ALTER TABLE program_activity_logs ADD COLUMN IF NOT EXISTS pinned_by VARCHAR(255)",
         "ALTER TABLE program_activity_logs ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ",
+        "ALTER TABLE program_requests ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
     )
     with engine.begin() as connection:
         for statement in statements:

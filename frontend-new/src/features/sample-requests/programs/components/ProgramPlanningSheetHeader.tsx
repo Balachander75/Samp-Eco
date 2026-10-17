@@ -7,6 +7,7 @@ import {
   Factory,
   CheckCircle2,
   Clock,
+  Pause,
 } from "lucide-react";
 
 export interface ProgramPlanningSheetHeaderProps {
@@ -16,9 +17,10 @@ export interface ProgramPlanningSheetHeaderProps {
 export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProps> = ({
   activeRequest,
 }) => {
-  const code = activeRequest.srNumber || activeRequest.materialCode || `PG-${activeRequest.id}`;
+  const code = activeRequest.requestCode || activeRequest.materialCode || `PP-${activeRequest.id}`;
   const hasSampNote = Boolean(activeRequest.samplingRemark?.trim());
   const hasPlantNote = Boolean(activeRequest.plantRemark?.trim());
+  const isPaused = activeRequest.isActive === false;
 
   return (
     <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
@@ -38,6 +40,19 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
 
         {/* Right: Operational Status Badges */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Active / Paused Lifecycle Status Badge */}
+          {isPaused ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-display font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300">
+              <Pause className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>Program Paused</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-display font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              <span>Active Program</span>
+            </span>
+          )}
+
           {/* Season Year Badge */}
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-mono font-semibold bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)]">
             <CalendarRange className="w-3 h-3 text-[var(--accent-primary)]" />

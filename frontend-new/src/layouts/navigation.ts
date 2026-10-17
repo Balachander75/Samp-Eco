@@ -146,7 +146,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
         departmentKey: "costing",
         subItems: [
           { id: "costing-overview", title: "Overview", path: "/costing-team" },
-          { id: "costing-costing", title: "Costing", path: "/costing-team/costing" },
+          { id: "costing-costing", title: "Costing", path: "/costing-team/costing", badgeKey: "costingQueue" },
         ],
         subTeams: ["Overview", "Costing"],
       },
@@ -169,7 +169,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
         departmentKey: "plant",
         subItems: [
           { id: "plant-overview", title: "Overview", path: "/plant" },
-          { id: "plant-sampling", title: "Sampling", path: "/plant/sampling" },
+          { id: "plant-sampling", title: "Sampling", path: "/plant/sampling", badgeKey: "plantSampling" },
           { id: "plant-programs", title: "Program Planning", path: "/plant/programs", badgeKey: "plantPrograms" },
         ],
         subTeams: ["Overview", "Sampling", "Program Planning"],

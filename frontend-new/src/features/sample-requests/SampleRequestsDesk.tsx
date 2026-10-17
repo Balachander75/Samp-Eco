@@ -31,6 +31,7 @@ import { useBusinessYear } from "@/context/BusinessYearContext";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { Building2 } from "lucide-react";
 import { TeamHeadReadOnlyNotice } from "@/components/ui/TeamHeadReadOnlyNotice";
+import { getRequestRequiredDate } from "./sampling/utils/requestTypeUtils";
 
 // Keep each large sub-desk out of the initial request-workspace chunk.
 const MarketingOverviewPage = React.lazy(() =>
@@ -269,7 +270,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
         year: req.year || "2026-27",
         targetPlant: req.targetPlant || "",
         parentRequestId: req.id,
-        parentSrNumber: req.srNumber || `SR-${req.id}`,
+        parentSrNumber: req.requestCode || req.srNumber || `SR-${req.id}`,
         parentRequestTypes: req.requestTypes || [],
         parentMockupWorkflowState: req.mockupWorkflowState,
         parentCreationMode: req.creationMode,
@@ -358,7 +359,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
   // Delete Request from Database
   const handleDeleteRequest = async (req: SampleRequestItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const reqCode = req.srNumber || req.materialCode || `FC-${String(req.id).padStart(4, "0")}`;
+    const reqCode = req.requestCode || req.srNumber || req.materialCode || `SR-${String(req.id).padStart(3, "0")}`;
     if (
       !window.confirm(
         `Permanently delete request ${reqCode} (${req.customer || "Unspecified"}) from database? (Testing mode)`
@@ -463,7 +464,8 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
 
       const hasCosting = requestItem.requestTypes?.includes("costing") === true;
       const costingDestination = requestItem.costingCreativeInputNeeded === true ? "Creative first, then Costing" : "directly to Costing";
-      showToast(`✓ Request ${requestItem.srNumber} released from Draft ${hasCosting ? `— Costing routed ${costingDestination}` : `into ${newStatus}`}!`);
+      const requestCode = requestItem.requestCode || requestItem.materialCode || requestItem.srNumber || requestItem.id;
+      showToast(`✓ Request ${requestCode} released from Draft ${hasCosting ? `— Costing routed ${costingDestination}` : `into ${newStatus}`}!`);
     } catch (err) {
       console.error("Failed to release draft request:", err);
       showToast("Error releasing request from draft.");
@@ -595,7 +597,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
         { header: "Customer", accessor: (r) => r.customer },
         { header: "Plant / Queue", accessor: (r) => r.targetPlant },
         { header: "Request Date", accessor: (r) => r.dateRequestCreated },
-        { header: "Required Date", accessor: (r) => r.sampleRequiredDate },
+        { header: "Required Date", accessor: (r) => getRequestRequiredDate(r) },
         { header: "Status", accessor: (r) => r.status },
         { header: "Feasibility (Plant)", accessor: (r) => r.plantFeasibilityResponse || "Pending" },
         { header: "Feasibility (SAMP)", accessor: (r) => r.samplingFeasibilityResponse || "Pending" },

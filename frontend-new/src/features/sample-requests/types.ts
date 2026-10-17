@@ -91,6 +91,7 @@ export interface FeasibilityRequestRecord extends FeasibilityRequestPayload {
   leadTimeNote?: string | null;
   convertedSampleRequestId?: number | string | null;
   convertedSrNumber?: string | null;
+  convertedRequestCode?: string | null;
   convertedRequestTypes?: Array<"sample" | "costing">;
   convertedAt?: string | null;
   convertedBy?: string | null;
@@ -150,6 +151,7 @@ export interface ProgramRequestRecord {
   programCampaignTitle: string;
   programYear: string;
   status: string;
+  isActive?: boolean;
   createdBy?: string | null;
   samplingSeenAt?: string | null;
   samplingSeenBy?: string | null;
@@ -213,6 +215,7 @@ export interface SampleRequestItem {
   createdByUserId?: number | null;
   materialCode?: string;
   requestCode?: string;
+  requestCodes?: Partial<Record<"design" | "mockup" | "costing", string>>;
   barcode?: string;
   customerProductCode?: string;
   sourceSampleCode?: string;
@@ -225,6 +228,7 @@ export interface SampleRequestItem {
   costingCounterDate?: string | null;
   costingOutputPath?: string | null;
   status?: SampleStatus | string;
+  isActive?: boolean;
   creationMode?: string;
   programYear?: string;
   programName?: string;
@@ -247,6 +251,14 @@ export interface SampleRequestItem {
   plantClaimedByUserId?: number | null;
   plantClaimedBy?: string | null;
   requestTypes?: RequestType[];
+  scopeReferenceImages?: Partial<Record<"sample" | "mockup" | "costing", Array<{
+    id: number;
+    name: string;
+    contentType?: string;
+    originalSizeBytes?: number | null;
+    sizeBytes?: number;
+    url?: string;
+  }>>>;
   requestKind?: "sample" | "design" | "feasibility" | "program";
   updatedAt?: string;
   samplingFeasibilityResponse?: "Yes" | "No" | "Maybe" | null;
@@ -277,6 +289,7 @@ export interface SampleRequestItem {
   takenAtSamp?: string | null;
   convertedSampleRequestId?: number | string | null;
   convertedSrNumber?: string | null;
+  convertedRequestCode?: string | null;
   convertedRequestTypes?: Array<"sample" | "costing">;
   convertedAt?: string | null;
   convertedBy?: string | null;
@@ -473,11 +486,15 @@ export interface CreateSampleRequestForm {
   customer: string;
   targetPlant: string;
   materialCode?: string;
+  sourceRequestCode?: string;
   barcode?: string;
   customerProductCode?: string;
   sourceSampleCode?: string;
   sampleRequiredDate?: string;
   productType?: string;
+  productCategory?: string;
+  productSubCategory?: string;
+  productThirdCategory?: string;
   brandName?: string;
   productTypeNavneet?: string;
   productTypeNewCustomer?: string;
@@ -525,6 +542,11 @@ export interface CreateSampleRequestForm {
   feasibilityClosedBy?: "plant" | "sampling" | null;
   referenceImages?: string[];
   referenceLinks?: string[];
+  scopeReferenceImages?: Partial<Record<"sample" | "mockup" | "costing", Array<{
+    url: string;
+    name?: string;
+    originalSizeBytes?: number;
+  }>>>;
   trend?: string;
   targetAudience?: string;
   numberOfDesigns?: number;

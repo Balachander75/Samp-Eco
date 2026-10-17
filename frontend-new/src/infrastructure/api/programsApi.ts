@@ -57,6 +57,7 @@ export function mapProgramResponse(item: Record<string, unknown>): ProgramReques
     programCampaignTitle: String(item.program_campaign_title || ""),
     programYear: String(item.program_year || "2026-2027"),
     status: String(item.status || "Pending SAMP Review"),
+    isActive: item.is_active !== false,
     createdBy: typeof item.created_by === "string" ? item.created_by : null,
     samplingSeenAt: typeof item.sampling_seen_at === "string" ? item.sampling_seen_at : null,
     samplingSeenBy: typeof item.sampling_seen_by === "string" ? item.sampling_seen_by : null,
@@ -96,6 +97,7 @@ export function mapProgramRequestToSampleRequest(record: ProgramRequestRecord): 
 
   return {
     id: `program-${record.id}`,
+    requestCode: record.requestCode,
     srNumber: record.srNumber,
     materialCode: record.requestCode,
     customer: record.customerName,
@@ -108,6 +110,7 @@ export function mapProgramRequestToSampleRequest(record: ProgramRequestRecord): 
     programMaterials: record.materials,
     activities: (record.activities || []) as any,
     status: record.status,
+    isActive: record.isActive !== false,
     createdBy: record.createdBy || "Marketing Team",
     samplingSeenAt: record.samplingSeenAt,
     samplingSeenBy: record.samplingSeenBy,
@@ -367,6 +370,23 @@ export async function claimProgramTaskApi(
     {
       method: "POST",
       jsonBody: { department },
+    }
+  );
+  const record = mapProgramResponse(data);
+  dispatchProgramRequestChanged(record);
+  return record;
+}
+
+export async function pauseProgramRequestApi(
+  requestId: number | string,
+  paused: boolean
+): Promise<ProgramRequestRecord> {
+  const cleanId = String(requestId).replace(/^program-/, "");
+  const data = await apiFetch<Record<string, unknown>>(
+    `/api/v1/program-requests/${cleanId}/pause`,
+    {
+      method: "POST",
+      jsonBody: { paused },
     }
   );
   const record = mapProgramResponse(data);

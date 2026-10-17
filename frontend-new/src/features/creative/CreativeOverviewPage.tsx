@@ -1,9 +1,10 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   Palette,
   Box,
-  Layers,
+  Boxes,
   CheckCircle2,
+  AlertTriangle,
   ArrowRight,
   Search,
   Download,
@@ -13,16 +14,25 @@ import {
   ShieldCheck,
   FileEdit,
   Send,
-  Hourglass,
   BarChart3,
   TrendingUp,
+  Sunrise,
+  Sun,
+  Moon,
+  ChevronRight,
+  X,
+  Flame,
+  LayoutDashboard,
+  Sparkles,
+  Clock,
 } from "lucide-react";
 import { CreativeBriefItem, SampleRequestItem } from "@/features/sample-requests/types";
 import { UserProfile } from "@/features/auth";
 import { fetchUsersApi, UserItem } from "@/infrastructure/api";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { Select } from "@/components/ui/Select";
 import { CopyBadge } from "@/components/ui/CopyBadge";
+import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export interface CreativeOverviewPageProps {
   briefs: CreativeBriefItem[];
@@ -69,21 +79,16 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
   onInspectRequest,
   onExportCSV,
 }) => {
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Determine if user has Head authority
+  // Authority check: Admin or Team Head has full creative studio leadership overview
   const isHeadRole = useMemo(() => {
     if (isAdmin) return true;
     return Boolean(user?.is_team_head);
   }, [isAdmin, user]);
 
-  // Two Persona View Modes:
-  // "head": Sees aggregated stats for all creative studio members with member breakdown table
-  // "specialist": Focuses strictly on the logged-in user's own briefs/tasks
-  const [viewMode, setViewMode] = useState<"head" | "specialist">(() =>
-    isHeadRole ? "head" : "specialist"
-  );
-
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>("all");
+  const [activeSection, setActiveSection] = useState<string>("creative-snapshot");
   const [watchlistFilter, setWatchlistFilter] = useState<
     "all" | "drafts" | "concept" | "review" | "delayed"
   >("all");
@@ -91,12 +96,16 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
   const [showMonthlyTable, setShowMonthlyTable] = useState(false);
   const [hoveredMonthIndex, setHoveredMonthIndex] = useState<number | null>(null);
 
-  // Time-based greeting
-  const greetingText = useMemo(() => {
+  // Dynamic Daylight Greeting with adaptive icon
+  const { greetingText, GreetingIcon } = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour >= 4 && hour < 12) return "Good morning";
-    if (hour >= 12 && hour < 17) return "Good afternoon";
-    return "Good evening";
+    if (hour >= 4 && hour < 12) {
+      return { greetingText: "Good morning", GreetingIcon: Sunrise };
+    }
+    if (hour >= 12 && hour < 17) {
+      return { greetingText: "Good afternoon", GreetingIcon: Sun };
+    }
+    return { greetingText: "Good evening", GreetingIcon: Moon };
   }, []);
 
   const firstName = useMemo(() => {
@@ -125,6 +134,22 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // Keyboard shortcut '/' to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === "/" &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // Normalize unified design items
@@ -187,7 +212,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
 
       list.push({
         id: String(d.id),
-        refCode: d.srNumber || d.requestCode || `DSG-${d.id}`,
+        refCode: d.requestCode || d.srNumber || `DR-${d.id}`,
         title: d.productDescription || (d as any).opportunityName || "Packaging Artwork Brief",
         customer: d.customer || "General Account",
         trend: d.trend || "Corporate Core",
@@ -235,9 +260,9 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
       .sort((a, b) => b.count - a.count);
   }, [creativeUsers, allDesignItems]);
 
-  // Scoped designs based on active persona
+  // Scoped designs based on user role
   const scopedDesigns = useMemo(() => {
-    if (viewMode === "specialist") {
+    if (!isHeadRole) {
       const me = currentUserName.toLowerCase();
       return allDesignItems.filter((d) => {
         const designer = (d.designer || "").toLowerCase();
@@ -264,7 +289,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
     }
 
     return allDesignItems;
-  }, [allDesignItems, viewMode, selectedMemberFilter, currentUserName]);
+  }, [allDesignItems, isHeadRole, selectedMemberFilter, currentUserName]);
 
   // Core Creative Telemetry
   const telemetry = useMemo(() => {
@@ -417,50 +442,56 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
     };
   }, [telemetry.classified]);
 
-  // SVG Spline Curve path math
+  // Clean Catmull-Rom Bezier Spline
   const svgCurve = useMemo(() => {
     const width = 800;
-    const height = 160;
-    const paddingX = 40;
+    const height = 180;
+    const paddingX = 36;
     const paddingY = 24;
+    const chartW = width - paddingX * 2;
+    const chartH = height - paddingY * 2;
     const pts = monthlyTimeline.points;
     const max = Math.max(monthlyTimeline.maxVal, 2);
 
-    const stepX = (width - paddingX * 2) / Math.max(pts.length - 1, 1);
-
-    const mapped = pts.map((pt, i) => {
-      const x = paddingX + i * stepX;
-      const y = height - paddingY - (pt.inflow / max) * (height - paddingY * 2);
-      return { ...pt, x, y };
+    const dataPoints = pts.map((p, i) => {
+      const x = paddingX + (i / Math.max(pts.length - 1, 1)) * chartW;
+      const normalizedY = p.inflow / max;
+      const y = height - paddingY - normalizedY * chartH;
+      return { x, y, ...p };
     });
 
-    if (mapped.length === 0) return { width, height, linePath: "", areaPath: "", points: [] };
+    if (dataPoints.length === 0) return { linePath: "", areaPath: "", points: [], width, height };
 
-    let linePath = `M ${mapped[0].x} ${mapped[0].y}`;
-    for (let i = 0; i < mapped.length - 1; i++) {
-      const p0 = mapped[i];
-      const p1 = mapped[i + 1];
-      const cx1 = p0.x + (p1.x - p0.x) / 2;
-      const cy1 = p0.y;
-      const cx2 = p0.x + (p1.x - p0.x) / 2;
-      const cy2 = p1.y;
-      linePath += ` C ${cx1} ${cy1}, ${cx2} ${cy2}, ${p1.x} ${p1.y}`;
+    let d = `M ${dataPoints[0].x.toFixed(1)} ${dataPoints[0].y.toFixed(1)}`;
+    for (let i = 0; i < dataPoints.length - 1; i++) {
+      const p0 = dataPoints[i === 0 ? 0 : i - 1];
+      const p1 = dataPoints[i];
+      const p2 = dataPoints[i + 1];
+      const p3 = dataPoints[i + 2 < dataPoints.length ? i + 2 : i + 1];
+
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
     }
 
-    const first = mapped[0];
-    const last = mapped[mapped.length - 1];
-    const areaPath = `${linePath} L ${last.x} ${height - paddingY} L ${first.x} ${height - paddingY} Z`;
+    const firstPt = dataPoints[0];
+    const lastPt = dataPoints[dataPoints.length - 1];
+    const baselineY = height - paddingY;
+    const area = `${d} L ${lastPt.x.toFixed(1)} ${baselineY} L ${firstPt.x.toFixed(1)} ${baselineY} Z`;
 
     return {
+      linePath: d,
+      areaPath: area,
+      points: dataPoints,
       width,
       height,
-      linePath,
-      areaPath,
-      points: mapped,
     };
   }, [monthlyTimeline]);
 
-  // Top Customer Account Portfolios (Section 6)
+  // Top Customer Account Portfolios
   const topAccounts = useMemo(() => {
     const map: Record<string, { total: number; active: number; delayed: number }> = {};
     telemetry.classified.forEach((r) => {
@@ -483,7 +514,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
       .slice(0, 5);
   }, [telemetry.classified]);
 
-  // Watchlist filtered items (Section 7)
+  // Watchlist filtered items
   const filteredWatchlist = useMemo(() => {
     let items = telemetry.classified;
 
@@ -512,233 +543,715 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
     return items;
   }, [telemetry.classified, watchlistFilter, searchTerm]);
 
+  // Smooth scroll handler
+  const scrollToSection = (id: string) => {
+    setActiveSection(id);
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  // Section Navigation Links
+  const SECTIONS = useMemo(() => {
+    const list = [
+      { id: "creative-snapshot", label: "Snapshot", icon: LayoutDashboard },
+      { id: "creative-workstreams", label: "Workstreams", icon: Boxes },
+      { id: "creative-cadence", label: "Cadence & Trends", icon: TrendingUp },
+    ];
+    if (isHeadRole) {
+      list.push({ id: "creative-team", label: "Team Audit", icon: Users });
+    }
+    list.push(
+      { id: "creative-accounts", label: "Top Accounts", icon: Building2 },
+      { id: "creative-watchlist", label: "Pipeline Watchlist", icon: Flame }
+    );
+    return list;
+  }, [isHeadRole]);
+
+  // CSV Export fallback handler
+  const handleExport = () => {
+    if (onExportCSV) {
+      onExportCSV();
+      return;
+    }
+    const headers = ["Ref Code", "Customer", "Title", "Designer", "Due Date", "Status"];
+    const rows = filteredWatchlist.map((item) => [
+      item.refCode,
+      item.customer,
+      `"${(item.title || "").replace(/"/g, '""')}"`,
+      item.designer,
+      item.dueDate,
+      item.status,
+    ]);
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `creative_pipeline_${selectedYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] font-sans select-text overflow-y-auto">
-      {/* ── 1. GREETING & CONTEXT HEADER (EXACT MARKETING OVERVIEW BLUEPRINT) ── */}
-      <header className="px-5 sm:px-8 py-4 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] shrink-0 transition-colors">
-        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* ── 1. SOLID EXECUTIVE GREETING & COMMAND HEADER ── */}
+      <header className="px-4 sm:px-6 lg:px-8 py-3.5 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] shrink-0 transition-colors">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Left Greeting & Context */}
-          <div>
-            <div className="flex items-center gap-2.5 mb-1">
-              <span
-                className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)] shadow-[0_0_8px_rgba(0,209,102,0.6)] animate-pulse"
-                title="Operational Creative Pipeline Live Sync"
-              />
-              <h1 className="text-xl sm:text-2xl font-bold font-display tracking-tight text-[var(--on-surface)]">
-                {greetingText}, {firstName}! Nice to see you.
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] shadow-2xs">
+                <GreetingIcon className="w-3.5 h-3.5" />
+              </span>
+              <h1 className="font-display font-bold text-lg sm:text-xl tracking-tight text-[var(--on-surface)] flex items-center gap-2">
+                <span>{greetingText}, {firstName}!</span>
               </h1>
             </div>
-            <div className="flex items-center gap-2 text-xs text-[var(--on-surface-muted)] font-mono">
-              <span className="font-semibold text-[var(--on-surface)]">
-                {isHeadRole ? "Creative Head Executive Console" : "Creative Designer Workspace"}
+
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--on-surface-muted)]">
+              <span className="inline-flex items-center gap-1 font-semibold text-[var(--on-surface)]">
+                {isHeadRole ? (
+                  <>
+                    <Users className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                    <span>Creative Studio Head Executive Console · Department Overview</span>
+                  </>
+                ) : (
+                  <>
+                    <User className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                    <span>Creative Designer Portfolio · Personal Workstream</span>
+                  </>
+                )}
               </span>
-              <span>·</span>
-              <span>Business Year {selectedYear === "ALL" ? "Consolidated" : selectedYear}</span>
+              <span className="text-[var(--border-strong)]">·</span>
+              <span className="font-mono text-[11px] text-[var(--on-surface-subtle)]">
+                Business Year {selectedYear === "ALL" ? "Consolidated" : selectedYear}
+              </span>
+              {selectedMemberFilter !== "all" && (
+                <>
+                  <span className="text-[var(--border-strong)]">·</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] border border-[var(--accent-primary)]/30">
+                    Scoped: {selectedMemberFilter}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMemberFilter("all")}
+                      className="ml-1 hover:opacity-75 cursor-pointer font-bold"
+                      title="Clear scope"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
           {/* Right Action Toolbar */}
-          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-            {/* View Mode Toggle (Head vs Specialist) */}
-            {isHeadRole && (
-              <div className="inline-flex rounded-lg bg-[var(--surface-low)] p-0.5 border border-[var(--border-subtle)] text-xs font-medium">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewMode("head");
-                    setSelectedMemberFilter("all");
-                  }}
-                  className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    viewMode === "head"
-                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                  }`}
-                  title="View aggregated department performance across all team members"
-                >
-                  <Users className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-                  <span>Team Head View</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("specialist")}
-                  className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    viewMode === "specialist"
-                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                  }`}
-                  title="Filter strictly to your personal requests"
-                >
-                  <User className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-                  <span>My Requests</span>
-                </button>
-              </div>
-            )}
-
-            {/* In Head View: Designer Selector Dropdown */}
-            {isHeadRole && viewMode === "head" && (
-              <Select
-                aria-label="Filter by creative team member"
-                value={selectedMemberFilter}
-                onChange={(e) => setSelectedMemberFilter(e.target.value)}
-                size="sm"
-                options={[
-                  { value: "all", label: `All Team Members (${teamMembersList.length})` },
-                  ...teamMembersList.map((m) => ({
-                    value: m.name,
-                    label: m.name,
-                    count: m.count,
-                  })),
-                ]}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Search Input with Hotkey Kbd */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search studio briefs..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 w-40 sm:w-52 pl-8 pr-7 text-xs rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-container)] focus:bg-[var(--surface-lowest)] border border-[var(--border-subtle)] focus:border-[var(--accent-primary)] text-[var(--on-surface)] placeholder-[var(--on-surface-subtle)] outline-none transition-all shadow-2xs font-sans"
               />
-            )}
+              {searchTerm ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-[var(--surface-high)] text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              ) : (
+                <kbd className="hidden sm:inline-block absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-[var(--on-surface-subtle)] bg-[var(--surface-container)] border border-[var(--border-subtle)] rounded shadow-2xs">
+                  /
+                </kbd>
+              )}
+            </div>
 
-            {/* Export CSV */}
+            {/* Export CSV Button */}
             <button
               type="button"
-              onClick={onExportCSV}
-              className="px-3 py-1.5 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+              onClick={handleExport}
+              className="h-9 px-3 rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-[0.985]"
+              title="Export current view to CSV"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
               <span className="hidden sm:inline">Export</span>
             </button>
           </div>
         </div>
       </header>
 
+      {/* ── STICKY SECTION NAVIGATOR (PILL BAR) ── */}
+      <nav
+        aria-label="Creative overview sections"
+        className="sticky top-0 z-30 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)]/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-2 transition-all shadow-xs"
+      >
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-1 sm:gap-1.5 overflow-x-auto py-0.5">
+            {SECTIONS.map((section) => {
+              const Icon = section.icon;
+              const isActive = activeSection === section.id;
+              const isWatchlist = section.id === "creative-watchlist";
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => scrollToSection(section.id)}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
+                    isActive
+                      ? "bg-[var(--surface-container)] text-[var(--on-surface)] font-bold shadow-2xs border border-[var(--border-strong)]"
+                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] border border-transparent font-medium"
+                  }`}
+                >
+                  <Icon
+                    className={`w-3.5 h-3.5 transition-colors ${
+                      isActive ? "text-[var(--accent-primary)]" : "text-[var(--on-surface-subtle)]"
+                    }`}
+                  />
+                  <span>{section.label}</span>
+                  {isWatchlist && telemetry.totalDelayed > 0 && (
+                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-rose-500 text-white shadow-2xs">
+                      {telemetry.totalDelayed}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick jump to delayed watchlist */}
+          {telemetry.totalDelayed > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setWatchlistFilter("delayed");
+                scrollToSection("creative-watchlist");
+              }}
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>{telemetry.totalDelayed} Overdue</span>
+            </button>
+          )}
+        </div>
+      </nav>
+
       {/* ── MAIN DASHBOARD BODY ── */}
-      <main className="w-full flex-1 p-5 sm:p-8 space-y-6">
-        {/* ── 2. CREATIVE MULTI-FACTOR KPI RIBBON (IMAGE 1 EXACT MATCH) ── */}
-        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {/* Tile 1: Total Team Intake */}
+      <main className="w-full flex-1 p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* ── 2. CREATIVE MULTI-FACTOR KPI RIBBON ── */}
+        <section id="creative-snapshot" className="scroll-mt-16 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {/* Tile 1: Total Studio Intake */}
           <div
-            onClick={() => setWatchlistFilter("all")}
-            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] cursor-pointer shadow-2xs transition-colors"
+            onClick={() => {
+              setWatchlistFilter("all");
+              scrollToSection("creative-watchlist");
+            }}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-                {viewMode === "head" ? "Total Team Intake" : "My Total Requests"}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
+                {isHeadRole ? "Studio Intake" : "My Briefs"}
               </span>
-              <Layers className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+              <div className="w-7 h-7 rounded-lg bg-[var(--surface-low)] group-hover:bg-[var(--accent-primary-subtle)] text-[var(--on-surface-muted)] group-hover:text-[var(--accent-primary-strong)] flex items-center justify-center transition-colors">
+                <Palette className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
-              {isLoading ? "—" : telemetry.total}
+              {isLoading ? "—" : telemetry.total.toLocaleString()}
             </div>
-            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              {viewMode === "head" ? `${teamMembersList.length} contributors` : "Raised by you"}
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>
+                {isHeadRole
+                  ? selectedMemberFilter !== "all"
+                    ? `Scoped: ${selectedMemberFilter}`
+                    : `${teamMembersList.length} designers`
+                  : "Assigned to you"}
+              </span>
+              <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-[var(--accent-primary)] group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
 
           {/* Tile 2: Pending Drafts */}
           <div
-            onClick={() => setWatchlistFilter("drafts")}
-            className={`p-3.5 rounded-xl bg-[var(--surface-lowest)] border cursor-pointer shadow-2xs transition-colors ${
+            onClick={() => {
+              setWatchlistFilter("drafts");
+              scrollToSection("creative-watchlist");
+            }}
+            className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${
               telemetry.totalDrafts > 0
-                ? "border-amber-300 dark:border-amber-900/60"
-                : "border-[var(--border-subtle)]"
+                ? "border-amber-300 dark:border-amber-900/60 hover:border-amber-400"
+                : "border-[var(--border-subtle)] hover:border-amber-400/50"
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                 Pending Drafts
               </span>
-              <FileEdit className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-colors">
+                <FileEdit className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
-              {isLoading ? "—" : telemetry.totalDrafts}
+              {isLoading ? "—" : telemetry.totalDrafts.toLocaleString()}
             </div>
-            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              Awaiting release
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>Awaiting intake / spec</span>
+              <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
 
-          {/* Tile 3: In Production */}
+          {/* Tile 3: In Production / Concept */}
           <div
-            onClick={() => setWatchlistFilter("concept")}
-            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] cursor-pointer shadow-2xs transition-colors"
+            onClick={() => {
+              setWatchlistFilter("concept");
+              scrollToSection("creative-watchlist");
+            }}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-purple-400 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 In Production
               </span>
-              <Hourglass className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+              <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center transition-colors">
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
-              {isLoading ? "—" : telemetry.totalInProduction}
+              {isLoading ? "—" : telemetry.totalInProduction.toLocaleString()}
             </div>
-            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              Active in lab/studio
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>Active in design lab</span>
+              <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
 
-          {/* Tile 4: Awaiting Decision */}
+          {/* Tile 4: Client Review / Action */}
           <div
-            onClick={() => setWatchlistFilter("review")}
-            className={`p-3.5 rounded-xl bg-[var(--surface-lowest)] border cursor-pointer shadow-2xs transition-colors ${
+            onClick={() => {
+              setWatchlistFilter("review");
+              scrollToSection("creative-watchlist");
+            }}
+            className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${
               telemetry.totalClientReview > 0
-                ? "border-purple-300 dark:border-purple-900/60"
-                : "border-[var(--border-subtle)]"
+                ? "border-indigo-300 dark:border-indigo-900/60 hover:border-indigo-400"
+                : "border-[var(--border-subtle)] hover:border-indigo-400/50"
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                Awaiting Decision
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                Needs Decision
               </span>
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center transition-colors">
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </div>
             </div>
-            <div className="text-2xl font-display font-bold tracking-tight text-purple-600 dark:text-purple-400 tabular-nums">
-              {isLoading ? "—" : telemetry.totalClientReview}
+            <div className="text-2xl font-display font-bold tracking-tight text-indigo-600 dark:text-indigo-400 tabular-nums">
+              {isLoading ? "—" : telemetry.totalClientReview.toLocaleString()}
             </div>
-            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              Needs client verdict
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>Client review / revisions</span>
+              <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
 
-          {/* Tile 5: Fulfillment SLA */}
-          <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+          {/* Tile 5: Turnaround SLA */}
+          <div className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Fulfillment SLA
               </span>
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
               {isLoading ? "—" : `${telemetry.onTimeRate}%`}
             </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-              {telemetry.totalOnTime} on-track tasks
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono flex items-center justify-between">
+              <span>{telemetry.totalOnTime} on-track tasks</span>
+              <span className="text-[10px] font-bold">Target 95%</span>
             </div>
           </div>
 
-          {/* Tile 6: Dispatched */}
-          <div
-            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] cursor-pointer shadow-2xs transition-colors"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+          {/* Tile 6: Prepress Dispatched */}
+          <div className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-teal-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Dispatched
               </span>
-              <Send className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center transition-colors">
+                <Send className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
-              {isLoading ? "—" : telemetry.totalCompleted}
+              {isLoading ? "—" : telemetry.totalCompleted.toLocaleString()}
             </div>
-            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              Delivered to client
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>Certified &amp; released</span>
+              <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-teal-600 group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
         </section>
 
-        {/* ── 3. TEAM MEMBERS PERFORMANCE & REQUEST OWNERSHIP (IMAGE 1 SECTION 1) ── */}
-        {isHeadRole && viewMode === "head" && (
-          <section className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        {/* ── 3. DEDICATED WORKSTREAMS & DELIVERY HUBS ── */}
+        <section id="creative-workstreams" className="scroll-mt-16 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+                <Boxes className="w-4 h-4 text-[var(--accent-primary)]" />
+                <span>Dedicated Creative Workstreams &amp; Delivery Hubs</span>
+              </h3>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Direct access to artwork briefs, packaging sampling &amp; CAD mockups, and prepress proofing.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Stream 1: Artwork & Graphic Design Desk */}
+            <div
+              onClick={() => onNavigateToTab("design")}
+              className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-purple-400/80 cursor-pointer shadow-2xs group transition-all duration-200 flex flex-col justify-between hover:-translate-y-0.5"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                      <Palette className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                        Artwork &amp; Design Briefs Desk
+                      </h4>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
+                        Graphic Concepts &amp; Themes
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
+                    {allDesignItems.length} Briefs
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--on-surface-muted)] mb-4 leading-relaxed">
+                  Intake of client artwork requests, brand typography, Shutterstock licensing, and variant generation.
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                <span className="font-mono tabular-nums text-[var(--on-surface-muted)]">
+                  {allDesignItems.length} active briefs
+                </span>
+                <span className="flex items-center gap-1">
+                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </div>
+            </div>
+
+            {/* Stream 2: Sampling & CAD Mockups Desk */}
+            <div
+              onClick={() => onNavigateToTab("sampling")}
+              className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-teal-400/80 cursor-pointer shadow-2xs group transition-all duration-200 flex flex-col justify-between hover:-translate-y-0.5"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                      <Box className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                        Sampling &amp; CAD Mockups Desk
+                      </h4>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
+                        3D Structural &amp; Dummies
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200 dark:border-teal-800/40">
+                    {samplingMockupRequests.length} Tasks
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--on-surface-muted)] mb-4 leading-relaxed">
+                  3D structural dummy mockups, substrate matching, folding simulations, and SAMP physical prototype verification.
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                <span className="font-mono tabular-nums text-[var(--on-surface-muted)]">
+                  {samplingMockupRequests.length} active mockups
+                </span>
+                <span className="flex items-center gap-1">
+                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </div>
+            </div>
+
+            {/* Stream 3: Prepress Certification & QC */}
+            <div
+              onClick={() => onNavigateToTab("design")}
+              className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-400/80 cursor-pointer shadow-2xs group transition-all duration-200 flex flex-col justify-between hover:-translate-y-0.5"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        Prepress Certification &amp; QC
+                      </h4>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
+                        Press-Ready Signoff
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                    {telemetry.totalCompleted} Certified
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--on-surface-muted)] mb-4 leading-relaxed">
+                  Final high-resolution PDF proof verification, CMYK/Pantone separations, and plant print authorization.
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                <span className="font-mono tabular-nums text-[var(--on-surface-muted)]">
+                  {telemetry.totalCompleted} certified projects
+                </span>
+                <span className="flex items-center gap-1">
+                  Audit Prepress <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 4. INFLOW CADENCE & DELIVERY VELOCITY SPLINE ── */}
+        <section id="creative-cadence" className="scroll-mt-16 p-4 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <TrendingUp className="w-4 h-4 text-[var(--accent-primary)]" />
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                  Creative Request Intake Cadence &amp; Delivery Velocity
+                </h2>
+                <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
+                  BY {selectedYear === "ALL" ? "Consolidated" : selectedYear}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Monthly trajectory of creative briefs progressing through concepting, sampling, and final prepress release.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs font-mono">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)]" />
+                <span className="text-[var(--on-surface)] font-semibold">Inflow</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span className="text-[var(--on-surface-muted)]">On-Time</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowMonthlyTable((prev) => !prev)}
+                className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                <span>{showMonthlyTable ? "Hide Matrix" : "View Monthly Breakdown"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Smooth Catmull-Rom Bezier Spline Curve */}
+          <div className="relative w-full overflow-hidden pt-2">
+            <svg
+              viewBox={`0 0 ${svgCurve.width} ${svgCurve.height}`}
+              className="w-full h-40 sm:h-48 overflow-visible"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="creativeSplineGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.28" />
+                  <stop offset="60%" stopColor="var(--accent-primary)" stopOpacity="0.08" />
+                  <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0.00" />
+                </linearGradient>
+              </defs>
+
+              {/* Grid Guideline lines */}
+              <line x1="36" y1="30" x2="764" y2="30" stroke="var(--border-subtle)" strokeDasharray="3 3" />
+              <line x1="36" y1="85" x2="764" y2="85" stroke="var(--border-subtle)" strokeDasharray="3 3" />
+              <line x1="36" y1="140" x2="764" y2="140" stroke="var(--border-subtle)" strokeDasharray="3 3" />
+              <line x1="36" y1="156" x2="764" y2="156" stroke="var(--border-subtle)" />
+
+              {/* Area gradient under spline */}
+              {svgCurve.areaPath && <path d={svgCurve.areaPath} fill="url(#creativeSplineGrad)" />}
+
+              {/* Solid Spline Line */}
+              {svgCurve.linePath && (
+                <path
+                  d={svgCurve.linePath}
+                  fill="none"
+                  stroke="var(--accent-primary)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+
+              {/* Data Interactive Nodes */}
+              {svgCurve.points.map((pt, idx) => {
+                const isHovered = hoveredMonthIndex === idx;
+                return (
+                  <g
+                    key={pt.key}
+                    onMouseEnter={() => setHoveredMonthIndex(idx)}
+                    onMouseLeave={() => setHoveredMonthIndex(null)}
+                    className="cursor-pointer"
+                  >
+                    <circle cx={pt.x} cy={pt.y} r={14} fill="transparent" />
+                    {isHovered && (
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={8}
+                        fill="var(--accent-primary)"
+                        opacity="0.25"
+                        className="animate-ping"
+                      />
+                    )}
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={isHovered ? 5.5 : 3.5}
+                      fill="var(--surface-lowest)"
+                      stroke="var(--accent-primary)"
+                      strokeWidth={isHovered ? 2.5 : 2}
+                    />
+                    <text
+                      x={pt.x}
+                      y={svgCurve.height - 4}
+                      textAnchor="middle"
+                      className={`text-[11px] font-mono select-none ${
+                        isHovered ? "fill-[var(--accent-primary)] font-bold" : "fill-[var(--on-surface-subtle)]"
+                      }`}
+                    >
+                      {pt.label}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* Hover Floating Tooltip */}
+            {hoveredMonthIndex !== null && svgCurve.points[hoveredMonthIndex] && (
+              <div
+                className="absolute top-2 z-20 pointer-events-none p-3 rounded-xl bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-xl text-xs font-sans animate-in fade-in zoom-in-95 duration-150"
+                style={{
+                  left: `${Math.min(
+                    Math.max(svgCurve.points[hoveredMonthIndex].x / (svgCurve.width / 100), 10),
+                    82
+                  )}%`,
+                  transform: "translateX(-50%)",
+                }}
+              >
+                <div className="font-bold text-[var(--on-surface)] mb-1.5 font-display flex items-center justify-between gap-4">
+                  <span>{svgCurve.points[hoveredMonthIndex].full}</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                    BY {selectedYear}
+                  </span>
+                </div>
+                <div className="space-y-1 font-mono text-[11px]">
+                  <div className="flex items-center justify-between gap-4 text-[var(--on-surface-muted)]">
+                    <span>Brief Inflow:</span>
+                    <span className="font-bold text-[var(--on-surface)] tabular-nums">
+                      {svgCurve.points[hoveredMonthIndex].inflow}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400">
+                    <span>On-Time:</span>
+                    <span className="font-bold tabular-nums">
+                      {svgCurve.points[hoveredMonthIndex].onTime}
+                    </span>
+                  </div>
+                  {svgCurve.points[hoveredMonthIndex].delayed > 0 && (
+                    <div className="flex items-center justify-between gap-4 text-rose-600 dark:text-rose-400">
+                      <span>Delayed:</span>
+                      <span className="font-bold tabular-nums">
+                        {svgCurve.points[hoveredMonthIndex].delayed}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-4 pt-1 border-t border-[var(--border-subtle)]">
+                    <span className="text-[10px] uppercase font-bold text-[var(--on-surface-subtle)]">Fulfillment:</span>
+                    <span className="font-bold text-[var(--accent-primary)] tabular-nums">
+                      {svgCurve.points[hoveredMonthIndex].slaRate}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Expandable Monthly Numbers */}
+          {showMonthlyTable && (
+            <div className="overflow-x-auto pt-3 border-t border-[var(--border-subtle)] animate-in fade-in duration-200">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
+                    <th className="py-2 px-3">Month</th>
+                    <th className="py-2 px-3 text-right">Inflow Volume</th>
+                    <th className="py-2 px-3 text-right">On-Time</th>
+                    <th className="py-2 px-3 text-right">Delayed</th>
+                    <th className="py-2 px-3 text-right">SLA Fulfillment</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
+                  {monthlyTimeline.points.map((m) => (
+                    <tr key={m.key} className="hover:bg-[var(--surface-low)] transition-colors">
+                      <td className="py-2 px-3 font-semibold text-[var(--on-surface)]">{m.full}</td>
+                      <td className="py-2 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{m.inflow}</td>
+                      <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
+                      <td className="py-2 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                          m.slaRate >= 90
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-500/20"
+                            : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-500/20"
+                        }`}>
+                          {m.slaRate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* ── 5. CREATIVE TEAM MEMBERS AUDIT (HEAD VIEW) ── */}
+        {isHeadRole && (
+          <section id="creative-team" className="scroll-mt-16 p-4 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight flex items-center gap-2">
                   <Users className="w-4 h-4 text-[var(--accent-primary)]" />
-                  <span>Creative Team Members Performance &amp; Request Ownership</span>
+                  <span>Creative Team Performance &amp; Assignment Audit</span>
                 </h2>
                 <p className="text-xs text-[var(--on-surface-muted)]">
-                  Leadership audit showing request volume, active pipeline, drafts, and delivery SLA for each creative coordinator.
+                  Leadership audit showing brief volume, active pipeline, drafts, and turnaround SLA across studio coordinators.
                 </p>
               </div>
 
@@ -746,9 +1259,10 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedMemberFilter("all")}
-                  className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] text-xs text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-xs text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium cursor-pointer transition-colors flex items-center gap-1.5"
                 >
-                  Clear Member Filter
+                  <X className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                  <span>Clear Member Scope</span>
                 </button>
               )}
             </div>
@@ -758,8 +1272,8 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                 <thead>
                   <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
                     <th className="py-2.5 px-3">Team Member</th>
-                    <th className="py-2.5 px-3 text-right">Total Requests</th>
-                    <th className="py-2.5 px-3 text-right">Active In Production</th>
+                    <th className="py-2.5 px-3 text-right">Total Briefs</th>
+                    <th className="py-2.5 px-3 text-right">Active In Concept</th>
                     <th className="py-2.5 px-3 text-right">Pending Drafts</th>
                     <th className="py-2.5 px-3 text-right">Delayed SLA</th>
                     <th className="py-2.5 px-3">Delivery SLA Fulfillment</th>
@@ -837,9 +1351,9 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                               onClick={() =>
                                 setSelectedMemberFilter(isSelected ? "all" : member.name)
                               }
-                              className={`px-2 py-1 rounded text-[11px] font-sans font-semibold border cursor-pointer transition-colors ${
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-sans font-semibold border cursor-pointer transition-colors ${
                                 isSelected
-                                  ? "bg-[var(--accent-primary)] text-white border-[var(--accent-primary)]"
+                                  ? "bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-2xs"
                                   : "bg-[var(--surface-low)] text-[var(--on-surface)] border-[var(--border-subtle)] hover:bg-[var(--surface-container)]"
                               }`}
                             >
@@ -856,304 +1370,8 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
           </section>
         )}
 
-        {/* ── 4. INTAKE CURVE & DELIVERY TRAJECTORY SPLINE (IMAGE 1 SECTION 2) ── */}
-        <section className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <TrendingUp className="w-4 h-4 text-[var(--accent-primary)]" />
-                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
-                  Creative Request Intake Curve &amp; Delivery Trajectory
-                </h2>
-                <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
-                  BY {selectedYear}
-                </span>
-              </div>
-              <p className="text-xs text-[var(--on-surface-muted)]">
-                Trajectory of requests raised by marketing progressing into sampling and physical verification.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 text-xs font-mono">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)]" />
-                <span className="text-[var(--on-surface)] font-semibold">Inflow</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                <span className="text-[var(--on-surface-muted)]">On-Time</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowMonthlyTable((prev) => !prev)}
-                className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium text-xs flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>{showMonthlyTable ? "Hide Matrix" : "View Monthly Numbers"}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Solid SVG Stock Spline Curve */}
-          <div className="relative w-full overflow-hidden pt-1">
-            <svg
-              viewBox={`0 0 ${svgCurve.width} ${svgCurve.height}`}
-              className="w-full h-36 sm:h-44 overflow-visible"
-              preserveAspectRatio="none"
-            >
-              <defs>
-                <linearGradient id="creativeCurveGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.22" />
-                  <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0.01" />
-                </linearGradient>
-              </defs>
-
-              <line x1="30" y1="30" x2="770" y2="30" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-              <line x1="30" y1="88" x2="770" y2="88" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-              <line x1="30" y1="146" x2="770" y2="146" stroke="var(--border-subtle)" />
-
-              {svgCurve.areaPath && <path d={svgCurve.areaPath} fill="url(#creativeCurveGrad)" />}
-
-              {svgCurve.linePath && (
-                <path
-                  d={svgCurve.linePath}
-                  fill="none"
-                  stroke="var(--accent-primary)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              )}
-
-              {svgCurve.points.map((pt, idx) => {
-                const isHovered = hoveredMonthIndex === idx;
-                return (
-                  <g
-                    key={pt.key}
-                    onMouseEnter={() => setHoveredMonthIndex(idx)}
-                    onMouseLeave={() => setHoveredMonthIndex(null)}
-                    className="cursor-pointer"
-                  >
-                    <circle cx={pt.x} cy={pt.y} r={12} fill="transparent" />
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={isHovered ? 5 : 3.5}
-                      fill="var(--surface-lowest)"
-                      stroke="var(--accent-primary)"
-                      strokeWidth={isHovered ? 2.5 : 2}
-                    />
-                    <text
-                      x={pt.x}
-                      y={svgCurve.height - 4}
-                      textAnchor="middle"
-                      className={`text-[11px] font-mono ${
-                        isHovered ? "fill-[var(--accent-primary)] font-bold" : "fill-[var(--on-surface-subtle)]"
-                      }`}
-                    >
-                      {pt.label}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-
-            {hoveredMonthIndex !== null && svgCurve.points[hoveredMonthIndex] && (
-              <div
-                className="absolute top-2 z-20 pointer-events-none p-2.5 rounded-lg bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-xl text-xs font-sans"
-                style={{
-                  left: `${Math.min(
-                    Math.max(svgCurve.points[hoveredMonthIndex].x / (svgCurve.width / 100), 10),
-                    82
-                  )}%`,
-                  transform: "translateX(-50%)",
-                }}
-              >
-                <div className="font-bold text-[var(--on-surface)] mb-1 font-display">
-                  {svgCurve.points[hoveredMonthIndex].full} (BY {selectedYear})
-                </div>
-                <div className="space-y-0.5 font-mono text-[11px]">
-                  <div className="flex items-center justify-between gap-4 text-[var(--on-surface-muted)]">
-                    <span>Brief Inflow:</span>
-                    <span className="font-bold text-[var(--on-surface)] tabular-nums">
-                      {svgCurve.points[hoveredMonthIndex].inflow}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400">
-                    <span>On-Time:</span>
-                    <span className="font-bold tabular-nums">
-                      {svgCurve.points[hoveredMonthIndex].onTime}
-                    </span>
-                  </div>
-                  {svgCurve.points[hoveredMonthIndex].delayed > 0 && (
-                    <div className="flex items-center justify-between gap-4 text-rose-600 dark:text-rose-400">
-                      <span>Delayed:</span>
-                      <span className="font-bold tabular-nums">
-                        {svgCurve.points[hoveredMonthIndex].delayed}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Expandable Monthly Numbers */}
-          {showMonthlyTable && (
-            <div className="overflow-x-auto pt-2 border-t border-[var(--border-subtle)]">
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
-                    <th className="py-2 px-3">Month</th>
-                    <th className="py-2 px-3 text-right">Inflow Volume</th>
-                    <th className="py-2 px-3 text-right">On-Time</th>
-                    <th className="py-2 px-3 text-right">Delayed</th>
-                    <th className="py-2 px-3 text-right">SLA Fulfillment</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
-                  {monthlyTimeline.points.map((m) => (
-                    <tr key={m.key} className="hover:bg-[var(--surface-low)]">
-                      <td className="py-2 px-3 font-semibold text-[var(--on-surface)]">{m.full}</td>
-                      <td className="py-2 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{m.inflow}</td>
-                      <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
-                      <td className="py-2 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
-                      <td className="py-2 px-3 text-right tabular-nums">
-                        <span className={`px-1.5 py-0.5 rounded font-bold ${
-                          m.slaRate >= 90 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                        }`}>
-                          {m.slaRate}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        {/* ── 5. CREATIVE WORKSTREAMS & CONSOLES (IDENTICAL DESK CARDS) ── */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight">
-                Dedicated Creative Workstreams &amp; Delivery Hubs
-              </h3>
-              <p className="text-xs text-[var(--on-surface-muted)]">
-                Direct access to artwork briefs, packaging sampling &amp; CAD mockups, and prepress proofing.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {/* Stream 1: Artwork & Design Briefs Desk */}
-            <div
-              onClick={() => onNavigateToTab("design")}
-              className="p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] cursor-pointer shadow-2xs group transition-colors flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--surface-low)] text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                      <Palette className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                        Artwork &amp; Design Briefs Desk
-                      </h4>
-                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Graphic Concepts &amp; Themes</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-[var(--surface-low)] text-[var(--on-surface)]">
-                    {allDesignItems.length} Briefs
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--on-surface-muted)] mb-3 leading-relaxed line-clamp-2">
-                  Intake of client artwork requests, brand typography, Shutterstock licensing, and variant generation.
-                </p>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                <span className="font-mono tabular-nums">{allDesignItems.length} Briefs</span>
-                <span className="flex items-center gap-0.5">
-                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </span>
-              </div>
-            </div>
-
-            {/* Stream 2: Sampling & CAD Mockups Desk */}
-            <div
-              onClick={() => onNavigateToTab("sampling")}
-              className="p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-teal-400 cursor-pointer shadow-2xs group transition-colors flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--surface-low)] text-teal-600 dark:text-teal-400 flex items-center justify-center">
-                      <Box className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-teal-600 transition-colors">
-                        Sampling &amp; CAD Mockups Desk
-                      </h4>
-                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">3D CAD &amp; Dummies</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300">
-                    {samplingMockupRequests.length} Tasks
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--on-surface-muted)] mb-3 leading-relaxed line-clamp-2">
-                  3D mockup simulations, structural parameters, and SAMP physical prototype coordination.
-                </p>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-teal-600 transition-colors">
-                <span className="font-mono tabular-nums">{samplingMockupRequests.length} Tasks</span>
-                <span className="flex items-center gap-0.5">
-                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </span>
-              </div>
-            </div>
-
-            {/* Stream 3: Prepress Certification & QC */}
-            <div
-              onClick={() => onNavigateToTab("design")}
-              className="p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-400 cursor-pointer shadow-2xs group transition-colors flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--surface-low)] text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                      <CheckCircle2 className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-emerald-600 transition-colors">
-                        Prepress Certification &amp; QC
-                      </h4>
-                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Press-Ready Signoff</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    {telemetry.totalCompleted} Certified
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--on-surface-muted)] mb-3 leading-relaxed line-clamp-2">
-                  Final high-resolution PDF proof verification, plate separations, and plant print authorization.
-                </p>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-emerald-600 transition-colors">
-                <span className="font-mono tabular-nums">{telemetry.totalCompleted} Certified</span>
-                <span className="flex items-center gap-0.5">
-                  Audit Prepress <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── 6. TOP CUSTOMER PORTFOLIO CONCENTRATION ── */}
-        <section className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
+        {/* ── 6. TOP CUSTOMER ACCOUNT PORTFOLIOS ── */}
+        <section id="creative-accounts" className="scroll-mt-16 p-4 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
           <div>
             <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
               <Building2 className="w-4 h-4 text-[var(--accent-primary)]" />
@@ -1168,11 +1386,11 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
-                  <th className="py-2 px-3">Customer Account</th>
-                  <th className="py-2 px-3 text-right">Total Requests</th>
-                  <th className="py-2 px-3 text-right">In Production</th>
-                  <th className="py-2 px-3 text-right">Delayed</th>
-                  <th className="py-2 px-3">On-Time Fulfillment Rate</th>
+                  <th className="py-2.5 px-3">Customer Account</th>
+                  <th className="py-2.5 px-3 text-right">Total Requests</th>
+                  <th className="py-2.5 px-3 text-right">In Production</th>
+                  <th className="py-2.5 px-3 text-right">Delayed</th>
+                  <th className="py-2.5 px-3">On-Time Fulfillment Rate</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
@@ -1184,20 +1402,20 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                   </tr>
                 ) : (
                   topAccounts.map((account) => (
-                    <tr key={account.name} className="hover:bg-[var(--surface-low)]">
-                      <td className="py-2.5 px-3 font-semibold text-[var(--on-surface)] font-sans">
+                    <tr key={account.name} className="hover:bg-[var(--surface-low)] transition-colors">
+                      <td className="py-3 px-3 font-semibold text-[var(--on-surface)] font-sans">
                         {account.name}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">
+                      <td className="py-3 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">
                         {account.total}
                       </td>
-                      <td className="py-2.5 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">
+                      <td className="py-3 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">
                         {account.active}
                       </td>
-                      <td className="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">
+                      <td className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">
                         {account.delayed}
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-3 px-3">
                         <div className="flex items-center gap-2 w-36">
                           <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
                             <div
@@ -1224,44 +1442,33 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
           </div>
         </section>
 
-        {/* ── 7. DETAILED CREATIVE WATCHLIST TABLE (VIEW MODE) ── */}
-        <section className="rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs overflow-hidden">
+        {/* ── 7. DETAILED CREATIVE WATCHLIST TABLE ── */}
+        <section id="creative-watchlist" className="scroll-mt-16 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs overflow-hidden">
           {/* Header with Search and Segmented Filters */}
           <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+                <Flame className="w-4 h-4 text-[var(--accent-primary)]" />
                 <span>Creative Request Pipeline Watchlist</span>
                 <span className="text-xs font-mono font-normal text-[var(--on-surface-subtle)]">
                   ({filteredWatchlist.length} records shown)
                 </span>
               </h3>
               <p className="text-xs text-[var(--on-surface-muted)]">
-                Line-by-line inspection of individual creative briefs and packaging design requests.
+                Line-by-line inspection of individual creative briefs, artwork requests, and CAD mockups.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Search Box */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Filter SR, Customer, Item..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[var(--surface-low)] text-xs text-[var(--on-surface)] placeholder-[var(--on-surface-subtle)] border border-[var(--border-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] w-48 sm:w-56"
-                />
-              </div>
-
               {/* Segmented Filter Pills */}
-              <div className="inline-flex rounded-lg bg-[var(--surface-low)] p-0.5 border border-[var(--border-subtle)] text-xs font-medium">
+              <div className="inline-flex rounded-xl bg-[var(--surface-low)] p-0.5 border border-[var(--border-subtle)] text-xs font-medium shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("all")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
                     watchlistFilter === "all"
                       ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)]"
+                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                   }`}
                 >
                   All ({telemetry.total})
@@ -1269,9 +1476,9 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("drafts")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
                     watchlistFilter === "drafts"
-                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs"
+                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs border border-amber-500/20"
                       : "text-[var(--on-surface-muted)] hover:text-amber-600"
                   }`}
                 >
@@ -1280,9 +1487,9 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("concept")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
                     watchlistFilter === "concept"
-                      ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-bold shadow-2xs"
+                      ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-bold shadow-2xs border border-purple-500/20"
                       : "text-[var(--on-surface-muted)] hover:text-purple-600"
                   }`}
                 >
@@ -1291,9 +1498,9 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("review")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
                     watchlistFilter === "review"
-                      ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold shadow-2xs"
+                      ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold shadow-2xs border border-indigo-500/20"
                       : "text-[var(--on-surface-muted)] hover:text-indigo-600"
                   }`}
                 >
@@ -1302,9 +1509,9 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("delayed")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
                     watchlistFilter === "delayed"
-                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs"
+                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs border border-rose-500/20"
                       : "text-[var(--on-surface-muted)] hover:text-rose-600"
                   }`}
                 >
@@ -1330,19 +1537,22 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
                 {isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-xs text-[var(--on-surface-muted)] font-mono">
-                      Loading creative request pipeline...
-                    </td>
-                  </tr>
+                  <TableSkeletonRows columns={7} rows={6} />
                 ) : filteredWatchlist.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-xs text-[var(--on-surface-muted)] font-sans">
-                      No creative projects match the selected watchlist filter.
+                    <td colSpan={7} className="py-12">
+                      <EmptyState
+                        title="No creative projects found"
+                        description={
+                          searchTerm
+                            ? `No records match the query "${searchTerm}".`
+                            : "No creative projects match the selected filter."
+                        }
+                      />
                     </td>
                   </tr>
                 ) : (
-                  filteredWatchlist.slice(0, 15).map((item) => (
+                  filteredWatchlist.slice(0, 25).map((item) => (
                     <tr
                       key={item.id}
                       onClick={() => {
@@ -1358,15 +1568,34 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                         {item.customer || "—"}
                       </td>
                       <td className="py-3 px-3 max-w-xs truncate text-[var(--on-surface)] font-medium">
-                        <span className="group-hover:text-purple-600 transition-colors">
+                        <span className="group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                           {item.title}
                         </span>
+                        {item.trend && (
+                          <span className="ml-2 text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                            {item.trend}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-3 font-mono text-[var(--on-surface-muted)] whitespace-nowrap">
-                        {item.designer || item.createdBy || "Unassigned"}
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[9px] flex items-center justify-center font-bold text-[var(--accent-primary)]">
+                            {(item.designer || item.createdBy || "U")[0]}
+                          </span>
+                          <span>{item.designer || item.createdBy || "Unassigned"}</span>
+                        </div>
                       </td>
-                      <td className="py-3 px-3 font-mono text-[var(--on-surface-muted)] whitespace-nowrap">
-                        {item.dueDate || "Standard"}
+                      <td className="py-3 px-3 font-mono whitespace-nowrap">
+                        {item._isDelayed ? (
+                          <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold">
+                            <Clock className="w-3 h-3" />
+                            <span>{item.dueDate}</span>
+                          </span>
+                        ) : (
+                          <span className="text-[var(--on-surface-muted)]">
+                            {item.dueDate || "Standard"}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         <StatusPill status={item.status} size="sm" showDot />
@@ -1379,7 +1608,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                             if (item.rawBrief) onInspectBrief(item.rawBrief);
                             else if (item.rawReq) onInspectRequest(item.rawReq);
                           }}
-                          className="px-2.5 py-1 rounded bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium text-xs transition cursor-pointer"
+                          className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium text-xs transition-colors cursor-pointer shadow-2xs group-hover:border-[var(--accent-primary)]"
                         >
                           Inspect
                         </button>
@@ -1390,6 +1619,12 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               </tbody>
             </table>
           </div>
+
+          {filteredWatchlist.length > 25 && (
+            <div className="p-3 text-center border-t border-[var(--border-subtle)] text-xs text-[var(--on-surface-muted)] font-mono">
+              Showing first 25 of {filteredWatchlist.length} records. Filter or search to narrow results.
+            </div>
+          )}
         </section>
       </main>
     </div>

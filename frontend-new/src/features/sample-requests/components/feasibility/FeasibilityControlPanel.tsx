@@ -24,7 +24,8 @@ export const FeasibilityControlPanel: React.FC<FeasibilityControlPanelProps> = (
   const isDecisionDone = Boolean(activeRequest.marketingDecision);
   const isDecisionActive = isReviewDone && !isDecisionDone;
 
-  const isConvertedDone = Boolean(activeRequest.convertedSrNumber);
+  const convertedCode = activeRequest.convertedRequestCode || activeRequest.convertedSrNumber;
+  const isConvertedDone = Boolean(convertedCode || activeRequest.convertedSampleRequestId);
   const isConvertedActive =
     isDecisionDone && activeRequest.marketingDecision === "Accepted" && !isConvertedDone;
 
@@ -53,8 +54,8 @@ export const FeasibilityControlPanel: React.FC<FeasibilityControlPanelProps> = (
     },
     {
       label: isConvertedDone
-        ? `4. Sampling: ${activeRequest.convertedSrNumber}`
-        : "4. Sampling Conversion",
+        ? `4. Commercial Request: ${convertedCode || "Created"}`
+        : "4. Commercial Request Conversion",
       status: isConvertedDone
         ? ("done" as const)
         : isConvertedActive

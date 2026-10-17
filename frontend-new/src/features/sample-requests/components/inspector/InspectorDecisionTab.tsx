@@ -131,11 +131,11 @@ export const InspectorDecisionTab: React.FC<InspectorDecisionTabProps> = ({
                 <span>Physical Prototype &amp; Sampling Creation</span>
               </div>
 
-              {activeRequest.convertedSampleRequestId || activeRequest.convertedSrNumber ? (
+              {activeRequest.convertedSampleRequestId || activeRequest.convertedRequestCode || activeRequest.convertedSrNumber ? (
                 <div className="p-3.5 bg-[var(--surface-lowest)] rounded-xl border border-[var(--accent-primary)]/25 flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <span className="font-bold font-mono text-sm text-[var(--accent-primary)]">
-                      Sample Request Code: {activeRequest.convertedSrNumber}
+                      Request Code: {activeRequest.convertedRequestCode || activeRequest.convertedSrNumber || "Created"}
                     </span>
                     <p className="text-[11px] text-slate-500 mt-0.5">
                       Converted by {activeRequest.convertedBy || "Marketing"} into active physical sampling pipeline.

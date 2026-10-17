@@ -77,6 +77,7 @@ export function mapFeasibilityResponse(item: Record<string, unknown>): Feasibili
     takenAtSamp: typeof item.taken_at_samp === "string" ? item.taken_at_samp : null,
     convertedSampleRequestId: item.converted_sample_request_id != null ? Number(item.converted_sample_request_id) : null,
     convertedSrNumber: typeof item.converted_sr_number === "string" ? item.converted_sr_number : null,
+    convertedRequestCode: typeof item.converted_request_code === "string" ? item.converted_request_code : null,
     convertedRequestTypes: Array.isArray(item.converted_request_types)
       ? item.converted_request_types.filter((value): value is "sample" | "costing" => value === "sample" || value === "costing")
       : [],
@@ -105,6 +106,7 @@ export function mapFeasibilityRequestToSampleRequest(item: FeasibilityRequestRec
   return {
     id: `feasibility-${item.id}`,
     srNumber: "",
+    requestCode: item.requestCode,
     year: getBusinessYearForDate(createdAt),
     productDescription: cleanDesc,
     customer: item.customer,
@@ -159,6 +161,7 @@ export function mapFeasibilityRequestToSampleRequest(item: FeasibilityRequestRec
     takenAtSamp: item.takenAtSamp,
     convertedSampleRequestId: item.convertedSampleRequestId,
     convertedSrNumber: item.convertedSrNumber,
+    convertedRequestCode: item.convertedRequestCode,
     convertedRequestTypes: item.convertedRequestTypes,
     convertedAt: item.convertedAt,
     convertedBy: item.convertedBy,
@@ -294,9 +297,9 @@ export async function claimFeasibilityTaskApi(
 export async function convertFeasibilityToSamplingApi(
   id: number | string,
   requestTypes: Array<"sample" | "costing"> = ["sample"]
-): Promise<{ feasibility: SampleRequestItem; sampleRequestId: number; sampleSrNumber: string; requestTypes: Array<"sample" | "costing"> }> {
+): Promise<{ feasibility: SampleRequestItem; sampleRequestId: number; sampleSrNumber: string | null; sampleRequestCode: string | null; requestTypes: Array<"sample" | "costing"> }> {
   const rawId = String(id).replace(/^feasibility-/, "");
-  const data = await apiFetch<{ feasibility: Record<string, unknown>; sample_request_id: number; sample_sr_number: string; request_types: Array<"sample" | "costing"> }>(
+  const data = await apiFetch<{ feasibility: Record<string, unknown>; sample_request_id: number; sample_sr_number: string | null; sample_request_code: string | null; request_types: Array<"sample" | "costing"> }>(
     `/api/v1/feasibility-requests/${Number(rawId)}/convert-to-sampling`,
     {
       method: "POST",
@@ -311,6 +314,7 @@ export async function convertFeasibilityToSamplingApi(
     feasibility,
     sampleRequestId: data.sample_request_id,
     sampleSrNumber: data.sample_sr_number,
+    sampleRequestCode: data.sample_request_code,
     requestTypes: data.request_types || requestTypes,
   };
 }

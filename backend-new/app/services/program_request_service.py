@@ -18,6 +18,7 @@ from app.schemas.program_request import (
     ProgramSeenSubmit,
 )
 from app.utils.business_year import get_current_business_year
+from app.utils.request_codes import REQUEST_CODE_PREFIX_BY_SCOPE, next_request_code, temporary_request_code
 from app.auth.permissions import is_admin
 
 
@@ -69,6 +70,7 @@ class ProgramRequestService:
             "program_campaign_title": item.program_campaign_title,
             "program_year": item.program_year,
             "status": item.status,
+            "is_active": getattr(item, "is_active", True) if getattr(item, "is_active", None) is not None else True,
             "created_by": item.created_by,
             "created_by_user_id": item.created_by_user_id,
             "sampling_seen_at": item.sampling_seen_at,
@@ -164,8 +166,8 @@ class ProgramRequestService:
         creator_name = actor_name or "Marketing Team"
 
         program_req = ProgramRequest(
-            request_code="PENDING",
-            sr_number="PENDING",
+            request_code=temporary_request_code(),
+            sr_number=None,
             customer_name=payload.customer_name.strip(),
             target_plant=payload.target_plant.strip(),
             program_campaign_title=payload.program_campaign_title.strip(),
@@ -177,15 +179,11 @@ class ProgramRequestService:
         self.db.add(program_req)
         self.db.flush()
 
-        yr_suffix = datetime.now(timezone.utc).year % 100
-        # The database-generated primary key is unique under concurrency and
-        # keeps the public business code stable even when another row is removed.
-        program_req.request_code = f"PG-{program_req.id:04d}"
-        program_req.sr_number = f"SR-{yr_suffix:02d}-PG-{program_req.id:03d}"
-        if self.db.query(ProgramRequest.id).filter(ProgramRequest.request_code == program_req.request_code).first():
-            program_req.request_code = f"PG-{program_req.id:04d}-R"
-        if self.db.query(ProgramRequest.id).filter(ProgramRequest.sr_number == program_req.sr_number).first():
-            program_req.sr_number = f"SR-{yr_suffix:02d}-PG-{program_req.id:03d}-R"
+        program_req.request_code = next_request_code(
+            self.db,
+            REQUEST_CODE_PREFIX_BY_SCOPE["program"],
+            program_req.created_at or datetime.now(timezone.utc),
+        )
 
         materials_count = 0
         if payload.materials:
@@ -703,6 +701,39 @@ class ProgramRequestService:
             self.db.commit()
             self.db.refresh(item)
 
+        return self.serialize(item)
+
+    def toggle_pause(
+        self,
+        request_id: int,
+        paused: bool,
+        current_user: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Marketing creator or Admin pauses/resumes execution of a seasonal program."""
+        item = self.repo.get_for_update(request_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Program planning request was not found")
+
+        actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
+        item.is_active = not paused
+
+        action = "PROGRAM_PAUSED" if paused else "PROGRAM_RESUMED"
+        note = "Seasonal Program was paused by Marketing" if paused else "Seasonal Program was resumed by Marketing"
+
+        self.repo.add_activity_log(
+            program_request_id=item.id,
+            actor_name=actor_name,
+            actor_department=actor_dept if current_user else "Marketing",
+            action=action,
+            payload={
+                "is_active": item.is_active,
+                "paused": paused,
+                "note": note,
+            },
+            actor_id=actor_id,
+        )
+        self.db.commit()
+        self.db.refresh(item)
         return self.serialize(item)
 
     def delete(self, request_id: int) -> bool:

@@ -85,7 +85,7 @@ export const ProgramPlanningRoute: React.FC<ProgramPlanningRouteProps> = ({ user
 
   const handleDeleteRequest = useCallback(async (request: SampleRequestItem, event?: React.MouseEvent) => {
     event?.stopPropagation();
-    if (!window.confirm(`Delete Program Planning request ${request.srNumber || request.materialCode || request.id}? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete Program Planning request ${request.requestCode || request.materialCode || request.id}? This cannot be undone.`)) return;
     const deleted = await deleteProgramRequestApi(request.id);
     if (!deleted) {
       setToast("Could not delete this Program Planning request.");

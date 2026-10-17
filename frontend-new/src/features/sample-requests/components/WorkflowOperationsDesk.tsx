@@ -148,6 +148,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
       // Text search
       if (!query) return true;
       return [
+        record.request_code,
         record.sr_number,
         record.customer,
         record.brand_name,
@@ -231,7 +232,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
       cell: (record) => (
         <button
           type="button"
-          aria-label={`Inspect ${record.sr_number}`}
+          aria-label={`Inspect ${record.request_code || record.sr_number || "request"}`}
           onClick={(event) => {
             event.stopPropagation();
             setSelectedKey(`${record.workflow_type}:${record.sample_request_id}`);
@@ -253,7 +254,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
           sortable: true,
           cell: (record) => (
             <div>
-              <div className="font-semibold text-[var(--on-surface)]">{record.sr_number}</div>
+              <div className="font-semibold text-[var(--on-surface)]">{record.request_code || record.sr_number || "Request"}</div>
               <div className="mt-0.5 text-[10px] text-[var(--on-surface-subtle)]">Costing</div>
             </div>
           ),
@@ -297,7 +298,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
           const isResample = Boolean(record.request_data?.is_resample || record.workflow_data?.isResample);
           return (
             <div>
-              <div className="font-bold text-[var(--on-surface)]">{record.sr_number}</div>
+              <div className="font-bold text-[var(--on-surface)]">{record.request_code || record.sr_number || "Request"}</div>
               {record.workflow_type === "sample" && (
                 isResample ? (
                   <span className="mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-500/20">

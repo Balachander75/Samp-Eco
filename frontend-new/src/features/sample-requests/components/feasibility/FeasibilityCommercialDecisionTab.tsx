@@ -281,24 +281,25 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                 <span>Commercial Request Conversion</span>
               </div>
 
-              {activeRequest.convertedSrNumber ? (
+              {(activeRequest.convertedRequestCode || activeRequest.convertedSrNumber) ? (
                 <div className="p-4 bg-[var(--surface-lowest)] rounded-xl border border-[var(--border-subtle)] flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-bold text-sm text-[var(--accent-primary)]">
-                        Official Request Code: {activeRequest.convertedSrNumber}
+                        Official Request Code: {activeRequest.convertedRequestCode || activeRequest.convertedSrNumber}
                       </span>
                       <button
                         type="button"
                         onClick={() => {
-                          if (activeRequest.convertedSrNumber) {
-                            navigator.clipboard.writeText(activeRequest.convertedSrNumber);
+                          const code = activeRequest.convertedRequestCode || activeRequest.convertedSrNumber;
+                          if (code) {
+                            navigator.clipboard.writeText(code);
                             setCopiedSr(true);
                             setTimeout(() => setCopiedSr(false), 2000);
                           }
                         }}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface-muted)] transition cursor-pointer"
-                        title="Copy SR Number"
+                        title="Copy Request Code"
                       >
                         {copiedSr ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                         <span>{copiedSr ? "Copied" : "Copy"}</span>

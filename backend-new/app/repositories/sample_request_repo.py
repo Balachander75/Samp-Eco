@@ -43,6 +43,24 @@ class SampleRequestRepository(BaseRepository[CreateSampleRequest]):
             .first()
         )
 
+    def get_by_scope_code(
+        self,
+        scope: str,
+        request_code: str,
+        *,
+        for_update: bool = False,
+    ) -> Optional[CreateSampleRequest]:
+        if not scope or not request_code:
+            return None
+        query = (
+            self.db.query(CreateSampleRequest)
+            .options(*self._eager_options())
+            .filter(CreateSampleRequest.request_codes[scope].astext == request_code)
+        )
+        if for_update:
+            query = query.with_for_update().populate_existing()
+        return query.first()
+
     def get_for_update(
         self,
         request_id: int,

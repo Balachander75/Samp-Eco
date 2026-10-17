@@ -11,6 +11,7 @@ import {
   replyToProgramActivityApi,
   claimProgramTaskApi,
   addProgramMaterialApi,
+  pauseProgramRequestApi,
 } from "@/infrastructure/api/programsApi";
 
 // Modular Sub-Components matching Feasibility Inspector
@@ -114,9 +115,9 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
   // Copy code handler
   const handleCopyCode = () => {
     const code =
-      activeRequest?.srNumber ||
+      activeRequest?.requestCode ||
       activeRequest?.materialCode ||
-      (activeRequest?.id ? `PG-${activeRequest.id}` : "");
+      (activeRequest?.id ? `PP-${activeRequest.id}` : "");
     if (!code) return;
     navigator.clipboard.writeText(code);
     setCopiedCode(true);
@@ -199,6 +200,26 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
     }
   };
 
+  const [isTogglingPause, setIsTogglingPause] = useState(false);
+  const isMarketing = effectiveUser?.team === "marketing" || user?.team === "marketing";
+  const canPause = !readOnly && isMarketing;
+
+  const handleTogglePause = async () => {
+    if (!activeRequest?.id || isTogglingPause) return;
+    const currentlyActive = activeRequest.isActive !== false;
+    setIsTogglingPause(true);
+    try {
+      const updated = await pauseProgramRequestApi(activeRequest.id, currentlyActive);
+      setLocalOverride(mapProgramRequestToSampleRequest(updated));
+      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
+    } catch (err) {
+      console.error("Failed to toggle program pause state:", err);
+    } finally {
+      setIsTogglingPause(false);
+    }
+  };
+
   if (!isOpen || !activeRequest) return null;
 
   const materials = activeRequest.programMaterials || [];
@@ -227,6 +248,9 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
           onCopyCode={handleCopyCode}
           onDeleteRequest={onDeleteRequest}
           readOnly={readOnly}
+          canPause={canPause}
+          isTogglingPause={isTogglingPause}
+          onTogglePause={handleTogglePause}
         />
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG CHATTER) */}

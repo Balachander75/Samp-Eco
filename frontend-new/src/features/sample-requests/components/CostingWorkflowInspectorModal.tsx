@@ -33,8 +33,10 @@ import {
   type ProductDetailItem,
 } from "@/infrastructure/api/masterApi";
 import { isMockupCreativeCharacteristic } from "@/features/sample-requests/components/staging/mockupCreativeFields";
+import { fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
+import { ScopeReferenceImagesGallery } from "@/features/sample-requests/components/staging/ScopeReferenceImagesGallery";
 import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
-import type { ProductSearchResult } from "@/features/sample-requests/types";
+import type { ProductSearchResult, SampleRequestItem } from "@/features/sample-requests/types";
 import { formatWorkflowAction } from "./workflowPresentation";
 
 export type InspectorMode = "creative" | "costing" | "sampling";
@@ -126,6 +128,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   const [specSearchQuery, setSpecSearchQuery] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState("all");
   const [specViewMode, setSpecViewMode] = useState<"all" | "configured" | "docket">("all");
+  const [scopeReferenceImages, setScopeReferenceImages] = useState<NonNullable<SampleRequestItem["scopeReferenceImages"]>>({});
 
   const dialogRef = useRef<HTMLElement>(null);
   const readOnly = isReadOnlyTeamHead(user);
@@ -180,6 +183,13 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
       setSelectedClassFilter("all");
     }
   }, [availableClasses, selectedClassFilter]);
+
+  useEffect(() => {
+    if (mode === "creative") {
+      setActiveTab("specs");
+      setSpecViewMode("all");
+    }
+  }, [mode]);
 
 
   const creativeFields = useMemo(
@@ -263,6 +273,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
     setNotes("");
     setError(null);
     setProductSpecifications([]);
+    setScopeReferenceImages({});
     setSpecificationsLoadError(null);
     setIsLoadingSpecifications(true);
     let cancelled = false;
@@ -283,6 +294,12 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
       .finally(() => {
         if (!cancelled) setIsLoadingSpecifications(false);
       });
+
+    fetchSampleRequestByIdApi(record.sample_request_id)
+      .then((request) => {
+        if (!cancelled) setScopeReferenceImages(request.scopeReferenceImages || {});
+      })
+      .catch((reason) => console.warn("Could not load Costing reference images:", reason));
 
     return () => {
       cancelled = true;
@@ -307,7 +324,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
 
   // Copy code handler
   const handleCopyCode = () => {
-    const code = record.sr_number || `SR-${record.sample_request_id}`;
+    const code = record.request_code || record.sr_number || `CR-${record.sample_request_id}`;
     navigator.clipboard.writeText(code);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
@@ -366,7 +383,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
     }
   };
 
-  const code = record.sr_number || `SR-${record.sample_request_id}`;
+  const code = record.request_code || record.sr_number || `CR-${record.sample_request_id}`;
 
   return createPortal(
     <div
@@ -524,7 +541,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--border-subtle)]">
-                        Technical Costing Dossier
+                        {mode === "creative" ? "Creative Product Inspection" : "Technical Costing Dossier"}
                       </span>
                       <h1
                         id="costing-inspector-title"
@@ -605,7 +622,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
               <div className="px-6 sm:px-8 pt-2 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
                 <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
                   {/* Tab 1: Costing Output Workspace (Primary Action Tab) */}
-                  <button
+                  {mode !== "creative" && <button
                     type="button"
                     onClick={() => setActiveTab("output")}
                     className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
@@ -625,7 +642,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         Pending
                       </span>
                     )}
-                  </button>
+                  </button>}
 
                   {/* Tab 2: Specifications & BOM Docket */}
                   <button
@@ -638,7 +655,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     }`}
                   >
                     <Layers className="w-3.5 h-3.5" />
-                    <span>2. Technical BOM &amp; Classes</span>
+                    <span>{mode === "creative" ? "Product Classes & Characteristics" : "2. Technical BOM &amp; Classes"}</span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
                       {specViewMode === "configured"
                         ? `${configuredCount} Configured`
@@ -647,7 +664,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                   </button>
 
                   {/* Tab 3: Commercial & Creative Inputs */}
-                  <button
+                  {mode !== "creative" && <button
                     type="button"
                     onClick={() => setActiveTab("commercial")}
                     className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
@@ -663,10 +680,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         Creative Spec
                       </span>
                     )}
-                  </button>
+                  </button>}
 
                   {/* Tab 4: Sampling Review */}
-                  <button
+                  {mode !== "creative" && <button
                     type="button"
                     onClick={() => setActiveTab("review")}
                     className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
@@ -690,7 +707,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         {isSamplingReview ? "In Review" : "Pending Costing"}
                       </span>
                     )}
-                  </button>
+                  </button>}
                 </div>
               </div>
 
@@ -860,6 +877,18 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                    ════════════════════════════════════════════════════════════════════ */}
                 {activeTab === "specs" && (
                   <div className="space-y-4">
+                    <ScopeReferenceImagesGallery
+                      images={scopeReferenceImages}
+                      scopes={["costing"]}
+                      onPreview={(url) => window.open(url, "_blank", "noopener,noreferrer")}
+                    />
+                    {mode === "creative" && (
+                      <div className="rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3 text-xs text-violet-950 dark:border-violet-900/50 dark:bg-violet-950/20 dark:text-violet-100">
+                        Review each product class and characteristic. You can edit any value here;
+                        changes are saved when you send the request to Costing. Purple “Creative input”
+                        fields are required for release.
+                      </div>
+                    )}
                     {/* View Controls & Filter Bar */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--surface-low)] p-3 rounded-xl border border-[var(--border-subtle)]">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -892,7 +921,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         )}
                       </div>
 
-                      {/* View Mode Toggle: All vs Configured vs Official Docket */}
+                      {/* Creative review stays in the editable product view; docket is for other teams. */}
                       <div className="flex items-center gap-1 bg-[var(--surface-lowest)] p-0.5 rounded-lg border border-[var(--border-subtle)] text-[10px] font-mono">
                         <button
                           type="button"
@@ -923,7 +952,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                             {configuredCount}
                           </span>
                         </button>
-                        <button
+                        {mode !== "creative" && <button
                           type="button"
                           onClick={() => setSpecViewMode("docket")}
                           className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
@@ -933,7 +962,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                           }`}
                         >
                           <span>Official Docket</span>
-                        </button>
+                        </button>}
                       </div>
                     </div>
 
@@ -960,7 +989,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                       <div className="rounded-xl bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-200">
                         No product class or specification rows are attached yet.
                       </div>
-                    ) : specViewMode === "docket" ? (
+                    ) : specViewMode === "docket" && mode !== "creative" ? (
                       /* Official Docket View */
                       <div className="overflow-x-auto rounded-xl border border-sky-300 bg-white p-3 dark:border-sky-900 dark:bg-zinc-950">
                         <div className="min-w-[720px]">
@@ -1093,9 +1122,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                                           )}
                                         </div>
 
-                                        {mode === "creative" && isCreativeField ? (
+                                        {mode === "creative" ? (
                                           <input
                                             aria-label={`${className} ${detail.characteristicName}`}
+                                            disabled={!canReleaseToCosting || isSaving}
                                             value={isMissingSpecificationValue(value) ? "" : value}
                                             onChange={(e) =>
                                               setProductSpecifications((current) =>

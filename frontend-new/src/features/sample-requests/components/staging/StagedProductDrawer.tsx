@@ -20,7 +20,13 @@ import type { ProductSearchResult } from "../../types";
 import { fetchProductDetailsApi, ProductDetailItem } from "@/infrastructure/api/masterApi";
 import { isMockupCreativeCharacteristic } from "./mockupCreativeFields";
 import { ProductDocketView } from "./ProductDocketView";
+import { ScopeReferenceImagesGallery } from "./ScopeReferenceImagesGallery";
 import { downloadProductDocketPdf, printProductDocketView } from "./productDocketPdf";
+
+const editableCharacteristicValue = (value: unknown) => {
+  const normalized = String(value ?? "").trim();
+  return ["NA", "N/A", "NONE", "NULL", "NAN", "—", "-"].includes(normalized.toUpperCase()) ? "" : normalized;
+};
 
 export interface StagedProductDrawerProps {
   inspectingProduct: StagedProductItem | null;
@@ -62,10 +68,14 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
   const [productDescription, setProductDescription] = useState("");
   const [editedDescription, setEditedDescription] = useState("");
   const [specView, setSpecView] = useState<"configured" | "all" | "docket">("configured");
-  const detailsRequestId = inspectingProduct?.savedRequestId || inspectingProduct?.sourceSampleRequestId;
+  const sourceProductId = inspectingProduct?.sourceSampleRequestId
+    || inspectingProduct?.catalogMetadata?.sourceProductId
+    || inspectingProduct?.samplingMetadata?.sourceSampleId;
+  const detailsRequestId = sourceProductId || inspectingProduct?.savedRequestId;
+  const docketRequestId = inspectingProduct?.savedRequestId || sourceProductId;
   const docketProduct = useMemo<(ProductSearchResult & { brandName?: string }) | null>(() => {
     if (!inspectingProduct) return null;
-    const requestId = Number(detailsRequestId);
+    const requestId = Number(docketRequestId);
     return {
       id: Number.isFinite(requestId) ? requestId : 0,
       sr_number: inspectingProduct.savedSrNumber || inspectingProduct.catalogMetadata?.sourceRequestNumber || "",
@@ -80,7 +90,7 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
       ].filter(Boolean).join(" / ") || "NA",
       brandName: inspectingProduct.brandName || "NA",
     };
-  }, [detailsRequestId, inspectingProduct, productDescription, programContext?.customer]);
+  }, [docketRequestId, inspectingProduct, productDescription, programContext?.customer]);
 
   const isDesignBrief = Boolean(
     inspectingProduct &&
@@ -209,13 +219,19 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
   const initialValues = useMemo(() => {
     const values: Record<string, string> = {};
     characteristics.forEach((detail) => {
-      const value = detail.value == null || ["NA", "N/A", "NONE", "NULL"].includes(String(detail.value).trim().toUpperCase())
-        ? ""
-        : String(detail.value);
+      const value = editableCharacteristicValue(detail.value);
       values[`${detail.className}::${detail.characteristicName}`] = value;
     });
     return values;
   }, [characteristics]);
+
+  const sourceValues = useMemo(() => {
+    const values: Record<string, string> = {};
+    sourceDetails.forEach((detail) => {
+      values[`${detail.className}::${detail.characteristicName}`] = editableCharacteristicValue(detail.value);
+    });
+    return values;
+  }, [sourceDetails]);
 
   useEffect(() => setEditedValues(initialValues), [initialValues]);
 
@@ -224,12 +240,23 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
     setIsSavingDetails(true);
     setDetailsError("");
     try {
-      const anyChanged = characteristics.some((detail) => {
+      const isSampleRequest = inspectingProduct.scopes.includes("sample");
+      const hasExistingSampleSource = Boolean(sourceProductId);
+      const anyChangedFromCurrent = characteristics.some((detail) => {
         const key = `${detail.className}::${detail.characteristicName}`;
         const original = (initialValues[key] || "").trim();
         const current = (editedValues[key] || "").trim();
         return original !== current;
       });
+      const anyChangedFromSource = characteristics.some((detail) => {
+        const key = `${detail.className}::${detail.characteristicName}`;
+        const sourceValue = sourceValues[key] ?? initialValues[key] ?? "";
+        const current = (editedValues[key] || "").trim();
+        return sourceValue.trim() !== current;
+      });
+      const anyChanged = isSampleRequest
+        ? !hasExistingSampleSource || anyChangedFromSource
+        : anyChangedFromCurrent;
 
       const creativePendingCharacteristicKeys = anyChanged
         ? characteristics
@@ -239,7 +266,7 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
                 Boolean((initialValues[`${detail.className}::${detail.characteristicName}`] || "").trim()))
             )
             .map((detail) => ({ className: detail.className, characteristicName: detail.characteristicName }))
-        : inspectingProduct.creativePendingCharacteristicKeys || [];
+        : isSampleRequest ? [] : inspectingProduct.creativePendingCharacteristicKeys || [];
 
       // If user changed specifications, blank the creative highlighted fields for Creative to fill
       const details = characteristics.map((detail) => {
@@ -604,6 +631,12 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
                 );
               })}
             </div>
+
+            <ScopeReferenceImagesGallery
+              images={inspectingProduct.scopeReferenceImages as any}
+              scopes={inspectingProduct.scopes.filter((scope): scope is "sample" | "mockup" | "costing" => scope !== "design")}
+              onPreview={(url) => window.open(url, "_blank", "noopener,noreferrer")}
+            />
 
             {/* Commercial Merchandising Taxonomy (Strictly outside technical SAP classes) */}
             {(inspectingProduct.productCategory || inspectingProduct.productSubCategory || inspectingProduct.productThirdCategory) && (

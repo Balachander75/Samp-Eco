@@ -1,10 +1,20 @@
 import React, { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2, Calendar, ChevronRight, Package } from "lucide-react";
+import {
+  Building2,
+  Calendar,
+  Package,
+  Palette,
+  Box,
+  Calculator,
+  ArrowUpRight,
+} from "lucide-react";
 import { DataTable } from "@/components/erp";
 import type { ColumnDef } from "@/components/erp";
 import type { SampleRequestItem } from "../types";
 import { getRequestTrackType, getStageIdForRequest } from "../utils/trackTypes";
+import { formatOdooDate } from "../utils/dateUtils";
+import { getPrimaryRequestCode, getRequestTypes } from "../sampling/utils/requestTypeUtils";
 
 export interface DraftPackageContext {
   id: string;
@@ -33,6 +43,13 @@ export interface DraftPackagesViewProps {
 }
 
 const packageKeyPart = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
+
+function getInitials(name?: string | null): string {
+  if (!name || !name.trim()) return "MK";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
   requests,
@@ -88,6 +105,10 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       .sort((a, b) => b.items.length - a.items.length || a.programName.localeCompare(b.programName));
   }, [matchingRequestIds, requests, selectedYear]);
 
+  const totalStagedItems = useMemo(() => {
+    return packageGroups.reduce((acc, g) => acc + g.items.length, 0);
+  }, [packageGroups]);
+
   const handleOpenWorkspace = useCallback((group: DraftPackageGroup) => {
     const context: DraftPackageContext = {
       id: group.id,
@@ -108,6 +129,25 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
     navigate("/sample-requests/draft-workspace", { state: { package: context } });
   }, [navigate]);
 
+  const handleOpenStaging = useCallback((group: DraftPackageGroup, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const first = group.items[0];
+    const stagingContext = {
+      customer: group.customer || "",
+      programName: group.programName || "",
+      programYear: group.programYear || "2026",
+      year: group.year || "2026-27",
+      targetPlant: group.targetPlant || "",
+      parentRequestId: first?.id,
+      parentSrNumber: first ? getPrimaryRequestCode(first) : "",
+      parentRequestTypes: first?.requestTypes || [],
+      parentMockupWorkflowState: first?.mockupWorkflowState,
+      parentCreationMode: first?.creationMode,
+    };
+    sessionStorage.setItem("samp_active_program_form", JSON.stringify(stagingContext));
+    navigate("/sample-requests/product-staging", { state: stagingContext });
+  }, [navigate]);
+
   const paginatedGroups = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return packageGroups.slice(start, start + pageSize);
@@ -116,85 +156,181 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
   const columns = useMemo<ColumnDef<DraftPackageGroup>[]>(() => [
     {
       id: "customer",
-      header: "Customer",
-      width: "25%",
+      header: "Customer & Target Plant",
+      width: "22%",
       cell: (group) => (
-        <span className="inline-flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]">
-          <Building2 className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
-          <span className="truncate" title={group.customer}>{group.customer}</span>
-        </span>
+        <div className="whitespace-nowrap">
+          <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--on-surface)]">
+            <Building2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <span className="truncate max-w-[180px]" title={group.customer}>
+              {group.customer}
+            </span>
+          </div>
+          {group.targetPlant && (
+            <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
+              Plant {group.targetPlant}
+            </div>
+          )}
+        </div>
       ),
     },
     {
       id: "programName",
-      header: "Program Name",
-      width: "35%",
+      header: "Program / Campaign",
+      width: "24%",
       cell: (group) => (
-        <span className="block truncate font-semibold text-[var(--text-primary)]" title={group.programName}>
-          {group.programName}
-        </span>
+        <div className="max-w-xs">
+          <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={group.programName}>
+            {group.programName}
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
+              <Calendar className="w-2.5 h-2.5 opacity-60" />
+              <span>BY {group.programYear}</span>
+            </span>
+          </div>
+        </div>
       ),
     },
     {
-      id: "programYear",
-      header: "Program Year",
+      id: "stagedProducts",
+      header: "Staged Products Preview",
+      width: "26%",
+      cell: (group) => {
+        const firstItem = group.items[0];
+        const remainingCount = group.items.length - 1;
+        return (
+          <div className="max-w-xs">
+            <div className="font-medium text-xs text-[var(--on-surface)] truncate" title={firstItem?.productDescription || firstItem?.materialCode || "Product"}>
+              {firstItem?.productDescription || firstItem?.materialCode || "Commercial Product"}
+            </div>
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              {firstItem?.materialCode && (
+                <span className="font-mono text-[10px] text-[var(--on-surface-subtle)]">
+                  {firstItem.materialCode}
+                </span>
+              )}
+              {remainingCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                  +{remainingCount} more
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: "scopesAndItems",
+      header: "Scopes & Deliverables",
+      width: "16%",
+      cell: (group) => {
+        const allTypes = new Set<string>();
+        group.items.forEach((item) => {
+          getRequestTypes(item).forEach((t) => allTypes.add(t));
+        });
+
+        return (
+          <div className="flex flex-col gap-1 whitespace-nowrap">
+            <div className="font-mono text-xs font-bold text-[var(--on-surface)]">
+              {group.items.length} {group.items.length === 1 ? "Product" : "Products"}
+            </div>
+            <div className="flex items-center gap-1 flex-wrap">
+              {allTypes.has("sample") && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" title="Contains Sampling">
+                  <Package className="w-2.5 h-2.5" />
+                  <span>SMP</span>
+                </span>
+              )}
+              {allTypes.has("design") && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20" title="Contains Design">
+                  <Palette className="w-2.5 h-2.5" />
+                  <span>DSG</span>
+                </span>
+              )}
+              {allTypes.has("mockup") && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20" title="Contains Mockup">
+                  <Box className="w-2.5 h-2.5" />
+                  <span>MUP</span>
+                </span>
+              )}
+              {allTypes.has("costing") && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20" title="Contains Costing">
+                  <Calculator className="w-2.5 h-2.5" />
+                  <span>CST</span>
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: "coordinator",
+      header: "Coordinator / Staged",
       width: "18%",
-      cell: (group) => (
-        <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">
-          <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden="true" />
-          {group.programYear}
-        </span>
-      ),
+      cell: (group) => {
+        const creator = group.createdBy || "Marketing";
+        const initials = getInitials(creator);
+        return (
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <span
+              className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 shrink-0"
+              title={creator}
+            >
+              {initials}
+            </span>
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-xs text-[var(--on-surface)] truncate max-w-[120px]" title={creator}>
+                {creator}
+              </span>
+              {group.dateRequestCreated && (
+                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                  {formatOdooDate(group.dateRequestCreated)}
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      },
     },
     {
-      id: "draftCount",
-      header: "Draft Items",
-      align: "center",
-      width: "12%",
-      cell: (group) => (
-        <span className="inline-flex items-center justify-center gap-1.5 font-medium tabular-nums text-[var(--text-secondary)]">
-          <Package className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden="true" />
-          {group.items.length}
-        </span>
-      ),
-    },
-    {
-      id: "action",
-      header: <span className="block text-right">Action</span>,
+      id: "actions",
+      header: <span className="block text-right">Actions</span>,
       align: "right",
-      width: "180px",
+      width: "160px",
       cell: (group) => (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            handleOpenWorkspace(group);
-          }}
-          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[var(--accent-primary)] transition hover:bg-[var(--accent-primary-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-          aria-label={`Open staging for ${group.customer}, ${group.programName}, ${group.programYear}`}
-        >
-          Open staging <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
+        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={(e) => handleOpenStaging(group, e)}
+            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-all cursor-pointer shadow-2xs hover:border-[var(--accent-primary)]/40 active:scale-95"
+            title="Open in Product Staging Form"
+          >
+            <Package className="w-3 h-3 text-[var(--on-surface-subtle)]" />
+            <span>Staging</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleOpenWorkspace(group)}
+            className="group inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-all cursor-pointer shadow-2xs hover:border-[var(--accent-primary)]/40 active:scale-95"
+            title="Open Full Draft Workspace"
+          >
+            <span>Workspace</span>
+            <ArrowUpRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-[var(--accent-primary)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+          </button>
+        </div>
       ),
     },
-  ], [handleOpenWorkspace]);
+  ], [handleOpenWorkspace, handleOpenStaging]);
 
   const hasDrafts = requests.some((item) => getStageIdForRequest(item) === "draft");
   const emptyMessage = hasDrafts
-    ? "No draft groups match these filters. Adjust the search or filters and try again."
-    : "No drafts to release. Saved products will appear grouped by customer, program, and year.";
+    ? "No draft packages match the active filter criteria. Clear filters or adjust your search."
+    : "No drafts currently staged. Products saved in intake will appear here grouped by program.";
 
   return (
-    <section className="space-y-3 p-4 sm:p-6" aria-labelledby="draft-groups-heading">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id="draft-groups-heading" className="text-sm font-semibold text-[var(--on-surface)]">
-          Drafts grouped by program
-        </h2>
-        <p className="text-xs text-[var(--on-surface-subtle)]">
-          Open a group to review its products and release them together.
-        </p>
-      </div>
-
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-[var(--surface-lowest)]">
       <DataTable
         data={paginatedGroups}
         columns={columns}
@@ -207,16 +343,26 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
         totalCount={packageGroups.length}
         onPageChange={onPageChange}
         toolbarLeft={(
-          <span className="text-xs text-[var(--text-secondary)]">
-            <span className="font-semibold tabular-nums text-[var(--text-primary)]">
-              {packageGroups.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
-              {packageGroups.length > 0 && <> - {Math.min(currentPage * pageSize, packageGroups.length)}</>}
-            </span>{" "}
-            of <span className="font-semibold tabular-nums text-[var(--text-primary)]">{packageGroups.length}</span> program groups
-          </span>
+          <div className="flex items-center gap-2 text-xs text-[var(--on-surface-muted)]">
+            <span>
+              Showing{" "}
+              <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">
+                {packageGroups.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+                {packageGroups.length > 0 && <> – {Math.min(currentPage * pageSize, packageGroups.length)}</>}
+              </span>{" "}
+              of{" "}
+              <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">
+                {packageGroups.length}
+              </span>{" "}
+              program packages
+            </span>
+            <span className="shrink-0 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] tabular-nums text-amber-700 dark:text-amber-300 font-bold">
+              {totalStagedItems} draft items staged
+            </span>
+          </div>
         )}
       />
-    </section>
+    </div>
   );
 };
 

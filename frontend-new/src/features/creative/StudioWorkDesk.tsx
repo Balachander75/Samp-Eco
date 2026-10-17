@@ -6,6 +6,7 @@ import type { SampleRequestItem } from "@/features/sample-requests/types";
 import { MockupWorkflowInspectorModal } from "@/features/sample-requests/components/staging/MockupWorkflowInspectorModal";
 import { MockupWorkflowQueuePage } from "@/features/sample-requests/components/staging/MockupWorkflowQueuePage";
 import { fetchSampleRequestsApi } from "@/infrastructure/api/sampleRequestsApi";
+import { isDirectPlantResampleRequest } from "@/features/sample-requests/utils/sampleRouting";
 import { useBusinessYear } from "@/context/BusinessYearContext";
 
 interface StudioWorkDeskProps {
@@ -24,6 +25,7 @@ export const StudioWorkDesk: React.FC<StudioWorkDeskProps> = ({ user }) => {
     try {
       const rows = await fetchSampleRequestsApi(selectedYear, false, "mockup");
       const studioRows = rows.filter((request) => {
+        if (isDirectPlantResampleRequest(request)) return false;
         const stage = String(request.mockupWorkflowState?.stage || "").toLowerCase();
         const status = String(request.status || "").toLowerCase();
         return stage === "studio" || (!stage && status.includes("studio"));

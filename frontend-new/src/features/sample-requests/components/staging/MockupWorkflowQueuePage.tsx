@@ -14,6 +14,7 @@ import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp
 import { Select } from "@/components/ui/Select";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
+import { getRequestRequiredDate } from "@/features/sample-requests/sampling/utils/requestTypeUtils";
 
 export interface MockupWorkflowQueuePageProps {
   requests: SampleRequestItem[];
@@ -102,7 +103,7 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
       // Search
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
-        const matchesSr = (r.srNumber || "").toLowerCase().includes(query);
+        const matchesSr = (r.requestCodes?.mockup || r.requestCode || r.srNumber || "").toLowerCase().includes(query);
         const matchesDesc = (r.productDescription || "").toLowerCase().includes(query);
         const matchesCust = (r.customer || "").toLowerCase().includes(query);
         const matchesCode = (r.materialCode || "").toLowerCase().includes(query);
@@ -147,12 +148,12 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
     exportRecordsToCsv({
       filename: `mockup_workflow_queue_${dateStr}.csv`,
       columns: [
-        { header: "SR Code", accessor: (r) => r.srNumber || r.id },
+        { header: "Mockup Code", accessor: (r) => r.requestCodes?.mockup || r.requestCode || r.srNumber || r.id },
         { header: "Product Description", accessor: (r) => r.productDescription },
         { header: "Customer / Brand", accessor: (r) => r.customer },
         { header: "Material Code", accessor: (r) => r.materialCode },
         { header: "Plant", accessor: (r) => r.targetPlant },
-        { header: "Due Date", accessor: (r) => r.sampleRequiredDate },
+        { header: "Due Date", accessor: (r) => getRequestRequiredDate(r, "mockup") },
         {
           header: "Mockup CAD Output (Link / Path)",
           accessor: (r) => r.mockupWorkflowState?.mockupUrl || "Awaiting Output",
@@ -211,12 +212,12 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
     () => [
       {
         id: "sr_number",
-        header: "SR Code / Date",
+        header: "Mockup Code / Date",
         width: "w-[150px]",
         sortable: true,
         cell: (r) => (
           <div>
-            <CopyBadge text={r.srNumber || `SR-${r.id}`} />
+            <CopyBadge text={r.requestCodes?.mockup || r.requestCode || r.srNumber || `MR-${r.id}`} />
             <div className="mt-0.5 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
               {r.dateRequestCreated ? formatOdooDate(r.dateRequestCreated) : "—"}
             </div>
@@ -281,12 +282,15 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
         id: "sla",
         header: "Required SLA Date",
         width: "w-[130px]",
-        cell: (r) => (
-          <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--on-surface-muted)]">
-            <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
-            <span>{r.sampleRequiredDate ? formatOdooDate(r.sampleRequiredDate) : "Standard SLA"}</span>
-          </div>
-        ),
+        cell: (r) => {
+          const requiredDate = getRequestRequiredDate(r, "mockup");
+          return (
+            <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--on-surface-muted)]">
+              <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
+              <span>{requiredDate ? formatOdooDate(requiredDate) : "Standard SLA"}</span>
+            </div>
+          );
+        },
       },
       {
         id: "output",

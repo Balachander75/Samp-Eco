@@ -195,7 +195,7 @@ export const ProgramPlanningWorkspace: React.FC<ProgramPlanningWorkspaceProps> =
       navigate("/sample-requests/programs", {
         replace: true,
         state: {
-          toastMessage: `✓ Program Request ${record.srNumber} (${record.requestCode}) submitted to Sampling Team!`,
+          toastMessage: `✓ Program Request ${record.requestCode} submitted to Sampling Team!`,
         },
       });
       return;

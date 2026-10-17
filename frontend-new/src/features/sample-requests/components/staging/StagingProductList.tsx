@@ -449,7 +449,7 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                         </span>
                       ) : prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length || prod.variantNumber ? (
                         <span className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[9px] font-semibold text-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                          Creative then Sampling
+                          Creative → Studio → Sampling → Plant
                         </span>
                       ) : (
                         <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">

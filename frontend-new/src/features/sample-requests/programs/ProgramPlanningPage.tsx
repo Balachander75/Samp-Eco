@@ -1,14 +1,26 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
 import { SampleRequestItem } from "../types";
 import { getRequestTrackType } from "../utils/trackTypes";
-import { Plus, Trash2, ChevronRight } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Layers,
+  Clock,
+  CheckCircle2,
+  Factory,
+  Search,
+  X,
+  Pause,
+  Play,
+} from "lucide-react";
 import { isMaterialAddedRecently } from "../utils/dateUtils";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { Select } from "@/components/ui/Select";
 import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
+import { pauseProgramRequestApi } from "@/infrastructure/api/programsApi";
 
 const NewProgramPlanningModal = React.lazy(() =>
   import("./components/NewProgramPlanningModal").then((m) => ({ default: m.NewProgramPlanningModal }))
@@ -30,7 +42,7 @@ export interface ProgramPlanningPageProps {
   onRefresh: () => Promise<void>;
 }
 
-export type ProgramStageTab = "all" | "awaiting_samp" | "samp_added" | "plant_added";
+export type ProgramStageTab = "all" | "running" | "awaiting_samp" | "samp_added" | "plant_added";
 
 const hasSampOutput = (request: SampleRequestItem) => Boolean((request.samplingRemark || "").trim());
 const hasPlantOutput = (request: SampleRequestItem) => Boolean((request.plantRemark || "").trim());
@@ -40,6 +52,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
   isLoading,
   selectedYear,
   uniqueCustomers,
+  user,
   isAdmin,
   isReadOnly = false,
   onInspectRequest,
@@ -53,17 +66,35 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
   const [customerFilter, setCustomerFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === "/" &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Scoped strictly to program planning requests
   const programRequests = useMemo(() => {
     return requests.filter((r) => {
       const mode = String(r.creationMode || "").toLowerCase();
       const kind = String(r.requestKind || "").toLowerCase();
+      const code = String(r.requestCode || "").toLowerCase();
       const sr = String(r.srNumber || "").toLowerCase();
       const mat = String(r.materialCode || "").toLowerCase();
       return (
         kind === "program" ||
         mode === "program_planning" ||
+        code.startsWith("pp-") ||
         sr.includes("-pg-") ||
         mat.includes("pg-") ||
         getRequestTrackType(r) === "program_planning"
@@ -93,11 +124,13 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
   // Program Statistics
   const programStats = useMemo(() => {
     let totalSkus = 0;
+    let running = 0;
     let awaitingSamp = 0;
     let sampAdded = 0;
     let plantAdded = 0;
 
     programRequests.forEach((r) => {
+      if (r.isActive !== false) running++;
       const matCount = (r.programMaterials || []).length;
       totalSkus += matCount > 0 ? matCount : 1;
       const samp = hasSampOutput(r);
@@ -111,6 +144,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
     return {
       totalPrograms: programRequests.length,
       totalSkus,
+      running,
       awaitingSamp,
       sampAdded,
       plantAdded,
@@ -120,6 +154,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
   // Filtered dataset
   const filteredRequests = useMemo(() => {
     return programRequests.filter((r) => {
+      if (filterTab === "running" && r.isActive === false) return false;
       if (filterTab === "awaiting_samp" && hasSampOutput(r)) return false;
       if (filterTab === "samp_added" && !hasSampOutput(r)) return false;
       if (filterTab === "plant_added" && !hasPlantOutput(r)) return false;
@@ -134,7 +169,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
 
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
-        const code = (r.materialCode || r.srNumber || "").toLowerCase();
+        const code = (r.requestCode || r.materialCode || r.srNumber || "").toLowerCase();
         const cust = (r.customer || "").toLowerCase();
         const title = (r.programName || r.productDescription || "").toLowerCase();
         const plant = (r.targetPlant || "").toLowerCase();
@@ -181,8 +216,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
     exportRecordsToCsv({
       filename: `Seasonal_Program_Planning_${dateStr}.csv`,
       columns: [
-        { header: "Program Code", accessor: (r) => r.materialCode || "" },
-        { header: "SR Number", accessor: (r) => r.srNumber || "" },
+        { header: "Program Code", accessor: (r) => r.requestCode || r.materialCode || "" },
         { header: "Campaign Title", accessor: (r) => r.programName || r.productDescription || "" },
         { header: "Customer", accessor: (r) => r.customer || "" },
         { header: "Target Plant", accessor: (r) => r.targetPlant || "" },
@@ -205,6 +239,14 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       color: "bg-indigo-500",
       isActive: filterTab === "all",
       onClick: () => setFilterTab("all"),
+    },
+    {
+      label: "Program Running",
+      value: programStats.running,
+      detail: "Active in development",
+      color: "bg-emerald-600",
+      isActive: filterTab === "running",
+      onClick: () => setFilterTab("running"),
     },
     {
       label: "Awaiting SAMP Input",
@@ -232,24 +274,51 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
     },
   ];
 
+  const [togglingId, setTogglingId] = useState<string | number | null>(null);
+
+  const handleTogglePause = async (req: SampleRequestItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const willPause = req.isActive !== false;
+    setTogglingId(req.id);
+    try {
+      await pauseProgramRequestApi(req.id, willPause);
+      await onRefresh();
+    } catch (err) {
+      console.error("Could not toggle program pause status:", err);
+      alert(err instanceof Error ? err.message : "Failed to update program status");
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const columns = useMemo<ColumnDef<SampleRequestItem>[]>(
     () => [
       {
         id: "program_id",
         header: "Program ID",
-        width: "w-[140px]",
+        width: "w-[135px]",
         sortable: true,
-        cell: (row) => <CopyBadge text={row.srNumber || row.materialCode || `PG-${row.id}`} />,
+        cell: (row) => (
+          <div className="flex flex-col gap-0.5 items-start">
+            <CopyBadge text={row.requestCode || row.materialCode || `PP-${row.id}`} />
+            <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] font-medium">
+              BY {row.programYear || "2026"}
+            </span>
+          </div>
+        ),
       },
       {
         id: "campaign",
         header: "Campaign Title & Product Scope",
         cell: (row) => (
-          <div className="max-w-sm">
-            <div className="truncate font-semibold text-xs text-[var(--on-surface)]" title={row.programName || row.programCampaignTitle || "Seasonal Program"}>
+          <div className="max-w-md">
+            <div
+              className="truncate font-semibold text-xs text-[var(--on-surface)]"
+              title={row.programName || row.programCampaignTitle || "Seasonal Program"}
+            >
               {row.programName || row.programCampaignTitle || "Seasonal Program"}
             </div>
-            <div className="mt-0.5 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+            <div className="mt-0.5 truncate text-[10.5px] font-mono text-[var(--on-surface-subtle)]">
               {row.productDescription || "Multi-SKU scholastic program range"}
             </div>
           </div>
@@ -257,46 +326,34 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       },
       {
         id: "customer",
-        header: "Customer",
+        header: "Customer & Plant",
         width: "w-[160px]",
         cell: (row) => (
-          <span className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.customer || ""}>
-            {row.customer || "—"}
-          </span>
-        ),
-      },
-      {
-        id: "plant",
-        header: "Plant",
-        width: "w-[100px]",
-        cell: (row) => (
-          <span className="font-mono text-xs text-[var(--on-surface-muted)]">
-            Plant {row.targetPlant || "1505"}
-          </span>
-        ),
-      },
-      {
-        id: "year",
-        header: "Year",
-        width: "w-[90px]",
-        align: "center",
-        cell: (row) => (
-          <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-xs font-bold text-[var(--on-surface-muted)]">
-            {row.programYear || "2026"}
-          </span>
+          <div className="flex flex-col gap-0.5 items-start min-w-0">
+            <span
+              className="font-semibold text-xs text-[var(--on-surface)] truncate max-w-full"
+              title={row.customer || "—"}
+            >
+              {row.customer || "—"}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--on-surface-muted)]">
+              <Factory className="w-2.5 h-2.5 opacity-70 shrink-0" />
+              <span>Plant {row.targetPlant || "1505"}</span>
+            </span>
+          </div>
         ),
       },
       {
         id: "skus",
         header: "Matrix SKUs",
-        width: "w-[120px]",
+        width: "w-[95px]",
         align: "center",
         cell: (row) => {
           const materials = row.programMaterials || [];
           const skuCount = materials.length > 0 ? materials.length : 1;
           const hasRecent = materials.some((m) => isMaterialAddedRecently(m.createdAt));
           return (
-            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            <div className="flex items-center justify-center gap-1">
               <span className="inline-flex items-center rounded-full bg-[var(--accent-primary-subtle)] px-2 py-0.5 font-mono text-[10.5px] font-bold text-[var(--accent-primary)]">
                 {skuCount} SKU{skuCount !== 1 ? "s" : ""}
               </span>
@@ -310,66 +367,87 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
         },
       },
       {
-        id: "notes",
-        header: "Team Notes",
-        width: "w-[160px]",
+        id: "samp_review",
+        header: "SAMP Review",
+        width: "w-[130px]",
         cell: (row) => {
           const samp = hasSampOutput(row);
-          const plant = hasPlantOutput(row);
           return (
-            <div className="flex flex-col gap-1 items-start">
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  samp
-                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                    : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
-                }`}
-              >
-                SAMP: {samp ? "Note added" : "Awaiting"}
-              </span>
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  plant
-                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                    : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
-                }`}
-              >
-                Plant: {plant ? "Note added" : "Awaiting"}
-              </span>
-            </div>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                samp
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60"
+                  : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)] border border-[var(--border-subtle)]"
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${samp ? "bg-emerald-500" : "bg-neutral-400"}`} />
+              <span>{samp ? "Note Added" : "Awaiting"}</span>
+            </span>
           );
         },
       },
       {
-        id: "actions",
-        header: "Commercial Action",
-        align: "right",
+        id: "plant_review",
+        header: "Plant Review",
         width: "w-[130px]",
-        cell: (row) => (
-          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => handleOpenInspector(row)}
-              className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
+        cell: (row) => {
+          const plant = hasPlantOutput(row);
+          return (
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                plant
+                  ? "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/60"
+                  : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)] border border-[var(--border-subtle)]"
+              }`}
             >
-              <span>Inspect</span>
-              <ChevronRight className="w-3 h-3" />
-            </button>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={(e) => onDeleteRequest(row, e)}
-                title="Delete program"
-                className="inline-flex h-7 w-7 select-none items-center justify-center rounded-lg text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        ),
+              <span className={`w-1.5 h-1.5 rounded-full ${plant ? "bg-teal-500" : "bg-neutral-400"}`} />
+              <span>{plant ? "Note Added" : "Awaiting"}</span>
+            </span>
+          );
+        },
+      },
+      {
+        id: "status",
+        header: "Status",
+        width: "w-[145px]",
+        cell: (row) => {
+          const isPaused = row.isActive === false;
+          const canPause = !isReadOnly && user?.team === "marketing";
+          return (
+            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              {isPaused ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                  <Pause className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>Paused</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span>Active</span>
+                </span>
+              )}
+              {canPause && (
+                <button
+                  type="button"
+                  onClick={(e) => handleTogglePause(row, e)}
+                  disabled={togglingId === row.id}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer select-none active:scale-95 ${
+                    isPaused
+                      ? "text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/60"
+                      : "text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/60"
+                  }`}
+                  title={isPaused ? "Resume this program" : "Pause this program"}
+                >
+                  {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                  <span>{isPaused ? "Resume" : "Pause"}</span>
+                </button>
+              )}
+            </div>
+          );
+        },
       },
     ],
-    [isAdmin, onDeleteRequest]
+    [isAdmin, isReadOnly, user, togglingId]
   );
 
   return (
@@ -391,40 +469,98 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       onExportCSV={handleExportCSV}
       exportDisabled={filteredRequests.length === 0}
       kpiItems={kpiItems}
+      kpiGridCols="grid-cols-2 gap-2 sm:grid-cols-5"
       filterControls={
         <>
+          {/* Quick Stage Segmented Tabs */}
+          <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5 shadow-2xs shrink-0">
+            {[
+              { id: "all", label: "All Plans", icon: Layers, count: programStats.totalPrograms },
+              { id: "running", label: "Running", icon: Play, count: programStats.running },
+              { id: "awaiting_samp", label: "Awaiting SAMP", icon: Clock, count: programStats.awaitingSamp },
+              { id: "samp_added", label: "SAMP Notes", icon: CheckCircle2, count: programStats.sampAdded },
+              { id: "plant_added", label: "Plant Notes", icon: Factory, count: programStats.plantAdded },
+            ].map((item) => {
+              const isSelected = filterTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setFilterTab(item.id as ProgramStageTab)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all duration-150 cursor-pointer select-none active:scale-95 ${
+                    isSelected
+                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold border border-[var(--border-subtle)]"
+                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50"
+                  }`}
+                >
+                  <item.icon className={`w-3 h-3 ${isSelected ? "text-[var(--accent-primary)]" : "opacity-70"}`} />
+                  <span>{item.label}</span>
+                  <span
+                    className={`text-[9.5px] font-mono px-1 py-0.2 rounded-full tabular-nums ${
+                      isSelected
+                        ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
+                        : "text-[var(--on-surface-subtle)] bg-[var(--surface-lowest)]/60"
+                    }`}
+                  >
+                    {item.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Integrated Search Input right next to Stage Tabs */}
+          <div className="group relative min-w-[180px] flex-1 max-w-[280px]">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--on-surface-subtle)] transition-colors group-focus-within:text-[var(--accent-primary)]" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search code, customer, title... ('/')"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] pl-8 pr-7 text-xs text-[var(--on-surface)] outline-none transition-all placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Customer Filter Dropdown */}
           {customerList.length > 0 && (
             <Select
               aria-label="Filter by customer"
               value={customerFilter}
               onChange={(e) => setCustomerFilter(e.target.value)}
-              className="min-w-[160px] max-w-[240px]"
+              className="min-w-[130px] max-w-[170px]"
               options={[
-                { value: "all", label: "All Customers" },
+                { value: "all", label: `Customers (${customerList.length})` },
                 ...customerList.map((c) => ({ value: c, label: c })),
               ]}
             />
           )}
 
+          {/* Plant Filter Dropdown */}
           {plantList.length > 0 && (
             <Select
               aria-label="Filter by plant"
               value={selectedPlantFilter}
               onChange={(e) => setSelectedPlantFilter(e.target.value)}
-              className="min-w-[140px]"
+              className="min-w-[110px] max-w-[140px]"
               options={[
-                { value: "all", label: "All Plants" },
+                { value: "all", label: `Plants (${plantList.length})` },
                 ...plantList.map((p) => ({ value: p, label: `Plant ${p}` })),
               ]}
             />
           )}
         </>
       }
-      search={{
-        value: searchTerm,
-        onChange: setSearchTerm,
-        placeholder: "Search code, customer, title...",
-      }}
       hasActiveFilters={Boolean(
         customerFilter !== "all" || selectedPlantFilter !== "all" || filterTab !== "all" || searchTerm
       )}

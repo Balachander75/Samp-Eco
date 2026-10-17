@@ -1,5 +1,17 @@
 export type DeliverableScopeId = "design" | "mockup" | "sample" | "costing";
 
+export type ReferenceImageScopeId = "mockup" | "sample" | "costing";
+
+export interface StagedReferenceImage {
+  id: string;
+  url: string;
+  name: string;
+  size?: string;
+  originalSizeBytes?: number;
+}
+
+export type ScopeReferenceImages = Partial<Record<ReferenceImageScopeId, StagedReferenceImage[]>>;
+
 export interface StagedDesignArtwork {
   designNumber: string;
   description: string;
@@ -34,6 +46,7 @@ export interface StagedProductItem {
   isDraftSaved?: boolean;
   sourceSampleRequestId?: number;
   sourceSampleCode?: string;
+  sourceRequestCode?: string;
   customBinding1?: string;
   customBinding2?: string;
   customDetails?: Array<{
@@ -80,6 +93,7 @@ export interface StagedProductItem {
     webLinks: string[];
     referenceImage: string;
   };
+  scopeReferenceImages?: ScopeReferenceImages;
   mockupMetadata?: {
     designNeeded: boolean;
     marketingShutterstockNo?: string;

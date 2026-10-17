@@ -43,6 +43,8 @@ export interface DataTableProps<T> {
   pageSize?: number;
   totalCount?: number;
   onPageChange?: (page: number) => void;
+  // Table custom styles
+  tableClassName?: string;
   // Toolbar slots
   toolbarLeft?: React.ReactNode;
   toolbarRight?: React.ReactNode;
@@ -67,6 +69,7 @@ export function DataTable<T>({
   pageSize = 50,
   totalCount,
   onPageChange,
+  tableClassName,
   toolbarLeft,
   toolbarRight,
 }: DataTableProps<T>) {
@@ -123,12 +126,12 @@ export function DataTable<T>({
 
       {/* Main Table Container */}
       <div className="flex-1 overflow-auto min-h-0 relative">
-        <table className="w-full text-left text-[13px] border-collapse min-w-[1080px]">
+        <table className={`w-full text-left text-[13px] border-collapse ${tableClassName ?? "min-w-[1080px]"}`}>
           {/* Sticky Header */}
           <thead className="sticky top-0 z-20 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] shadow-2xs">
             <tr>
               {enableSelection && (
-                <th className="w-10 px-4 py-2.5 text-center bg-[var(--surface-low)]">
+                <th className="w-9 px-2.5 py-2 text-center bg-[var(--surface-low)]">
                   <input
                     type="checkbox"
                     checked={isAllSelected}
@@ -158,7 +161,7 @@ export function DataTable<T>({
                     key={col.id}
                     onClick={() => col.sortable && onSortChange && onSortChange(col.id)}
                     className={[
-                      "px-4 py-2.5 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.045em] text-[var(--text-muted)]",
+                      "px-3 py-2 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.045em] text-[var(--text-muted)]",
                       col.width ?? "",
                       col.sortable
                         ? "cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 group select-none transition-colors"
@@ -263,7 +266,7 @@ export function DataTable<T>({
                   >
                     {enableSelection && (
                       <td
-                        className="px-4 py-3 text-center"
+                        className="px-2.5 py-2 text-center"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -289,7 +292,7 @@ export function DataTable<T>({
                         <td
                           key={col.id}
                           className={[
-                            "px-4 py-2.5",
+                            "px-3 py-2",
                             col.width ?? "",
                             col.align === "right"
                               ? "text-right"

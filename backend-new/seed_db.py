@@ -18,8 +18,6 @@ def init_and_seed():
         # 1. Seed Plants
         plants_data = [
             {"code": "1505", "name": "1505 - Khaniwade", "location": "Khaniwade, Maharashtra"},
-            {"code": "1508", "name": "1508 - Vasai", "location": "Vasai, Maharashtra"},
-            {"code": "1509", "name": "1509 - Daman", "location": "Daman, UT"},
         ]
 
         for p_info in plants_data:

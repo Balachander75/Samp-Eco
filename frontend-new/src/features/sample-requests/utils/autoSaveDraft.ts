@@ -7,6 +7,7 @@ import { CreateSampleRequestForm } from "../types";
 import { apiRawFetch } from "@/infrastructure/api/client";
 import { UserProfile } from "@/features/auth";
 import { getBusinessYearForDate } from "@/lib/businessYear";
+import { getAutomaticSampleRoute } from "./sampleRouting";
 
 export interface ProgramContextData {
   customer?: string;
@@ -72,6 +73,7 @@ export async function autoSaveStagedProductsToDraft(
         items: items.map((prod) => ({
           product_description: prod.productDescription,
           material_code: prod.materialCode,
+          source_request_code: prod.sourceRequestCode || null,
           source_sample_request_id:
             prod.sourceSampleRequestId ||
             prod.catalogMetadata?.sourceProductId ||
@@ -103,7 +105,7 @@ export async function autoSaveStagedProductsToDraft(
           mockup_workflow_state: prod.scopes.includes("mockup") ? {
             stage: "marketing",
             designNeeded: prod.mockupMetadata?.designNeeded ?? (prod.creationMode === "new" || prod.scopes.includes("design")),
-            creativeChangesRequired: Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
+            creativeChangesRequired: (prod.scopes.includes("sample") && getAutomaticSampleRoute(prod).creativeChangesRequired) || Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
             marketingShutterstockNo: prod.mockupMetadata?.marketingShutterstockNo || "",
             marketingRemark: prod.mockupMetadata?.marketingRemark || "",
             qtyForMockup: prod.qtyForMockup || prod.mockupMetadata?.qtyForMockup || "1",
@@ -118,23 +120,23 @@ export async function autoSaveStagedProductsToDraft(
                 },
               },
             } : {}),
-            isResample: Boolean(prod.isResample || prod.samplingMetadata?.isResample),
+            isResample: getAutomaticSampleRoute(prod).isResample,
             ...(prod.scopes.includes("sample") ? {
               samplingRouting: {
                 stage: "marketing",
-                isResample: Boolean(prod.isResample || prod.samplingMetadata?.isResample),
-                creativeChangesRequired: Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
+                isResample: getAutomaticSampleRoute(prod).isResample,
+                creativeChangesRequired: getAutomaticSampleRoute(prod).creativeChangesRequired,
                 isDesignVariant: Boolean(prod.variantNumber),
                 variantNumber: prod.variantNumber,
                 creativePendingCharacteristicKeys: prod.creativePendingCharacteristicKeys || [],
               },
             } : {}),
           } : prod.scopes.includes("sample") ? {
-            isResample: Boolean(prod.isResample || prod.samplingMetadata?.isResample),
+            isResample: getAutomaticSampleRoute(prod).isResample,
             samplingRouting: {
               stage: "marketing",
-              isResample: Boolean(prod.isResample || prod.samplingMetadata?.isResample),
-              creativeChangesRequired: Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
+              isResample: getAutomaticSampleRoute(prod).isResample,
+              creativeChangesRequired: getAutomaticSampleRoute(prod).creativeChangesRequired,
               isDesignVariant: Boolean(prod.variantNumber),
               variantNumber: prod.variantNumber,
               creativePendingCharacteristicKeys: prod.creativePendingCharacteristicKeys || [],
@@ -167,6 +169,12 @@ export async function autoSaveStagedProductsToDraft(
           product_image_path: prod.designMetadata?.referenceImage || null,
           reference_images: prod.designMetadata?.images?.map((img) => img.url) || [],
           reference_links: prod.designMetadata?.webLinks || [],
+          scope_reference_images: Object.fromEntries(
+            Object.entries(prod.scopeReferenceImages || {}).map(([scope, images]) => [
+              scope,
+              (images || []).map((image) => ({ url: image.url, name: image.name, original_size_bytes: image.originalSizeBytes })),
+            ]),
+          ),
           remarks:
             prod.designMetadata?.remarks ||
             (prod.samplingMetadata?.partialRequirements
@@ -241,6 +249,7 @@ export async function autoSaveStagedProductsToDraft(
       targetPlant,
       productDescription: prod.productDescription,
       materialCode: prod.materialCode,
+      sourceRequestCode: prod.sourceRequestCode,
       barcode: prod.barcode || "",
       customerProductCode: prod.customerProductCode || "",
       sampleRequiredDate: prod.sampleRequiredDate || prod.designMetadata?.designRequiredDate,
@@ -256,6 +265,12 @@ export async function autoSaveStagedProductsToDraft(
       productImagePath: prod.designMetadata?.referenceImage || undefined,
       referenceImages: prod.designMetadata?.images?.map((img) => img.url) || [],
       referenceLinks: prod.designMetadata?.webLinks || [],
+      scopeReferenceImages: Object.fromEntries(
+        Object.entries(prod.scopeReferenceImages || {}).map(([scope, images]) => [
+          scope,
+          (images || []).map((image) => ({ url: image.url, name: image.name, originalSizeBytes: image.originalSizeBytes })),
+        ]),
+      ),
       trend: prod.designMetadata?.trend || undefined,
       targetAudience: prod.designMetadata?.targetAudience || undefined,
       numberOfDesigns: prod.designMetadata?.numberOfDesigns || 1,
@@ -266,6 +281,7 @@ export async function autoSaveStagedProductsToDraft(
         prod.catalogMetadata?.sourceMaterialCode,
       sourceSampleRequestId:
         prod.sourceSampleRequestId || prod.catalogMetadata?.sourceProductId || prod.samplingMetadata?.sourceSampleId,
+      requestTypeSelectedAt: prod.requestTypeTimestamps,
       customDetails: prod.customDetails?.map((detail) => ({
         className: detail.className || detail.class_name || "Product",
         characteristicName: detail.characteristicName || detail.characteristic_name || "",
@@ -277,8 +293,9 @@ export async function autoSaveStagedProductsToDraft(
       mockupRequired: prod.scopes.includes("mockup") ? "Yes" : undefined,
       mockupWorkflowState: prod.scopes.includes("mockup") ? {
         stage: "marketing",
+        isResample: getAutomaticSampleRoute(prod).isResample,
         designNeeded: prod.mockupMetadata?.designNeeded ?? (prod.creationMode === "new" || prod.scopes.includes("design")),
-        creativeChangesRequired: Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
+        creativeChangesRequired: (prod.scopes.includes("sample") && getAutomaticSampleRoute(prod).creativeChangesRequired) || Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
         marketingShutterstockNo: prod.mockupMetadata?.marketingShutterstockNo || "",
         marketingRemark: prod.mockupMetadata?.marketingRemark || "",
         qtyForMockup: prod.qtyForMockup || prod.mockupMetadata?.qtyForMockup || "1",
@@ -296,7 +313,8 @@ export async function autoSaveStagedProductsToDraft(
         ...(prod.scopes.includes("sample") ? {
           samplingRouting: {
             stage: "marketing",
-            creativeChangesRequired: Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
+            isResample: getAutomaticSampleRoute(prod).isResample,
+            creativeChangesRequired: getAutomaticSampleRoute(prod).creativeChangesRequired,
             isDesignVariant: Boolean(prod.variantNumber),
             variantNumber: prod.variantNumber,
             creativePendingCharacteristicKeys: prod.creativePendingCharacteristicKeys || [],
@@ -304,15 +322,20 @@ export async function autoSaveStagedProductsToDraft(
         } : {}),
       } : prod.scopes.includes("sample") ? {
         stage: "marketing",
+        isResample: getAutomaticSampleRoute(prod).isResample,
         samplingRouting: {
           stage: "marketing",
-          creativeChangesRequired: Boolean(prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length),
+          isResample: getAutomaticSampleRoute(prod).isResample,
+          creativeChangesRequired: getAutomaticSampleRoute(prod).creativeChangesRequired,
           isDesignVariant: Boolean(prod.variantNumber),
           variantNumber: prod.variantNumber,
           creativePendingCharacteristicKeys: prod.creativePendingCharacteristicKeys || [],
         },
       } : undefined,
       brandName: prod.brandName || undefined,
+      productCategory: prod.productCategory || undefined,
+      productSubCategory: prod.productSubCategory || undefined,
+      productThirdCategory: prod.productThirdCategory || undefined,
       unitPcPack: prod.unitPcPack || undefined,
       qtyPerPack: prod.qtyPerPack || undefined,
       qtyForSampling: prod.qtyForSampling || undefined,

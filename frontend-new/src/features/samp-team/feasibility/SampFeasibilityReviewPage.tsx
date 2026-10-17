@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { UserProfile } from "@/features/auth";
 import { isAdmin as checkIsAdmin } from "@/features/auth/permissions";
 import { useBusinessYear } from "@/context/BusinessYearContext";
@@ -17,6 +17,8 @@ import {
 } from "@/components/ui";
 import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
+import { Search, X } from "lucide-react";
+import { getFeasibilityTypeDisplay } from "@/features/sample-requests/utils/feasibilityParsers";
 
 export interface SampFeasibilityReviewPageProps {
   requests?: SampleRequestItem[];
@@ -137,6 +139,20 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
     },
     [showToast]
   );
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Global '/' keyboard shortcut to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setTodayKey(indiaDateKey(new Date()) || ""), 60_000);
@@ -378,7 +394,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
     });
   };
 
-  // 10 Distinct Enterprise ERP Columns
+  // Compact & Beautifully Organized Columns
   const columns: ColumnDef<SampleRequestItem>[] = useMemo(
     () => [
       {
@@ -388,13 +404,21 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
         cell: (req) => (
           <div className="min-w-0">
             <CopyBadge text={req.materialCode || `FC-${String(req.id).padStart(4, "0")}`} />
+            <div className="mt-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
+              Raised{" "}
+              {req.dateRequestCreated
+                ? formatOdooDate(req.dateRequestCreated)
+                : req.createdAt
+                ? formatOdooDate(req.createdAt)
+                : "—"}
+            </div>
           </div>
         ),
       },
       {
         id: "customer",
         header: "Customer",
-        width: "w-[170px]",
+        width: "w-[150px]",
         cell: (req) => (
           <div className="min-w-0">
             <div
@@ -407,22 +431,18 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
         ),
       },
       {
-        id: "category",
-        header: "Category",
-        width: "w-[140px]",
+        id: "feasibility_type",
+        header: "Feasibility Type",
+        width: "w-[145px]",
         cell: (req) => {
-          const category =
-            req.customFeasibilityType ||
-            (req.feasibilityType
-              ? req.feasibilityType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-              : "New Category");
+          const typeLabel = getFeasibilityTypeDisplay(req);
           return (
             <div className="min-w-0">
               <span
-                className="inline-block max-w-[130px] truncate rounded border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-[10px] font-semibold text-[var(--on-surface-muted)]"
-                title={category}
+                className="inline-block max-w-[135px] truncate rounded border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-[10.5px] font-semibold text-[var(--on-surface)]"
+                title={typeLabel}
               >
-                {category}
+                {typeLabel}
               </span>
             </div>
           );
@@ -430,18 +450,19 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       },
       {
         id: "description",
-        header: "Description / Scope",
-        width: "min-w-[210px]",
+        header: "Scope / Description",
+        width: "min-w-[220px]",
         cell: (req) => {
           const desc =
             req.productDescription ||
             req.descriptionNotes ||
             req.feasibilityDescription ||
             "—";
+
           return (
             <div className="min-w-0">
               <span
-                className="text-xs text-[var(--on-surface-muted)] truncate block max-w-sm"
+                className="text-xs text-[var(--on-surface-muted)] truncate block leading-normal font-normal"
                 title={desc}
               >
                 {desc}
@@ -453,7 +474,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "required_date",
         header: "Required Date",
-        width: "w-[130px]",
+        width: "w-[125px]",
         cell: (req) => (
           <div className="whitespace-nowrap font-mono text-xs font-semibold tabular-nums text-[var(--on-surface)]">
             {req.sampleRequiredDate ? formatOdooDate(req.sampleRequiredDate) : "Flexible"}
@@ -463,7 +484,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "sla",
         header: "SLA / Timeline",
-        width: "w-[150px]",
+        width: "w-[140px]",
         cell: (req) => {
           const sla = getSlaDisplay(req, todayKey);
           const tone =
@@ -479,21 +500,25 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
           return <StatusPill status={sla.label} tone={tone} size="xs" />;
         },
       },
-      {
-        id: "requester",
-        header: "Requester",
-        width: "w-[130px]",
-        cell: (req) => (
-          <div className="min-w-0">
-            <span
-              className="truncate font-medium text-xs text-[var(--on-surface)] block"
-              title={req.createdBy?.trim() || "Marketing"}
-            >
-              {req.createdBy?.trim() || "Marketing"}
-            </span>
-          </div>
-        ),
-      },
+      ...(isAdmin
+        ? [
+            {
+              id: "requester",
+              header: "Requester",
+              width: "w-[120px]",
+              cell: (req: SampleRequestItem) => (
+                <div className="min-w-0">
+                  <span
+                    className="truncate font-medium text-xs text-[var(--on-surface)] block"
+                    title={req.createdBy?.trim() || "Marketing"}
+                  >
+                    {req.createdBy?.trim() || "Marketing"}
+                  </span>
+                </div>
+              ),
+            },
+          ]
+        : []),
       {
         id: "reviewer",
         header: "Assigned Reviewer",
@@ -526,7 +551,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "verdict",
         header: "Review Status",
-        width: "w-[150px]",
+        width: "w-[135px]",
         cell: (req) => {
           const verdict = req.samplingFeasibilityResponse;
           if (verdict === "Yes") return <StatusPill status="Feasible" tone="success" size="xs" />;
@@ -542,14 +567,14 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "actions",
         header: "Action",
-        width: "w-[110px]",
+        width: "w-[100px]",
         align: "right",
         cell: (req) => (
           <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               onClick={() => handleOpenInspect(req)}
-              className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold transition shadow-2xs active:scale-95 ${
+              className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-bold transition shadow-2xs active:scale-95 ${
                 req.samplingFeasibilityResponse
                   ? "border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-high)] text-[var(--on-surface)]"
                   : req.counterDateDecision === "pending"
@@ -567,7 +592,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
         ),
       },
     ],
-    [todayKey, claimingId, notify]
+    [todayKey, claimingId, notify, isAdmin]
   );
 
   const kpiItems = [
@@ -657,26 +682,48 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
           </button>
         }
         filterControls={
-          customerList.length > 0 ? (
-            <Select
-              aria-label="Filter by customer"
-              value={customerFilter}
-              onChange={(e) => setCustomerFilter(e.target.value)}
-              className="min-w-[160px] max-w-[220px]"
-              options={[
-                { value: "all", label: `All Customers (${customerList.length})` },
-                ...customerList.map((c) => ({ value: c, label: c })),
-              ]}
-            />
-          ) : null
+          <>
+            {/* Integrated Search Input directly on top row */}
+            <div className="group relative min-w-[200px] flex-1 max-w-[300px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--on-surface-subtle)] transition-colors group-focus-within:text-[var(--accent-primary)]" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search code, customer, scope... ('/')"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] pl-8 pr-7 text-xs text-[var(--on-surface)] outline-none transition-all placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Customer Filter Dropdown */}
+            {customerList.length > 0 && (
+              <Select
+                aria-label="Filter by customer"
+                value={customerFilter}
+                onChange={(e) => setCustomerFilter(e.target.value)}
+                className="min-w-[130px] max-w-[170px]"
+                options={[
+                  { value: "all", label: `Customers (${customerList.length})` },
+                  ...customerList.map((c) => ({ value: c, label: c })),
+                ]}
+              />
+            )}
+          </>
         }
-        search={{
-          value: searchTerm,
-          onChange: setSearchTerm,
-          placeholder: "Search code, customer, requester...",
-        }}
         hasActiveFilters={hasActiveFilters}
         onResetFilters={clearFilters}
+        resetFiltersLabel="Clear Filters"
       >
         <DataTable
           data={filteredRequests}

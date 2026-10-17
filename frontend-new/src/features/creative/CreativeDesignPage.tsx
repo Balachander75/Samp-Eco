@@ -1,12 +1,12 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Palette,
   Plus,
-  ChevronRight,
-  Package,
-  Layers,
+  Sparkles,
   Building2,
   Trash2,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { CreativeBriefItem, SampleRequestItem } from "@/features/sample-requests/types";
 import { UserProfile } from "@/features/auth";
@@ -58,10 +58,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
 }) => {
   const [selectedStageTab, setSelectedStageTab] = useState<CreativeDesignTab>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedScopeFilter, setSelectedScopeFilter] = useState<"all" | "brief" | "request">("all");
-  const [trendFilter, setTrendFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
-  const [designerFilter, setDesignerFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [workflowVersion, setWorkflowVersion] = useState(0);
@@ -69,6 +66,21 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 40;
+
+  const now = useMemo(() => new Date(), []);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Global '/' keyboard shortcut to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const handleStorageUpdate = () => {
@@ -142,7 +154,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
 
       list.push({
         id: String(merged.id),
-        refCode: merged.srNumber || merged.requestCode || `DSG-${merged.id}`,
+        refCode: merged.requestCode || merged.srNumber || `DR-${merged.id}`,
         title: merged.productDescription || (merged as any).opportunityName || "Packaging Artwork Brief",
         customer: merged.customer || "General Account",
         trend: merged.trend || "Corporate Core",
@@ -175,36 +187,11 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
     return { total, intake, concept, review, revisions, approved };
   }, [unifiedDesigns]);
 
-  // Scope counts
-  const typeCounts = useMemo(() => {
-    return {
-      all: unifiedDesigns.length,
-      brief: unifiedDesigns.filter((d) => d.isBrief).length,
-      request: unifiedDesigns.filter((d) => !d.isBrief).length,
-    };
-  }, [unifiedDesigns]);
-
   // Unique dropdown items
   const customerList = useMemo(() => {
     const set = new Set<string>();
     unifiedDesigns.forEach((d) => {
       if (d.customer?.trim()) set.add(d.customer.trim());
-    });
-    return Array.from(set).sort();
-  }, [unifiedDesigns]);
-
-  const trendList = useMemo(() => {
-    const set = new Set<string>();
-    unifiedDesigns.forEach((d) => {
-      if (d.trend?.trim()) set.add(d.trend.trim());
-    });
-    return Array.from(set).sort();
-  }, [unifiedDesigns]);
-
-  const designerList = useMemo(() => {
-    const set = new Set<string>();
-    unifiedDesigns.forEach((d) => {
-      if (d.designer?.trim() && d.designer !== "Unassigned") set.add(d.designer.trim());
     });
     return Array.from(set).sort();
   }, [unifiedDesigns]);
@@ -218,12 +205,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       if (selectedStageTab === "revisions" && d.proofStatus !== "Revisions Requested") return false;
       if (selectedStageTab === "approved" && d.proofStatus !== "Prepress Approved") return false;
 
-      if (selectedScopeFilter === "brief" && !d.isBrief) return false;
-      if (selectedScopeFilter === "request" && d.isBrief) return false;
-
       if (customerFilter !== "all" && d.customer !== customerFilter) return false;
-      if (trendFilter !== "all" && d.trend !== trendFilter) return false;
-      if (designerFilter !== "all" && d.designer !== designerFilter) return false;
 
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
@@ -241,10 +223,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
   }, [
     unifiedDesigns,
     selectedStageTab,
-    selectedScopeFilter,
     customerFilter,
-    trendFilter,
-    designerFilter,
     searchTerm,
   ]);
 
@@ -267,20 +246,14 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
 
   const handleResetFilters = () => {
     setSearchTerm("");
-    setSelectedScopeFilter("all");
     setCustomerFilter("all");
-    setTrendFilter("all");
-    setDesignerFilter("all");
     setSelectedStageTab("all");
     setCurrentPage(1);
   };
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
-      selectedScopeFilter !== "all" ||
       customerFilter !== "all" ||
-      trendFilter !== "all" ||
-      designerFilter !== "all" ||
       selectedStageTab !== "all"
   );
 
@@ -320,7 +293,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       label: "All Active",
       value: metrics.total,
       detail: "Active artwork queue",
-      color: "bg-[var(--accent-primary)]",
+      color: "bg-[#245942]",
       isActive: selectedStageTab === "all",
       onClick: () => {
         setSelectedStageTab("all");
@@ -389,7 +362,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       {
         id: "ref_code",
         header: "Artwork / Ref Code",
-        width: "w-[150px]",
+        width: "w-[140px]",
         sortable: true,
         cell: (row) => (
           <div>
@@ -425,12 +398,12 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       {
         id: "customer",
         header: "Customer / Brand",
-        width: "w-[160px]",
+        width: "w-[150px]",
         cell: (row) => (
           <div>
             <div className="flex items-center gap-1.5 font-semibold text-[var(--on-surface)]">
               <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
-              <span className="truncate max-w-[140px]" title={row.customer || ""}>
+              <span className="truncate max-w-[130px]" title={row.customer || ""}>
                 {row.customer || "—"}
               </span>
             </div>
@@ -442,25 +415,25 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       },
       {
         id: "source",
-        header: "Brief Source & Scope",
-        width: "w-[140px]",
+        header: "Brief Source",
+        width: "w-[130px]",
         cell: (row) =>
           row.isBrief ? (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-              <Palette className="w-3 h-3 text-purple-600" />
+              <Palette className="w-3 h-3 text-purple-600 shrink-0" />
               <span>Studio Brief</span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-              <Package className="w-3 h-3 text-emerald-600" />
-              <span>Commercial SR</span>
+              <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+              <span>Design</span>
             </span>
           ),
       },
       {
         id: "variants",
         header: "Variants",
-        width: "w-[90px]",
+        width: "w-[85px]",
         align: "center",
         cell: (row) => (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full font-mono font-bold text-[11px] bg-[var(--surface-low)] text-[var(--on-surface)] tabular-nums border border-[var(--border-subtle)]">
@@ -471,63 +444,67 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       {
         id: "designer",
         header: "Designer Ownership",
-        width: "w-[150px]",
+        width: "w-[140px]",
         cell: (row) => (
-          <div>
-            <div className="font-mono text-xs font-semibold text-[var(--on-surface)]">
-              {row.designer}
-            </div>
-            <span
-              className={`mt-0.5 inline-flex rounded-md px-1.5 py-0.2 text-[10px] font-mono ${
-                row.designer === "Unassigned"
-                  ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-bold"
-                  : "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold"
-              }`}
-            >
-              {row.designer === "Unassigned" ? "Needs Claim" : "Assigned"}
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[10px] font-bold flex items-center justify-center text-[var(--accent-primary)] shrink-0">
+              {(row.designer || "U")[0].toUpperCase()}
             </span>
+            <div className="min-w-0">
+              <div className="font-mono text-xs font-semibold text-[var(--on-surface)] truncate">
+                {row.designer}
+              </div>
+              <span
+                className={`inline-flex rounded-md px-1.5 py-0.2 text-[9.5px] font-mono font-bold ${
+                  row.designer === "Unassigned"
+                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+                    : "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
+                }`}
+              >
+                {row.designer === "Unassigned" ? "Needs Claim" : "Assigned"}
+              </span>
+            </div>
           </div>
         ),
       },
       {
         id: "sla",
         header: "Target SLA Date",
-        width: "w-[120px]",
-        cell: (row) => (
-          <span className="font-mono text-xs text-[var(--on-surface-muted)]">
-            {row.dueDate ? formatOdooDate(row.dueDate) : "Standard SLA"}
-          </span>
-        ),
+        width: "w-[130px]",
+        cell: (row) => {
+          let isOverdue = false;
+          if (row.dueDate && row.proofStatus !== "Prepress Approved") {
+            const dt = new Date(row.dueDate);
+            if (!isNaN(dt.getTime()) && dt < now) {
+              isOverdue = true;
+            }
+          }
+          return (
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--on-surface)]">
+                <Clock className={`w-3.5 h-3.5 shrink-0 ${isOverdue ? "text-rose-500" : "text-[var(--on-surface-subtle)]"}`} />
+                <span className={isOverdue ? "font-semibold text-rose-600 dark:text-rose-400" : "text-[var(--on-surface-muted)]"}>
+                  {row.dueDate ? formatOdooDate(row.dueDate) : "Standard SLA"}
+                </span>
+              </div>
+              {isOverdue && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
+                  <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                  <span>Overdue</span>
+                </span>
+              )}
+            </div>
+          );
+        },
       },
       {
         id: "status",
         header: "Proof Review Status",
-        width: "w-[140px]",
+        width: "w-[135px]",
         cell: (row) => <StatusPill status={row.proofStatus} size="sm" showDot />,
       },
-      {
-        id: "actions",
-        header: "Action",
-        align: "right",
-        width: "w-[100px]",
-        cell: (row) => (
-          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => {
-                if (row.rawBrief) onInspectBrief(row.rawBrief);
-                else if (row.rawReq) onInspectRequest(row.rawReq);
-              }}
-              className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
-            >
-              <span>Inspect</span>
-              <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-        ),
-      },
     ],
-    [onInspectBrief, onInspectRequest]
+    [now]
   );
 
   return (
@@ -551,62 +528,8 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       exportDisabled={filteredDesigns.length === 0}
       kpiItems={kpiItems}
       kpiGridCols="grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
-      extraFilterControls={
-        <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5">
-          {[
-            { id: "all" as const, label: "All Scopes", icon: Layers, count: typeCounts.all },
-            { id: "brief" as const, label: "Studio Briefs", icon: Palette, count: typeCounts.brief },
-            { id: "request" as const, label: "Commercial SR", icon: Package, count: typeCounts.request },
-          ].map((item) => {
-            const isSelected = selectedScopeFilter === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setSelectedScopeFilter(item.id);
-                  setCurrentPage(1);
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer select-none ${
-                  isSelected
-                    ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
-                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
-                }`}
-              >
-                <item.icon className="w-3.5 h-3.5" />
-                <span>{item.label}</span>
-                <span
-                  className={`text-[10px] font-mono px-1 py-0.2 rounded-full ${
-                    isSelected
-                      ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
-                      : "text-[var(--on-surface-subtle)]"
-                  }`}
-                >
-                  {item.count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      }
       filterControls={
         <>
-          {trendList.length > 0 && (
-            <Select
-              aria-label="Filter by theme / trend"
-              value={trendFilter}
-              onChange={(e) => {
-                setTrendFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="min-w-[140px] max-w-[180px]"
-              options={[
-                { value: "all", label: `All Themes (${trendList.length})` },
-                ...trendList.map((t) => ({ value: t, label: t })),
-              ]}
-            />
-          )}
-
           {customerList.length > 0 && (
             <Select
               aria-label="Filter by customer"
@@ -619,22 +542,6 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
               options={[
                 { value: "all", label: `All Brands (${customerList.length})` },
                 ...customerList.map((c) => ({ value: c, label: c })),
-              ]}
-            />
-          )}
-
-          {designerList.length > 0 && (
-            <Select
-              aria-label="Filter by designer"
-              value={designerFilter}
-              onChange={(e) => {
-                setDesignerFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="min-w-[150px] max-w-[180px]"
-              options={[
-                { value: "all", label: `All Designers (${designerList.length})` },
-                ...designerList.map((d) => ({ value: d, label: d })),
               ]}
             />
           )}

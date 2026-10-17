@@ -96,7 +96,10 @@ export function mapDesignRequestToSampleRequest(item: DesignRequest): SampleRequ
   const createdDate = item.createdAt ? item.createdAt.split("T")[0] : "";
   return {
     id: `design-${item.id}`,
-    srNumber: item.srNumber || "",
+    // Design requests are identified by their DR material/request code. Keep
+    // legacy SR links internal so the Design queue never presents an SR code.
+    srNumber: "",
+    requestCode: item.requestCode || undefined,
     year: normalizeToBusinessYear(item.programYear) || "",
     productDescription: item.productDescription,
     customer: item.customerName,
@@ -147,6 +150,11 @@ export function mapDesignRequestToSampleRequest(item: DesignRequest): SampleRequ
       : undefined,
     creationMode: "marketing_request",
   };
+}
+
+function getDesignRequestCode(request: SampleRequestItem): string | undefined {
+  return request.requestCodes?.design ||
+    (request.requestCode?.startsWith("DR-") ? request.requestCode : undefined);
 }
 
 export async function fetchDesignRequestsApi(year?: string, draftOnly = false): Promise<DesignRequest[]> {
@@ -247,10 +255,7 @@ export async function releaseDesignRequestApi(id: number): Promise<DesignRequest
 }
 
 function isStandaloneDesignRequest(request: SampleRequestItem): boolean {
-  return (
-    String(request.id).startsWith("design-") ||
-    (request.requestKind === "design" && Boolean(request.designRequestId))
-  );
+  return String(request.id).startsWith("design-");
 }
 
 export async function updateAnyRequestStatusApi(
@@ -279,11 +284,35 @@ export async function releaseDraftRequestsApi(
   requests: SampleRequestItem[],
   status = "Creative"
 ): Promise<void> {
+  const uniqueRequests = new Map<string, SampleRequestItem>();
+  for (const request of requests) {
+    const code = request.requestCode || request.srNumber;
+    const key = code ? `code:${code}` : `id:${String(request.id)}`;
+    const existing = uniqueRequests.get(key);
+    // When a staged request and its workflow mirror share a code, keep the
+    // staged row so one batch release updates both records through sync.
+    if (!existing || (isStandaloneDesignRequest(existing) && !isStandaloneDesignRequest(request))) {
+      uniqueRequests.set(key, request);
+    }
+  }
+
   const sampleRequests: SampleRequestItem[] = [];
   const directDesigns: SampleRequestItem[] = [];
-  for (const request of requests) {
+  for (const request of uniqueRequests.values()) {
     (isStandaloneDesignRequest(request) ? directDesigns : sampleRequests).push(request);
   }
+
+  // A staged Design request has one product-staging row and one Creative
+  // mirror row. Prefer the staged row for release; it also synchronizes the
+  // Creative mirror as part of the same server transaction.
+  const stagedDesignCodes = new Set(
+    sampleRequests
+      .map(getDesignRequestCode)
+      .filter((code): code is string => Boolean(code)),
+  );
+  const deduplicatedDirectDesigns = directDesigns.filter((request) =>
+    !request.requestCode || !stagedDesignCodes.has(request.requestCode),
+  );
 
   if (sampleRequests.length > 0) {
     const result = await batchUpdateStatusApi(sampleRequests.map((request) => request.id), status);
@@ -291,7 +320,7 @@ export async function releaseDraftRequestsApi(
       throw new Error(`Released ${result.updatedCount} of ${sampleRequests.length} sample requests.`);
     }
   }
-  for (const request of directDesigns) {
+  for (const request of deduplicatedDirectDesigns) {
     await updateAnyRequestStatusApi(request, status);
   }
   if (typeof window !== "undefined") {
@@ -426,9 +455,15 @@ export async function addDesignWorkflowNoteApi(id: number, body: string, actorDe
 }
 
 export function mapSampleRequest(item: ApiSampleRequest, fallbackDate = ""): SampleRequestItem {
+  const rawRequestCodes = item.request_codes ?? (item as any).requestCodes;
+  const requestCodes = rawRequestCodes && typeof rawRequestCodes === "object"
+    ? rawRequestCodes as SampleRequestItem["requestCodes"]
+    : undefined;
   return {
     id: text(item.id),
     srNumber: text(item.sr_number ?? (item as any).srNumber),
+    requestCode: text(item.request_code ?? (item as any).requestCode) || undefined,
+    requestCodes,
     year: text(item.year),
     productDescription: text(item.product_description ?? (item as any).productDescription),
     programName: text(item.program_name ?? (item as any).programName),
@@ -489,13 +524,55 @@ export function mapSampleRequest(item: ApiSampleRequest, fallbackDate = ""): Sam
     programYear: text(item.program_year ?? (item as any).programYear),
     requestTypes: (() => {
       const rawTypes = item.request_types || (item as any).requestTypes;
+      const audit = item.request_type_audit ?? (item as any).requestTypeAudit;
+      if (audit && typeof audit === "object") {
+        const audited = (["design", "mockup", "sample", "costing"] as const)
+          .filter((scope) => audit[scope] === true);
+        if (audited.length > 0) return audited;
+      }
+
       if (Array.isArray(rawTypes) && rawTypes.length > 0) {
         const filtered = (rawTypes as any[]).filter((value): value is "design" | "mockup" | "sample" | "costing" =>
           ["design", "mockup", "sample", "costing"].includes(String(value))
         );
         if (filtered.length > 0) return filtered;
       }
+
+      const codedScopes = (["design", "mockup", "sample", "costing"] as const)
+        .filter((scope) => Boolean((requestCodes as any)?.[scope]));
+      if (codedScopes.length > 0) return codedScopes;
+
+      const code = text(item.request_code ?? (item as any).requestCode ?? item.material_code ?? (item as any).materialCode)
+        .trim()
+        .toUpperCase();
+      if (code.startsWith("DR-")) return ["design"];
+      if (code.startsWith("MR-")) return ["mockup"];
+      if (code.startsWith("CR-")) return ["costing"];
+
+      const mockupRequested = ["yes", "true", "y"].includes(
+        text(item.mockup_required ?? (item as any).mockupRequired).trim().toLowerCase(),
+      );
+      if (mockupRequested) return ["mockup"];
+      if (code.startsWith("SR-")) return ["sample"];
       return ["sample"];
+    })(),
+    scopeReferenceImages: (() => {
+      const raw = item.scope_reference_images ?? (item as any).scopeReferenceImages;
+      if (!raw || typeof raw !== "object") return {};
+      const result: NonNullable<SampleRequestItem["scopeReferenceImages"]> = {};
+      for (const scope of ["sample", "mockup", "costing"] as const) {
+        const entries = (raw as Record<string, unknown>)[scope];
+        if (!Array.isArray(entries)) continue;
+        result[scope] = entries.map((entry: any) => ({
+          id: Number(entry.id),
+          name: text(entry.name ?? entry.original_name, "Reference image"),
+          contentType: text(entry.content_type ?? entry.contentType) || undefined,
+          originalSizeBytes: Number(entry.original_size_bytes ?? entry.originalSizeBytes) || null,
+          sizeBytes: Number(entry.size_bytes ?? entry.sizeBytes) || undefined,
+          url: text(entry.url) || undefined,
+        }));
+      }
+      return result;
     })(),
     createdAt: item.created_at ? text(item.created_at).split("T")[0] : (item as any).createdAt ? text((item as any).createdAt).split("T")[0] : fallbackDate,
     plantFeasibilityResponse: (item.plant_feasibility_response || (item as any).plantFeasibilityResponse || null) as any,
@@ -760,15 +837,30 @@ function mergeSampleAndDesignRequests(
   year?: string,
 ): SampleRequestItem[] {
   const mappedDesignRequests = designRequests.map(mapDesignRequestToSampleRequest);
+  const designByRequestCode = new Map(
+    mappedDesignRequests.filter((item) => item.requestCode).map((item) => [item.requestCode!, item]),
+  );
   const designBySrNumber = new Map(
-    mappedDesignRequests.filter((item) => item.srNumber).map((item) => [item.srNumber, item]),
+    designRequests
+      .filter((item) => item.srNumber)
+      .map((item) => [item.srNumber!, mapDesignRequestToSampleRequest(item)]),
+  );
+  const sampleDesignCodes = new Set(
+    sampleRequests
+      .map(getDesignRequestCode)
+      .filter((code): code is string => Boolean(code)),
   );
   const sampleSrNumbers = new Set(sampleRequests.filter((item) => item.srNumber).map((item) => item.srNumber));
   const mergedSamples = sampleRequests.map((sample) => {
-    const design = sample.srNumber ? designBySrNumber.get(sample.srNumber) : undefined;
+    const designCode = getDesignRequestCode(sample);
+    const design = (designCode ? designByRequestCode.get(designCode) : undefined) ||
+      (sample.srNumber ? designBySrNumber.get(sample.srNumber) : undefined);
     return design ? {
       ...sample,
-      requestTypes: [...new Set([...(sample.requestTypes || []), ...(design.requestTypes || []).filter((type) => type !== "design")])],
+      // The persisted Sample Request owns its scopes. The linked Design mirror
+      // contributes artwork data, but must not add a Sample scope to a
+      // Mockup-only parent from its follow-up metadata.
+      requestTypes: sample.requestTypes || [],
       status: design.marketingDesignDecision === "accepted" &&
         (sample.requestTypes || []).some((type) => type === "mockup" || type === "sample")
         ? sample.status
@@ -803,7 +895,8 @@ function mergeSampleAndDesignRequests(
     } : sample;
   });
   const mappedDesignOnly = mappedDesignRequests.filter((design) =>
-    !design.srNumber || !sampleSrNumbers.has(design.srNumber),
+    (!design.requestCode || !sampleDesignCodes.has(design.requestCode)) &&
+    (!design.srNumber || !sampleSrNumbers.has(design.srNumber)),
   );
   let result = [...mergedSamples, ...mappedDesignOnly];
   if (year && year.toUpperCase() !== "ALL") {
@@ -840,11 +933,16 @@ export async function createSampleRequestApi(form: CreateSampleRequestForm): Pro
       date_request_created: form.dateRequestCreated || new Date().toISOString().split("T")[0],
       created_by: form.createdBy || "Admin",
       material_code: form.materialCode || "",
+      source_request_code: form.sourceRequestCode || null,
       barcode: form.barcode || null,
       customer_product_code: form.customerProductCode || null,
       source_sample_code: form.sourceSampleCode || null,
+      source_sample_request_id: form.sourceSampleRequestId ?? form.sourceRequestId ?? null,
       sample_required_date: form.sampleRequiredDate || null,
       product_type: form.productType || null,
+      product_category: form.productCategory || null,
+      product_sub_category: form.productSubCategory || null,
+      product_third_category: form.productThirdCategory || null,
       brand_name: form.brandName || null,
       product_type_navneet: form.productTypeNavneet || null,
       product_type_new_customer: form.productTypeNewCustomer || null,
@@ -866,18 +964,27 @@ export async function createSampleRequestApi(form: CreateSampleRequestForm): Pro
       target_artwork_date_studio: form.targetArtworkDateStudio || null,
       creation_mode: form.creationMode || "marketing_request",
       request_types: form.requestTypes || [],
-      request_type_selected_at: form.requestTypeSelectedAt || {},
+      request_type_timestamps: form.requestTypeSelectedAt || {},
       custom_binding_1: form.customBinding1 || null,
       custom_binding_2: form.customBinding2 || null,
       custom_details: form.customDetails || null,
       status: form.status || "Draft (Pre-SMT)",
-      source_sample_request_id: form.sourceRequestId,
       trend: form.trend || null,
       target_audience: form.targetAudience || null,
       number_of_designs: form.numberOfDesigns != null ? Number(form.numberOfDesigns) : null,
       design_remarks: form.designRemarks || null,
       reference_images: form.referenceImages || [],
       reference_links: form.referenceLinks || [],
+      scope_reference_images: Object.fromEntries(
+        Object.entries(form.scopeReferenceImages || {}).map(([scope, images]) => [
+          scope,
+          (images || []).map((image) => ({
+            url: image.url,
+            name: image.name,
+            original_size_bytes: image.originalSizeBytes,
+          })),
+        ]),
+      ),
       plant_feasibility_response: form.plantFeasibilityResponse || null,
       plant_feasibility_remark: form.plantFeasibilityRemark || null,
       sampling_feasibility_response: form.samplingFeasibilityResponse || null,
@@ -954,6 +1061,9 @@ export async function updateSampleRequestApi(
       sample_required_date: payload.sampleRequiredDate || null,
       brand_name: payload.brandName,
       product_type: payload.productType,
+      product_category: payload.productCategory,
+      product_sub_category: payload.productSubCategory,
+      product_third_category: payload.productThirdCategory,
       unit_pc_pack: payload.unitPcPack != null ? String(payload.unitPcPack) : undefined,
       qty_per_pack: payload.qtyPerPack != null ? String(payload.qtyPerPack) : undefined,
       qty_for_sampling: payload.qtyForSampling != null ? String(payload.qtyForSampling) : undefined,
@@ -970,6 +1080,7 @@ export async function updateSampleRequestApi(
       product_image_path: payload.productImagePath,
       creation_mode: payload.creationMode,
       request_types: payload.requestTypes,
+      request_type_timestamps: payload.requestTypeSelectedAt,
       source_sample_code: payload.sourceSampleCode,
       custom_details: payload.customDetails !== undefined ? payload.customDetails.map((detail) => ({
         class_name: detail.className || detail.class_name,
@@ -984,6 +1095,7 @@ export async function updateSampleRequestApi(
       design_remarks: payload.designRemarks !== undefined ? payload.designRemarks : (payload as any).design_remarks,
       reference_images: payload.referenceImages !== undefined ? payload.referenceImages : (payload as any).reference_images,
       reference_links: payload.referenceLinks !== undefined ? payload.referenceLinks : (payload as any).reference_links,
+      scope_reference_images: payload.scopeReferenceImages !== undefined ? payload.scopeReferenceImages : (payload as any).scope_reference_images,
       plant_feasibility_response: (payload as any).plantFeasibilityResponse ?? (payload as any).plant_feasibility_response,
       plant_feasibility_remark: (payload as any).plantFeasibilityRemark ?? (payload as any).plant_feasibility_remark,
       sampling_feasibility_response: (payload as any).samplingFeasibilityResponse ?? (payload as any).sampling_feasibility_response,

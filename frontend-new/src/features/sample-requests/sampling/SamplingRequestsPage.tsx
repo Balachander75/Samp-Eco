@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
 import { SampleRequestItem } from "../types";
@@ -12,13 +12,16 @@ import {
   Layers,
   Palette,
   Box,
+  Boxes,
   Calculator,
+  Search,
+  X,
 } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 import { DeskWorkspaceLayout } from "@/components/erp";
 import { SamplingRequestsTable } from "./components/SamplingRequestsTable";
 import { DraftPackagesView } from "../components/DraftPackagesView";
-import { getRequestTypes } from "./utils/requestTypeUtils";
+import { getPrimaryRequestCode, getRequestTypes } from "./utils/requestTypeUtils";
 
 export interface SamplingRequestsPageProps {
   requests: SampleRequestItem[];
@@ -62,6 +65,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   isLoading,
   selectedYear,
   selectedPlant,
+  user,
   isAdmin,
   isReadOnly = false,
   onOpenNewModal,
@@ -75,20 +79,43 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   onDraftModeChange,
 }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const isHeadRole = isAdmin || Boolean(user?.is_team_head);
+
   const [selectedStageTab, setSelectedStageTab] = useState<SamplingFilterTab>(
-    () => ((location.state as { stage?: string } | null)?.stage === "draft" ? "draft" : "all"),
+    () => ((location.state as { stage?: string } | null)?.stage === "draft" ? "draft" : "all")
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomerFilter, setSelectedCustomerFilter] = useState<string>("all");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
+  const [userScopeMode, setUserScopeMode] = useState<"my_requests" | "all_marketing">(
+    isHeadRole ? "all_marketing" : "my_requests"
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
+  const [draftViewMode, setDraftViewMode] = useState<"grouped" | "items">("grouped");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 40;
 
-  const navigate = useNavigate();
+  // Keyboard shortcut '/' to instantly focus search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === "/" &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     onDraftModeChange?.(selectedStageTab === "draft");
@@ -97,7 +124,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   useEffect(() => {
     setSelectedIds(new Set());
     setCurrentPage(1);
-  }, [selectedStageTab]);
+  }, [selectedStageTab, userScopeMode]);
 
   const handleOpenDraftInStaging = (row: SampleRequestItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -108,7 +135,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       year: row.year || "2026-27",
       targetPlant: row.targetPlant || "",
       parentRequestId: row.id,
-      parentSrNumber: row.srNumber || `SR-${row.id}`,
+      parentSrNumber: getPrimaryRequestCode(row),
       parentRequestTypes: row.requestTypes || [],
       parentMockupWorkflowState: row.mockupWorkflowState,
       parentCreationMode: row.creationMode,
@@ -133,7 +160,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
         designMetadata: isDesign
           ? {
               numberOfDesigns: Number(row.designsCustomerCreative || row.productArtworkNos) || 1,
-              designRequiredDate: row.sampleRequiredDate || row.targetArtworkDateCreative || "",
+              designRequiredDate: row.targetArtworkDateCreative || row.designRequiredDate || row.sampleRequiredDate || "",
               trend: row.trend || "",
               targetAudience: row.targetAudience || "",
               referenceImage: row.productImagePath || "",
@@ -223,58 +250,51 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
     return Array.from(set).sort();
   }, [samplingRequests]);
 
-  // Stage counts
-  const stageCounts = useMemo(() => {
-    const counts = {
-      all: 0,
-      draft: 0,
-      creative: 0,
-      studio: 0,
-      costing: 0,
-      marketing: 0,
-      samp: 0,
-      plant: 0,
-      dispatched: 0,
-      deal: 0,
-    };
 
+  // Derived unique draft program package groups count
+  const draftPackagesCount = useMemo(() => {
+    const set = new Set<string>();
     samplingRequests.forEach((r) => {
-      const stage = getStageIdForRequest(r) as keyof typeof counts;
-      if (counts[stage] !== undefined) {
-        counts[stage]++;
-      }
-      if (stage !== "draft") {
-        counts.all++;
+      if (getStageIdForRequest(r) === "draft") {
+        const cust = (r.customer || "Unassigned").trim().toLowerCase();
+        const prog = (r.programName || r.programCampaignTitle || "Standard").trim().toLowerCase();
+        const yr = (r.programYear || r.year || "2026").trim().toLowerCase();
+        set.add(`${cust}_${prog}_${yr}`);
       }
     });
-
-    return counts;
+    return set.size;
   }, [samplingRequests]);
 
-  // Request Type counts
-  const typeCounts = useMemo(() => {
-    const counts = {
-      all: samplingRequests.length,
-      sample: 0,
-      design: 0,
-      mockup: 0,
-      costing: 0,
-    };
-    samplingRequests.forEach((r) => {
-      const types = getRequestTypes(r);
-      if (types.includes("sample")) counts.sample++;
-      if (types.includes("design")) counts.design++;
-      if (types.includes("mockup")) counts.mockup++;
-      if (types.includes("costing")) counts.costing++;
-    });
-    return counts;
-  }, [samplingRequests]);
+  // Personal request count for standard user
+  const myRequestsCount = useMemo(() => {
+    const uname = (user?.name || "").toLowerCase().trim();
+    const uid = (user?.userid || "").toLowerCase().trim();
+    if (!uname && !uid) return 0;
+    return samplingRequests.filter((r) => {
+      const creator = (r.createdBy || r.requestCreatedBy || "").toLowerCase().trim();
+      return (
+        (Boolean(uname) && (creator === uname || creator.includes(uname) || uname.includes(creator))) ||
+        (Boolean(uid) && (creator === uid || creator.includes(uid)))
+      );
+    }).length;
+  }, [samplingRequests, user?.name, user?.userid]);
 
-  // Filtered requests
+  // Filtered requests according to role perspective and criteria
   const filteredRequests = useMemo(() => {
     return samplingRequests.filter((r) => {
-      const itemStage = getStageIdForRequest(r);
+      // 1. Role Perspective Filtering
+      if (!isHeadRole && userScopeMode === "my_requests") {
+        const creator = (r.createdBy || r.requestCreatedBy || "").toLowerCase().trim();
+        const uname = (user?.name || "").toLowerCase().trim();
+        const uid = (user?.userid || "").toLowerCase().trim();
+        const matchesUser =
+          (Boolean(uname) && (creator === uname || creator.includes(uname) || uname.includes(creator))) ||
+          (Boolean(uid) && (creator === uid || creator.includes(uid)));
+        if (!matchesUser) return false;
+      }
 
+      // 2. Stage Tab Filtering
+      const itemStage = getStageIdForRequest(r);
       if (selectedStageTab === "all") {
         if (itemStage === "draft") return false;
       } else if (selectedStageTab === "draft") {
@@ -289,19 +309,23 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
         if (itemStage !== selectedStageTab) return false;
       }
 
+      // 3. Customer Filter
       if (selectedCustomerFilter !== "all" && r.customer !== selectedCustomerFilter) {
         return false;
       }
 
+      // 4. Category Filter
       if (selectedCategoryFilter !== "all" && r.productCategory !== selectedCategoryFilter) {
         return false;
       }
 
+      // 5. Request Scope Type Filter
       if (selectedTypeFilter !== "all") {
         const types = getRequestTypes(r);
         if (!types.includes(selectedTypeFilter as any)) return false;
       }
 
+      // 6. Search Term Filter
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
         const sr = (r.srNumber || "").toLowerCase();
@@ -315,6 +339,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
         const cat = (r.productCategory || "").toLowerCase();
         const subCat = (r.productSubCategory || "").toLowerCase();
         const thirdCat = (r.productThirdCategory || "").toLowerCase();
+        const creator = (r.createdBy || r.requestCreatedBy || "").toLowerCase();
 
         return (
           sr.includes(q) ||
@@ -327,7 +352,8 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
           brand.includes(q) ||
           cat.includes(q) ||
           subCat.includes(q) ||
-          thirdCat.includes(q)
+          thirdCat.includes(q) ||
+          creator.includes(q)
         );
       }
 
@@ -335,14 +361,83 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
     });
   }, [
     samplingRequests,
+    isHeadRole,
+    userScopeMode,
+    user?.name,
+    user?.userid,
     selectedStageTab,
-    selectedYear,
-    selectedPlant,
     selectedCustomerFilter,
     selectedCategoryFilter,
     selectedTypeFilter,
     searchTerm,
   ]);
+
+  // Stage counts (based on current scope: personal vs all)
+  const scopedForCounts = useMemo(() => {
+    if (!isHeadRole && userScopeMode === "my_requests") {
+      const uname = (user?.name || "").toLowerCase().trim();
+      const uid = (user?.userid || "").toLowerCase().trim();
+      return samplingRequests.filter((r) => {
+        const creator = (r.createdBy || r.requestCreatedBy || "").toLowerCase().trim();
+        return (
+          (Boolean(uname) && (creator === uname || creator.includes(uname) || uname.includes(creator))) ||
+          (Boolean(uid) && (creator === uid || creator.includes(uid)))
+        );
+      });
+    }
+    return samplingRequests;
+  }, [samplingRequests, isHeadRole, userScopeMode, user?.name, user?.userid]);
+
+  const stageCounts = useMemo(() => {
+    const counts = {
+      all: 0,
+      draft: 0,
+      creative: 0,
+      studio: 0,
+      costing: 0,
+      marketing: 0,
+      samp: 0,
+      plant: 0,
+      dispatched: 0,
+      deal: 0,
+    };
+
+    scopedForCounts.forEach((r) => {
+      const stage = getStageIdForRequest(r) as keyof typeof counts;
+      if (counts[stage] !== undefined) {
+        counts[stage]++;
+      }
+      if (stage !== "draft") {
+        counts.all++;
+      }
+    });
+
+    return counts;
+  }, [scopedForCounts]);
+
+  // Request Type counts (accurately scoped to active stage or drafts)
+  const typeCounts = useMemo(() => {
+    const counts = {
+      all: 0,
+      sample: 0,
+      design: 0,
+      mockup: 0,
+      costing: 0,
+    };
+    const targetSet = selectedStageTab === "draft"
+      ? scopedForCounts.filter((r) => getStageIdForRequest(r) === "draft")
+      : scopedForCounts;
+
+    counts.all = targetSet.length;
+    targetSet.forEach((r) => {
+      const types = getRequestTypes(r);
+      if (types.includes("sample")) counts.sample++;
+      if (types.includes("design")) counts.design++;
+      if (types.includes("mockup")) counts.mockup++;
+      if (types.includes("costing")) counts.costing++;
+    });
+    return counts;
+  }, [scopedForCounts, selectedStageTab]);
 
   // Paginated Slice
   const paginatedRequests = useMemo(() => {
@@ -353,7 +448,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
   const matchingDraftRequestIds = useMemo(
     () => new Set(filteredRequests.map((request) => String(request.id))),
-    [filteredRequests],
+    [filteredRequests]
   );
 
   // Selection
@@ -398,12 +493,13 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       selectedStageTab !== "all"
   );
 
+  // Milestone Workflow KPI Cards
   const kpiItems = [
     {
       label: "All Active",
       value: stageCounts.all,
-      detail: "Active workflow",
-      color: "bg-[var(--accent-primary)]",
+      detail: "Active in-flight",
+      color: "bg-[#245942]",
       isActive: selectedStageTab === "all" && !hasActiveFilters,
       onClick: () => {
         setSelectedStageTab("all");
@@ -411,9 +507,9 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       },
     },
     {
-      label: "Drafts to Release",
+      label: "Draft Packages",
       value: stageCounts.draft,
-      detail: "Pre-PMT staging",
+      detail: "Staging queue",
       color: "bg-amber-500",
       isActive: selectedStageTab === "draft",
       onClick: () => {
@@ -433,9 +529,9 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       },
     },
     {
-      label: "SAMP Lab & Plant",
+      label: "Sampling Lab & Plant",
       value: stageCounts.samp + stageCounts.plant + stageCounts.costing,
-      detail: "Sampling, BOM & floor",
+      detail: "Floor, BOM & costing",
       color: "bg-teal-500",
       isActive: selectedStageTab === "production_group",
       onClick: () => {
@@ -458,17 +554,53 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
 
   return (
     <DeskWorkspaceLayout
-      title="Commercial Sample Requests"
+      title={
+        <div className="flex items-center gap-3">
+          <span>Sample Requests</span>
+          {!isHeadRole && (
+            <div className="flex items-center p-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] shadow-2xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setUserScopeMode("my_requests");
+                  setCurrentPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer select-none ${
+                  userScopeMode === "my_requests"
+                    ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
+                    : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
+                }`}
+              >
+                My Portfolio ({myRequestsCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setUserScopeMode("all_marketing");
+                  setCurrentPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer select-none ${
+                  userScopeMode === "all_marketing"
+                    ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
+                    : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
+                }`}
+              >
+                Team Queue ({samplingRequests.length})
+              </button>
+            </div>
+          )}
+        </div>
+      }
       businessYear={selectedYear}
-      totalCount={samplingRequests.length}
-      totalLabel="Total"
+      totalCount={selectedStageTab === "draft" && draftViewMode === "grouped" ? draftPackagesCount : filteredRequests.length}
+      totalLabel={selectedStageTab === "draft" && draftViewMode === "grouped" ? "Packages" : "Filtered"}
       primaryAction={
         !isReadOnly
           ? {
               label: "New Sample Request",
               icon: Plus,
               onClick: onOpenNewModal,
-              title: "Create New Commercial Sample Request",
+              title: "Create New Sample Request",
             }
           : undefined
       }
@@ -479,8 +611,8 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       kpiItems={kpiItems}
       filterControls={
         <>
-          {/* Quick Request Type Filter Tabs */}
-          <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5">
+          {/* Quick Request Type Segmented Filter (Compact) */}
+          <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] p-0.5 shadow-2xs shrink-0">
             {[
               { id: "all", label: "All Scopes", icon: Layers, count: typeCounts.all },
               { id: "sample", label: "Sampling", icon: Package, count: typeCounts.sample },
@@ -497,19 +629,19 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
                     setSelectedTypeFilter(item.id);
                     setCurrentPage(1);
                   }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer select-none ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all duration-150 cursor-pointer select-none active:scale-95 ${
                     isSelected
-                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold"
-                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
+                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold border border-[var(--border-subtle)]"
+                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50"
                   }`}
                 >
-                  <item.icon className="w-3.5 h-3.5" />
+                  <item.icon className={`w-3 h-3 ${isSelected ? "text-[var(--accent-primary)]" : "opacity-70"}`} />
                   <span>{item.label}</span>
                   <span
-                    className={`text-[10px] font-mono px-1 py-0.2 rounded-full ${
+                    className={`text-[9.5px] font-mono px-1 py-0.2 rounded-full tabular-nums ${
                       isSelected
                         ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
-                        : "text-[var(--on-surface-subtle)]"
+                        : "text-[var(--on-surface-subtle)] bg-[var(--surface-lowest)]/60"
                     }`}
                   >
                     {item.count}
@@ -517,6 +649,35 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
                 </button>
               );
             })}
+          </div>
+
+          {/* Integrated Search Input right next to Scope Tabs on Top Row */}
+          <div className="group relative min-w-[200px] flex-1 max-w-[300px]">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--on-surface-subtle)] transition-colors group-focus-within:text-[var(--accent-primary)]" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search SR#, material, desc, customer... ('/')"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] pl-8 pr-7 text-xs text-[var(--on-surface)] outline-none transition-all placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setCurrentPage(1);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
           {/* Product Category Filter */}
@@ -528,9 +689,9 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
                 setSelectedCategoryFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="min-w-[150px] max-w-[200px]"
+              className="min-w-[130px] max-w-[170px]"
               options={[
-                { value: "all", label: `All Categories (${categoryList.length})` },
+                { value: "all", label: `Categories (${categoryList.length})` },
                 ...categoryList.map((cat) => ({ value: cat, label: cat })),
               ]}
             />
@@ -545,63 +706,64 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
                 setSelectedCustomerFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="min-w-[150px] max-w-[200px]"
+              className="min-w-[130px] max-w-[170px]"
               options={[
-                { value: "all", label: `All Customers (${customerList.length})` },
+                { value: "all", label: `Customers (${customerList.length})` },
                 ...customerList.map((c) => ({ value: c, label: c })),
               ]}
             />
           )}
 
-          {/* Batch Controls */}
-          {selectedIds.size > 0 && selectedStageTab !== "draft" && (
-            <div className="flex items-center gap-1.5 ml-auto">
-              {selectedDraftsCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onBatchReleaseDraft(selectedIds)}
-                  className="h-8 px-3 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 shadow-2xs transition cursor-pointer bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
-                  title="Release selected drafts to their assigned workflow"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Release ({selectedDraftsCount})</span>
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => onBatchDelete(selectedIds)}
-                  className="h-8 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition"
-                  title="Delete selected requests"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete ({selectedIds.size})</span>
-                </button>
-              )}
+          {/* Draft Sub-View Toggle (when in Draft stage) */}
+          {selectedStageTab === "draft" && (
+            <div className="flex items-center p-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] shadow-2xs shrink-0">
               <button
                 type="button"
-                onClick={() => setSelectedIds(new Set())}
-                className="text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] text-[11px] underline px-1 cursor-pointer"
+                onClick={() => {
+                  setDraftViewMode("grouped");
+                  setCurrentPage(1);
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all duration-150 cursor-pointer select-none active:scale-95 ${
+                  draftViewMode === "grouped"
+                    ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold border border-[var(--border-subtle)]"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50"
+                }`}
+                title="View drafts grouped by Program Packages"
               >
-                Clear ({selectedIds.size})
+                <Boxes className={`w-3 h-3 ${draftViewMode === "grouped" ? "text-amber-600 dark:text-amber-400" : "opacity-70"}`} />
+                <span>Packages</span>
+                <span className="text-[9.5px] font-mono px-1 py-0.2 rounded-full tabular-nums bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold">
+                  {draftPackagesCount}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftViewMode("items");
+                  setCurrentPage(1);
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all duration-150 cursor-pointer select-none active:scale-95 ${
+                  draftViewMode === "items"
+                    ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs font-bold border border-[var(--border-subtle)]"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50"
+                }`}
+                title="View all individual staged draft products"
+              >
+                <Layers className={`w-3 h-3 ${draftViewMode === "items" ? "text-[var(--accent-primary)]" : "opacity-70"}`} />
+                <span>All Drafts</span>
+                <span className="text-[9.5px] font-mono px-1 py-0.2 rounded-full tabular-nums bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold">
+                  {filteredRequests.length}
+                </span>
               </button>
             </div>
           )}
         </>
       }
-      search={{
-        value: searchTerm,
-        onChange: (val) => {
-          setSearchTerm(val);
-          setCurrentPage(1);
-        },
-        placeholder: "Search SR#, material, desc...",
-      }}
       hasActiveFilters={hasActiveFilters}
       onResetFilters={handleResetFilters}
-      resetFiltersLabel="Reset"
+      resetFiltersLabel="Clear Filters"
     >
-      {selectedStageTab === "draft" ? (
+      {selectedStageTab === "draft" && draftViewMode === "grouped" ? (
         <DraftPackagesView
           requests={samplingRequests}
           matchingRequestIds={matchingDraftRequestIds}
@@ -621,6 +783,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
           pageSize={pageSize}
           totalPages={totalPages}
           isAdmin={isAdmin}
+          isDraftView={selectedStageTab === "draft"}
           hasActiveFilters={hasActiveFilters}
           selectedTypeFilter={selectedTypeFilter}
           onToggleSelectAll={handleToggleSelectAll}
@@ -633,6 +796,53 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
           onOpenNewModal={onOpenNewModal}
           onResetFilters={handleResetFilters}
         />
+      )}
+
+      {/* ── Floating Executive Batch Action Dock ── */}
+      {selectedIds.size > 0 && (selectedStageTab !== "draft" || draftViewMode === "items") && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-zinc-900/92 dark:bg-zinc-800/95 text-white backdrop-blur-md shadow-2xl border border-white/10 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2 pr-2 border-r border-white/15">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-mono text-xs font-bold tabular-nums text-emerald-300">
+              {selectedIds.size}
+            </span>
+            <span className="text-xs text-zinc-300 font-medium">selected</span>
+          </div>
+
+          {selectedDraftsCount > 0 && (
+            <button
+              type="button"
+              onClick={() => onBatchReleaseDraft(selectedIds)}
+              className="h-8 px-3.5 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 shadow-sm bg-gradient-to-r from-[#245942] to-[#1b4332] hover:from-[#1b4332] hover:to-[#143728] active:scale-[0.98] transition-all cursor-pointer"
+              title="Release selected drafts to their workflow"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Release Drafts ({selectedDraftsCount})</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => onBatchDelete(selectedIds)}
+              className="h-8 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
+              title="Delete selected requests"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete ({selectedIds.size})</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="h-8 px-2.5 rounded-xl hover:bg-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+            title="Deselect all rows"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Deselect</span>
+          </button>
+        </div>
       )}
     </DeskWorkspaceLayout>
   );

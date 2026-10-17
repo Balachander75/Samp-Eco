@@ -87,10 +87,10 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
           )}
 
           {/* Converted Sampling Badge */}
-          {activeRequest.convertedSrNumber && (
+          {(activeRequest.convertedRequestCode || activeRequest.convertedSrNumber) && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-[var(--accent-primary)] text-white shadow-2xs">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Sampling: {activeRequest.convertedSrNumber}</span>
+              <span>Request: {activeRequest.convertedRequestCode || activeRequest.convertedSrNumber}</span>
             </span>
           )}
         </div>
@@ -218,8 +218,8 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
               Commercial Sign-Off
             </span>
             <div className="font-sans font-bold text-xs">
-              {activeRequest.convertedSrNumber ? (
-                <span className="text-emerald-600 dark:text-emerald-400">Converted to Sample</span>
+              {(activeRequest.convertedRequestCode || activeRequest.convertedSrNumber) ? (
+                <span className="text-emerald-600 dark:text-emerald-400">Commercial Request Created</span>
               ) : activeRequest.marketingDecision ? (
                 <span
                   className={

@@ -1,6 +1,6 @@
 import React from "react";
 import { SampleRequestItem } from "../../types";
-import { Copy, Check, Trash2, X, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Copy, Check, Trash2, X, ChevronRight, CheckCircle2, Pause, Play, Loader2 } from "lucide-react";
 
 export interface ProgramPlanningControlPanelProps {
   activeRequest: SampleRequestItem;
@@ -9,6 +9,9 @@ export interface ProgramPlanningControlPanelProps {
   onCopyCode: () => void;
   onDeleteRequest?: (req: SampleRequestItem) => void;
   readOnly?: boolean;
+  canPause?: boolean;
+  isTogglingPause?: boolean;
+  onTogglePause?: () => void;
 }
 
 export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelProps> = ({
@@ -18,6 +21,9 @@ export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelPr
   onCopyCode,
   onDeleteRequest,
   readOnly = false,
+  canPause = false,
+  isTogglingPause = false,
+  onTogglePause,
 }) => {
   const hasSampNote = Boolean(activeRequest.samplingRemark?.trim());
   const hasPlantNote = Boolean(activeRequest.plantRemark?.trim());
@@ -80,6 +86,29 @@ export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelPr
           )}
           <span>{copiedCode ? "Copied" : "Copy Code"}</span>
         </button>
+
+        {canPause && onTogglePause && (
+          <button
+            type="button"
+            onClick={onTogglePause}
+            disabled={isTogglingPause}
+            className={`font-semibold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition border disabled:opacity-60 disabled:cursor-not-allowed ${
+              activeRequest.isActive === false
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60 hover:bg-emerald-100"
+                : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60 hover:bg-amber-100"
+            }`}
+            title={activeRequest.isActive === false ? "Resume Program Plan" : "Pause Program Plan"}
+          >
+            {isTogglingPause ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : activeRequest.isActive === false ? (
+              <Play className="w-3.5 h-3.5 fill-current" />
+            ) : (
+              <Pause className="w-3.5 h-3.5 fill-current" />
+            )}
+            <span>{activeRequest.isActive === false ? "Resume Program" : "Pause Program"}</span>
+          </button>
+        )}
 
         {!readOnly && onDeleteRequest && (
           <button

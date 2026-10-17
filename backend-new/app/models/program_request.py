@@ -18,7 +18,7 @@ class ProgramRequest(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     request_code = Column(String(32), nullable=False, unique=True, index=True)
-    sr_number = Column(String(32), nullable=False, unique=True, index=True)
+    sr_number = Column(String(32), nullable=True, unique=True, index=True)
 
     customer_name = Column(String(255), nullable=False, index=True)
     target_plant = Column(String(255), nullable=False)
@@ -26,6 +26,7 @@ class ProgramRequest(Base):
     program_year = Column(String(50), nullable=False, default="2026-2027", server_default="2026-2027", index=True)
 
     status = Column(String(64), nullable=False, default="Pending SAMP Review", server_default="Pending SAMP Review")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="1")
     created_by = Column(String(255), nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 

@@ -4,7 +4,7 @@ import { getStageIdForRequest } from "../../utils/trackTypes";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DataTable, ColumnDef } from "@/components/erp";
-import { getRequestTypes } from "../utils/requestTypeUtils";
+import { getPrimaryRequestCode, getRequestRequiredDate, getRequestTypes, getSecondaryRequestCode } from "../utils/requestTypeUtils";
 import { formatOdooDate } from "../../utils/dateUtils";
 import {
   Building2,
@@ -12,9 +12,6 @@ import {
   Palette,
   Layers,
   Calculator,
-  Send,
-  Trash2,
-  ChevronRight,
 } from "lucide-react";
 
 export interface SamplingRequestsTableProps {
@@ -42,14 +39,45 @@ export interface SamplingRequestsTableProps {
   onResetFilters?: () => void;
 }
 
-function getDeliverableColumnHeader(typeFilter: string): string {
-  switch (typeFilter) {
-    case "sample": return "Sample Qty (PC / Pack)";
-    case "design": return "Designs (Req / Delivered)";
-    case "mockup": return "Mockup Qty & Specs";
-    case "costing": return "Costing Run Volume";
-    default: return "Deliverables & Quantities";
+function getInitials(name?: string | null): string {
+  if (!name || !name.trim()) return "MK";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getSlaUrgency(dateStr?: string | null): { label?: string; color: string } {
+  if (!dateStr) return { color: "text-[var(--on-surface-subtle)]" };
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return { color: "text-[var(--on-surface-subtle)]" };
+  const now = new Date();
+  const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) {
+    return { label: "Overdue", color: "text-rose-600 dark:text-rose-400 font-semibold" };
   }
+  if (diffDays <= 2) {
+    return { label: "Due Soon", color: "text-amber-600 dark:text-amber-400 font-semibold" };
+  }
+  return { color: "text-[var(--on-surface-muted)]" };
+}
+
+function renderRequiredDateCell(dateStr?: string | null): React.ReactNode {
+  if (!dateStr) {
+    return <span className="font-mono text-xs text-[var(--on-surface-subtle)]">—</span>;
+  }
+  const { label, color } = getSlaUrgency(dateStr);
+  return (
+    <div className="flex flex-col whitespace-nowrap">
+      <span className={`font-mono text-xs ${color}`}>
+        {formatOdooDate(dateStr)}
+      </span>
+      {label && (
+        <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+          {label}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function quantityLabel(value: string | number | undefined): string | null {
@@ -57,124 +85,120 @@ function quantityLabel(value: string | number | undefined): string | null {
   return String(value).trim();
 }
 
-function renderDeliverableCell(row: SampleRequestItem, typeFilter: string): React.ReactNode {
+function renderQuantityCell(row: SampleRequestItem, typeFilter: string = "all"): React.ReactNode {
   const types = getRequestTypes(row);
   const sampleQty = quantityLabel(row.qtyForSampling) || "1";
   const sampleUnit = row.unitPcPack || "PC";
-  const samplePackInfo = sampleUnit === "Pack" && row.qtyPerPack ? ` (${row.qtyPerPack} pcs/pk)` : "";
+  const samplePackInfo = sampleUnit === "Pack" && row.qtyPerPack ? ` (${row.qtyPerPack}/pk)` : "";
 
   const reqDesigns = Number(row.designsCustomerCreative || row.productArtworkNos || row.numberOfDesigns) || 1;
   const recDesigns = (row.creativeSubmissions || []).reduce(
     (total, batch) => total + (Array.isArray(batch?.rows) ? batch.rows.length : 0),
-    0,
+    0
   );
 
   const mockupQty = quantityLabel((row as any).qtyForMockup || (row as any).mockupQty || (row.mockupWorkflowState as any)?.qtyForMockup) || "1";
-  const mockupStage = row.mockupWorkflowState?.stage
-    ? row.mockupWorkflowState.stage.replace(/_/g, " ")
-    : "Marketing Prep";
 
   const costingQty = quantityLabel(row.qtyDesignCosting) || "1";
   const costingUnit = row.unitPcPack || "PC";
-  const costingPackInfo = costingUnit === "Pack" && row.qtyPerPack ? ` (${row.qtyPerPack} pcs/pk)` : "";
+  const costingPackInfo = costingUnit === "Pack" && row.qtyPerPack ? ` (${row.qtyPerPack}/pk)` : "";
 
   if (typeFilter === "sample") {
-    if (!types.includes("sample")) return <span className="text-[var(--on-surface-subtle)]">—</span>;
+    if (!types.includes("sample")) return <span className="text-[var(--on-surface-subtle)] font-mono text-xs">—</span>;
     return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+      <div className="flex flex-col whitespace-nowrap">
+        <div className="flex items-center gap-1 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400">
           <span>{sampleQty}</span>
-          <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 border border-emerald-500/20 font-bold uppercase">
-            {sampleUnit}
-          </span>
+          <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{sampleUnit}</span>
         </div>
         {samplePackInfo && (
-          <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
-            {row.qtyPerPack} pcs / pack
-          </span>
+          <span className="text-[9.5px] text-[var(--on-surface-subtle)] font-mono">{samplePackInfo}</span>
         )}
       </div>
     );
   }
 
   if (typeFilter === "design") {
-    if (!types.includes("design")) return <span className="text-[var(--on-surface-subtle)]">—</span>;
-    const isCompleted = recDesigns >= reqDesigns;
+    if (!types.includes("design")) return <span className="text-[var(--on-surface-subtle)] font-mono text-xs">—</span>;
     return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-1.5 font-mono text-xs">
-          <span className="font-semibold text-purple-700 dark:text-purple-300">
-            {reqDesigns} Req
-          </span>
-          <span className="text-[var(--on-surface-subtle)]">·</span>
-          <span className={`font-semibold ${isCompleted ? "text-emerald-600 dark:text-emerald-400" : recDesigns > 0 ? "text-amber-600 dark:text-amber-400" : "text-[var(--on-surface-subtle)]"}`}>
-            {recDesigns} Deliv
-          </span>
-        </div>
-        <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
-          {isCompleted ? "All delivered" : `${Math.max(0, reqDesigns - recDesigns)} pending`}
-        </span>
+      <div className="flex items-center gap-1 font-mono text-xs font-semibold text-purple-700 dark:text-purple-300 whitespace-nowrap">
+        <span>{reqDesigns}</span>
+        <span className="text-[10px] font-normal text-[var(--on-surface-subtle)]">Req</span>
+        {recDesigns > 0 && (
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400">({recDesigns} Deliv)</span>
+        )}
       </div>
     );
   }
 
   if (typeFilter === "mockup") {
-    if (!types.includes("mockup")) return <span className="text-[var(--on-surface-subtle)]">—</span>;
+    if (!types.includes("mockup")) return <span className="text-[var(--on-surface-subtle)] font-mono text-xs">—</span>;
     return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-amber-700 dark:text-amber-400">
-          <span>{mockupQty} Mockup{mockupQty !== "1" ? "s" : ""}</span>
-        </div>
-        <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono capitalize">
-          Stage: {mockupStage}
-        </span>
+      <div className="flex items-center gap-1 font-mono text-xs font-semibold text-amber-700 dark:text-amber-400 whitespace-nowrap">
+        <span>{mockupQty}</span>
+        <span className="text-[10px] font-medium text-[var(--on-surface-subtle)]">Mockup{mockupQty !== "1" ? "s" : ""}</span>
       </div>
     );
   }
 
   if (typeFilter === "costing") {
-    if (!types.includes("costing")) return <span className="text-[var(--on-surface-subtle)]">—</span>;
+    if (!types.includes("costing")) return <span className="text-[var(--on-surface-subtle)] font-mono text-xs">—</span>;
     return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-teal-700 dark:text-teal-400">
+      <div className="flex flex-col whitespace-nowrap">
+        <div className="flex items-center gap-1 font-mono text-xs font-semibold text-sky-700 dark:text-sky-300">
           <span>{costingQty}</span>
-          <span className="px-1.5 py-0.5 rounded text-[10px] bg-teal-500/10 border border-teal-500/20 font-bold uppercase">
-            {costingUnit}
-          </span>
+          <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{costingUnit}</span>
         </div>
         {costingPackInfo && (
-          <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
-            {row.qtyPerPack} pcs / pack
-          </span>
+          <span className="text-[9.5px] text-[var(--on-surface-subtle)] font-mono">{costingPackInfo}</span>
         )}
       </div>
     );
   }
 
   // "all" view
+  const items: React.ReactNode[] = [];
+
+  if (types.includes("sample") || (!types.includes("design") && !types.includes("mockup") && !types.includes("costing"))) {
+    items.push(
+      <span key="sample" className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+        {sampleQty} <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{sampleUnit}</span>
+        {samplePackInfo && <span className="text-[9.5px] text-[var(--on-surface-subtle)] font-normal">{samplePackInfo}</span>}
+      </span>
+    );
+  }
+
+  if (types.includes("design")) {
+    items.push(
+      <span key="design" className="font-mono text-xs font-semibold text-purple-700 dark:text-purple-300">
+        {reqDesigns} <span className="text-[10px] font-normal text-[var(--on-surface-subtle)]">DSG</span>
+      </span>
+    );
+  }
+
+  if (types.includes("mockup")) {
+    items.push(
+      <span key="mockup" className="font-mono text-xs font-semibold text-amber-700 dark:text-amber-400">
+        {mockupQty} <span className="text-[10px] font-normal text-[var(--on-surface-subtle)]">MUP</span>
+      </span>
+    );
+  }
+
+  if (types.includes("costing")) {
+    items.push(
+      <span key="costing" className="font-mono text-xs font-semibold text-sky-700 dark:text-sky-300">
+        {costingQty} <span className="text-[10px] font-normal text-[var(--on-surface-subtle)]">CST</span>
+      </span>
+    );
+  }
+
+  if (items.length === 0) {
+    return <span className="text-[var(--on-surface-subtle)] font-mono text-xs">—</span>;
+  }
+
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {types.includes("sample") && (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-          SMP: {sampleQty} {sampleUnit}
-        </span>
-      )}
-      {types.includes("design") && (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20">
-          DSG: {reqDesigns}R/{recDesigns}D
-        </span>
-      )}
-      {types.includes("mockup") && (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-          MUP: {mockupQty}
-        </span>
-      )}
-      {types.includes("costing") && (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20">
-          CST: {costingQty} {costingUnit}
-        </span>
-      )}
-      {types.length === 0 && <span className="text-[var(--on-surface-subtle)]">—</span>}
+    <div className="flex flex-col gap-0.5 whitespace-nowrap">
+      {items}
     </div>
   );
 }
@@ -194,136 +218,536 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
   onToggleSelectRow,
   onOpenDraftInStaging,
   onInspectRequest,
-  onReleaseDraft,
-  onDeleteRequest,
+  onReleaseDraft: _onReleaseDraft,
+  onDeleteRequest: _onDeleteRequest,
   onPageChange,
 }) => {
   const draftColumns: ColumnDef<SampleRequestItem>[] = useMemo(
     () => [
       {
+        id: "srAndMaterial",
+        header: "Draft / Material Code",
+        cell: (row) => (
+          <div className="flex flex-col gap-1 whitespace-nowrap font-mono">
+            <div className="font-bold">
+              {getPrimaryRequestCode(row, selectedTypeFilter) ? (
+                <CopyBadge text={getPrimaryRequestCode(row, selectedTypeFilter)} />
+              ) : (
+                <span className="pl-1 text-xs text-[var(--on-surface-subtle)]">—</span>
+              )}
+            </div>
+            {getSecondaryRequestCode(row) ? (
+              <span className="self-start px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[var(--on-surface-muted)]">
+                {getSecondaryRequestCode(row)}
+              </span>
+            ) : (
+              <span className="text-[10px] text-[var(--on-surface-subtle)] pl-1">—</span>
+            )}
+          </div>
+        ),
+      },
+      {
         id: "customer",
-        header: "Customer Name",
+        header: "Customer",
         cell: (row) => (
-          <span className="font-semibold text-zinc-900 dark:text-white truncate" title={row.customer || ""}>
-            {row.customer || "—"}
-          </span>
-        ),
-      },
-      {
-        id: "programName",
-        header: "Program Name",
-        cell: (row) => (
-          <span className="block truncate font-medium text-zinc-900 dark:text-white max-w-xs" title={row.programName || row.programCampaignTitle || ""}>
-            {row.programName || row.programCampaignTitle || "—"}
-          </span>
-        ),
-      },
-      {
-        id: "programYear",
-        header: "Program Year",
-        cell: (row) => (
-          <span className="font-mono text-zinc-500 dark:text-zinc-400">
-            {row.programYear || "—"}
-          </span>
+          <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--on-surface)] whitespace-nowrap">
+            <Building2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <span className="truncate max-w-[160px]" title={row.customer || ""}>
+              {row.customer || "—"}
+            </span>
+          </div>
         ),
       },
       {
         id: "stagedProducts",
-        header: "Products Staged in This Program",
+        header: "Classification & Staged Product",
         cell: (row) => (
-          <div className="min-w-[240px]">
-            <div className="font-semibold text-zinc-900 dark:text-white">
-              {row.productDescription || row.materialCode || row.srNumber || "Product"}
+          <div className="max-w-xs">
+            <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Product"}>
+              {row.productDescription || row.materialCode || row.srNumber || "Commercial Product"}
             </div>
-            {row.materialCode && (
-              <div className="mt-0.5 font-mono text-[10px] text-zinc-400">{row.materialCode}</div>
+            {row.productCategory && (
+              <div className="mt-0.5">
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                  {row.productCategory}
+                </span>
+              </div>
             )}
           </div>
         ),
       },
       {
-        id: "actions",
-        header: <span className="block text-right">Actions</span>,
-        align: "right",
+        id: "programName",
+        header: "Program & Year",
         cell: (row) => (
-          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={(e) => onOpenDraftInStaging(row, e)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-xs font-semibold font-mono text-[var(--on-surface)] transition cursor-pointer"
-              title="Open and edit in Product Staging Workspace"
-            >
-              <Package className="w-3 h-3 text-[var(--on-surface-subtle)]" />
-              <span>Staging</span>
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onReleaseDraft(row);
-              }}
-              className="px-2.5 py-1 rounded-lg text-white text-xs font-bold font-mono transition shadow-xs hover:shadow-sm cursor-pointer flex items-center gap-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
-              title="Release this request to its assigned workflow"
-            >
-              <Send className="w-3 h-3" />
-              <span>Release</span>
-            </button>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={(e) => onDeleteRequest(row, e)}
-                className="p-1.5 text-zinc-400 hover:text-rose-600 transition cursor-pointer rounded-lg hover:bg-rose-500/10"
-                title="Delete Record"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+          <div className="max-w-xs">
+            <span className="block truncate font-medium text-xs text-[var(--on-surface)]" title={row.programName || row.programCampaignTitle || ""}>
+              {row.programName || row.programCampaignTitle || "—"}
+            </span>
+            {row.programYear && (
+              <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
+                BY {row.programYear}
+              </span>
             )}
           </div>
         ),
       },
+      {
+        id: "quantity",
+        header: "Quantity",
+        cell: (row) => renderQuantityCell(row, "all"),
+      },
+      ...(isAdmin
+        ? [
+            {
+              id: "coordinator",
+              header: "Raised By",
+              cell: (row: SampleRequestItem) => {
+                const creator = row.createdBy || row.requestCreatedBy || "Marketing Team";
+                const initials = getInitials(creator);
+                const dateCreated = row.dateRequestCreated || row.createdAt;
+                return (
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <span
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 shrink-0"
+                      title={creator}
+                    >
+                      {initials}
+                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold text-xs text-[var(--on-surface)] truncate max-w-[120px]" title={creator}>
+                        {creator}
+                      </span>
+                      {dateCreated && (
+                        <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                          {formatOdooDate(dateCreated)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              },
+            },
+          ]
+        : []),
     ],
-    [isAdmin, onOpenDraftInStaging, onReleaseDraft, onDeleteRequest]
+    [isAdmin, selectedTypeFilter]
   );
 
-  const standardColumns: ColumnDef<SampleRequestItem>[] = useMemo(
-    () => [
-      {
-        id: "srCode",
-        header: "SR / Code",
-        cell: (row) => (
-          <div className="whitespace-nowrap font-mono font-bold">
-            <CopyBadge text={row.srNumber || `SR-${row.id}`} />
-          </div>
-        ),
-      },
-      {
-        id: "materialCode",
-        header: "Material Code",
-        cell: (row) => (
-          <div className="whitespace-nowrap font-mono">
-            {row.materialCode ? (
-              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[var(--on-surface)]">
-                {row.materialCode}
-              </span>
+  const standardColumns: ColumnDef<SampleRequestItem>[] = useMemo(() => {
+    // 1. Base Column: SR & Material Code (clubbed)
+    const srAndMaterialCol: ColumnDef<SampleRequestItem> = {
+      id: "srAndMaterial",
+      header: "SR / Material Code",
+      cell: (row) => (
+        <div className="flex flex-col gap-0.5 whitespace-nowrap font-mono">
+          <div className="font-bold">
+            {getPrimaryRequestCode(row, selectedTypeFilter) ? (
+              <CopyBadge text={getPrimaryRequestCode(row, selectedTypeFilter)} />
             ) : (
-              <span className="text-[var(--on-surface-subtle)]">—</span>
+              <span className="pl-1 text-xs text-[var(--on-surface-subtle)]">—</span>
             )}
           </div>
-        ),
+          {getSecondaryRequestCode(row) ? (
+            <span className="self-start px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[var(--on-surface-muted)]">
+              {getSecondaryRequestCode(row)}
+            </span>
+          ) : (
+            <span className="text-[10px] text-[var(--on-surface-subtle)] pl-1">—</span>
+          )}
+        </div>
+      ),
+    };
+
+    // 2. Base Column: Customer (No plant)
+    const customerCol: ColumnDef<SampleRequestItem> = {
+      id: "customer",
+      header: "Customer",
+      cell: (row) => (
+        <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--on-surface)] whitespace-nowrap">
+          <Building2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span className="truncate max-w-[125px]" title={row.customer || ""}>
+            {row.customer || "—"}
+          </span>
+        </div>
+      ),
+    };
+
+    // Stage Column
+    const stageCol: ColumnDef<SampleRequestItem> = {
+      id: "status",
+      header: "Stage",
+      cell: (row) => (
+        <StatusPill status={row.status || "Draft"} size="sm" showDot />
+      ),
+    };
+
+    // Coordinator Column (Admin only)
+    const coordinatorCol: ColumnDef<SampleRequestItem> = {
+      id: "coordinator",
+      header: "Raised By",
+      cell: (row: SampleRequestItem) => {
+        const creator = row.createdBy || row.requestCreatedBy || "Marketing Team";
+        const initials = getInitials(creator);
+        const dateCreated = row.dateRequestCreated || row.createdAt;
+        return (
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <span
+              className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono font-bold bg-[#1b4332]/10 dark:bg-emerald-500/20 text-[#1b4332] dark:text-emerald-300 border border-[#1b4332]/20 dark:border-emerald-500/30 shrink-0"
+              title={creator}
+            >
+              {initials}
+            </span>
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-xs text-[var(--on-surface)] truncate max-w-[95px]" title={creator}>
+                {creator}
+              </span>
+              {dateCreated && (
+                <span className="text-[9.5px] font-mono text-[var(--on-surface-subtle)]">
+                  {formatOdooDate(dateCreated)}
+                </span>
+              )}
+            </div>
+          </div>
+        );
       },
+    };
+
+    // ── SCOPE: SAMPLING ──
+    if (selectedTypeFilter === "sample") {
+      const cols: ColumnDef<SampleRequestItem>[] = [
+        srAndMaterialCol,
+        customerCol,
+        {
+          id: "classification",
+          header: "Classification",
+          cell: (row) => (
+            <div className="min-w-0 max-w-[130px]">
+              <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Commercial Product"}>
+                {row.productDescription || "Commercial Product"}
+              </div>
+              {row.productCategory && (
+                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 truncate max-w-[110px]" title={row.productCategory}>
+                  {row.productCategory}
+                </span>
+              )}
+            </div>
+          ),
+        },
+        {
+          id: "brandAndSku",
+          header: "Brand / SKU",
+          cell: (row) => (
+            <div className="flex flex-col whitespace-nowrap min-w-0 max-w-[100px]">
+              <span className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.brandName || "—"}>
+                {row.brandName || "—"}
+              </span>
+              {row.customerProductCode ? (
+                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] truncate" title={row.customerProductCode}>
+                  {row.customerProductCode}
+                </span>
+              ) : row.barcode ? (
+                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] truncate" title={row.barcode}>
+                  {row.barcode}
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">—</span>
+              )}
+            </div>
+          ),
+        },
+        {
+          id: "sampleQuantity",
+          header: "Qty",
+          cell: (row) => {
+            const qty = quantityLabel(row.qtyForSampling) || "1";
+            const unit = row.unitPcPack || "PC";
+            const packInfo = unit === "Pack" && row.qtyPerPack ? ` (${row.qtyPerPack}/pk)` : "";
+            return (
+              <div className="flex items-center gap-1 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                <span>{qty}</span>
+                <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{unit}</span>
+                {packInfo && (
+                  <span className="text-[9px] text-[var(--on-surface-subtle)] font-normal">{packInfo}</span>
+                )}
+              </div>
+            );
+          },
+        },
+        {
+          id: "targetSla",
+          header: "Req Date",
+          cell: (row) => renderRequiredDateCell(row.sampleRequiredDate),
+        },
+        stageCol,
+      ];
+      if (isAdmin) cols.push(coordinatorCol);
+      return cols;
+    }
+
+    // ── SCOPE: DESIGN ──
+    if (selectedTypeFilter === "design") {
+      const cols: ColumnDef<SampleRequestItem>[] = [
+        srAndMaterialCol,
+        customerCol,
+        {
+          id: "classification",
+          header: "Classification",
+          cell: (row) => (
+            <div className="min-w-0 max-w-[160px]">
+              <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Design Item"}>
+                {row.productDescription || "Commercial Product"}
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                {row.productCategory && (
+                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 truncate max-w-[120px]" title={row.productCategory}>
+                    {row.productCategory}
+                  </span>
+                )}
+                {row.brandName && (
+                  <span className="text-[10px] text-[var(--on-surface-subtle)] truncate max-w-[70px]">
+                    {row.brandName}
+                  </span>
+                )}
+              </div>
+            </div>
+          ),
+        },
+        {
+          id: "designCount",
+          header: "Designs (Req / Deliv)",
+          cell: (row) => {
+            const reqDesigns = Number(row.designsCustomerCreative || row.productArtworkNos || row.numberOfDesigns) || 1;
+            const recDesigns = (row.creativeSubmissions || []).reduce(
+              (total, batch) => total + (Array.isArray(batch?.rows) ? batch.rows.length : 0),
+              0
+            );
+            return (
+              <div className="flex items-center gap-1.5 font-mono text-xs whitespace-nowrap">
+                <span className="font-bold text-purple-700 dark:text-purple-300">
+                  {reqDesigns} Req
+                </span>
+                <span className="text-[var(--on-surface-subtle)] font-normal">/</span>
+                <span className={`font-bold ${recDesigns >= reqDesigns ? "text-emerald-600 dark:text-emerald-400" : recDesigns > 0 ? "text-amber-600 dark:text-amber-400" : "text-[var(--on-surface-subtle)]"}`}>
+                  {recDesigns} Deliv
+                </span>
+              </div>
+            );
+          },
+        },
+        {
+          id: "theme",
+          header: "Theme / Trend",
+          cell: (row) => (
+            <div className="whitespace-nowrap max-w-[110px] truncate" title={row.trend || "Standard"}>
+              <span className="text-xs font-medium text-[var(--on-surface)]">
+                {row.trend || "—"}
+              </span>
+            </div>
+          ),
+        },
+        {
+          id: "targetAudience",
+          header: "Target Audience",
+          cell: (row) => (
+            <div className="whitespace-nowrap max-w-[110px] truncate" title={row.targetAudience || "All Ages"}>
+              <span className="text-xs text-[var(--on-surface-muted)]">
+                {row.targetAudience || "—"}
+              </span>
+            </div>
+          ),
+        },
+        {
+          id: "targetSla",
+          header: "Required Date",
+          cell: (row) => renderRequiredDateCell(row.designRequiredDate || row.targetArtworkDateCreative || row.sampleRequiredDate),
+        },
+        stageCol,
+      ];
+      if (isAdmin) cols.push(coordinatorCol);
+      return cols;
+    }
+
+    // ── SCOPE: MOCKUP ──
+    if (selectedTypeFilter === "mockup") {
+      const cols: ColumnDef<SampleRequestItem>[] = [
+        srAndMaterialCol,
+        customerCol,
+        {
+          id: "classification",
+          header: "Classification",
+          cell: (row) => (
+            <div className="min-w-0 max-w-[180px]">
+              <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Mockup Item"}>
+                {row.productDescription || "Commercial Product"}
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                {row.productCategory && (
+                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[120px]" title={row.productCategory}>
+                    {row.productCategory}
+                  </span>
+                )}
+                {row.brandName && (
+                  <span className="text-[10px] text-[var(--on-surface-subtle)] truncate max-w-[80px]">
+                    {row.brandName}
+                  </span>
+                )}
+              </div>
+            </div>
+          ),
+        },
+        {
+          id: "mockupQty",
+          header: "Mockup Qty",
+          cell: (row) => {
+            const mockupQty = quantityLabel((row as any).qtyForMockup || (row as any).mockupQty || (row.mockupWorkflowState as any)?.qtyForMockup) || "1";
+            const mockupStage = row.mockupWorkflowState?.stage
+              ? row.mockupWorkflowState.stage.replace(/_/g, " ")
+              : undefined;
+            return (
+              <div className="flex flex-col whitespace-nowrap font-mono">
+                <div className="flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-400">
+                  <span>{mockupQty}</span>
+                  <span className="text-[10px] font-medium text-[var(--on-surface-subtle)] font-sans">
+                    Mockup{mockupQty !== "1" ? "s" : ""}
+                  </span>
+                </div>
+                {mockupStage && (
+                  <span className="text-[9.5px] text-[var(--on-surface-subtle)] font-sans capitalize">
+                    {mockupStage}
+                  </span>
+                )}
+              </div>
+            );
+          },
+        },
+        {
+          id: "targetSla",
+          header: "Required Date",
+          cell: (row) => renderRequiredDateCell(row.mockupWorkflowState?.requiredDate || row.sampleRequiredDate),
+        },
+        stageCol,
+      ];
+      if (isAdmin) cols.push(coordinatorCol);
+      return cols;
+    }
+
+    // ── SCOPE: COSTING ──
+    if (selectedTypeFilter === "costing") {
+      const cols: ColumnDef<SampleRequestItem>[] = [
+        srAndMaterialCol,
+        customerCol,
+        {
+          id: "classification",
+          header: "Classification",
+          cell: (row) => (
+            <div className="min-w-0 max-w-[160px]">
+              <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Costing Item"}>
+                {row.productDescription || "Commercial Product"}
+              </div>
+              {row.productCategory && (
+                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 truncate max-w-[130px]" title={row.productCategory}>
+                  {row.productCategory}
+                </span>
+              )}
+            </div>
+          ),
+        },
+        {
+          id: "brandAndSku",
+          header: "Brand & SKU / Barcode",
+          cell: (row) => (
+            <div className="flex flex-col whitespace-nowrap min-w-0 max-w-[140px]">
+              <span className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.brandName || "—"}>
+                {row.brandName || "—"}
+              </span>
+              <div className="flex items-center gap-1 text-[10px] font-mono text-[var(--on-surface-subtle)] truncate">
+                {row.customerProductCode && (
+                  <span title={`SKU: ${row.customerProductCode}`}>SKU: {row.customerProductCode}</span>
+                )}
+                {row.customerProductCode && row.barcode && <span>·</span>}
+                {row.barcode && (
+                  <span title={`BAR: ${row.barcode}`}>BAR: {row.barcode}</span>
+                )}
+                {!row.customerProductCode && !row.barcode && <span>—</span>}
+              </div>
+            </div>
+          ),
+        },
+        {
+          id: "costingQuantity",
+          header: "Costing Quantity",
+          cell: (row) => {
+            const costingQty = quantityLabel(row.qtyDesignCosting) || "1";
+            const costingUnit = row.unitPcPack || "PC";
+            const packInfo = costingUnit === "Pack" && row.qtyPerPack ? ` (${row.qtyPerPack}/pk)` : "";
+            return (
+              <div className="flex items-center gap-1 font-mono text-xs font-semibold text-sky-700 dark:text-sky-300 whitespace-nowrap">
+                <span>{costingQty}</span>
+                <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{costingUnit}</span>
+                {packInfo && (
+                  <span className="text-[9.5px] text-[var(--on-surface-subtle)] font-normal">{packInfo}</span>
+                )}
+              </div>
+            );
+          },
+        },
+        {
+          id: "costingRequirement",
+          header: "Requirement & Route",
+          cell: (row) => {
+            const hasCreativeInput = row.costingCreativeInputNeeded === true;
+            const remark = row.costingCreativeInputRemark || row.marketingRemarks || row.descriptionNotes;
+            return (
+              <div className="flex flex-col min-w-0 max-w-[150px]">
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  {hasCreativeInput ? (
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                      Creative First
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                      Direct Costing
+                    </span>
+                  )}
+                </div>
+                {remark && (
+                  <span className="text-[10px] text-[var(--on-surface-subtle)] truncate mt-0.5" title={remark}>
+                    {remark}
+                  </span>
+                )}
+              </div>
+            );
+          },
+        },
+        {
+          id: "targetSla",
+          header: "Required Date",
+          cell: (row) => renderRequiredDateCell(row.costingRequiredDate || row.sampleRequiredDate),
+        },
+        stageCol,
+      ];
+      if (isAdmin) cols.push(coordinatorCol);
+      return cols;
+    }
+
+    // ── SCOPE: ALL SCOPES (Default) ──
+    const cols: ColumnDef<SampleRequestItem>[] = [
+      srAndMaterialCol,
+      customerCol,
       {
         id: "classification",
         header: "Classification & Scope",
         cell: (row) => (
-          <div className="max-w-xs">
-            <div className="font-semibold text-xs text-zinc-900 dark:text-white truncate">
+          <div className="max-w-xs min-w-0">
+            <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || row.programName || ""}>
               {row.productDescription || row.programName || "Commercial Product Sample"}
             </div>
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               {row.productCategory && (
                 <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-[var(--accent-primary)] border border-emerald-200/60"
-                  title={`Category: ${row.productCategory}${row.productSubCategory ? " › " + row.productSubCategory : ""}${row.productThirdCategory ? " › " + row.productThirdCategory : ""}`}
+                  className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 truncate max-w-[130px]"
+                  title={`Category: ${row.productCategory}${row.productSubCategory ? " › " + row.productSubCategory : ""}`}
                 >
                   {row.productCategory}
                   {row.productSubCategory && (
@@ -334,7 +758,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                 </span>
               )}
               {row.brandName && (
-                <span className="text-[10px] text-[var(--on-surface-subtle)] font-sans truncate">
+                <span className="text-[10px] text-[var(--on-surface-subtle)] font-sans truncate max-w-[80px]">
                   Brand: {row.brandName}
                 </span>
               )}
@@ -344,20 +768,20 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       },
       {
         id: "requestScope",
-        header: "Request Scope",
+        header: "Type of Request",
         cell: (row) => {
           const requestTypes = getRequestTypes(row);
           return (
-            <div className="flex items-center gap-1.5 flex-wrap whitespace-nowrap">
+            <div className="flex items-center gap-1 flex-wrap whitespace-nowrap">
               {requestTypes.map((type) => {
                 if (type === "design") {
                   return (
                     <span
                       key="design"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
                       title="Design Request"
                     >
-                      <Palette className="w-2.5 h-2.5 text-purple-600" />
+                      <Palette className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" />
                       <span>Design</span>
                     </span>
                   );
@@ -366,10 +790,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                   return (
                     <span
                       key="mockup"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
                       title="Mockup Sample"
                     >
-                      <Layers className="w-2.5 h-2.5 text-amber-600" />
+                      <Layers className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
                       <span>Mockup</span>
                     </span>
                   );
@@ -378,10 +802,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                   return (
                     <span
                       key="costing"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20"
                       title="Costing Estimation"
                     >
-                      <Calculator className="w-2.5 h-2.5 text-sky-600" />
+                      <Calculator className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400" />
                       <span>Costing</span>
                     </span>
                   );
@@ -389,10 +813,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                 return (
                   <span
                     key="sample"
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
                     title="Sampling Production"
                   >
-                    <Package className="w-2.5 h-2.5 text-emerald-600" />
+                    <Package className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
                     <span>Sampling</span>
                   </span>
                 );
@@ -402,81 +826,30 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
       },
       {
-        id: "deliverables",
-        header: getDeliverableColumnHeader(selectedTypeFilter),
-        cell: (row) => renderDeliverableCell(row, selectedTypeFilter),
-      },
-      {
-        id: "customerPlant",
-        header: "Customer & Plant",
-        cell: (row) => (
-          <div className="whitespace-nowrap">
-            <div className="flex items-center gap-1.5 font-semibold text-zinc-900 dark:text-white">
-              <Building2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span className="truncate max-w-[180px]" title={row.customer || ""}>
-                {row.customer || "—"}
-              </span>
-            </div>
-            {row.targetPlant && (
-              <div className="text-[10px] font-mono text-zinc-400 mt-0.5 pl-5">
-                Plant {row.targetPlant}
-              </div>
-            )}
-          </div>
-        ),
+        id: "quantity",
+        header: "Quantity",
+        cell: (row) => renderQuantityCell(row, "all"),
       },
       {
         id: "targetSla",
-        header: "Target SLA Date",
-        cell: (row) => (
-          <span className="whitespace-nowrap font-mono text-zinc-500 dark:text-zinc-400">
-            {row.sampleRequiredDate ? formatOdooDate(row.sampleRequiredDate) : "—"}
-          </span>
-        ),
+        header: "Required Date",
+        cell: (row) => renderRequiredDateCell(getRequestRequiredDate(row)),
       },
-      {
-        id: "status",
-        header: "Workflow Stage",
-        cell: (row) => (
-          <StatusPill status={row.status || "Draft"} size="sm" showDot />
-        ),
-      },
-      {
-        id: "actions",
-        header: <span className="block text-right">Actions</span>,
-        align: "right",
-        cell: (row) => (
-          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => onInspectRequest(row)}
-              className="inline-flex select-none items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container)] cursor-pointer"
-              title="Inspect Sample Request Details"
-            >
-              <span>Inspect</span>
-              <ChevronRight className="h-3 w-3 text-[var(--on-surface-subtle)]" />
-            </button>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={(e) => onDeleteRequest(row, e)}
-                className="p-1.5 text-zinc-400 hover:text-rose-600 transition cursor-pointer rounded-lg hover:bg-rose-500/10"
-                title="Delete Record"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        ),
-      },
-    ],
-    [selectedTypeFilter, isAdmin, onInspectRequest, onDeleteRequest]
-  );
+      stageCol,
+    ];
+
+    if (isAdmin) {
+      cols.push(coordinatorCol);
+    }
+
+    return cols;
+  }, [selectedTypeFilter, isAdmin]);
 
   return (
     <DataTable
       data={paginatedRequests}
       columns={isDraftView ? draftColumns : standardColumns}
+      tableClassName="w-full min-w-0"
       keyExtractor={(row) => row.id}
       isLoading={isLoading}
       emptyMessage={
@@ -503,23 +876,23 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       totalCount={filteredRequestsCount}
       onPageChange={onPageChange}
       toolbarLeft={
-        <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--on-surface-muted)]">
           <span className="truncate">
             Showing{" "}
-            <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+            <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">
               {filteredRequestsCount === 0 ? 0 : (currentPage - 1) * pageSize + 1}
               {filteredRequestsCount > 0 && (
                 <> – {Math.min(filteredRequestsCount, currentPage * pageSize)}</>
               )}
             </span>{" "}
             of{" "}
-            <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+            <span className="font-mono font-semibold tabular-nums text-[var(--on-surface)]">
               {filteredRequestsCount}
             </span>{" "}
             {isDraftView ? "products" : "requests"}
           </span>
           {selectedIds.size > 0 && (
-            <span className="shrink-0 rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700 dark:text-indigo-300 font-bold">
+            <span className="shrink-0 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] tabular-nums text-emerald-700 dark:text-emerald-300 font-bold">
               {selectedIds.size} selected
             </span>
           )}
@@ -528,3 +901,5 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
     />
   );
 };
+
+export default SamplingRequestsTable;

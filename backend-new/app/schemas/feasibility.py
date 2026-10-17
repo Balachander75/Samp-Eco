@@ -136,6 +136,7 @@ class FeasibilityRequestOut(BaseModel):
     # Sampling request conversion fields
     converted_sample_request_id: Optional[int] = None
     converted_sr_number: Optional[str] = None
+    converted_request_code: Optional[str] = None
     converted_request_types: List[str] = Field(default_factory=list)
     converted_at: Optional[datetime] = None
     converted_by: Optional[str] = None

@@ -20,13 +20,14 @@ import { useMasterData } from "../hooks/useMasterData";
 import { getCurrentBusinessYear } from "@/lib/businessYear";
 import { compressReferenceImage } from "@/lib/referenceImage";
 import { autoSaveStagedProductsToDraft } from "../utils/autoSaveDraft";
+import { getAutomaticSampleRoute } from "../utils/sampleRouting";
 import { isMockupCreativeCharacteristic } from "./staging/mockupCreativeFields";
 import { requestPostDesignDeliverablesApi } from "@/infrastructure/api/sampleRequestsApi";
 
 // Re-export domain types and helpers for backward compatibility
 export type { DeliverableScopeId, DeliverableDefinition, StagedProductItem } from "../types/staging";
 export { DELIVERABLES, cleanPlantName } from "../types/staging";
-import { DeliverableScopeId, StagedProductItem } from "../types/staging";
+import { DeliverableScopeId, ReferenceImageScopeId, ScopeReferenceImages, StagedProductItem } from "../types/staging";
 
 // Sub-components
 import {
@@ -174,10 +175,24 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   const [linkInput, setLinkInput] = useState<string>("");
   const [mediaTab, setMediaTab] = useState<"files" | "links">("files");
   const [modalError, setModalError] = useState<string | null>(null);
+  const [scopeReferenceImages, setScopeReferenceImages] = useState<ScopeReferenceImages>({});
+  const [compressingScopeImages, setCompressingScopeImages] = useState<Set<ReferenceImageScopeId>>(() => new Set());
+
+  const updateScopeReferenceImages = (scope: ReferenceImageScopeId, images: NonNullable<ScopeReferenceImages[ReferenceImageScopeId]>) => {
+    setScopeReferenceImages((previous) => ({ ...previous, [scope]: images }));
+  };
+
+  const setScopeImageProcessing = (scope: ReferenceImageScopeId, processing: boolean) => {
+    setCompressingScopeImages((previous) => {
+      const next = new Set(previous);
+      if (processing) next.add(scope);
+      else next.delete(scope);
+      return next;
+    });
+  };
 
   // Sampling / Specification Configuration State
   const [sampleType, setSampleType] = useState<"full" | "partial">("full");
-  const [isResample, setIsResample] = useState(false);
   const [partialRequirements, setPartialRequirements] = useState("");
   const [samplingSearchMode, setSamplingSearchMode] = useState<"new" | "material_code" | "binding">(designMockupHandoff ? "material_code" : "new");
   const [designNeeded, setDesignNeeded] = useState<boolean | null>(designMockupHandoff ? false : null);
@@ -347,9 +362,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     setCostingRequiredDate("");
     setCreativeInputNeeded(false);
     setCreativeInputRemark("");
-    setIsResample(false);
     setBindingSearchResults([]);
     setModalError(null);
+    setScopeReferenceImages({});
+    setCompressingScopeImages(new Set());
   };
 
   const resetDesignState = () => {
@@ -482,7 +498,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     hasCreativeChanges?: boolean,
     creativePendingCharacteristicKeys?: Array<{ className: string; characteristicName: string }>
   ) => {
-    const updatedItem: StagedProductItem = {
+    const updatedItemBase: StagedProductItem = {
       ...item,
       customDetails: details,
       productDescription,
@@ -490,6 +506,19 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       creativeCharacteristicsCleared: hasCreativeChanges ?? item.creativeCharacteristicsCleared,
       creativePendingCharacteristicKeys: creativePendingCharacteristicKeys ?? item.creativePendingCharacteristicKeys,
     };
+    const sampleRoute = getAutomaticSampleRoute(updatedItemBase);
+    const updatedItem: StagedProductItem = item.scopes.includes("sample")
+      ? {
+          ...updatedItemBase,
+          isResample: sampleRoute.isResample,
+          samplingMetadata: {
+            ...item.samplingMetadata,
+            sampleType: item.samplingMetadata?.sampleType || "full",
+            searchMode: item.samplingMetadata?.searchMode || "new",
+            isResample: sampleRoute.isResample,
+          },
+        }
+      : updatedItemBase;
     const nextProducts = stagedProducts.map((product) => product.id === item.id ? updatedItem : product);
 
     if (item.savedRequestId) {
@@ -498,8 +527,9 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         ? {
             ...existingWorkflowState,
             stage: "marketing",
+            isResample: sampleRoute.isResample,
             designNeeded: item.mockupMetadata?.designNeeded ?? (item.creationMode === "new" || item.scopes.includes("design")),
-            creativeChangesRequired: Boolean(updatedItem.hasCreativeChanges || updatedItem.creativeCharacteristicsCleared || updatedItem.creativePendingCharacteristicKeys?.length),
+            creativeChangesRequired: sampleRoute.creativeChangesRequired || Boolean(updatedItem.hasCreativeChanges || updatedItem.creativeCharacteristicsCleared || updatedItem.creativePendingCharacteristicKeys?.length),
             marketingShutterstockNo: item.mockupMetadata?.marketingShutterstockNo || "",
             marketingRemark: item.mockupMetadata?.marketingRemark || "",
             qtyForMockup: item.qtyForMockup || item.mockupMetadata?.qtyForMockup || "1",
@@ -508,7 +538,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
             ...(item.scopes.includes("sample") ? { samplingRouting: {
               ...(existingWorkflowState.samplingRouting || {}),
               stage: "marketing",
-              creativeChangesRequired: Boolean(updatedItem.hasCreativeChanges || updatedItem.creativeCharacteristicsCleared || updatedItem.creativePendingCharacteristicKeys?.length),
+              isResample: sampleRoute.isResample,
+              creativeChangesRequired: sampleRoute.creativeChangesRequired,
               isDesignVariant: Boolean(item.variantNumber),
               variantNumber: item.variantNumber,
               creativePendingCharacteristicKeys: creativePendingCharacteristicKeys ?? item.creativePendingCharacteristicKeys ?? [],
@@ -517,10 +548,12 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         : item.scopes.includes("sample") ? {
             ...existingWorkflowState,
             stage: "marketing",
+            isResample: sampleRoute.isResample,
             samplingRouting: {
               ...(existingWorkflowState.samplingRouting || {}),
               stage: "marketing",
-              creativeChangesRequired: Boolean(updatedItem.hasCreativeChanges || updatedItem.creativeCharacteristicsCleared || updatedItem.creativePendingCharacteristicKeys?.length),
+              isResample: sampleRoute.isResample,
+              creativeChangesRequired: sampleRoute.creativeChangesRequired,
               isDesignVariant: Boolean(item.variantNumber),
               variantNumber: item.variantNumber,
               creativePendingCharacteristicKeys: creativePendingCharacteristicKeys ?? item.creativePendingCharacteristicKeys ?? [],
@@ -808,6 +841,11 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       setSelectedScopes((prev) =>
         prev.filter((scope) => !scopesToRemove.includes(scope))
       );
+      setScopeReferenceImages((previous) => {
+        const next = { ...previous };
+        scopesToRemove.forEach((scope) => { if (scope === "sample" || scope === "mockup" || scope === "costing") delete next[scope]; });
+        return next;
+      });
       setScopeTimestamps((prev) => {
         const next = { ...prev };
         scopesToRemove.forEach((scope) => delete next[scope]);
@@ -985,6 +1023,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Step 3: Submit Sampling Configuration and Stage Product
   const handleStageSamplingProduct = async () => {
+    if (compressingScopeImages.size > 0) {
+      setModalError("Wait for the reference images to finish compressing before continuing.");
+      return;
+    }
 
     if (selectedScopes.includes("costing")) {
       if (!qtyDesignCosting.trim() || !Number.isInteger(Number(qtyDesignCosting)) || Number(qtyDesignCosting) < 1) {
@@ -1070,6 +1112,51 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     const isNewProduct = samplingSearchMode === "new";
     const bindingType1 = isNewProduct ? undefined : selectedBinding1 || selectedDbSample?.binding_type_1;
     const bindingType2 = isNewProduct ? undefined : selectedBinding2 || selectedDbSample?.binding_type_2;
+    const sampleSourceId = isNewProduct
+      ? undefined
+      : selectedDbSample?.id || editingProduct?.sourceSampleRequestId || editingProduct?.catalogMetadata?.sourceProductId || editingProduct?.samplingMetadata?.sourceSampleId;
+    const isBrandNewSample = selectedScopes.includes("sample") && !sampleSourceId;
+    const stagedCustomDetails = isBrandNewSample
+      ? newProductCustomDetails.map((detail) => {
+          const className = detail.className || detail.class_name || "Product";
+          const characteristicName = detail.characteristicName || detail.characteristic_name || "";
+          return isMockupCreativeCharacteristic(className, characteristicName)
+            ? { ...detail, value: "" }
+            : detail;
+        })
+      : newProductCustomDetails;
+    const newProductCreativeKeys = isBrandNewSample
+      ? stagedCustomDetails
+          .filter((detail) => isMockupCreativeCharacteristic(
+            detail.className || detail.class_name || "Product",
+            detail.characteristicName || detail.characteristic_name || ""
+          ))
+          .map((detail) => ({
+            className: detail.className || detail.class_name || "Product",
+            characteristicName: detail.characteristicName || detail.characteristic_name || "",
+          }))
+      : [];
+    const retainedCreativeKeys = editingProduct?.creativePendingCharacteristicKeys || [];
+    const sampleRoute = getAutomaticSampleRoute({
+      ...(editingProduct || {}),
+      scopes: selectedScopes,
+      sourceSampleRequestId: sampleSourceId,
+      samplingMetadata: {
+        ...editingProduct?.samplingMetadata,
+        sampleType,
+        searchMode: samplingSearchMode,
+        sourceSampleId: sampleSourceId,
+      },
+      catalogMetadata: {
+        ...editingProduct?.catalogMetadata,
+        sourceProductId: sampleSourceId,
+        sourceDescription: selectedDbSample?.product_description || desc,
+      },
+      hasCreativeChanges: isBrandNewSample || Boolean(editingProduct?.hasCreativeChanges),
+      creativeCharacteristicsCleared: isBrandNewSample || Boolean(editingProduct?.creativeCharacteristicsCleared),
+      creativePendingCharacteristicKeys: isBrandNewSample ? newProductCreativeKeys : retainedCreativeKeys,
+      variantNumber: editingProduct?.variantNumber,
+    });
 
     let nextItem: StagedProductItem;
     let nextProducts: StagedProductItem[];
@@ -1081,7 +1168,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         scopes: [...selectedScopes],
         requestTypeTimestamps: { ...scopeTimestamps },
         creationMode: samplingSearchMode,
-        customDetails: isNewProduct ? newProductCustomDetails : undefined,
+        customDetails: isNewProduct ? stagedCustomDetails : editingProduct.customDetails,
         unitPcPack,
         qtyPerPack: unitPcPack === "Pack" ? qtyPerPack.trim() : "1",
         ...(selectedScopes.includes("sample") && {
@@ -1102,8 +1189,14 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           costingCreativeInputNeeded: creativeInputNeeded,
           costingCreativeInputRemark: creativeInputNeeded ? creativeInputRemark.trim() : "",
         }),
-        sourceSampleRequestId: isNewProduct ? undefined : selectedDbSample?.id || editingProduct.sourceSampleRequestId,
-        sourceSampleCode: isNewProduct ? undefined : selectedDbSample?.material_code || editingProduct.sourceSampleCode,
+        sourceSampleRequestId: sampleSourceId,
+        sourceRequestCode: isNewProduct ? undefined : (
+          selectedDbSample?.request_codes?.mockup || selectedDbSample?.request_codes?.design ||
+          (selectedDbSample?.request_code && /^(FC|DR|MR)-\d{2}-\d{3,}$/.test(selectedDbSample.request_code)
+            ? selectedDbSample.request_code
+            : undefined)
+        ),
+        sourceSampleCode: isNewProduct ? undefined : selectedDbSample?.material_code || editingProduct.sourceSampleCode || editingProduct.catalogMetadata?.sourceMaterialCode,
         productCategory: selectedDbSample?.product_category || selectedCategory || (isNewProduct ? undefined : editingProduct.productCategory),
         productSubCategory: selectedDbSample?.product_sub_category || selectedSubCategory || (isNewProduct ? undefined : editingProduct.productSubCategory),
         productThirdCategory: selectedDbSample?.product_third_category || selectedThirdCategory || (isNewProduct ? undefined : editingProduct.productThirdCategory),
@@ -1111,10 +1204,11 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         customBinding2: bindingType2 || (isNewProduct ? undefined : editingProduct.customBinding2),
         samplingMetadata: selectedScopes.includes("sample") ? {
           sampleType,
+          isResample: sampleRoute.isResample,
           partialRequirements: partialRequirements.trim() || undefined,
           searchMode: samplingSearchMode,
-          sourceSampleId: isNewProduct ? undefined : selectedDbSample?.id || editingProduct.samplingMetadata?.sourceSampleId,
-          sourceSrNumber: isNewProduct ? undefined : selectedDbSample?.sr_number || editingProduct.samplingMetadata?.sourceSrNumber,
+          sourceSampleId: sampleSourceId,
+          sourceSrNumber: isNewProduct ? undefined : selectedDbSample?.sr_number || editingProduct.samplingMetadata?.sourceSrNumber || undefined,
           selectedMaterialCode: isNewProduct ? undefined : selectedDbSample?.material_code || editingProduct.samplingMetadata?.selectedMaterialCode,
           bindingType1: bindingType1 || (isNewProduct ? undefined : editingProduct.samplingMetadata?.bindingType1),
           bindingType2: bindingType2 || (isNewProduct ? undefined : editingProduct.samplingMetadata?.bindingType2),
@@ -1138,14 +1232,25 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           qtyForMockup: qtyForMockup.trim() || "1",
           requiredDate: mockupRequiredDate.trim() || undefined,
         } : undefined,
+        scopeReferenceImages: Object.fromEntries(
+          (["sample", "mockup", "costing"] as ReferenceImageScopeId[])
+            .filter((scope) => selectedScopes.includes(scope))
+            .map((scope) => [scope, scopeReferenceImages[scope] || []]),
+        ),
         catalogMetadata: {
-          sourceProductId: isNewProduct ? undefined : selectedDbSample?.id || editingProduct.catalogMetadata?.sourceProductId,
-          sourceRequestNumber: isNewProduct ? undefined : selectedDbSample?.sr_number || editingProduct.catalogMetadata?.sourceRequestNumber,
+          sourceProductId: sampleSourceId,
+          sourceRequestNumber: isNewProduct ? undefined : selectedDbSample?.sr_number || editingProduct.catalogMetadata?.sourceRequestNumber || undefined,
           sourceMaterialCode: isNewProduct ? undefined : selectedDbSample?.material_code || editingProduct.catalogMetadata?.sourceMaterialCode,
           sourceDescription: selectedDbSample?.product_description || desc,
           bindingType1: bindingType1 || (isNewProduct ? undefined : editingProduct.catalogMetadata?.bindingType1),
           bindingType2: bindingType2 || (isNewProduct ? undefined : editingProduct.catalogMetadata?.bindingType2),
         },
+        ...(selectedScopes.includes("sample") && {
+          isResample: sampleRoute.isResample,
+          hasCreativeChanges: sampleRoute.creativeChangesRequired,
+          creativeCharacteristicsCleared: sampleRoute.creativeChangesRequired,
+          creativePendingCharacteristicKeys: isBrandNewSample ? newProductCreativeKeys : retainedCreativeKeys,
+        }),
       };
       nextProducts = stagedProducts.map((p) => (p.id === editingProduct.id ? nextItem : p));
       setEditingProduct(null);
@@ -1158,7 +1263,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         scopes: [...selectedScopes],
         requestTypeTimestamps: { ...scopeTimestamps },
         creationMode: samplingSearchMode,
-        customDetails: isNewProduct ? newProductCustomDetails : undefined,
+        customDetails: isNewProduct ? stagedCustomDetails : undefined,
         unitPcPack,
         qtyPerPack: unitPcPack === "Pack" ? qtyPerPack.trim() : "1",
         ...(selectedScopes.includes("sample") && {
@@ -1168,6 +1273,11 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           qtyForMockup: qtyForMockup.trim() || "1",
           mockupRequiredDate: mockupRequiredDate.trim() || undefined,
         }),
+        scopeReferenceImages: Object.fromEntries(
+          (["sample", "mockup", "costing"] as ReferenceImageScopeId[])
+            .filter((scope) => selectedScopes.includes(scope))
+            .map((scope) => [scope, scopeReferenceImages[scope] || []]),
+        ),
         ...((selectedScopes.includes("mockup") || selectedScopes.includes("costing")) && {
           customerProductCode: customerProductCode.trim(),
           brandName: brandName.trim(),
@@ -1179,7 +1289,13 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           costingCreativeInputNeeded: creativeInputNeeded,
           costingCreativeInputRemark: creativeInputNeeded ? creativeInputRemark.trim() : "",
         }),
-        sourceSampleRequestId: selectedDbSample?.id,
+        sourceSampleRequestId: sampleSourceId,
+        sourceRequestCode: (
+          selectedDbSample?.request_codes?.mockup || selectedDbSample?.request_codes?.design ||
+          (selectedDbSample?.request_code && /^(FC|DR|MR)-\d{2}-\d{3,}$/.test(selectedDbSample.request_code)
+            ? selectedDbSample.request_code
+            : undefined)
+        ),
         sourceSampleCode: selectedDbSample?.material_code,
         productCategory: selectedDbSample?.product_category || selectedCategory || undefined,
         productSubCategory: selectedDbSample?.product_sub_category || selectedSubCategory || undefined,
@@ -1211,14 +1327,17 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           },
         }),
         ...(selectedScopes.includes("sample") && {
-          isResample,
+          isResample: sampleRoute.isResample,
+          hasCreativeChanges: sampleRoute.creativeChangesRequired,
+          creativeCharacteristicsCleared: sampleRoute.creativeChangesRequired,
+          creativePendingCharacteristicKeys: newProductCreativeKeys,
           samplingMetadata: {
             sampleType,
-            isResample,
+            isResample: sampleRoute.isResample,
             partialRequirements: partialRequirements.trim() || undefined,
             searchMode: samplingSearchMode,
-            sourceSampleId: selectedDbSample?.id,
-            sourceSrNumber: selectedDbSample?.sr_number,
+            sourceSampleId: sampleSourceId,
+            sourceSrNumber: selectedDbSample?.sr_number || undefined,
             selectedMaterialCode: selectedDbSample?.material_code,
             bindingType1,
             bindingType2,
@@ -1227,8 +1346,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           },
         }),
         catalogMetadata: {
-          sourceProductId: selectedDbSample?.id,
-          sourceRequestNumber: selectedDbSample?.sr_number,
+          sourceProductId: sampleSourceId,
+          sourceRequestNumber: selectedDbSample?.sr_number || undefined,
           sourceMaterialCode: selectedDbSample?.material_code,
           sourceDescription: selectedDbSample?.product_description || desc,
           bindingType1,
@@ -1360,14 +1479,6 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     const now = new Date();
     const isSamplingVariant = item.scopes.includes("sample");
     const baseDescription = item.variantBaseDescription || item.productDescription.replace(/\s+D\d+$/i, "");
-    const variantNumber = isSamplingVariant
-      ? stagedProducts.reduce((max, candidate) => {
-          const candidateBase = candidate.variantBaseDescription || candidate.productDescription.replace(/\s+D\d+$/i, "");
-          return candidateBase.toLocaleLowerCase() === baseDescription.toLocaleLowerCase()
-            ? Math.max(max, candidate.variantNumber || 0)
-            : max;
-        }, 0) + 1
-      : undefined;
     let customDetails = item.customDetails;
     if (isSamplingVariant && !customDetails?.length) {
       const sourceId = item.savedRequestId || item.sourceSampleRequestId || item.samplingMetadata?.sourceSampleId;
@@ -1381,6 +1492,16 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         }));
       }
     }
+    const currentStagedProducts = stagedProductsRef.current;
+    const variantNumber = isSamplingVariant
+      ? currentStagedProducts.reduce((max, candidate) => {
+          const candidateBase = candidate.variantBaseDescription || candidate.productDescription.replace(/\s+D\d+$/i, "");
+          const descriptionVariant = Number(candidate.productDescription.match(/\s+D(\d+)$/i)?.[1]) || 0;
+          return candidateBase.toLocaleLowerCase() === baseDescription.toLocaleLowerCase()
+            ? Math.max(max, candidate.variantNumber || descriptionVariant)
+            : max;
+        }, 0) + 1
+      : undefined;
     const creativePendingCharacteristicKeys = isSamplingVariant
       ? (customDetails || [])
           .filter((detail) => isMockupCreativeCharacteristic(
@@ -1421,6 +1542,12 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       ...(isSamplingVariant ? {
         variantBaseDescription: baseDescription,
         variantNumber,
+        isResample: false,
+        samplingMetadata: item.samplingMetadata ? {
+          ...item.samplingMetadata,
+          sampleType: item.samplingMetadata.sampleType || "full",
+          isResample: false,
+        } : undefined,
         customDetails: variantDetails,
         hasCreativeChanges: true,
         creativeCharacteristicsCleared: true,
@@ -1429,7 +1556,9 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       stagedDate: now.toISOString().split("T")[0],
       timestamp: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
-    setStagedProducts((prev) => [...prev, clone]);
+    const nextProducts = [...currentStagedProducts, clone];
+    stagedProductsRef.current = nextProducts;
+    setStagedProducts(nextProducts);
     showToast(isSamplingVariant
       ? `Created design variant D${variantNumber}; Creative-owned characteristics were cleared.`
       : `Duplicated "${item.productDescription}".`);
@@ -1611,12 +1740,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       const directCostingCount = stagedProducts.filter((item) => item.scopes.includes("costing") && item.costingCreativeInputNeeded !== true).length;
       const mockupStudioCount = stagedProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === false).length;
       const mockupCreativeCount = stagedProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === true).length;
-      const samplingResampleDirectPlantCount = stagedProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
-        && Boolean(item.isResample || item.samplingMetadata?.isResample)).length;
+      const samplingResampleDirectPlantCount = stagedProducts.filter((item) => item.scopes.length === 1 && getAutomaticSampleRoute(item).isResample).length;
       const samplingReviewCount = stagedProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
-        && !item.isResample && !item.samplingMetadata?.isResample && !item.hasCreativeChanges && !item.creativeCharacteristicsCleared && !item.creativePendingCharacteristicKeys?.length && !item.variantNumber).length;
-      const samplingCreativeCount = stagedProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
-        && (item.hasCreativeChanges || item.creativeCharacteristicsCleared || item.creativePendingCharacteristicKeys?.length || item.variantNumber)).length;
+        && !getAutomaticSampleRoute(item).isResample && !getAutomaticSampleRoute(item).creativeChangesRequired).length;
+      const samplingCreativeCount = stagedProducts.filter((item) => item.scopes.length === 1 && getAutomaticSampleRoute(item).creativeChangesRequired).length;
       const otherScopeCount = stagedProducts.filter((item) => item.scopes.some((scope) => scope !== "costing" && scope !== "mockup" && scope !== "sample")).length;
       const routes = [
         creativeFirstCount ? `${creativeFirstCount} Costing request(s) to Creative first` : "",
@@ -1625,7 +1752,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         mockupCreativeCount ? `${mockupCreativeCount} Mockup request(s) to Creative` : "",
         samplingReviewCount ? `${samplingReviewCount} Sampling request(s) to Sampling Team review` : "",
         samplingResampleDirectPlantCount ? `${samplingResampleDirectPlantCount} Resample(s) directly to Plant` : "",
-        samplingCreativeCount ? `${samplingCreativeCount} changed/variant Sampling request(s) to Creative first` : "",
+        samplingCreativeCount ? `${samplingCreativeCount} new/changed Sampling request(s) through Creative, Studio, Creative approval, Sampling review, then Plant` : "",
         otherScopeCount ? "other selected scopes to their workflows" : "",
       ].filter(Boolean).join("; ");
       showToast(`✓ ${label} released${routes ? `: ${routes}` : ` into ${newStatus}`}!`);
@@ -1759,10 +1886,12 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                 designHandoffDesigns={designMockupHandoff?.designs}
                 selectedScopes={selectedScopes}
                 modalError={modalError}
-                isResample={isResample}
-                onSetIsResample={setIsResample}
                 sampleType={sampleType}
                 partialRequirements={partialRequirements}
+                scopeReferenceImages={scopeReferenceImages}
+                isCompressingScopeImages={compressingScopeImages.size > 0}
+                onSetScopeReferenceImages={updateScopeReferenceImages}
+                onScopeImageProcessingChange={setScopeImageProcessing}
                 samplingSearchMode={samplingSearchMode}
                 productDescription={samplingDescription}
                 qtyForSampling={qtyForSampling}

@@ -5,7 +5,11 @@ batch creation, and material searches.
 """
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timezone, date
+import base64
+import binascii
+import re
 from uuid import uuid4
+from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,12 +20,18 @@ from app.models.sample_request import (
     ProductDetail,
     SampleRequestActivityLog,
     SampleRequestType,
+    SampleRequestReferenceImage,
 )
 from app.models.master import Plant
 from app.utils.business_year import (
     get_business_year_for_date_str,
     get_current_business_year,
 )
+from app.utils.request_codes import REQUEST_CODE_PREFIX_BY_SCOPE, next_request_code
+
+MAX_SCOPE_REFERENCE_IMAGE_BYTES = 524_288
+MAX_SCOPE_REFERENCE_IMAGE_SOURCE_BYTES = 15 * 1024 * 1024
+SCOPE_REFERENCE_IMAGE_DATA_URL_RE = re.compile(r"^data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$")
 
 
 class SampleRequestService:
@@ -44,6 +54,7 @@ class SampleRequestService:
         r: CreateSampleRequest,
         *,
         list_detail_summary: Optional[Dict[str, Optional[str]]] = None,
+        include_scope_reference_data: bool = False,
     ) -> Dict[str, Any]:
         """Serialize a sample request database record."""
         created_date = r.date_request_created or (r.created_at.strftime("%Y-%m-%d") if r.created_at else "")
@@ -56,7 +67,32 @@ class SampleRequestService:
             else (list_detail_summary.get("binding_type_1"), list_detail_summary.get("binding_type_2"))
         )
         mockup_workflow_state = r.mockup_workflow_state if isinstance(r.mockup_workflow_state, dict) else {}
-        request_types = r.request_types if isinstance(r.request_types, list) else []
+        valid_scopes = ("design", "mockup", "sample", "costing")
+        request_types = [scope for scope in r.request_types if scope in valid_scopes] if isinstance(r.request_types, list) else []
+        request_codes = r.request_codes if isinstance(r.request_codes, dict) else {}
+        audit = getattr(r, "request_type_audit", None)
+        if audit:
+            audited_scopes = [scope for scope in valid_scopes if getattr(audit, scope, False)]
+            if audited_scopes:
+                request_types = audited_scopes
+        if not request_types:
+            request_types = [scope for scope in valid_scopes if request_codes.get(scope)]
+        mockup_requested = str(r.mockup_required or "").strip().casefold() in {"yes", "true", "y"} or bool(mockup_workflow_state)
+        if not request_types:
+            code_prefixes = {"DR": "design", "MR": "mockup", "SR": "sample", "CR": "costing"}
+            for code in (getattr(r, "request_code", None), r.material_code):
+                prefix = str(code or "").strip().upper().split("-", 1)[0]
+                if prefix in code_prefixes:
+                    if prefix == "SR" and mockup_requested:
+                        continue
+                    request_types = [code_prefixes[prefix]]
+                    break
+        if not request_types and mockup_requested:
+            request_types = ["mockup"]
+        if not request_types and r.sr_number and str(r.sr_number).upper().startswith("SR-"):
+            request_types = ["sample"]
+        if not request_types:
+            request_types = ["sample"]
         if not mockup_workflow_state and ("mockup" in request_types or str(r.mockup_required or "").casefold() == "yes"):
             current_status = str(r.status or "").strip().casefold()
             stage = "studio" if current_status.startswith("studio") else "creative" if current_status.startswith("creative") else "marketing"
@@ -76,6 +112,26 @@ class SampleRequestService:
                 "costing_selected_at": audit.costing_selected_at.isoformat() if audit.costing_selected_at else None,
             }
 
+        scope_reference_images: Dict[str, List[Dict[str, Any]]] = {scope: [] for scope in ("sample", "mockup", "costing")}
+        if include_scope_reference_data:
+            image_records = (
+                self.db.query(SampleRequestReferenceImage)
+                .filter(SampleRequestReferenceImage.sample_request_id == r.id)
+                .order_by(SampleRequestReferenceImage.scope, SampleRequestReferenceImage.sort_order)
+                .all()
+            )
+            for image in image_records:
+                encoded = base64.b64encode(image.image_data or b"").decode("ascii")
+                scope_reference_images.setdefault(image.scope, []).append({
+                    "id": image.id,
+                    "name": image.original_name,
+                    "content_type": image.content_type,
+                    "original_size_bytes": image.original_size_bytes,
+                    "size_bytes": len(image.image_data or b""),
+                    "sort_order": image.sort_order,
+                    "url": f"data:{image.content_type};base64,{encoded}",
+                })
+
         trend_val = list_detail_summary.get("trend") if list_detail_summary is not None else None
         target_audience_val = (
             list_detail_summary.get("target_audience") if list_detail_summary is not None else None
@@ -93,7 +149,13 @@ class SampleRequestService:
 
         return {
             "id": r.id,
-            "sr_number": r.sr_number,
+            "sr_number": r.sr_number if "sample" in request_types else None,
+            "request_code": r.sr_number if "sample" in request_types else next((
+                request_codes.get(key)
+                for key in ("design", "mockup", "costing")
+                if key in request_types and request_codes.get(key)
+            ), None),
+            "request_codes": request_codes,
             "year": by_val,
             "program_year": py_val,
             "program_name": r.program_name or "",
@@ -103,7 +165,10 @@ class SampleRequestService:
             "date_request_created": created_date,
             "created_by": r.created_by or "",
             "created_by_user_id": r.created_by_user_id,
-            "material_code": r.material_code or "",
+            "material_code": (
+                next((request_codes.get(key) for key in ("design", "mockup", "costing") if key in request_types and request_codes.get(key)), r.material_code or "")
+                if "sample" not in request_types else r.material_code or ""
+            ),
             "barcode": r.barcode or "",
             "customer_product_code": r.customer_product_code or "",
             "source_sample_code": r.source_sample_code or "",
@@ -129,11 +194,12 @@ class SampleRequestService:
             "product_image_path": r.product_image_path,
             "reference_images": r.reference_images if isinstance(r.reference_images, list) else [],
             "reference_links": r.reference_links if isinstance(r.reference_links, list) else [],
+            "scope_reference_images": scope_reference_images,
             "target_artwork_date_creative": r.target_artwork_date_creative,
             "target_artwork_date_studio": r.target_artwork_date_studio,
             "status": r.status or "Draft (Pre-SMT)",
             "creation_mode": r.creation_mode or "material_code",
-            "request_types": r.request_types if isinstance(r.request_types, list) and len(r.request_types) > 0 else ["sample"],
+            "request_types": request_types,
             "mockup_workflow_state": mockup_workflow_state,
             "request_type_audit": audit_data,
             "custom_details": [
@@ -363,7 +429,103 @@ class SampleRequestService:
         r = self.repo.get_by_id(id)
         if not r:
             return None
-        return self.serialize(r)
+        return self.serialize(r, include_scope_reference_data=True)
+
+    @staticmethod
+    def _decode_scope_reference_image(value: Any) -> Tuple[str, bytes, str, Optional[int]]:
+        if isinstance(value, str):
+            data_url = value
+            name = "Reference image"
+            original_size = None
+        elif isinstance(value, dict):
+            data_url = value.get("url") or value.get("data_url") or value.get("dataUrl") or ""
+            name = str(value.get("name") or value.get("original_name") or "Reference image").strip()
+            raw_original_size = value.get("original_size_bytes", value.get("originalSizeBytes"))
+            try:
+                original_size = int(raw_original_size) if raw_original_size is not None else None
+            except (TypeError, ValueError):
+                original_size = None
+        else:
+            raise HTTPException(status_code=422, detail="Reference image entries must include image data.")
+
+        match = SCOPE_REFERENCE_IMAGE_DATA_URL_RE.fullmatch(str(data_url or ""))
+        if not match:
+            raise HTTPException(status_code=422, detail="Reference images must be JPEG, PNG, or WebP data URLs.")
+        content_type, encoded = match.groups()
+        try:
+            image_data = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError):
+            raise HTTPException(status_code=422, detail="Reference image data is invalid.")
+        if not image_data:
+            raise HTTPException(status_code=422, detail="Reference image data is empty.")
+        if len(image_data) > MAX_SCOPE_REFERENCE_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail="Each compressed reference image must be at most 512 KB.")
+        signatures = {
+            "image/jpeg": image_data.startswith(b"\xff\xd8\xff"),
+            "image/png": image_data.startswith(b"\x89PNG\r\n\x1a\n"),
+            "image/webp": image_data.startswith(b"RIFF") and image_data[8:12] == b"WEBP",
+        }
+        if not signatures.get(content_type, False):
+            raise HTTPException(status_code=422, detail="Reference image content does not match its file type.")
+        if original_size is not None and (original_size < 0 or original_size > MAX_SCOPE_REFERENCE_IMAGE_SOURCE_BYTES):
+            raise HTTPException(status_code=422, detail="Original reference images must be at most 15 MB.")
+        return content_type, image_data, (name or "Reference image")[:255], original_size
+
+    def _sync_scope_reference_images(self, request: CreateSampleRequest, payload: Dict[str, Any]) -> bool:
+        raw = payload.get("scope_reference_images", payload.get("scopeReferenceImages"))
+        if raw is None:
+            return False
+        if not isinstance(raw, dict):
+            raise HTTPException(status_code=422, detail="Scope reference images must be grouped by request type.")
+
+        allowed_scopes = {"sample", "mockup", "costing"}
+        selected_scopes = set(request.request_types or [])
+        unknown = set(raw.keys()) - allowed_scopes
+        if unknown:
+            raise HTTPException(status_code=422, detail="Reference images are supported only for Sample, Mockup, and Costing.")
+
+        prepared: List[SampleRequestReferenceImage] = []
+        for scope in ("sample", "mockup", "costing"):
+            entries = raw.get(scope, [])
+            if entries is None:
+                entries = []
+            if not isinstance(entries, list):
+                raise HTTPException(status_code=422, detail=f"{scope.title()} reference images must be a list.")
+            if len(entries) > 2:
+                raise HTTPException(status_code=422, detail=f"A maximum of 2 {scope} reference images is allowed.")
+            if entries and scope not in selected_scopes:
+                raise HTTPException(status_code=422, detail=f"{scope.title()} reference images need a matching request scope.")
+            for order, entry in enumerate(entries):
+                content_type, image_data, original_name, original_size = self._decode_scope_reference_image(entry)
+                prepared.append(SampleRequestReferenceImage(
+                    scope=scope,
+                    original_name=original_name,
+                    content_type=content_type,
+                    original_size_bytes=original_size,
+                    image_data=image_data,
+                    sort_order=order,
+                ))
+
+        current_records = list(request.scope_reference_image_records or [])
+        existing_signature = [
+            (image.scope, image.original_name, image.content_type, image.original_size_bytes, image.image_data, image.sort_order)
+            for image in current_records
+        ]
+        prepared_signature = [
+            (image.scope, image.original_name, image.content_type, image.original_size_bytes, image.image_data, image.sort_order)
+            for image in prepared
+        ]
+        if existing_signature == prepared_signature:
+            return False
+
+        for current in current_records:
+            request.scope_reference_image_records.remove(current)
+            self.db.delete(current)
+        if current_records:
+            self.db.flush()
+        for image in prepared:
+            request.scope_reference_image_records.append(image)
+        return True
 
     def _build_entity(self, payload: Any) -> CreateSampleRequest:
         if hasattr(payload, "model_dump"):
@@ -386,7 +548,28 @@ class SampleRequestService:
         else:
             target_plant = str(target_plant).strip()
 
-        sr_num = payload.get("sr_number")
+        raw_types = payload.get("request_types") or payload.get("requestTypes") or []
+        request_types = (
+            [value.strip().lower() for value in raw_types.split(",") if value.strip()]
+            if isinstance(raw_types, str)
+            else [str(value).strip().lower() for value in raw_types if str(value).strip()]
+        )
+        if not request_types:
+            raw_codes = payload.get("request_codes") or payload.get("requestCodes") or {}
+            if isinstance(raw_codes, dict):
+                request_types = [scope for scope in ("design", "mockup", "sample", "costing") if raw_codes.get(scope)]
+        if not request_types:
+            raw_mockup_state = payload.get("mockup_workflow_state") or payload.get("mockupWorkflowState") or {}
+            mockup_requested = str(payload.get("mockup_required") or payload.get("mockupRequired") or "").strip().casefold() in {"yes", "true", "y"}
+            if mockup_requested or (isinstance(raw_mockup_state, dict) and bool(raw_mockup_state)):
+                request_types = ["mockup"]
+            else:
+                request_types = ["sample"]
+        source_request_code = str(
+            payload.get("source_request_code") or payload.get("sourceRequestCode") or ""
+        ).strip().upper()
+        if not re.fullmatch(r"(?:FC|DR|MR)-\d{2}-\d{3,}", source_request_code):
+            source_request_code = ""
         reference_images = payload.get("reference_images", payload.get("referenceImages", []))
         reference_links = payload.get("reference_links", payload.get("referenceLinks", []))
         if not isinstance(reference_images, list):
@@ -403,7 +586,7 @@ class SampleRequestService:
                 sample_req_date = None
 
         req = CreateSampleRequest(
-            sr_number=sr_num or "",
+            sr_number=None,
             client_draft_key=(str(payload.get("client_draft_key") or "").strip() or None),
             year=item_year,
             program_year=prog_year,
@@ -414,7 +597,7 @@ class SampleRequestService:
             date_request_created=created_date_str,
             created_by=payload.get("created_by") or "",
             created_by_user_id=payload.get("created_by_user_id"),
-            material_code=payload.get("material_code") or "",
+            material_code=source_request_code if "sample" in request_types else "",
             barcode=payload.get("barcode") or None,
             customer_product_code=payload.get("customer_product_code") or None,
             source_sample_code=payload.get("source_sample_code") or None,
@@ -451,7 +634,8 @@ class SampleRequestService:
             product_third_category=payload.get("product_third_category") or payload.get("productThirdCategory") or None,
             status=payload.get("status") or "Draft (Pre-SMT)",
             creation_mode=payload.get("creation_mode") or "material_code",
-            request_types=payload.get("request_types") or [],
+            request_types=request_types,
+            request_codes={},
             mockup_workflow_state=payload.get("mockup_workflow_state") or payload.get("mockupWorkflowState") or {},
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
@@ -479,19 +663,49 @@ class SampleRequestService:
         return req
 
     def _reserve_sr_number(self, request: CreateSampleRequest) -> None:
+        if "sample" not in (request.request_types or []):
+            request.sr_number = None
+            return
+        if request.sr_number and request.sr_number.startswith("SR-"):
+            return
         created_date = request.date_request_created or datetime.now(timezone.utc).strftime("%Y-%m-%d")
         try:
-            year = date.fromisoformat(str(created_date).split("T")[0]).year
+            created_at = date.fromisoformat(str(created_date).split("T")[0])
         except (TypeError, ValueError):
-            year = datetime.now(timezone.utc).year
+            created_at = datetime.now(timezone.utc).date()
+        request.sr_number = next_request_code(self.db, REQUEST_CODE_PREFIX_BY_SCOPE["sample"], created_at)
 
-        sequence = request.id
-        while True:
-            candidate = f"SR-{year % 100:02d}-{sequence:06d}"
-            if not self.repo.get_by_sr_number(candidate):
-                request.sr_number = candidate
-                return
-            sequence += 1
+    def _reserve_request_codes(self, request: CreateSampleRequest) -> None:
+        request_types = set(request.request_types or [])
+        codes = dict(request.request_codes or {})
+        for request_type in ("design", "costing", "mockup"):
+            if request_type in request_types and not codes.get(request_type):
+                codes[request_type] = self._reserve_scope_code(request, request_type)
+        codes = dict(request.request_codes or {})
+        request.request_codes = codes
+        self._reserve_sr_number(request)
+        if "sample" not in request_types and codes:
+            request.material_code = next(
+                (codes[key] for key in ("design", "mockup", "costing") if codes.get(key)),
+                "",
+            )
+
+    def _reserve_scope_code(self, request: CreateSampleRequest, request_type: str) -> str:
+        prefix = REQUEST_CODE_PREFIX_BY_SCOPE.get(request_type)
+        if not prefix:
+            raise ValueError(f"Unsupported request type for code allocation: {request_type}")
+        codes = dict(request.request_codes or {})
+        if codes.get(request_type):
+            return str(codes[request_type])
+        created_date = request.date_request_created or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        try:
+            created_at = date.fromisoformat(str(created_date).split("T")[0])
+        except (TypeError, ValueError):
+            created_at = datetime.now(timezone.utc).date()
+        code = next_request_code(self.db, prefix, created_at)
+        codes[request_type] = code
+        request.request_codes = codes
+        return code
 
     def _find_by_draft_key(self, draft_key: Optional[str]) -> Optional[CreateSampleRequest]:
         if not draft_key:
@@ -504,7 +718,7 @@ class SampleRequestService:
         previous_status = request.status
         previous_types = list(request.request_types or [])
         candidate = self._build_entity(payload)
-        protected = {"id", "sr_number", "created_at", "date_request_created", "year", "created_by"}
+        protected = {"id", "sr_number", "request_codes", "created_at", "date_request_created", "year", "created_by"}
         changed_fields: List[str] = []
         for column in CreateSampleRequest.__table__.columns:
             if column.key not in protected:
@@ -558,6 +772,14 @@ class SampleRequestService:
             if request.request_type_audit is not None:
                 request.request_type_audit = None
                 changed_fields.append("request_type_audit")
+
+        if self._sync_scope_reference_images(request, payload):
+            changed_fields.append("scope_reference_images")
+
+        old_identifiers = (request.sr_number, dict(request.request_codes or {}), request.material_code)
+        self._reserve_request_codes(request)
+        if old_identifiers != (request.sr_number, dict(request.request_codes or {}), request.material_code):
+            changed_fields.append("request_identifiers")
 
         if changed_fields:
             request.updated_at = datetime.now(timezone.utc)
@@ -623,12 +845,8 @@ class SampleRequestService:
             req.sr_number = f"TMP-SR-{uuid4().hex}"
             self.db.add(req)
             self.db.flush()
-
-            mat_code = str(req.material_code or "").strip()
-            if not mat_code or mat_code.upper() in {"PENDING", "TEMP"}:
-                req.material_code = f"A1-{req.id}"
-
-            self._reserve_sr_number(req)
+            self._sync_scope_reference_images(req, payload)
+            self._reserve_request_codes(req)
             self.add_activity_log(
                 req,
                 action="DRAFT_CREATED" if self._is_draft(req) else "REQUEST_CREATED",
@@ -680,12 +898,8 @@ class SampleRequestService:
                     req.sr_number = f"TMP-SR-{uuid4().hex}"
                     self.db.add(req)
                     self.db.flush()
-
-                    mat_code = str(req.material_code or "").strip()
-                    if not mat_code or mat_code.upper() in {"PENDING", "TEMP"}:
-                        req.material_code = f"A1-{req.id}"
-
-                    self._reserve_sr_number(req)
+                    self._sync_scope_reference_images(req, item)
+                    self._reserve_request_codes(req)
                     self.add_activity_log(
                         req,
                         action="DRAFT_CREATED" if self._is_draft(req) else "REQUEST_CREATED",
@@ -751,6 +965,8 @@ class SampleRequestService:
             for detail in record.product_details
         ]
         self._apply_product_details(record, payload)
+        if self._sync_scope_reference_images(record, payload):
+            changed_fields.append("scope_reference_images")
         if "request_types" in payload or "requestTypes" in payload:
             self._apply_request_type_audit(record, payload, stamp_new=True)
         details_after = [
@@ -761,6 +977,14 @@ class SampleRequestService:
             changed_fields.append("product_details")
         if not changed_fields:
             return self.serialize(record)
+
+        old_identifiers = (record.sr_number, dict(record.request_codes or {}), record.material_code)
+        self._reserve_request_codes(record)
+        if old_identifiers != (record.sr_number, dict(record.request_codes or {}), record.material_code):
+            changed_fields.append("request_identifiers")
+            update_fields["sr_number"] = record.sr_number
+            update_fields["request_codes"] = record.request_codes
+            update_fields["material_code"] = record.material_code
 
         update_fields["updated_at"] = datetime.now(timezone.utc)
         self.add_activity_log(
@@ -796,6 +1020,12 @@ class SampleRequestService:
                 "id": r.id,
                 "created_by_user_id": r.created_by_user_id,
                 "sr_number": r.sr_number,
+                "request_code": r.sr_number if "sample" in (r.request_types or []) and r.sr_number else next((
+                    (r.request_codes or {}).get(key)
+                    for key in ("design", "mockup", "costing")
+                    if (r.request_codes or {}).get(key)
+                ), None),
+                "request_codes": r.request_codes if isinstance(r.request_codes, dict) else {},
                 "material_code": r.material_code,
                 "product_description": r.product_description,
                 "customer": r.customer,

@@ -69,6 +69,20 @@ def _actor_team_label(user: Any) -> str:
     return "Operations"
 
 
+def _linked_sample_for_design(
+    sample_service: SampleRequestService,
+    design_request: DesignRequest,
+    *,
+    for_update: bool = False,
+) -> Optional[CreateSampleRequest]:
+    linked = sample_service.repo.get_by_scope_code(
+        "design", design_request.request_code, for_update=for_update
+    ) if design_request.request_code else None
+    if linked:
+        return linked
+    return sample_service.repo.get_by_sr_number(design_request.sr_number) if design_request.sr_number else None
+
+
 def _record_workflow_event(db, *, kind: str, record: CreateSampleRequest, user: Any,
                            action: str, from_stage: Optional[str], to_stage: str,
                            from_status: Optional[str], to_status: Optional[str],
@@ -80,8 +94,12 @@ def _record_workflow_event(db, *, kind: str, record: CreateSampleRequest, user: 
             workflow_model.sample_request_id == record.id
         ).with_for_update().first()
         if workflow is None:
+            request_code = (record.request_codes or {}).get("mockup")
+            if not request_code:
+                request_code = SampleRequestService(db)._reserve_scope_code(record, "mockup")
             workflow = workflow_model(
                 sample_request_id=record.id,
+                request_code=request_code,
                 sr_number=record.sr_number,
                 status=from_status or record.status,
                 current_stage=from_stage or to_stage,
@@ -103,14 +121,20 @@ def _record_workflow_event(db, *, kind: str, record: CreateSampleRequest, user: 
                 details={"request_types": record.request_types or []},
             ))
         workflow.workflow_data = dict(record.mockup_workflow_state or {})
+        if not workflow.request_code:
+            workflow.request_code = SampleRequestService(db)._reserve_scope_code(record, "mockup")
     else:
         workflow_model, log_model = CostingWorkflow, CostingWorkflowLog
         workflow = db.query(workflow_model).filter(
             workflow_model.sample_request_id == record.id
         ).with_for_update().first()
         if workflow is None:
+            request_code = (record.request_codes or {}).get("costing")
+            if not request_code:
+                request_code = SampleRequestService(db)._reserve_scope_code(record, "costing")
             workflow = workflow_model(
                 sample_request_id=record.id,
+                request_code=request_code,
                 sr_number=record.sr_number,
                 status=from_status or record.status,
                 current_stage=from_stage or to_stage,
@@ -143,6 +167,8 @@ def _record_workflow_event(db, *, kind: str, record: CreateSampleRequest, user: 
                 to_status=from_status or record.status,
                 details=workflow.request_data,
             ))
+        if not workflow.request_code:
+            workflow.request_code = SampleRequestService(db)._reserve_scope_code(record, "costing")
         else:
             workflow.request_data = {
                 **(workflow.request_data or {}),
@@ -328,7 +354,7 @@ def list_sample_requests(
     service: SampleRequestService = Depends(get_sample_request_service),
     current_user=Depends(get_current_user),
 ):
-    require_any_team(current_user, ("marketing", "samp", "plant", "creative_studio"))
+    require_any_team(current_user, ("marketing", "samp", "plant", "creative_studio", "costing"))
     created_by_filter = None
     if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user):
         created_by_filter = current_user.id
@@ -431,13 +457,13 @@ def get_sample_request(
     service: SampleRequestService = Depends(get_sample_request_service),
     current_user=Depends(get_current_user),
 ):
-    require_any_team(current_user, ("marketing", "samp", "plant", "creative_studio"))
+    require_any_team(current_user, ("marketing", "samp", "plant", "creative_studio", "costing"))
     num_id = int(id) if id.isdigit() else None
     if num_id:
         record = service.get_by_id(num_id)
     else:
         req = service.repo.get_by_sr_number(id)
-        record = service.serialize(req) if req else None
+        record = service.get_by_id(req.id) if req else None
 
     if not record:
         raise HTTPException(status_code=404, detail="Sample request not found")
@@ -841,7 +867,10 @@ def delete_sample_request(
         raise HTTPException(status_code=404, detail="Sample request not found")
 
     if "design" in (record.request_types or []):
-        linked_design = design_service.repo.get_model_by_sr_number(record.sr_number)
+        design_code = (record.request_codes or {}).get("design")
+        linked_design = design_service.repo.get_model_by_request_code(design_code) if design_code else None
+        if not linked_design and record.sr_number:
+            linked_design = design_service.repo.get_model_by_sr_number(record.sr_number)
         if linked_design:
             service.db.delete(linked_design)
 
@@ -863,7 +892,10 @@ def batch_delete_sample_requests(
         if num_id:
             record = service.repo.get_by_id(num_id)
             if record and "design" in (record.request_types or []):
-                linked_design = design_service.repo.get_model_by_sr_number(record.sr_number)
+                design_code = (record.request_codes or {}).get("design")
+                linked_design = design_service.repo.get_model_by_request_code(design_code) if design_code else None
+                if not linked_design and record.sr_number:
+                    linked_design = design_service.repo.get_model_by_sr_number(record.sr_number)
                 if linked_design:
                     service.db.delete(linked_design)
             if record:
@@ -976,6 +1008,35 @@ def batch_update_status(
                 to_status=target_status,
                 details={"request_types": sorted(request_types), "design_needed": design_needed},
             )
+
+        if "costing" in request_types and was_draft and is_releasing:
+            costing_workflow = db.query(CostingWorkflow).filter(
+                CostingWorkflow.sample_request_id == record.id
+            ).with_for_update().first()
+            if costing_workflow is None or costing_workflow.current_stage == "marketing":
+                _validate_staged_handoff_requirements(record)
+                needs_creative = record.costing_creative_input_needed is True
+                target_stage = "creative" if needs_creative else "costing"
+                workflow_status = "Creative Review" if needs_creative else "Costing Work"
+                if len(request_types) == 1:
+                    target_status = "Creative" if needs_creative else "Costing"
+                _record_workflow_event(
+                    db,
+                    kind="costing",
+                    record=record,
+                    user=current_user,
+                    action="MARKETING_SUBMITTED_TO_CREATIVE" if needs_creative else "MARKETING_SUBMITTED_TO_COSTING",
+                    from_stage=costing_workflow.current_stage if costing_workflow else "marketing",
+                    to_stage=target_stage,
+                    from_status=costing_workflow.status if costing_workflow else previous_status,
+                    to_status=workflow_status,
+                    details={
+                        "request_types": sorted(request_types),
+                        "costing_creative_input_needed": needs_creative,
+                        "costing_creative_input_remark": record.costing_creative_input_remark,
+                        "required_date": record.costing_required_date,
+                    },
+                )
 
         record.status = target_status
         record.updated_at = now
@@ -1463,8 +1524,11 @@ def claim_mockup_request(
     service.db.refresh(record)
 
     # Sync linked design request if exists
-    if record.sr_number:
-        linked_design = design_service.get_by_sr_number(record.sr_number)
+    design_code = (record.request_codes or {}).get("design")
+    if design_code or record.sr_number:
+        linked_design = design_service.get_by_request_code(design_code) if design_code else None
+        if not linked_design and record.sr_number:
+            linked_design = design_service.get_by_sr_number(record.sr_number)
         if linked_design:
             def mutate_design(item: DesignRequest):
                 dstate = dict(item.workflow_state or {})
@@ -1914,8 +1978,11 @@ def release_sample_to_plant(
     previous_status = record.status
     now = datetime.now(timezone.utc).isoformat()
     actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Sampling").strip()[:100]
-    target_plant = str(body.get("target_plant") or body.get("targetPlant") or record.target_plant or "Khaniwade").strip()[:100]
+    target_plant = service.get_default_plant()
+    if not target_plant:
+        raise HTTPException(status_code=409, detail="The active Khaniwade plant is not configured")
     remark = str(body.get("sampling_remark") or body.get("samplingRemark") or "").strip()
+    record.target_plant = target_plant
     state.update({"stage": "plant", "plantReleasedAt": now, "plantReleasedBy": actor, "plantReleaseTarget": target_plant})
     routing.update({"stage": "plant", "samplingReleasedAt": now, "samplingReleasedBy": actor})
     state["samplingRouting"] = routing
@@ -2137,6 +2204,7 @@ def create_design_request(
     current_user=Depends(get_current_user),
 ):
     require_team(current_user, "marketing")
+    payload.pop("request_code", None)
     payload["created_by"] = _marketing_actor(current_user)
     payload["created_by_user_id"] = current_user.id
     created = service.create(payload)
@@ -2277,7 +2345,7 @@ def decide_design_counter_date(
         proposed_date = state.get("proposedTargetDate")
         if accepted and proposed_date:
             item.design_required_date = proposed_date
-            linked_sample = sample_service.repo.get_by_sr_number(item.sr_number)
+            linked_sample = _linked_sample_for_design(sample_service, item)
             if linked_sample:
                 linked_sample.target_artwork_date_creative = proposed_date
         state.update(
@@ -2384,7 +2452,7 @@ def release_design_request(
         state["events"] = events[:500]
         item.workflow_state = state
         item.status = "Creative"
-        linked_sample = sample_service.repo.get_by_sr_number(item.sr_number)
+        linked_sample = _linked_sample_for_design(sample_service, item)
         if linked_sample:
             linked_sample.status = "Creative"
 
@@ -2485,7 +2553,7 @@ def submit_creative_design_output(
             state.pop(key, None)
         item.workflow_state = state
 
-        linked_sample = sample_service.repo.get_by_sr_number(item.sr_number)
+        linked_sample = _linked_sample_for_design(sample_service, item)
         if linked_sample:
             linked_sample.status = item.status
 
@@ -2561,7 +2629,7 @@ def marketing_design_decision(
             state.pop(key, None)
         item.workflow_state = state
 
-        linked_sample = sample_service.repo.get_by_sr_number(item.sr_number)
+        linked_sample = _linked_sample_for_design(sample_service, item)
         if linked_sample:
             linked_sample.status = item.status
 
@@ -2603,10 +2671,7 @@ def request_post_design_deliverables(
     actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Marketing")
 
     def mutate(item: DesignRequest):
-        if not item.sr_number:
-            raise HTTPException(status_code=409, detail="This design request is not linked to a sample request")
-
-        sample = sample_service.repo.get_by_sr_number(item.sr_number)
+        sample = _linked_sample_for_design(sample_service, item, for_update=True)
         if not sample:
             raise HTTPException(status_code=409, detail="Linked sample request not found")
         if item.marketing_decision != "accepted":
@@ -2646,7 +2711,10 @@ def request_post_design_deliverables(
             if "sample" not in current_types:
                 current_types.append("sample")
             sample.request_types = current_types
+            if not sample.sr_number:
+                sample_service._reserve_sr_number(sample)
             sample.status = "Sampling Review (PMT)"
+            sample.material_code = item.request_code
             sample_state = dict(sample.mockup_workflow_state or {})
             design_followups = dict(sample_state.get("designFollowups") or {})
             design_followups["sample"] = {
@@ -2818,18 +2886,17 @@ def submit_design_brief(
         except ValueError:
             raise HTTPException(status_code=422, detail="Design required date must use YYYY-MM-DD format")
 
-    sr_number = sample_record.sr_number
-    if not sr_number:
-        raise HTTPException(status_code=409, detail="Sample request number is unavailable; refresh the request and try again")
-
-    existing_design = design_service.get_by_sr_number(sr_number)
-    if existing_design and not str(existing_design.get("status") or "").lower().startswith("draft"):
-        raise HTTPException(status_code=409, detail="This design request has already left Draft")
-
     request_types = list(sample_record.request_types or [])
     if "design" not in request_types:
         request_types.append("design")
     sample_record.request_types = request_types
+    design_code = service._reserve_scope_code(sample_record, "design")
+    existing_design = design_service.get_by_request_code(design_code)
+    if not existing_design and sample_record.sr_number:
+        existing_design = design_service.get_by_sr_number(sample_record.sr_number)
+    if existing_design and not str(existing_design.get("status") or "").lower().startswith("draft"):
+        raise HTTPException(status_code=409, detail="This design request has already left Draft")
+
     sample_record.status = "Creative"
     sample_record.product_description = description
     sample_record.product_artwork_nos = count
@@ -2839,7 +2906,9 @@ def submit_design_brief(
 
     serialized = service.serialize(sample_record)
     design_service.sync_sample_request(serialized)
-    record = design_service.get_by_sr_number(sr_number)
+    record = design_service.get_by_request_code(design_code)
+    if not record and sample_record.sr_number:
+        record = design_service.get_by_sr_number(sample_record.sr_number)
     if not record:
         raise HTTPException(status_code=500, detail="Design request could not be created")
 

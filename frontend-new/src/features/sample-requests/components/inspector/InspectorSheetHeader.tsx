@@ -27,10 +27,12 @@ export const InspectorSheetHeader: React.FC<InspectorSheetHeaderProps> = ({
   displayType,
   primaryTitle,
 }) => {
-  const code = request.srNumber || activeRequest.srNumber || `SR-${request.id}`;
   const requestTypes = getRequestTypes(activeRequest);
-
-  const isDesign = requestTypes.includes("design") || String(activeRequest.materialCode || "").startsWith("DSG-");
+  const isDesign = requestTypes.includes("design");
+  const isDesignOnly = isDesign && !requestTypes.includes("sample");
+  const code = isDesignOnly
+    ? request.requestCode || activeRequest.requestCode || request.materialCode || activeRequest.materialCode || `DR-${request.id}`
+    : request.srNumber || activeRequest.srNumber || `SR-${request.id}`;
   const isMockup = requestTypes.includes("mockup");
   const isCosting = requestTypes.includes("costing");
 

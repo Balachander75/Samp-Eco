@@ -51,9 +51,13 @@ import {
 import { formatOdooLogDate, formatOdooDate } from "../utils/dateUtils";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ImageLightboxModal } from "./inspector/ImageLightboxModal";
+import { fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
 import { isMockupCreativeCharacteristic } from "./staging/mockupCreativeFields";
 import { ProductDocketView } from "./staging/ProductDocketView";
 import type { ProductSearchResult } from "../types";
+import { getPrimaryRequestCode } from "../sampling/utils/requestTypeUtils";
+
+const getDisplayedRequestCode = getPrimaryRequestCode;
 
 // Domain Parsers & Types Re-exports for backward compatibility
 import {
@@ -109,6 +113,8 @@ export interface SampleRequestInspectorProps {
 
 type InspectorTab = "specs" | "creative" | "studio" | "sampling" | "plant";
 
+const KHANIWADE_PLANT_TARGET = "1505 - Khaniwade";
+
 interface ChatterMessage {
   id: string;
   actorName: string;
@@ -148,6 +154,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   // Specifications & Characteristics state
   const [productDetails, setProductDetails] = useState<ProductDetailItem[]>([]);
+  const [scopeReferenceImages, setScopeReferenceImages] = useState<NonNullable<SampleRequestItem["scopeReferenceImages"]>>({});
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [charSearchQuery, setCharSearchQuery] = useState("");
   const [charFilter, setCharFilter] = useState<"all" | "configured" | "docket">("docket");
@@ -174,7 +181,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   // Sampling Team section state (No Feasible/Infeasible selection as requested)
   const [samplingRemark, setSamplingRemark] = useState("");
-  const [targetPlant, setTargetPlant] = useState("Khaniwade");
+  const [targetPlant, setTargetPlant] = useState(KHANIWADE_PLANT_TARGET);
   const [isReleasingToPlant, setIsReleasingToPlant] = useState(false);
   const [isSavingSamplingFeedback, setIsSavingSamplingFeedback] = useState(false);
   const [samplingFeedbackMessage, setSamplingFeedbackMessage] = useState<string | null>(null);
@@ -204,6 +211,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     setActiveTab(initialTab);
     setCharFilter("docket");
     setCopiedCode(false);
+    setScopeReferenceImages({});
   }, [request?.id, initialTab]);
 
   // Load internal notes from localStorage
@@ -229,6 +237,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
     let cancelled = false;
     setIsLoadingDetails(true);
+    setScopeReferenceImages(activeRequest.scopeReferenceImages || {});
 
     fetchProductDetailsApi(numericId, false)
       .then((details: any[]) => {
@@ -241,6 +250,12 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
       .finally(() => {
         if (!cancelled) setIsLoadingDetails(false);
       });
+
+    fetchSampleRequestByIdApi(numericId)
+      .then((detail) => {
+        if (!cancelled) setScopeReferenceImages(detail.scopeReferenceImages || {});
+      })
+      .catch((err: any) => console.warn("Could not load request reference images:", err));
 
     return () => {
       cancelled = true;
@@ -257,7 +272,11 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     setStudioRevisionRejectRemark(ws.studioRevisionRejectRemark || "");
     setMockupDecisionRemark(ws.marketingRevisionRemark || ws.creativeRevisionRemark || "");
     setSamplingRemark(ws.samplingFeedback || activeRequest.samplingRemark || "");
-    setTargetPlant(activeRequest.targetPlant || ws.plantReleaseTarget || "Khaniwade");
+    const savedPlant = activeRequest.targetPlant || ws.plantReleaseTarget;
+    const hasAlreadyBeenReleased = Boolean(
+      ws.plantReleasedAt || String(activeRequest.status || "").toLowerCase().includes("released to plant")
+    );
+    setTargetPlant(hasAlreadyBeenReleased && savedPlant ? savedPlant : KHANIWADE_PLANT_TARGET);
   }, [activeRequest]);
 
   // Keep keyboard focus inside the inspector and return it to the opener.
@@ -303,7 +322,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   const handleCopyCode = () => {
     if (!activeRequest) return;
-    const code = activeRequest.srNumber || `SR-${activeRequest.id}`;
+    const code = getDisplayedRequestCode(activeRequest);
+    if (!code) return;
     navigator.clipboard.writeText(code);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
@@ -335,16 +355,19 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   }, [productDetails, charSearchQuery, charFilter]);
 
   // Workflow Gates & Status Flags
+  const ws: Partial<MockupWorkflowState> = activeRequest?.mockupWorkflowState || {};
   const isDirectCatalogSample = useMemo(() => {
     if (!activeRequest) return false;
     const scopes = activeRequest.requestTypes || [];
     const isMockup = scopes.includes("mockup");
     const isDesign = scopes.includes("design");
-    const hasCreative = (activeRequest as any).hasCreativeChanges || (activeRequest as any).creativeCharacteristicsCleared;
+    const hasCreative = (activeRequest as any).hasCreativeChanges ||
+      (activeRequest as any).creativeCharacteristicsCleared ||
+      ws.creativeChangesRequired ||
+      ws.samplingRouting?.creativeChangesRequired;
     return !isMockup && !isDesign && !hasCreative;
-  }, [activeRequest]);
+  }, [activeRequest, ws]);
 
-  const ws: Partial<MockupWorkflowState> = activeRequest?.mockupWorkflowState || {};
   const requestTypes = activeRequest?.requestTypes || [];
   const isMockupRequest = requestTypes.includes("mockup") || String(activeRequest?.mockupRequired || "").toLowerCase() === "yes";
   const hasSampleScope = requestTypes.includes("sample");
@@ -761,12 +784,12 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     setSamplingFeedbackMessage(null);
     try {
       const updated = await releaseSampleToPlantApi(activeRequest.id, {
-        targetPlant,
+        targetPlant: KHANIWADE_PLANT_TARGET,
         samplingRemark: samplingRemark.trim(),
         actorName,
       });
       setLocalOverride(updated);
-      setSamplingFeedbackMessage(`✓ Sample officially released to Plant (${targetPlant})!`);
+      setSamplingFeedbackMessage(`✓ Sample officially released to Plant (${KHANIWADE_PLANT_TARGET})!`);
       if (onRefresh) void onRefresh();
     } catch (err: any) {
       setSamplingFeedbackMessage(err?.message || "Failed to release sample to plant.");
@@ -778,7 +801,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   // ── EARLY RETURN AFTER ALL HOOKS ──
   if (!isOpen || !activeRequest) return null;
 
-  const code = activeRequest.srNumber || `SR-${activeRequest.id}`;
+  const code = getDisplayedRequestCode(activeRequest);
 
   return createPortal(
     <div
@@ -818,7 +841,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
             <button
               type="button"
               onClick={handleCopyCode}
-              className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] cursor-pointer"
+              disabled={!code}
+              className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               title="Copy request code"
             >
               {copiedCode ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-[var(--on-surface-subtle)]" />}
@@ -886,7 +910,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 sm:px-8">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs font-bold text-[var(--accent-primary)]">
-                      {code}
+                      {code || "—"}
                     </span>
                     <span className="text-zinc-300 dark:text-zinc-700">/</span>
                       <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
@@ -1135,10 +1159,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                             onChange={(e) => setTargetPlant(e.target.value)}
                             className="w-full px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-xs text-[var(--on-surface)] focus:ring-1 focus:ring-teal-500 focus:outline-none"
                           >
-                            <option value="Khaniwade">Khaniwade Plant (Standard &amp; Books)</option>
-                            <option value="Palghar">Palghar Plant (Exports &amp; Formats)</option>
-                            <option value="Daman">Daman Plant (Specialty &amp; Packaging)</option>
-                            <option value="Silvassa">Silvassa Plant (Hardcase Binding)</option>
+                            <option value={KHANIWADE_PLANT_TARGET}>Khaniwade Plant (1505)</option>
                           </select>
                         </div>
 
@@ -1291,6 +1312,36 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                       </div>
                     </div>
 
+                    {(["sample", "mockup", "costing"] as const).some((scope) => (scopeReferenceImages[scope] || []).length > 0) && (
+                      <section aria-label="Request reference images" className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <h3 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Request Reference Images</h3>
+                          <span className="text-[10px] text-[var(--on-surface-muted)]">Compressed attachments</span>
+                        </div>
+                        <div className="space-y-3">
+                          {(["sample", "mockup", "costing"] as const).map((scope) => {
+                            const images = scopeReferenceImages[scope] || [];
+                            if (!images.length) return null;
+                            return (
+                              <div key={scope} className="flex flex-wrap items-center gap-2.5">
+                                <span className="w-16 shrink-0 text-[10px] font-semibold capitalize text-[var(--on-surface-muted)]">{scope}</span>
+                                {images.map((image) => (
+                                  image.url ? (
+                                    <button key={image.id} type="button" onClick={() => setSelectedPreviewImage(image.url || null)} className="group flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-1.5 text-left transition hover:border-[var(--accent-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]">
+                                      <img src={image.url} alt={image.name} className="h-11 w-11 rounded-md object-cover" />
+                                      <span className="max-w-40 truncate text-[10px] font-medium text-[var(--on-surface)]">{image.name}</span>
+                                    </button>
+                                  ) : (
+                                    <span key={image.id} className="text-[10px] text-[var(--on-surface-muted)]">{image.name}</span>
+                                  )
+                                ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    )}
+
                     {/* Characteristics Explorer (Creative can edit all fields when claimed) */}
                     <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-3">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1376,7 +1427,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                             <ProductDocketView
                               product={{
                                 id: Number(String(activeRequest.id).replace(/^sample-/, "")),
-                                sr_number: activeRequest.srNumber || `SR-${activeRequest.id}`,
+                                sr_number: getDisplayedRequestCode(activeRequest),
                                 material_code: activeRequest.materialCode || "",
                                 product_description: activeRequest.productDescription || "",
                                 customer: activeRequest.customer || "",
@@ -1808,10 +1859,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                           onChange={(e) => setTargetPlant(e.target.value)}
                           className="w-full px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-xs text-[var(--on-surface)] focus:ring-1 focus:ring-teal-500 focus:outline-none"
                         >
-                          <option value="Khaniwade">Khaniwade Plant (Standard &amp; Books)</option>
-                          <option value="Palghar">Palghar Plant (Exports &amp; Formats)</option>
-                          <option value="Daman">Daman Plant (Specialty &amp; Packaging)</option>
-                          <option value="Silvassa">Silvassa Plant (Hardcase Binding)</option>
+                          <option value={KHANIWADE_PLANT_TARGET}>Khaniwade Plant (1505)</option>
                         </select>
                       </div>
 

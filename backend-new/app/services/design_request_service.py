@@ -44,6 +44,11 @@ class DesignRequestService:
         item = self.repo.get_model_by_sr_number(sr_number)
         return self.repo.to_dict(item) if item else None
 
+    def get_by_request_code(self, request_code: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Fetch a design workflow by its DR request/material code."""
+        item = self.repo.get_model_by_request_code(request_code)
+        return self.repo.to_dict(item) if item else None
+
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new creative design request."""
         return self.repo.create_record(data)

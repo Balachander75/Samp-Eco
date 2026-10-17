@@ -12,6 +12,7 @@ import { CreativeSamplingMockupPage } from "./CreativeSamplingMockupPage";
 import { CreativeCostingPage } from "./CreativeCostingPage";
 import { MockupWorkflowInspectorModal } from "@/features/sample-requests/components/staging/MockupWorkflowInspectorModal";
 import { getRequestTrackType } from "@/features/sample-requests/utils/trackTypes";
+import { isDirectPlantResampleRequest } from "@/features/sample-requests/utils/sampleRouting";
 import { TeamHeadReadOnlyNotice } from "@/components/ui/TeamHeadReadOnlyNotice";
 import { isReadOnlyTeamHead, isAdmin as isAdminUser } from "@/features/auth/permissions";
 
@@ -111,7 +112,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
         (b) => !String(b.id || "").startsWith("CB-2024-") && !String(b.srNumber || "").startsWith("SR-25-")
       );
       const cleanRequests = (Array.isArray(requests) ? requests : []).filter(
-        (r) => !String(r.srNumber || "").startsWith("SR-25-0001")
+        (r) => !String(r.srNumber || "").startsWith("SR-25-0001") && !isDirectPlantResampleRequest(r)
       );
 
       setBriefs(cleanBriefs);
@@ -156,9 +157,11 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
     return allRequests.filter((r) => {
       const srCode = String(r.srNumber || "").toUpperCase();
       const materialCode = String(r.materialCode || "").toUpperCase();
+      const requestCode = String(r.requestCode || "").toUpperCase();
       if (
         getRequestTrackType(r) === "program_planning" ||
         r.requestKind === "program" ||
+        requestCode.startsWith("PP-") ||
         srCode.startsWith("PG-") ||
         materialCode.startsWith("PG-")
       ) {
@@ -189,10 +192,12 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
     return allRequests.filter((r) => {
       const srCode = String(r.srNumber || "").toUpperCase();
       const materialCode = String(r.materialCode || "").toUpperCase();
+      const requestCode = String(r.requestCode || "").toUpperCase();
       if (
         getRequestTrackType(r) === "program_planning" ||
         r.requestKind === "program" ||
         r.creationMode === "program_planning" ||
+        requestCode.startsWith("PP-") ||
         srCode.includes("-PG-") ||
         srCode.startsWith("PG-") ||
         materialCode.startsWith("PG-")

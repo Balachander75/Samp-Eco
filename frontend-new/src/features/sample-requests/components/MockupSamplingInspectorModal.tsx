@@ -23,13 +23,15 @@ import {
 } from "lucide-react";
 import type { UserProfile } from "@/features/auth";
 import { reviewRequestWorkflowApi, type RequestWorkflowRecord } from "@/infrastructure/api";
-import { claimMockupRequestApi } from "@/infrastructure/api/sampleRequestsApi";
+import { claimMockupRequestApi, fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
 import {
   fetchProductClassSpecificationsApi,
   type ProductDetailItem,
 } from "@/infrastructure/api/masterApi";
 import { formatWorkflowAction } from "./workflowPresentation";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { ScopeReferenceImagesGallery } from "@/features/sample-requests/components/staging/ScopeReferenceImagesGallery";
+import type { SampleRequestItem } from "../types";
 
 interface MockupSamplingInspectorModalProps {
   record: RequestWorkflowRecord;
@@ -126,6 +128,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
   const [productSpecifications, setProductSpecifications] = useState<ProductDetailItem[]>([]);
   const [isLoadingSpecifications, setIsLoadingSpecifications] = useState(false);
   const [specSearchQuery, setSpecSearchQuery] = useState("");
+  const [scopeReferenceImages, setScopeReferenceImages] = useState<NonNullable<SampleRequestItem["scopeReferenceImages"]>>({});
 
   const dialogRef = useRef<HTMLElement>(null);
   const data = (record.workflow_data || {}) as Record<string, any>;
@@ -155,6 +158,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
   useEffect(() => {
     let active = true;
     setIsLoadingSpecifications(true);
+    setScopeReferenceImages({});
     fetchProductClassSpecificationsApi(record.sample_request_id)
       .then((specs) => {
         if (active) setProductSpecifications(specs);
@@ -165,6 +169,11 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
       .finally(() => {
         if (active) setIsLoadingSpecifications(false);
       });
+    fetchSampleRequestByIdApi(record.sample_request_id)
+      .then((request) => {
+        if (active) setScopeReferenceImages(request.scopeReferenceImages || {});
+      })
+      .catch((reason) => console.warn("Could not load Mockup reference images:", reason));
     return () => {
       active = false;
     };
@@ -709,6 +718,11 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
               {/* ═════════ TAB 2: TECHNICAL SPECIFICATIONS & BOM ═════════ */}
               {activeTab === "specs" && (
                 <div className="space-y-5">
+                  <ScopeReferenceImagesGallery
+                    images={scopeReferenceImages}
+                    scopes={["mockup"]}
+                    onPreview={setLightboxUrl}
+                  />
                   {/* Search Bar for Specs */}
                   <div className="flex items-center justify-between gap-3">
                     <div className="relative flex-1 max-w-md">
@@ -1003,7 +1017,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
             <div className="relative max-h-[90vh] max-w-[90vw]">
               <img
                 src={lightboxUrl}
-                alt="Enlarged CAD Dieline"
+                alt="Enlarged reference image"
                 className="max-h-[85vh] max-w-[85vw] object-contain rounded-xl shadow-2xl"
               />
               <button

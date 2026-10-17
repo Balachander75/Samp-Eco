@@ -92,6 +92,12 @@ class SingleSampRemarkUpdate(BaseModel):
     samp_remark: Optional[str] = None
 
 
+class ProgramPauseSubmit(BaseModel):
+    """Payload to pause or resume a seasonal program plan."""
+
+    paused: bool = True
+
+
 class ProgramNoteCreate(BaseModel):
     """Payload for adding a note/comment to the program planning audit chatter."""
 
@@ -117,12 +123,13 @@ class ProgramActivityLogOut(BaseModel):
 class ProgramRequestOut(BaseModel):
     id: int
     request_code: str
-    sr_number: str
+    sr_number: Optional[str] = None
     customer_name: str
     target_plant: str
     program_campaign_title: str
     program_year: str
     status: str
+    is_active: bool = True
     created_by: Optional[str] = None
 
     # Sampling Review & Seen

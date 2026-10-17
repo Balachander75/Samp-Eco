@@ -265,9 +265,11 @@ export const DeskWorkspaceLayout: React.FC<DeskWorkspaceLayoutProps> = ({
               <button
                 type="button"
                 onClick={onResetFilters}
-                className="h-8 select-none rounded-lg px-2 text-xs font-semibold text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] transition-colors cursor-pointer"
+                className="inline-flex h-8 items-center gap-1.5 select-none rounded-lg px-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shrink-0"
+                title="Clear all active filters"
               >
-                {resetFiltersLabel}
+                <X className="w-3.5 h-3.5" />
+                <span>{resetFiltersLabel}</span>
               </button>
             )}
           </div>

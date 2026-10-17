@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { SampleRequestItem } from "../types";
 import {
   getRequestTrackType,
@@ -24,12 +25,18 @@ import {
   Building2,
   Hourglass,
   BarChart3,
+  Sunrise,
+  Sun,
+  Moon,
+  X,
+  Flame,
+  LayoutDashboard,
+  Boxes,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { Select } from "@/components/ui/Select";
 import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { getRequestRequiredDate } from "../sampling/utils/requestTypeUtils";
 
 export interface MarketingOverviewPageProps {
   requests: SampleRequestItem[];
@@ -69,24 +76,21 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
   onExportCSV,
 }) => {
   const navigate = useNavigate();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Determine if the current user has Marketing Head / Lead authority
+  // Authority check: Admin or Team Head has full organization audit view
   const isHeadRole = useMemo(() => {
     if (isAdmin) return true;
     return Boolean(user?.is_team_head);
   }, [isAdmin, user]);
 
-  // Two Persona View Modes:
-  // "head": Sees aggregated stats for all marketing members with member breakdown table
-  // "specialist": Focuses strictly on the logged-in user's own requests
-  const [viewMode, setViewMode] = useState<"head" | "specialist">(() =>
-    isHeadRole ? "head" : "specialist"
-  );
-
-  // Selected member filter when in Head mode
+  // Selected Marketing DB user filter when in Head mode (defaults to "all" for full overview)
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>("all");
 
-  // Filtering & search states
+  // Section navigation state
+  const [activeSection, setActiveSection] = useState<string>("mkt-snapshot");
+
+  // Watchlist filtering & search states
   const [watchlistFilter, setWatchlistFilter] = useState<
     "all" | "drafts" | "feasibility" | "delayed" | "ontime"
   >("all");
@@ -94,12 +98,16 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
   const [showMonthlyTable, setShowMonthlyTable] = useState(false);
   const [hoveredMonthIndex, setHoveredMonthIndex] = useState<number | null>(null);
 
-  // Time-based greeting
-  const greetingText = useMemo(() => {
+  // Time-based greeting with adaptive daylight icon
+  const { greetingText, GreetingIcon } = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour >= 4 && hour < 12) return "Good morning";
-    if (hour >= 12 && hour < 17) return "Good afternoon";
-    return "Good evening";
+    if (hour >= 4 && hour < 12) {
+      return { greetingText: "Good morning", GreetingIcon: Sunrise };
+    }
+    if (hour >= 12 && hour < 17) {
+      return { greetingText: "Good afternoon", GreetingIcon: Sun };
+    }
+    return { greetingText: "Good evening", GreetingIcon: Moon };
   }, []);
 
   const firstName = useMemo(() => {
@@ -107,97 +115,136 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
     return user.name.split(" ")[0];
   }, [user?.name]);
 
-  // Returning user greeting check
-  const isReturningUser = useMemo(() => {
-    try {
-      const stored = localStorage.getItem("samp_mkt_visited");
-      if (stored) return true;
-      localStorage.setItem("samp_mkt_visited", "true");
-      return false;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  // Determine the logged-in user's identifier for request matching
+  // Determine current user identifier tokens for precise request matching
   const currentUserName = useMemo(() => {
-    return (user?.name || user?.userid || "Admin").trim();
-  }, [user?.name, user?.userid]);
+    return (user?.name || "").trim();
+  }, [user?.name]);
 
-  // Real marketing department members from backend users table
-  const [marketingUsers, setMarketingUsers] = useState<UserItem[]>([]);
+  const currentUserIdentifier = useMemo(() => {
+    return (user?.userid || "").trim();
+  }, [user?.userid]);
+
+  // Marketing DB Users loaded from backend API (strictly Marketing team members)
+  const [dbUsers, setDbUsers] = useState<UserItem[]>([]);
 
   useEffect(() => {
     let isMounted = true;
+    // Strictly load Marketing department users for the Marketing overview
     fetchUsersApi("marketing")
-      .then((usersList) => {
-        if (isMounted && Array.isArray(usersList)) {
-          setMarketingUsers(usersList);
-        }
+      .then((mktUsers) => {
+        if (!isMounted) return;
+        const marketingOnly = (mktUsers || []).filter((u) => {
+          const team = (u.team || "").toLowerCase().trim();
+          const role = (u.role || "").toLowerCase().trim();
+          return team === "marketing" || role.includes("marketing");
+        });
+        setDbUsers(marketingOnly);
       })
       .catch((err) => {
-        console.warn("Could not load marketing users list:", err);
+        console.warn("Could not load marketing users:", err);
       });
+
     return () => {
       isMounted = false;
     };
   }, []);
 
+  // Keyboard shortcut '/' to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === "/" &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // =========================================================================
-  // 1. TEAM MEMBERS EXTRACTION & RECOGNITION (100% REAL DATA ONLY)
+  // 1. EXTRACT MARKETING TEAM MEMBERS (100% STRICTLY MARKETING DEPT)
   // =========================================================================
   const teamMembersList = useMemo(() => {
-    const countsMap: Record<string, number> = {};
+    const map = new Map<
+      string,
+      {
+        name: string;
+        userid?: string;
+        email?: string;
+        role?: string;
+        count: number;
+        dbUser?: UserItem;
+      }
+    >();
 
-    // 1. Seed registered marketing team members from company directory
-    marketingUsers.forEach((u) => {
-      const name = (u.name || u.userid || "").trim();
-      if (name) {
-        countsMap[name] = 0;
+    // 1. Seed strictly with registered marketing users from DB
+    dbUsers.forEach((u) => {
+      const displayName = (u.name || u.userid || "").trim();
+      if (displayName) {
+        map.set(displayName.toLowerCase(), {
+          name: displayName,
+          userid: u.userid,
+          email: u.email,
+          role: u.role || u.subRole || "Marketing Coordinator",
+          count: 0,
+          dbUser: u,
+        });
       }
     });
 
-    // 2. Aggregate actual creators recorded on requests
+    // 2. Aggregate request counts created by these marketing users
     requests.forEach((r) => {
-      const creator = (r.createdBy || "").trim();
+      const creator = (r.createdBy || r.requestCreatedBy || "").trim();
       if (!creator) return;
+      const key = creator.toLowerCase();
 
-      const matchedKey = Object.keys(countsMap).find(
-        (k) => k.toLowerCase() === creator.toLowerCase()
-      );
-      if (matchedKey) {
-        countsMap[matchedKey] = (countsMap[matchedKey] || 0) + 1;
-      } else {
-        countsMap[creator] = (countsMap[creator] || 0) + 1;
+      for (const [k, item] of map.entries()) {
+        if (k === key || (k.length > 2 && (k.includes(key) || key.includes(k)))) {
+          item.count += 1;
+          break;
+        }
       }
     });
 
-    return Object.entries(countsMap)
-      .map(([name, count]) => ({
-        name,
-        count,
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [marketingUsers, requests]);
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [dbUsers, requests]);
 
   // =========================================================================
-  // 2. DATA FILTERING BY ACTIVE PERSONA (HEAD VS SPECIALIST)
+  // 2. DATA FILTERING: ADMIN/LEAD SEES ALL; NORMAL USER SEES ONLY THEIR OWN
   // =========================================================================
   const scopedRequests = useMemo(() => {
-    if (viewMode === "specialist") {
-      // Filter strictly to the logged-in user's own requests (100% genuine)
-      const me = currentUserName.toLowerCase();
+    // Standard User: strictly scoped to their own personal requests
+    if (!isHeadRole) {
+      const meName = currentUserName.toLowerCase();
+      const meId = currentUserIdentifier.toLowerCase();
+
       return requests.filter((r) => {
-        const creator = (r.createdBy || "").toLowerCase().trim();
-        return creator === me || (me.length > 2 && (creator.includes(me) || me.includes(creator)));
+        if (user?.id && r.createdByUserId && String(r.createdByUserId) === String(user.id)) {
+          return true;
+        }
+        const creator = (r.createdBy || r.requestCreatedBy || "").toLowerCase().trim();
+        if (!creator) return false;
+
+        if (meId && (creator === meId || creator.includes(meId) || meId.includes(creator))) {
+          return true;
+        }
+        if (meName && (creator === meName || creator.includes(meName) || meName.includes(creator))) {
+          return true;
+        }
+        return false;
       });
     }
 
-    // In Head mode, apply member filter if selected
+    // Admin / Team Head: by default sees all marketing requests across all users!
+    // If a specific marketing team member is selected in the dropdown or table, filter by that member:
     if (selectedMemberFilter !== "all") {
       const target = selectedMemberFilter.toLowerCase().trim();
       return requests.filter((r) => {
-        const creator = (r.createdBy || "").toLowerCase().trim();
+        const creator = (r.createdBy || r.requestCreatedBy || "").toLowerCase().trim();
         return (
           creator === target ||
           (target.length > 2 && (creator.includes(target) || target.includes(creator)))
@@ -205,11 +252,19 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
       });
     }
 
+    // Default for Admin: all organization requests
     return requests;
-  }, [requests, viewMode, selectedMemberFilter, currentUserName]);
+  }, [
+    requests,
+    isHeadRole,
+    selectedMemberFilter,
+    currentUserName,
+    currentUserIdentifier,
+    user?.id,
+  ]);
 
   // =========================================================================
-  // 3. CORE MARKETING SLA & STAGE CLASSIFICATION
+  // 3. CORE MARKETING SLA & LIFECYCLE CLASSIFICATION
   // =========================================================================
   const telemetry = useMemo(() => {
     const now = new Date();
@@ -236,9 +291,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
         statusStr.includes("closed") ||
         statusStr.includes("approved");
 
-      // Awaiting Marketing Action:
-      // (1) Feasibility evaluated by lab but marketing decision not recorded
-      // (2) Creative proof submitted awaiting marketing review
+      // Awaiting Marketing Action
       const isFeasibilityAwaitingAction =
         track === "feasibility_check" &&
         Boolean(r.samplingFeasibilityResponse) &&
@@ -253,8 +306,9 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
       let isUrgent = false;
       let overdueDays = 0;
 
-      if (r.sampleRequiredDate) {
-        const targetDate = new Date(r.sampleRequiredDate);
+      const requiredDate = getRequestRequiredDate(r);
+      if (requiredDate) {
+        const targetDate = new Date(requiredDate);
         if (!isNaN(targetDate.getTime())) {
           if (!isClosed && targetDate < now) {
             isDelayed = true;
@@ -308,13 +362,12 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
   }, [scopedRequests]);
 
   // =========================================================================
-  // 4. TEAM MEMBERS PERFORMANCE AUDIT (FOR MARKETING HEAD VIEW)
+  // 4. TEAM MEMBERS PERFORMANCE AUDIT (FOR ADMIN / HEAD VIEW)
   // =========================================================================
   const memberAuditMatrix = useMemo(() => {
     return teamMembersList.map((member) => {
-      // Find actual requests created by this member (or assigned)
       const memberReqs = requests.filter((r) => {
-        const creator = (r.createdBy || "").toLowerCase().trim();
+        const creator = (r.createdBy || r.requestCreatedBy || "").toLowerCase().trim();
         const memberName = member.name.toLowerCase().trim();
         return (
           creator === memberName ||
@@ -324,8 +377,9 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
 
       const total = memberReqs.length;
       const delayed = memberReqs.filter((r) => {
-        if (!r.sampleRequiredDate) return false;
-        const d = new Date(r.sampleRequiredDate);
+        const requiredDate = getRequestRequiredDate(r);
+        if (!requiredDate) return false;
+        const d = new Date(requiredDate);
         const s = String(r.status || "").toLowerCase();
         return (
           d < new Date() &&
@@ -358,6 +412,8 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
 
       return {
         name: member.name,
+        userid: member.userid,
+        role: member.role,
         total,
         active,
         drafts,
@@ -403,7 +459,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
   }, [scopedRequests]);
 
   // =========================================================================
-  // 6. 12-MONTH INFLOW TIMELINE (CURVE + NUMERICAL TABLE)
+  // 6. 12-MONTH INFLOW TIMELINE (CATMULL-ROM SPLINE + EXPANDABLE TABLE)
   // =========================================================================
   const monthlyTimeline = useMemo(() => {
     const monthCounts: Record<
@@ -453,7 +509,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
   // Clean Catmull-Rom Bezier Spline
   const svgCurve = useMemo(() => {
     const width = 800;
-    const height = 170;
+    const height = 180;
     const paddingX = 30;
     const paddingY = 24;
     const chartW = width - paddingX * 2;
@@ -483,16 +539,22 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
       d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
     }
 
-    const lastX = dataPoints[dataPoints.length - 1].x;
-    const firstX = dataPoints[0].x;
-    const bottomY = height - paddingY;
-    const area = `${d} L ${lastX.toFixed(1)} ${bottomY.toFixed(1)} L ${firstX.toFixed(1)} ${bottomY.toFixed(1)} Z`;
+    const firstPt = dataPoints[0];
+    const lastPt = dataPoints[dataPoints.length - 1];
+    const baselineY = height - paddingY;
+    const area = `${d} L ${lastPt.x.toFixed(1)} ${baselineY} L ${firstPt.x.toFixed(1)} ${baselineY} Z`;
 
-    return { linePath: d, areaPath: area, points: dataPoints, width, height };
+    return {
+      linePath: d,
+      areaPath: area,
+      points: dataPoints,
+      width,
+      height,
+    };
   }, [monthlyTimeline]);
 
   // =========================================================================
-  // 7. TOP CLIENT ACCOUNTS (PORTFOLIO HEALTH)
+  // 7. TOP CUSTOMER ACCOUNTS (PORTFOLIO CONCENTRATION)
   // =========================================================================
   const topAccounts = useMemo(() => {
     const map: Record<string, { total: number; active: number; delayed: number }> = {};
@@ -518,7 +580,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
   }, [telemetry.classified]);
 
   // =========================================================================
-  // 8. WATCHLIST FILTERING
+  // 8. WATCHLIST FILTERING & SEARCH
   // =========================================================================
   const filteredWatchlist = useMemo(() => {
     return telemetry.classified.filter((r) => {
@@ -530,6 +592,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const matches =
+          String(r.requestCode || "").toLowerCase().includes(q) ||
           String(r.srNumber || "").toLowerCase().includes(q) ||
           String(r.customer || "").toLowerCase().includes(q) ||
           String(r.productDescription || "").toLowerCase().includes(q) ||
@@ -542,91 +605,144 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
     });
   }, [telemetry.classified, watchlistFilter, searchTerm]);
 
+  // Smooth scroll handler
+  const scrollToSection = (id: string) => {
+    setActiveSection(id);
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const SECTIONS = useMemo(() => {
+    const list = [
+      { id: "mkt-snapshot", label: "Snapshot", icon: LayoutDashboard },
+      { id: "mkt-workstreams", label: "Workstreams", icon: Boxes },
+      { id: "mkt-trends", label: "Intake Trends", icon: TrendingUp },
+    ];
+    if (isHeadRole) {
+      list.push({ id: "mkt-team-audit", label: "Team Audit", icon: Users });
+    }
+    list.push(
+      { id: "mkt-accounts", label: "Accounts", icon: Building2 },
+      { id: "mkt-watchlist", label: "Watchlist", icon: Flame }
+    );
+    return list;
+  }, [isHeadRole]);
+
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] font-sans select-text overflow-y-auto">
 
-      {/* ── 1. SOLID MARKETING GREETING & COMMAND HEADER ── */}
-      <header className="px-5 sm:px-8 py-3.5 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] shrink-0">
+      {/* ── 1. SOLID EXECUTIVE GREETING & COMMAND HEADER ── */}
+      <header className="px-4 sm:px-6 lg:px-8 py-3.5 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] shrink-0 transition-colors">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-3">
 
-          {/* Left: Dynamic Greeting with Role Context */}
-          <div className="space-y-0.5">
+          {/* Left: Dynamic Daylight Greeting with Role & Scope Badge */}
+          <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)] shrink-0" />
-              <h1 className="font-display font-bold text-lg sm:text-xl tracking-tight text-[var(--on-surface)]">
-                {greetingText}, {firstName}! {isReturningUser && <span className="text-[var(--on-surface-muted)] font-normal text-sm sm:text-base">Nice to see you.</span>}
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] shadow-2xs">
+                <GreetingIcon className="w-3.5 h-3.5" />
+              </span>
+              <h1 className="font-display font-bold text-lg sm:text-xl tracking-tight text-[var(--on-surface)] flex items-center gap-2">
+                <span>{greetingText}, {firstName}!</span>
               </h1>
             </div>
-            <p className="text-xs text-[var(--on-surface-muted)] flex items-center gap-2">
-              <span>{isHeadRole ? "Marketing Head Executive Console" : "Marketing Specialist Portfolio"}</span>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--on-surface-muted)]">
+              {/* Role badge */}
+              <span className="inline-flex items-center gap-1 font-semibold text-[var(--on-surface)]">
+                {isHeadRole ? (
+                  <>
+                    <Users className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                    <span>Marketing Department Overview · All Team Inflow</span>
+                  </>
+                ) : (
+                  <>
+                    <User className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                    <span>My Marketing Portfolio · Personal Inflow</span>
+                  </>
+                )}
+              </span>
               <span className="text-[var(--border-strong)]">·</span>
               <span className="font-mono text-[11px] text-[var(--on-surface-subtle)]">
                 Business Year {selectedYear}
               </span>
-            </p>
+              {selectedMemberFilter !== "all" && (
+                <>
+                  <span className="text-[var(--border-strong)]">·</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] border border-[var(--accent-primary)]/30">
+                    Scoped to: {selectedMemberFilter}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMemberFilter("all")}
+                      className="ml-1 hover:opacity-75 cursor-pointer"
+                      title="Clear scope"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Right: Persona Switcher & View Controls */}
-          <div className="flex items-center gap-2.5">
-            {/* Persona Switcher for Marketing Heads / Admins */}
-            {isHeadRole && (
-              <div className="inline-flex rounded-lg bg-[var(--surface-low)] p-0.5 border border-[var(--border-subtle)] text-xs font-medium">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewMode("head");
-                    setSelectedMemberFilter("all");
-                  }}
-                  className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors ${viewMode === "head"
-                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  title="View aggregated department performance across all team members"
-                >
-                  <Users className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-                  <span>Team Head View</span>
-                </button>
+          {/* Right: Marketing Member Filter Dropdown & Fast Actions */}
+          <div className="flex flex-wrap items-center gap-2.5">
 
-                <button
-                  type="button"
-                  onClick={() => setViewMode("specialist")}
-                  className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors ${viewMode === "specialist"
-                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  title="Filter strictly to your personal requests"
+            {/* In Admin/Head View: Direct Marketing DB User Dropdown Selector */}
+            {isHeadRole && (
+              <div className="relative">
+                <select
+                  aria-label="Filter overview by marketing member"
+                  value={selectedMemberFilter}
+                  onChange={(e) => setSelectedMemberFilter(e.target.value)}
+                  className="h-9 pl-3 pr-8 rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] text-xs font-semibold cursor-pointer shadow-2xs outline-none focus:border-[var(--accent-primary)] transition-all font-sans"
                 >
-                  <User className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-                  <span>My Requests</span>
-                </button>
+                  <option value="all">👥 All Marketing Members ({teamMembersList.length})</option>
+                  {teamMembersList.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      👤 {m.name} ({m.count} reqs)
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
-            {/* In Head View: Team Member Filter Dropdown */}
-            {isHeadRole && viewMode === "head" && (
-              <Select
-                aria-label="Filter by marketing team member"
-                value={selectedMemberFilter}
-                onChange={(e) => setSelectedMemberFilter(e.target.value)}
-                size="sm"
-                options={[
-                  { value: "all", label: `All Team Members (${teamMembersList.length})` },
-                  ...teamMembersList.map((m) => ({
-                    value: m.name,
-                    label: m.name,
-                    count: m.count,
-                  })),
-                ]}
+            {/* Search Input with Hotkey Kbd */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search requests..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 w-40 sm:w-52 pl-8 pr-7 text-xs rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-container)] focus:bg-[var(--surface-lowest)] border border-[var(--border-subtle)] focus:border-[var(--accent-primary)] text-[var(--on-surface)] placeholder-[var(--on-surface-subtle)] outline-none transition-all shadow-2xs font-sans"
               />
-            )}
+              {searchTerm ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-[var(--surface-high)] text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              ) : (
+                <kbd className="hidden sm:inline-block absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-[var(--on-surface-subtle)] bg-[var(--surface-container)] border border-[var(--border-subtle)] rounded shadow-2xs">
+                  /
+                </kbd>
+              )}
+            </div>
 
-            {/* Export CSV (Pure View Mode Action) */}
+            {/* Export CSV Button */}
             <button
               type="button"
               onClick={onExportCSV}
-              className="px-3 py-1.5 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+              className="h-9 px-3 rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-[0.985]"
+              title="Export current view to CSV"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
               <span className="hidden sm:inline">Export</span>
             </button>
           </div>
@@ -634,42 +750,170 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
         </div>
       </header>
 
+      {/* ── STICKY SECTION NAVIGATOR (PILL BAR) ── */}
+      <nav
+        aria-label="Marketing overview sections"
+        className="sticky top-0 z-30 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)]/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-2 transition-all shadow-xs"
+      >
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-1 sm:gap-1.5 overflow-x-auto py-0.5">
+            {SECTIONS.map((section) => {
+              const Icon = section.icon;
+              const isActive = activeSection === section.id;
+              const isWatchlist = section.id === "mkt-watchlist";
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => scrollToSection(section.id)}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
+                    isActive
+                      ? "bg-[var(--surface-container)] text-[var(--on-surface)] font-bold shadow-2xs border border-[var(--border-strong)]"
+                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] border border-transparent font-medium"
+                  }`}
+                >
+                  <Icon
+                    className={`w-3.5 h-3.5 transition-colors ${
+                      isActive ? "text-[var(--accent-primary)]" : "text-[var(--on-surface-subtle)]"
+                    }`}
+                  />
+                  <span>{section.label}</span>
+                  {isWatchlist && telemetry.totalDelayed > 0 && (
+                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-rose-500 text-white shadow-2xs">
+                      {telemetry.totalDelayed}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick jump to delayed watchlist */}
+          {telemetry.totalDelayed > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setWatchlistFilter("delayed");
+                scrollToSection("mkt-watchlist");
+              }}
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>{telemetry.totalDelayed} Overdue</span>
+            </button>
+          )}
+        </div>
+      </nav>
+
       {/* ── MAIN DASHBOARD BODY ── */}
-      <main className="w-full flex-1 p-5 sm:p-8 space-y-6">
+      <main className="w-full flex-1 p-4 sm:p-6 lg:p-8 space-y-6">
 
-        {/* ── 2. MARKETING EXECUTIVE MULTI-FACTOR KPI STRIP (VIEW MODE) ── */}
-        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* ── 2. EXECUTIVE MULTI-FACTOR KPI STRIP ── */}
+        <section id="mkt-snapshot" className="scroll-mt-16 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
 
-          {/* Tile 1: Total Scoped Intake */}
+          {/* Tile 1: Intake Volume */}
           <div
-            onClick={() => setWatchlistFilter("all")}
-            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] cursor-pointer shadow-2xs transition-colors"
+            onClick={() => {
+              setWatchlistFilter("all");
+              scrollToSection("mkt-watchlist");
+            }}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-                {viewMode === "head" ? "Total Team Intake" : "My Total Requests"}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
+                {isHeadRole ? "Total Inflow" : "My Intake"}
               </span>
-              <Layers className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+              <div className="w-7 h-7 rounded-lg bg-[var(--surface-low)] group-hover:bg-[var(--accent-primary-subtle)] text-[var(--on-surface-muted)] group-hover:text-[var(--accent-primary-strong)] flex items-center justify-center transition-colors">
+                <Layers className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
-              {isLoading ? "—" : telemetry.total}
+              {isLoading ? "—" : telemetry.total.toLocaleString()}
             </div>
-            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              {viewMode === "head" ? `${teamMembersList.length} contributors` : "Raised by you"}
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>
+                {isHeadRole
+                  ? selectedMemberFilter !== "all"
+                    ? `Scoped: ${selectedMemberFilter}`
+                    : `${teamMembersList.length} coordinators`
+                  : "Raised by you"}
+              </span>
+              <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-[var(--accent-primary)] group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
 
-          {/* Tile 2: Pending Drafts (Waiting to Release) */}
+          {/* Tile 2: Delivery Fulfillment SLA */}
           <div
-            onClick={() => setWatchlistFilter("drafts")}
-            className={`p-3.5 rounded-xl bg-[var(--surface-lowest)] border cursor-pointer shadow-2xs transition-colors ${telemetry.totalDrafts > 0 ? "border-amber-300 dark:border-amber-900/60" : "border-[var(--border-subtle)]"
-              }`}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
           >
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
+                Fulfillment SLA
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums flex items-baseline gap-1.5">
+              <span>{isLoading ? "—" : `${telemetry.onTimeRate}%`}</span>
+              <span className={`w-2 h-2 rounded-full inline-block mb-1 ${telemetry.onTimeRate >= 80 ? "bg-emerald-500" : "bg-amber-500"}`} />
+            </div>
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+              {telemetry.totalOnTime.toLocaleString()} on-track tasks
+            </div>
+          </div>
+
+          {/* Tile 3: Breached / Overdue SLA */}
+          <div
+            onClick={() => {
+              setWatchlistFilter("delayed");
+              scrollToSection("mkt-watchlist");
+            }}
+            className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${
+              telemetry.totalDelayed > 0
+                ? "border-rose-500/30 hover:border-rose-500/50 bg-rose-500/[0.02]"
+                : "border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
+                telemetry.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface-subtle)]"
+              }`}>
+                Overdue Tasks
+              </span>
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                telemetry.totalDelayed > 0
+                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                  : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
+              }`}>
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className={`text-2xl font-display font-bold tracking-tight tabular-nums ${
+              telemetry.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface)]"
+            }`}>
+              {isLoading ? "—" : telemetry.totalDelayed}
+            </div>
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
+              {telemetry.totalDelayed > 0 ? "SLA past target date" : "100% on schedule"}
+            </div>
+          </div>
+
+          {/* Tile 4: Pending Drafts */}
+          <div
+            onClick={() => {
+              setWatchlistFilter("drafts");
+              scrollToSection("mkt-watchlist");
+            }}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-amber-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
+          >
+            <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                 Pending Drafts
               </span>
-              <FileEdit className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-colors">
+                <FileEdit className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
               {isLoading ? "—" : telemetry.totalDrafts}
@@ -679,13 +923,18 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
             </div>
           </div>
 
-          {/* Tile 3: In Production Fabrication */}
-          <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+          {/* Tile 5: In Production Fabrication */}
+          <div
+            onClick={() => navigate("/sample-requests/sampling")}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-blue-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 In Production
               </span>
-              <Hourglass className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-colors">
+                <Hourglass className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
               {isLoading ? "—" : telemetry.totalInProduction}
@@ -695,51 +944,18 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
             </div>
           </div>
 
-          {/* Tile 4: Feasibility / NPD Awaiting Decision */}
-          <div
-            onClick={() => setWatchlistFilter("feasibility")}
-            className={`p-3.5 rounded-xl bg-[var(--surface-lowest)] border cursor-pointer shadow-2xs transition-colors ${telemetry.totalAwaitingMarketingAction > 0
-                ? "border-purple-300 dark:border-purple-900/60"
-                : "border-[var(--border-subtle)]"
-              }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                Awaiting Decision
-              </span>
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="text-2xl font-display font-bold tracking-tight text-purple-600 dark:text-purple-400 tabular-nums">
-              {isLoading ? "—" : telemetry.totalAwaitingMarketingAction}
-            </div>
-            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              Needs client verdict
-            </div>
-          </div>
-
-          {/* Tile 5: On-Time Delivery SLA */}
-          <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-                Fulfillment SLA
-              </span>
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
-              {isLoading ? "—" : `${telemetry.onTimeRate}%`}
-            </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-              {telemetry.totalOnTime} on-track tasks
-            </div>
-          </div>
-
           {/* Tile 6: Dispatched / Won Deals */}
-          <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-                Dispatched
+          <div
+            onClick={() => navigate("/sample-requests/sampling")}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
+                Dispatched / Won
               </span>
-              <Send className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+                <Send className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
               {isLoading ? "—" : telemetry.totalCompleted}
@@ -751,134 +967,132 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
 
         </section>
 
-        {/* ── 3. MARKETING HEAD EXCLUSIVE: TEAM MEMBERS ALLOCATION MATRIX ── */}
-        {isHeadRole && viewMode === "head" && (
-          <section className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        {/* ── 3. WORKSTREAMS & DESKS ── */}
+        <section id="mkt-workstreams" className="scroll-mt-16 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+                <Boxes className="w-4 h-4 text-[var(--accent-primary)]" />
+                <span>Dedicated Marketing Workstreams & Delivery Hubs</span>
+              </h2>
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Direct access to physical sampling, feasibility NPD reviews, and seasonal catalog program matrices.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+            {/* Stream 1: Physical Sampling */}
+            <div
+              onClick={() => navigate("/sample-requests/sampling")}
+              className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 flex flex-col justify-between"
+            >
               <div>
-                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight flex items-center gap-2">
-                  <Users className="w-4 h-4 text-[var(--accent-primary)]" />
-                  <span>Marketing Team Members Performance & Request Ownership</span>
-                </h2>
-                <p className="text-xs text-[var(--on-surface-muted)]">
-                  Leadership audit showing request volume, active pipeline, drafts, and delivery SLA for each marketing coordinator.
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--surface-low)] text-[var(--accent-primary)] flex items-center justify-center">
+                      <FlaskConical className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-[var(--accent-primary)] transition-colors">
+                        Physical Sampling Desk
+                      </h3>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Notebooks & Boxes</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-[var(--surface-low)] text-[var(--on-surface)]">
+                    {workstreams.sampling.pct}%
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--on-surface-muted)] mb-3">
+                  Client sample intake, PMT laboratory verification, and physical dispatch tracking.
                 </p>
               </div>
 
-              {selectedMemberFilter !== "all" && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedMemberFilter("all")}
-                  className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] text-xs text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium cursor-pointer"
-                >
-                  Clear Member Filter
-                </button>
-              )}
+              <div className="flex items-center justify-between pt-2.5 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-[var(--accent-primary)]">
+                <span className="font-mono tabular-nums">{workstreams.sampling.count} Requests</span>
+                <span className="flex items-center gap-1">
+                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
-                    <th className="py-2.5 px-3">Team Member</th>
-                    <th className="py-2.5 px-3 text-right">Total Requests</th>
-                    <th className="py-2.5 px-3 text-right">Active In Production</th>
-                    <th className="py-2.5 px-3 text-right">Pending Drafts</th>
-                    <th className="py-2.5 px-3 text-right">Delayed SLA</th>
-                    <th className="py-2.5 px-3">Delivery SLA Fulfillment</th>
-                    <th className="py-2.5 px-3 text-right">Filter Scope</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
-                  {memberAuditMatrix.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-6 text-center text-xs text-[var(--on-surface-muted)] font-sans">
-                        No team members or request ownership records found for Business Year {selectedYear}.
-                      </td>
-                    </tr>
-                  ) : (
-                    memberAuditMatrix.map((member) => {
-                    const isSelected = selectedMemberFilter === member.name;
-                    return (
-                      <tr
-                        key={member.name}
-                        className={`hover:bg-[var(--surface-low)] transition-colors ${isSelected ? "bg-[var(--accent-primary-subtle)]/40" : ""
-                          }`}
-                      >
-                        <td className="py-3 px-3 font-semibold text-[var(--on-surface)] flex items-center gap-2.5 font-sans">
-                          <span className="w-6 h-6 rounded-full bg-[var(--surface-low)] border border-[var(--border-subtle)] font-bold text-[10px] flex items-center justify-center text-[var(--accent-primary)]">
-                            {member.name[0]}
-                          </span>
-                          <span>{member.name}</span>
-                          {member.isCurrentUser && (
-                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-[var(--surface-low)] text-[var(--accent-primary)] font-mono font-bold">
-                              You
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">
-                          {member.total}
-                        </td>
-                        <td className="py-3 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">
-                          {member.active}
-                        </td>
-                        <td className="py-3 px-3 text-right text-amber-600 dark:text-amber-400 font-semibold tabular-nums">
-                          {member.drafts}
-                        </td>
-                        <td className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">
-                          {member.delayed}
-                        </td>
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-2 w-36">
-                            <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${member.slaRate >= 90
-                                    ? "bg-emerald-500"
-                                    : member.slaRate >= 75
-                                      ? "bg-amber-500"
-                                      : "bg-rose-500"
-                                  }`}
-                                style={{ width: `${member.slaRate}%` }}
-                              />
-                            </div>
-                            <span
-                              className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${member.slaRate >= 90
-                                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                  : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                                }`}
-                            >
-                              {member.slaRate}%
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedMemberFilter(isSelected ? "all" : member.name)
-                            }
-                            className={`px-2 py-1 rounded text-[11px] font-sans font-semibold border cursor-pointer transition-colors ${isSelected
-                                ? "bg-[var(--accent-primary)] text-white border-[var(--accent-primary)]"
-                                : "bg-[var(--surface-low)] text-[var(--on-surface)] border-[var(--border-subtle)] hover:bg-[var(--surface-container)]"
-                              }`}
-                          >
-                            {isSelected ? "Filtered ✓" : "Scope"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-              </table>
+            {/* Stream 2: Feasibility NPD */}
+            <div
+              onClick={() => navigate("/sample-requests/feasibility")}
+              className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-purple-400 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                        Feasibility NPD Desk
+                      </h3>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Technical Feasibility</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                    {workstreams.feasibility.pct}%
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--on-surface-muted)] mb-3">
+                  Technical feasibility evaluations before client commitment and tooling allocation.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2.5 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                <span className="font-mono tabular-nums">{workstreams.feasibility.count} NPD Checks</span>
+                <span className="flex items-center gap-1">
+                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </div>
             </div>
-          </section>
-        )}
+
+            {/* Stream 3: Seasonal Retail Programs */}
+            <div
+              onClick={() => navigate("/sample-requests/programs")}
+              className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-indigo-400 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        Seasonal Programs Desk
+                      </h3>
+                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Back to School & Retail</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+                    {workstreams.program.pct}%
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--on-surface-muted)] mb-3">
+                  Catalog product matrices, multi-item program planning, and customer range sign-off.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2.5 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                <span className="font-mono tabular-nums">{workstreams.program.count} Programs</span>
+                <span className="flex items-center gap-1">
+                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </div>
+            </div>
+
+          </div>
+        </section>
 
         {/* ── 4. ANNUAL MARKETING INFLOW SPLINE CURVE & MONTHLY TABLE ── */}
-        <section className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
-
-          {/* Header */}
+        <section id="mkt-trends" className="scroll-mt-16 p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 mb-0.5">
@@ -886,12 +1100,12 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                 <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
                   Marketing Request Intake Curve & Delivery Trajectory
                 </h2>
-                <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] text-[10px] font-mono font-bold">
                   BY {selectedYear}
                 </span>
               </div>
               <p className="text-xs text-[var(--on-surface-muted)]">
-                Trajectory of requests raised by marketing progressing into sampling and physical verification.
+                Trajectory of requests raised progressing into sampling review and physical delivery.
               </p>
             </div>
 
@@ -908,15 +1122,15 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
               <button
                 type="button"
                 onClick={() => setShowMonthlyTable((prev) => !prev)}
-                className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
               >
                 <BarChart3 className="w-3.5 h-3.5" />
-                <span>{showMonthlyTable ? "Hide Matrix" : "View Monthly Numbers"}</span>
+                <span>{showMonthlyTable ? "Hide Matrix" : "View Numbers"}</span>
               </button>
             </div>
           </div>
 
-          {/* Solid SVG Stock Spline Curve */}
+          {/* Solid SVG Spline Curve */}
           <div className="relative w-full overflow-hidden pt-1">
             <svg
               viewBox={`0 0 ${svgCurve.width} ${svgCurve.height}`}
@@ -925,7 +1139,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
             >
               <defs>
                 <linearGradient id="mktCurveGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.22" />
+                  <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.25" />
                   <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0.01" />
                 </linearGradient>
               </defs>
@@ -956,11 +1170,11 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                     onMouseLeave={() => setHoveredMonthIndex(null)}
                     className="cursor-pointer"
                   >
-                    <circle cx={pt.x} cy={pt.y} r={12} fill="transparent" />
+                    <circle cx={pt.x} cy={pt.y} r={14} fill="transparent" />
                     <circle
                       cx={pt.x}
                       cy={pt.y}
-                      r={isHovered ? 5 : 3.5}
+                      r={isHovered ? 5.5 : 3.5}
                       fill="var(--surface-lowest)"
                       stroke="var(--accent-primary)"
                       strokeWidth={isHovered ? 2.5 : 2}
@@ -969,8 +1183,9 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                       x={pt.x}
                       y={svgCurve.height - 4}
                       textAnchor="middle"
-                      className={`text-[11px] font-mono ${isHovered ? "fill-[var(--accent-primary)] font-bold" : "fill-[var(--on-surface-subtle)]"
-                        }`}
+                      className={`text-[11px] font-mono ${
+                        isHovered ? "fill-[var(--accent-primary)] font-bold" : "fill-[var(--on-surface-subtle)]"
+                      }`}
                     >
                       {pt.label}
                     </text>
@@ -981,21 +1196,22 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
 
             {hoveredMonthIndex !== null && svgCurve.points[hoveredMonthIndex] && (
               <div
-                className="absolute top-2 z-20 pointer-events-none p-2.5 rounded-lg bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-xl text-xs font-sans"
+                className="absolute top-2 z-20 pointer-events-none p-3 rounded-xl bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-xl text-xs font-sans backdrop-blur-md"
                 style={{
                   left: `${Math.min(
-                    Math.max(svgCurve.points[hoveredMonthIndex].x / (svgCurve.width / 100), 10),
+                    Math.max(svgCurve.points[hoveredMonthIndex].x / (svgCurve.width / 100), 12),
                     82
                   )}%`,
                   transform: "translateX(-50%)",
                 }}
               >
-                <div className="font-bold text-[var(--on-surface)] mb-1 font-display">
-                  {svgCurve.points[hoveredMonthIndex].full} (BY {selectedYear})
+                <div className="font-bold text-[var(--on-surface)] mb-1.5 font-display flex items-center justify-between gap-3">
+                  <span>{svgCurve.points[hoveredMonthIndex].full}</span>
+                  <span className="font-mono text-[10px] text-[var(--on-surface-subtle)]">BY {selectedYear}</span>
                 </div>
-                <div className="space-y-0.5 font-mono text-[11px]">
+                <div className="space-y-1 font-mono text-[11px]">
                   <div className="flex items-center justify-between gap-4 text-[var(--on-surface-muted)]">
-                    <span>Marketing Inflow:</span>
+                    <span>Intake:</span>
                     <span className="font-bold text-[var(--on-surface)] tabular-nums">
                       {svgCurve.points[hoveredMonthIndex].inflow}
                     </span>
@@ -1034,14 +1250,19 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                 </thead>
                 <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
                   {monthlyTimeline.points.map((m) => (
-                    <tr key={m.key} className="hover:bg-[var(--surface-low)]">
+                    <tr key={m.key} className="hover:bg-[var(--surface-low)] transition-colors">
                       <td className="py-2 px-3 font-semibold text-[var(--on-surface)]">{m.full}</td>
                       <td className="py-2 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{m.inflow}</td>
                       <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
                       <td className="py-2 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
                       <td className="py-2 px-3 text-right tabular-nums">
-                        <span className={`px-1.5 py-0.5 rounded font-bold ${m.slaRate >= 90 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                          }`}>
+                        <span
+                          className={`px-1.5 py-0.5 rounded font-bold ${
+                            m.slaRate >= 90
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                          }`}
+                        >
                           {m.slaRate}%
                         </span>
                       </td>
@@ -1051,141 +1272,160 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
               </table>
             </div>
           )}
-
         </section>
 
-        {/* ── 5. MARKETING WORKSTREAMS & CONSOLES DECOMPOSITION ── */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight">
-                Dedicated Marketing Workstreams & Delivery Hubs
-              </h3>
-              <p className="text-xs text-[var(--on-surface-muted)]">
-                Direct access to physical sampling, feasibility NPD reviews, and seasonal program matrices.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-
-            {/* Stream 1: Sampling Requests */}
-            <div
-              onClick={() => navigate("/sample-requests/sampling")}
-              className="p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] cursor-pointer shadow-2xs group transition-colors flex flex-col justify-between"
-            >
+        {/* ── 5. ADMIN EXCLUSIVE: TEAM MEMBERS PERFORMANCE & OWNERSHIP AUDIT MATRIX ── */}
+        {isHeadRole && (
+          <section
+            id="mkt-team-audit"
+            className="scroll-mt-16 p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--surface-low)] text-[var(--accent-primary)] flex items-center justify-center">
-                      <FlaskConical className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-[var(--accent-primary)] transition-colors">
-                        Physical Sampling Desk
-                      </h4>
-                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Notebooks & Boxes</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-[var(--surface-low)] text-[var(--on-surface)]">
-                    {workstreams.sampling.pct}%
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[var(--accent-primary)]" />
+                  <span>Marketing Team Members Performance & Request Ownership</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                    {memberAuditMatrix.length} Members
                   </span>
-                </div>
-                <p className="text-xs text-[var(--on-surface-muted)] mb-3">
-                  Client sample intake, PMT laboratory verification, and physical dispatch tracking.
+                </h2>
+                <p className="text-xs text-[var(--on-surface-muted)]">
+                  Audit showing request volume, active pipeline, drafts, and delivery SLA for each marketing coordinator.
                 </p>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-[var(--accent-primary)]">
-                <span className="font-mono tabular-nums">{workstreams.sampling.count} Requests</span>
-                <span className="flex items-center gap-0.5">
-                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </span>
-              </div>
+              {selectedMemberFilter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMemberFilter("all")}
+                  className="px-3 py-1 rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-xs text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium cursor-pointer transition-all active:scale-95"
+                >
+                  Clear Member Filter
+                </button>
+              )}
             </div>
 
-            {/* Stream 2: Feasibility NPD Checks */}
-            <div
-              onClick={() => navigate("/sample-requests/feasibility")}
-              className="p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-purple-400 cursor-pointer shadow-2xs group transition-colors flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-purple-600 transition-colors">
-                        Feasibility NPD Desk
-                      </h4>
-                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Technical Feasibility</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
-                    {workstreams.feasibility.pct}%
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--on-surface-muted)] mb-3">
-                  Technical feasibility evaluations before client commitment and tooling allocation.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-purple-600">
-                <span className="font-mono tabular-nums">{workstreams.feasibility.count} NPD Checks</span>
-                <span className="flex items-center gap-0.5">
-                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </span>
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
+                    <th className="py-2.5 px-3">Team Member</th>
+                    <th className="py-2.5 px-3 text-right">Total Requests</th>
+                    <th className="py-2.5 px-3 text-right">In Production</th>
+                    <th className="py-2.5 px-3 text-right">Pending Drafts</th>
+                    <th className="py-2.5 px-3 text-right">Delayed SLA</th>
+                    <th className="py-2.5 px-3">Delivery SLA Fulfillment</th>
+                    <th className="py-2.5 px-3 text-right">Filter Scope</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
+                  {memberAuditMatrix.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center text-xs text-[var(--on-surface-muted)] font-sans">
+                        No team members or request ownership records found for Business Year {selectedYear}.
+                      </td>
+                    </tr>
+                  ) : (
+                    memberAuditMatrix.map((member) => {
+                      const isSelected = selectedMemberFilter === member.name;
+                      return (
+                        <tr
+                          key={member.name}
+                          className={`hover:bg-[var(--surface-low)] transition-colors ${
+                            isSelected ? "bg-[var(--accent-primary-subtle)]/35" : ""
+                          }`}
+                        >
+                          <td className="py-3 px-3 font-semibold text-[var(--on-surface)] flex items-center gap-2.5 font-sans">
+                            <span className="w-7 h-7 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] font-bold text-xs flex items-center justify-center text-[var(--accent-primary)] shadow-2xs">
+                              {member.name[0]?.toUpperCase()}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span>{member.name}</span>
+                                {member.isCurrentUser && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-[var(--surface-container)] text-[var(--accent-primary-strong)] font-mono font-bold">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              {member.role && (
+                                <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono block">
+                                  {member.role}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">
+                            {member.total}
+                          </td>
+                          <td className="py-3 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">
+                            {member.active}
+                          </td>
+                          <td className="py-3 px-3 text-right text-amber-600 dark:text-amber-400 font-semibold tabular-nums">
+                            {member.drafts}
+                          </td>
+                          <td className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">
+                            {member.delayed}
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2 w-36">
+                              <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-300 ${
+                                    member.slaRate >= 90
+                                      ? "bg-emerald-500"
+                                      : member.slaRate >= 75
+                                      ? "bg-amber-500"
+                                      : "bg-rose-500"
+                                  }`}
+                                  style={{ width: `${member.slaRate}%` }}
+                                />
+                              </div>
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
+                                  member.slaRate >= 90
+                                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                    : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                                }`}
+                              >
+                                {member.slaRate}%
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedMemberFilter(isSelected ? "all" : member.name)
+                              }
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-sans font-semibold border cursor-pointer transition-all active:scale-95 shadow-2xs ${
+                                isSelected
+                                  ? "bg-[var(--accent-primary)] text-white border-[var(--accent-primary)]"
+                                  : "bg-[var(--surface-low)] text-[var(--on-surface)] border-[var(--border-subtle)] hover:bg-[var(--surface-container)]"
+                              }`}
+                            >
+                              {isSelected ? "Scoped ✓" : "Scope"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-
-            {/* Stream 3: Seasonal Retail Programs */}
-            <div
-              onClick={() => navigate("/sample-requests/programs")}
-              className="p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-indigo-400 cursor-pointer shadow-2xs group transition-colors flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                      <Layers className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-indigo-600 transition-colors">
-                        Seasonal Programs Desk
-                      </h4>
-                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Back to School & Retail</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                    {workstreams.program.pct}%
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--on-surface-muted)] mb-3">
-                  Catalog product matrices, multi-item program planning, and customer range sign-off.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-indigo-600">
-                <span className="font-mono tabular-nums">{workstreams.program.count} Programs</span>
-                <span className="flex items-center gap-0.5">
-                  Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </span>
-              </div>
-            </div>
-
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ── 6. TOP CUSTOMER PORTFOLIO CONCENTRATION ── */}
-        <section className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
+        <section id="mkt-accounts" className="scroll-mt-16 p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
           <div>
-            <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+            <h2 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
               <Building2 className="w-4 h-4 text-[var(--accent-primary)]" />
               <span>Top Customer Account Portfolios</span>
-            </h3>
+            </h2>
             <p className="text-xs text-[var(--on-surface-muted)]">
-              Marketing accounts with the highest intake volume and delivery SLA health.
+              Key client accounts with the highest request volume and fulfillment health.
             </p>
           </div>
 
@@ -1209,104 +1449,101 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                   </tr>
                 ) : (
                   topAccounts.map((account) => (
-                  <tr key={account.name} className="hover:bg-[var(--surface-low)]">
-                    <td className="py-2.5 px-3 font-semibold text-[var(--on-surface)] font-sans">
-                      {account.name}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{account.total}</td>
-                    <td className="py-2.5 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{account.active}</td>
-                    <td className="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{account.delayed}</td>
-                    <td className="py-2.5 px-3">
-                      <div className="flex items-center gap-2 w-36">
-                        <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
-                          <div
-                            className="bg-emerald-500 h-full rounded-full"
-                            style={{ width: `${account.onTimeRate}%` }}
-                          />
+                    <tr key={account.name} className="hover:bg-[var(--surface-low)] transition-colors">
+                      <td className="py-2.5 px-3 font-semibold text-[var(--on-surface)] font-sans">
+                        {account.name}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{account.total}</td>
+                      <td className="py-2.5 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{account.active}</td>
+                      <td className="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{account.delayed}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2 w-36">
+                          <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                              style={{ width: `${account.onTimeRate}%` }}
+                            />
+                          </div>
+                          <span
+                            className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
+                              account.onTimeRate >= 90
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                            }`}
+                          >
+                            {account.onTimeRate}%
+                          </span>
                         </div>
-                        <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${account.onTimeRate >= 90 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                          }`}>
-                          {account.onTimeRate}%
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
             </table>
           </div>
         </section>
 
-        {/* ── 7. DETAILED MARKETING WATCHLIST TABLE (VIEW MODE) ── */}
-        <section className="rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs overflow-hidden">
+        {/* ── 7. DETAILED MARKETING WATCHLIST TABLE ── */}
+        <section id="mkt-watchlist" className="scroll-mt-16 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs overflow-hidden">
 
-          {/* Header with Search and Segmented Filters */}
+          {/* Table Header with Live Search & Segmented Filter Pills */}
           <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+              <h2 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
                 <span>Marketing Request Pipeline Watchlist</span>
                 <span className="text-xs font-mono font-normal text-[var(--on-surface-subtle)]">
                   ({filteredWatchlist.length} records shown)
                 </span>
-              </h3>
+              </h2>
               <p className="text-xs text-[var(--on-surface-muted)]">
-                Line-by-line inspection of individual requests created by marketing coordinators.
+                Line-by-line inspection of individual requests with real-time status and SLA tracking.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Search Box */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Filter SR, Customer, Item..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[var(--surface-low)] text-xs text-[var(--on-surface)] placeholder-[var(--on-surface-subtle)] border border-[var(--border-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] w-48 sm:w-56"
-                />
-              </div>
-
               {/* Segmented Filter Pills */}
-              <div className="inline-flex rounded-lg bg-[var(--surface-low)] p-0.5 border border-[var(--border-subtle)] text-xs font-medium">
+              <div className="inline-flex rounded-xl bg-[var(--surface-low)] p-1 border border-[var(--border-subtle)] text-xs font-medium shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("all")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "all"
-                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)]"
-                    }`}
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95 ${
+                    watchlistFilter === "all"
+                      ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs border border-[var(--border-strong)]"
+                      : "text-[var(--on-surface-muted)] border border-transparent"
+                  }`}
                 >
                   All ({telemetry.total})
                 </button>
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("drafts")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "drafts"
-                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)] hover:text-amber-600"
-                    }`}
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95 ${
+                    watchlistFilter === "drafts"
+                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs border border-amber-300/50"
+                      : "text-[var(--on-surface-muted)] hover:text-amber-600 border border-transparent"
+                  }`}
                 >
                   Drafts ({telemetry.totalDrafts})
                 </button>
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("feasibility")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "feasibility"
-                      ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)] hover:text-purple-600"
-                    }`}
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95 ${
+                    watchlistFilter === "feasibility"
+                      ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-bold shadow-2xs border border-purple-300/50"
+                      : "text-[var(--on-surface-muted)] hover:text-purple-600 border border-transparent"
+                  }`}
                 >
                   Needs Action ({telemetry.totalAwaitingMarketingAction})
                 </button>
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("delayed")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "delayed"
-                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)] hover:text-rose-600"
-                    }`}
+                  className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95 ${
+                    watchlistFilter === "delayed"
+                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs border border-rose-300/50"
+                      : "text-[var(--on-surface-muted)] hover:text-rose-600 border border-transparent"
+                  }`}
                 >
                   Delayed ({telemetry.totalDelayed})
                 </button>
@@ -1314,12 +1551,12 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
             </div>
           </div>
 
-          {/* Table */}
+          {/* Watchlist Table Body */}
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)] bg-[var(--surface-low)]">
-                  <th className="py-2.5 px-4">SR Number</th>
+                  <th className="py-2.5 px-4">Request Code</th>
                   <th className="py-2.5 px-3">Customer</th>
                   <th className="py-2.5 px-3">Product Description</th>
                   <th className="py-2.5 px-3">Creator</th>
@@ -1337,7 +1574,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                       <EmptyState
                         compact
                         title={
-                          viewMode === "specialist"
+                          !isHeadRole
                             ? `No personal requests for BY ${selectedYear}`
                             : "No matching marketing requests"
                         }
@@ -1355,14 +1592,14 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredWatchlist.slice(0, 10).map((req) => (
+                  filteredWatchlist.slice(0, 15).map((req) => (
                     <tr
                       key={req.id}
                       onClick={() => onInspectRequest(req)}
                       className="hover:bg-[var(--surface-low)] cursor-pointer group transition-colors"
                     >
                       <td className="py-3 px-4 font-mono font-bold text-[var(--on-surface)] group-hover:text-[var(--accent-primary)]">
-                        {req.srNumber || "—"}
+                        {req.requestCode || req.srNumber || `SR-${req.id}`}
                       </td>
                       <td className="py-3 px-3 font-medium text-[var(--on-surface)] truncate max-w-[140px]">
                         {req.customer || "—"}
@@ -1370,11 +1607,14 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                       <td className="py-3 px-3 text-[var(--on-surface-muted)] truncate max-w-[200px]">
                         {req.productDescription || "—"}
                       </td>
-                      <td className="py-3 px-3 font-mono text-[var(--on-surface-subtle)] truncate max-w-[110px]">
-                        {req.createdBy || "Unassigned"}
+                      <td className="py-3 px-3">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--surface-low)] text-[var(--on-surface-muted)] text-[11px] font-mono">
+                          <User className="w-3 h-3 text-[var(--accent-primary)]" />
+                          <span className="truncate max-w-[90px]">{req.createdBy || "Unassigned"}</span>
+                        </span>
                       </td>
                       <td className="py-3 px-3 font-mono text-[var(--on-surface)] tabular-nums">
-                        {req.sampleRequiredDate || "—"}
+                        {getRequestRequiredDate(req) || "—"}
                       </td>
                       <td className="py-3 px-3">
                         {req._isDraft ? (
@@ -1408,7 +1648,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                         )}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <ChevronRight className="w-4 h-4 text-[var(--on-surface-subtle)] group-hover:translate-x-0.5 inline transition-transform" />
+                        <ChevronRight className="w-4 h-4 text-[var(--on-surface-subtle)] group-hover:text-[var(--accent-primary)] group-hover:translate-x-0.5 inline transition-all" />
                       </td>
                     </tr>
                   ))
@@ -1417,13 +1657,15 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
             </table>
           </div>
 
-          {/* Footer note */}
+          {/* Footer Note & Quick Routing */}
           <div className="p-3.5 px-5 bg-[var(--surface-low)] border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--on-surface-muted)]">
-            <span>Showing top marketing records in executive view mode.</span>
+            <span>
+              Showing {Math.min(15, filteredWatchlist.length)} of {filteredWatchlist.length} records in pipeline.
+            </span>
             <button
               type="button"
               onClick={() => navigate("/sample-requests/sampling")}
-              className="font-semibold text-[var(--on-surface)] hover:text-[var(--accent-primary)] flex items-center gap-1 cursor-pointer transition-colors"
+              className="font-semibold text-[var(--on-surface)] hover:text-[var(--accent-primary)] flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95"
             >
               <span>Go to Sampling Queue</span>
               <ArrowRight className="w-3.5 h-3.5" />

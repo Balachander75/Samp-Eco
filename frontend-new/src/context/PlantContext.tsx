@@ -24,8 +24,6 @@ const STORAGE_KEY = "samp_active_plant";
 
 const DEFAULT_PLANTS: PlantOption[] = [
   { code: "1505", name: "1505 - Khaniwade", displayName: "1505 — Khaniwade", location: "Khaniwade" },
-  { code: "1508", name: "1508 - Vasai", displayName: "1508 — Vasai", location: "Vasai" },
-  { code: "1509", name: "1509 - Daman", displayName: "1509 — Daman", location: "Daman" },
 ];
 
 const PlantContext = createContext<PlantContextType | undefined>(undefined);
@@ -87,6 +85,15 @@ export const PlantProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     void reloadPlants(controller.signal);
     return () => controller.abort();
   }, [reloadPlants]);
+
+  useEffect(() => {
+    if (
+      selectedPlant !== "ALL" &&
+      !plantOptions.some((plant) => plant.code.toLowerCase() === selectedPlant.toLowerCase())
+    ) {
+      setSelectedPlant(plantOptions[0]?.code || "ALL");
+    }
+  }, [plantOptions, selectedPlant, setSelectedPlant]);
 
   const activePlantOption = useMemo(() => {
     if (selectedPlant === "ALL") return null;

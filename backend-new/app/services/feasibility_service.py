@@ -7,7 +7,6 @@ import base64
 import binascii
 import io
 import re
-from uuid import uuid4
 from sqlalchemy import func
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any, Tuple
@@ -29,6 +28,9 @@ from app.models.feasibility import (
     FeasibilityReferenceImage,
 )
 from app.models.master import Customer, Plant
+from app.models.sample_request import CreateSampleRequest
+from app.utils.request_codes import REQUEST_CODE_PREFIX_BY_SCOPE, next_request_code, temporary_request_code
+from app.utils.business_year import get_current_business_year
 from app.schemas.feasibility import (
     FeasibilityRequestCreate,
     FeasibilitySampVerdictPayload,
@@ -174,6 +176,18 @@ class FeasibilityService:
             closed_date = (closed_at.replace(tzinfo=timezone.utc) if closed_at.tzinfo is None else closed_at).astimezone(INDIA_TZ).date()
             is_on_time = closed_date <= _shift_workdays(request.required_date, request.samp_sla_paused_workdays or 0)
 
+        converted_request = self.db.query(CreateSampleRequest).filter(
+            CreateSampleRequest.id == request.converted_sample_request_id,
+        ).first() if request.converted_sample_request_id else None
+        converted_codes = converted_request.request_codes if converted_request and isinstance(converted_request.request_codes, dict) else {}
+        converted_request_code = (
+            converted_request.sr_number
+            if converted_request and "sample" in (converted_request.request_types or [])
+            else next((converted_codes.get(key) for key in ("design", "mockup", "costing") if converted_codes.get(key)), None)
+            if converted_request
+            else request.converted_sr_number
+        )
+
         return {
             "id": request.id,
             "request_code": request.request_code,
@@ -226,7 +240,8 @@ class FeasibilityService:
             "marketing_decision_remark": request.marketing_decision_remark,
             "converted_sample_request_id": request.converted_sample_request_id,
             "converted_sr_number": request.converted_sr_number,
-            "converted_request_types": ["sample"] if request.converted_sample_request_id else [],
+            "converted_request_code": converted_request_code,
+            "converted_request_types": converted_request.request_types if converted_request else [],
             "converted_at": request.converted_at,
             "converted_by": request.converted_by,
             "activities": [
@@ -293,7 +308,7 @@ class FeasibilityService:
         creator_user_id = current_user.id if current_user else None
 
         req = FeasibilityRequest(
-            request_code="PENDING",
+            request_code=temporary_request_code(),
             customer_id=customer.id,
             target_plant=target_plant_name,
             feasibility_type=payload.feasibility_type,
@@ -309,19 +324,11 @@ class FeasibilityService:
         self.db.add(req)
         self.db.flush()
 
-        seq = req.id
-        while True:
-            candidate_code = f"FC-{seq:04d}"
-            collision = (
-                self.db.query(FeasibilityRequest)
-                .filter(FeasibilityRequest.request_code == candidate_code)
-                .filter(FeasibilityRequest.id != req.id)
-                .first()
-            )
-            if not collision:
-                req.request_code = candidate_code
-                break
-            seq += 1
+        req.request_code = next_request_code(
+            self.db,
+            REQUEST_CODE_PREFIX_BY_SCOPE["feasibility"],
+            req.request_raised_at or datetime.now(timezone.utc),
+        )
 
         # Decode reference images
         if payload.reference_images:
@@ -710,20 +717,87 @@ class FeasibilityService:
             )
 
         if req.converted_sample_request_id:
-            return {
-                "feasibility": self.serialize_request(req),
-                "sample_request_id": req.converted_sample_request_id,
-                "sample_sr_number": req.converted_sr_number,
-                "request_types": selected_types,
-            }
+            linked = self.db.query(CreateSampleRequest).filter(
+                CreateSampleRequest.id == req.converted_sample_request_id,
+                CreateSampleRequest.source_sample_code == req.request_code,
+            ).first()
+            if linked:
+                return {
+                    "feasibility": self.serialize_request(req),
+                    "sample_request_id": linked.id,
+                    "sample_sr_number": linked.sr_number,
+                    "sample_request_code": linked.sr_number if "sample" in (linked.request_types or []) else next(
+                        ((linked.request_codes or {}).get(key) for key in ("design", "mockup", "costing") if (linked.request_codes or {}).get(key)),
+                        None,
+                    ),
+                    "request_types": selected_types,
+                }
+            # Older versions recorded the Feasibility row ID and a synthetic SR
+            # without creating a commercial request. Let this conversion repair it.
+            req.converted_sample_request_id = None
+            req.converted_sr_number = None
 
         actor_name = current_user.name if current_user else "Marketing Lead"
         actor_id = current_user.id if current_user else None
 
-        yr_suffix = datetime.now(timezone.utc).year % 100
-        generated_sr_num = f"SR-MK-{yr_suffix:02d}-{req.id:04d}"
+        from app.services.sample_request_service import SampleRequestService
 
-        req.converted_sample_request_id = req.id
+        customer_name = self.db.query(Customer.name).filter(Customer.id == req.customer_id).scalar() or ""
+        conversion_date = datetime.now(timezone.utc).date().isoformat()
+        sample_service = SampleRequestService(self.db)
+        converted = sample_service.create({
+            "year": get_current_business_year(),
+            "program_year": get_current_business_year(),
+            "product_description": req.description_notes,
+            "customer": customer_name,
+            "target_plant": req.target_plant,
+            "date_request_created": conversion_date,
+            "created_by": actor_name,
+            "created_by_user_id": actor_id,
+            "material_code": req.request_code if "sample" in selected_types else "",
+            "source_request_code": req.request_code if "sample" in selected_types else "",
+            "source_sample_code": req.request_code,
+            "sample_required_date": req.required_date.isoformat(),
+            "request_types": selected_types,
+            "status": "Draft (Pre-SMT)",
+            "creation_mode": "new",
+            "client_draft_key": f"feasibility-conversion-{req.id}",
+        }, commit=False)
+        generated_sr_num = converted.get("sr_number") or None
+        converted_request_id = int(converted["id"])
+
+        if "costing" in selected_types:
+            from app.models.request_workflows import CostingWorkflow, CostingWorkflowLog
+
+            workflow = self.db.query(CostingWorkflow).filter(
+                CostingWorkflow.sample_request_id == converted_request_id,
+            ).first()
+            if not workflow:
+                workflow = CostingWorkflow(
+                    sample_request_id=converted_request_id,
+                    request_code=(converted.get("request_codes") or {}).get("costing"),
+                    sr_number=generated_sr_num,
+                    status="Costing Work",
+                    current_stage="costing",
+                    request_data=converted,
+                    created_by_user_id=actor_id,
+                )
+                self.db.add(workflow)
+                self.db.flush()
+                self.db.add(CostingWorkflowLog(
+                    workflow_id=workflow.id,
+                    sample_request_id=converted_request_id,
+                    sr_number=generated_sr_num,
+                    actor_user_id=actor_id,
+                    actor_name=actor_name,
+                    actor_team="Marketing",
+                    action="FEASIBILITY_CONVERTED_TO_COSTING",
+                    to_stage="costing",
+                    to_status="Costing Work",
+                    details={"feasibility_request_code": req.request_code},
+                ))
+
+        req.converted_sample_request_id = converted_request_id
         req.converted_sr_number = generated_sr_num
         req.converted_at = datetime.now(timezone.utc)
         req.converted_by = actor_name
@@ -742,8 +816,9 @@ class FeasibilityService:
             actor_department="Marketing",
             action="CONVERTED_TO_SAMPLING",
             payload={
-                "sample_request_id": req.id,
+                "sample_request_id": converted_request_id,
                 "sample_sr_number": generated_sr_num,
+                "sample_request_code": converted.get("request_code"),
                 "request_types": selected_types,
             },
             commit=False,
@@ -752,8 +827,9 @@ class FeasibilityService:
         self.db.commit()
         return {
             "feasibility": self.serialize_request(self.repo.get_with_details(req.id)),
-            "sample_request_id": req.id,
+            "sample_request_id": converted_request_id,
             "sample_sr_number": generated_sr_num,
+            "sample_request_code": converted.get("request_code"),
             "request_types": selected_types,
         }
 

@@ -15,6 +15,7 @@ from app.schemas.program_request import (
     ProgramNoteCreate,
     ProgramOutputSubmit,
     ProgramClaimSubmit,
+    ProgramPauseSubmit,
     ProgramRequestCreate,
     ProgramRequestOut,
     ProgramRequestUpdate,
@@ -348,6 +349,23 @@ def mark_program_seen(
     if not item:
         raise HTTPException(status_code=404, detail="Program planning request was not found")
     return item
+
+
+@router.post(
+    "/{request_id}/pause",
+    response_model=ProgramRequestOut,
+    summary="Pause or resume a program planning request",
+)
+def pause_program_request(
+    request_id: int,
+    payload: ProgramPauseSubmit,
+    service: ProgramRequestService = Depends(get_program_service),
+    current_user=Depends(get_current_user),
+):
+    """Marketing creator or Admin pauses/resumes execution of a seasonal program."""
+    require_team(current_user, "marketing")
+    _require_marketing_request_owner(request_id, service, current_user)
+    return service.toggle_pause(request_id, paused=payload.paused, current_user=current_user)
 
 
 @router.delete(

@@ -199,6 +199,7 @@ def _serialize_workflow(db, workflow, request, kind: str, log_model, logs=None):
         "workflow_type": kind,
         "workflow_id": workflow.id,
         "sample_request_id": request.id,
+        "request_code": workflow.request_code or (request.request_codes or {}).get(kind) or (request.sr_number if kind == "sample" else None),
         "sr_number": request.sr_number,
         "customer": request.customer,
         "brand_name": request.brand_name,
@@ -259,6 +260,7 @@ def _create_mockup_if_missing(db, request, user, stage="creative"):
         return workflow
     workflow = MockupWorkflow(
         sample_request_id=request.id,
+        request_code=SampleRequestService(db)._reserve_scope_code(request, "mockup"),
         sr_number=request.sr_number,
         status=request.status or "In Progress",
         current_stage=stage,
@@ -278,6 +280,7 @@ def _create_costing_if_missing(db, request, user, stage="marketing"):
         return workflow
     workflow = CostingWorkflow(
         sample_request_id=request.id,
+        request_code=SampleRequestService(db)._reserve_scope_code(request, "costing"),
         sr_number=request.sr_number,
         status=request.status or "In Progress",
         current_stage=stage,
@@ -507,8 +510,8 @@ def complete_costing_work(sample_request_id: int, payload: Dict[str, Any] = Body
 def _list_sample_requests_for_sampling(db, year, limit):
     query = db.query(CreateSampleRequest).filter(
         or_(
-            CreateSampleRequest.request_types.contains(["sample"]),
             CreateSampleRequest.status.ilike("%sampling%"),
+            CreateSampleRequest.status == "SAMP",
             CreateSampleRequest.status == "Released to Plant",
         )
     )
@@ -531,12 +534,22 @@ def _list_sample_requests_for_sampling(db, year, limit):
     for req in rows:
         state = dict(req.mockup_workflow_state or {})
         routing = dict(state.get("samplingRouting") or {})
-        is_resample = bool(state.get("isResample") or routing.get("isResample") or req.creation_mode == "resample")
-        stage = state.get("stage") or routing.get("stage") or ("plant" if req.status == "Released to Plant" else "sampling_review")
+        is_resample = bool(
+            state.get("isResample") or state.get("is_resample")
+            or routing.get("isResample") or routing.get("is_resample")
+            or req.creation_mode == "resample"
+        )
+        is_released_to_plant = req.status == "Released to Plant"
+        status = str(req.status or "").casefold()
+        is_awaiting_sampling = "sampling" in status or status == "samp"
+        if not is_awaiting_sampling and not (is_resample and is_released_to_plant):
+            continue
+        stage = "plant" if is_released_to_plant else "sampling_review"
         results.append({
             "workflow_type": "sample",
             "workflow_id": req.id,
             "sample_request_id": req.id,
+            "request_code": req.sr_number,
             "sr_number": req.sr_number,
             "customer": req.customer,
             "brand_name": req.brand_name,
@@ -561,7 +574,7 @@ def _list_sample_requests_for_sampling(db, year, limit):
                 "claimedBy": state.get("claimedBy"),
                 "plantReleaseTarget": state.get("plantReleaseTarget") or req.target_plant,
             },
-            "reviewer_status": "approved" if req.status == "Released to Plant" else "not_started" if req.status == "Sampling Review (PMT)" else "in_progress",
+            "reviewer_status": "bypassed" if is_resample and is_released_to_plant else "not_started" if req.status == "Sampling Review (PMT)" else "in_progress",
             "reviewer_notes": state.get("samplingRemark") or state.get("samplingFeedback"),
             "reviewer_name": state.get("samplingFeedbackBy") or state.get("plantReleasedBy"),
             "reviewed_at": state.get("samplingFeedbackAt") or state.get("plantReleasedAt"),
@@ -586,10 +599,11 @@ def _list_design_requests_for_sampling(db, year, limit):
             "workflow_type": "design",
             "workflow_id": d.id,
             "sample_request_id": d.id,
-            "sr_number": d.sr_number or d.request_code,
+            "request_code": d.request_code,
+            "sr_number": d.sr_number,
             "customer": d.customer_name,
             "brand_name": d.program_name,
-            "material_code": f"DSG-{d.id}",
+            "material_code": d.request_code,
             "product_description": d.product_description or "Creative Design Brief",
             "status": d.status,
             "current_stage": "design_review",
@@ -612,7 +626,7 @@ def _list_design_requests_for_sampling(db, year, limit):
     return results
 
 
-@router.get("/api/v1/workflows/reviews", summary="List items awaiting Sampling review")
+@router.get("/api/v1/workflows/reviews", summary="List Sampling reviews and direct Plant resamples")
 def list_sampling_workflow_reviews(year: Optional[str] = None,
                                    limit: int = Query(500, ge=1, le=2000),
                                    db: Session = Depends(get_db), current_user=Depends(get_current_user)):

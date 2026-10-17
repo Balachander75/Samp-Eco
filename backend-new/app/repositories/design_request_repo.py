@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.repositories.base import BaseRepository
 from app.models.sample_request import CreateSampleRequest, DesignRequest, SampleRequestActivityLog
 from app.utils.business_year import get_business_year_date_range
+from app.utils.request_codes import REQUEST_CODE_PREFIX_BY_SCOPE, next_request_code, temporary_request_code
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -88,6 +89,34 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             return None
         return self.db.query(DesignRequest).filter(DesignRequest.sr_number == sr_number).first()
 
+    def get_model_by_request_code(self, request_code: Optional[str]) -> Optional[DesignRequest]:
+        if not request_code:
+            return None
+        return self.db.query(DesignRequest).filter(DesignRequest.request_code == request_code).first()
+
+    def _get_linked_sample(
+        self,
+        request_code: Optional[str],
+        sr_number: Optional[str] = None,
+        *,
+        for_update: bool = False,
+    ) -> Optional[CreateSampleRequest]:
+        if request_code:
+            query = self.db.query(CreateSampleRequest).filter(
+                CreateSampleRequest.request_codes["design"].astext == request_code
+            )
+            if for_update:
+                query = query.with_for_update().populate_existing()
+            linked = query.first()
+            if linked:
+                return linked
+        if sr_number:
+            query = self.db.query(CreateSampleRequest).filter(CreateSampleRequest.sr_number == sr_number)
+            if for_update:
+                query = query.with_for_update().populate_existing()
+            return query.first()
+        return None
+
     def create_record(self, data: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
         """Create a design request in PostgreSQL using its sequence-generated ID."""
         now = datetime.now(timezone.utc)
@@ -125,8 +154,10 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
                 )
 
         item = DesignRequest(
-            request_code=f"PENDING-{uuid4().hex}",
-            sr_number=data.get("sr_number") or f"PENDING-{uuid4().hex}",
+            request_code=temporary_request_code(),
+            # Creative Design requests use their DR material/request code.
+            # Keep SR only on the actual Sample request, not its design mirror.
+            sr_number=None,
             customer_name=str(data.get("customer_name") or "").strip(),
             program_name=data.get("program_name") or None,
             program_year=str(data.get("program_year") or "").strip() or None,
@@ -156,16 +187,10 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
         self.db.add(item)
         try:
             self.db.flush()
-            item.request_code = data.get("request_code") or f"DSG-{item.id:04d}"
-            if not data.get("sr_number"):
-                item.sr_number = f"SR-{now.year % 100:02d}-DSG-{item.id:03d}"
-            linked_sample = (
-                self.db.query(CreateSampleRequest)
-                .filter(CreateSampleRequest.sr_number == item.sr_number)
-                .first()
-                if item.sr_number
-                else None
+            item.request_code = data.get("request_code") or next_request_code(
+                self.db, REQUEST_CODE_PREFIX_BY_SCOPE["design"], now
             )
+            linked_sample = self._get_linked_sample(item.request_code, data.get("sr_number"))
             self.db.add(
                 SampleRequestActivityLog(
                     sample_request_id=linked_sample.id if linked_sample else None,
@@ -271,15 +296,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
         if not item:
             return None
         try:
-            linked_sample = (
-                self.db.query(CreateSampleRequest)
-                .filter(CreateSampleRequest.sr_number == item.sr_number)
-                .with_for_update()
-                .populate_existing()
-                .first()
-                if item.sr_number
-                else None
-            )
+            linked_sample = self._get_linked_sample(item.request_code, item.sr_number, for_update=True)
             previous_sample_status = linked_sample.status if linked_sample else None
             previous_state = item.workflow_state if isinstance(item.workflow_state, dict) else {}
             previous_events = previous_state.get("events") if isinstance(previous_state.get("events"), list) else []
@@ -345,11 +362,15 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
     def sync_sample_request_design(self, sample_req: Dict[str, Any], is_delete: bool = False, *, commit: bool = True):
         """Sync design requests whenever a sample request with 'design' scope is created, updated, or deleted."""
         sr_number = sample_req.get("sr_number")
-        if not sr_number:
+        request_codes = sample_req.get("request_codes") if isinstance(sample_req.get("request_codes"), dict) else {}
+        request_code = request_codes.get("design") or sample_req.get("design_request_code")
+        if not sr_number and not request_code:
             return None
 
         if is_delete:
-            item = self.get_model_by_sr_number(sr_number)
+            item = self.get_model_by_request_code(request_code) if request_code else None
+            if not item and sr_number:
+                item = self.get_model_by_sr_number(sr_number)
             if item:
                 self.db.delete(item)
                 if commit:
@@ -389,12 +410,15 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
         )
         desc = sample_req.get("product_description") or ""
 
-        current = self.get_model_by_sr_number(sr_number)
+        current = self.get_model_by_request_code(request_code) if request_code else None
+        if not current and sr_number:
+            current = self.get_model_by_sr_number(sr_number)
         if not current:
             status_value = sample_req.get("status") or "Draft (Pre-SMT)"
             return self.create_record(
                 {
-                    "sr_number": sr_number,
+                    "sr_number": None,
+                    "request_code": request_code,
                     "customer_name": sample_req.get("customer") or sample_req.get("customer_name") or "",
                     "program_name": sample_req.get("program_name", ""),
                     "program_year": sample_req.get("program_year"),
@@ -417,6 +441,10 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             )
 
         updates: Dict[str, Any] = {}
+        # Normalize older mirrored rows as they are touched. The link is now
+        # resolved through DR code, with the legacy SR retained as fallback.
+        if current.sr_number is not None:
+            current.sr_number = None
         if sample_req.get("status"):
             updates["status"] = sample_req["status"]
         if "trend" in sample_req:

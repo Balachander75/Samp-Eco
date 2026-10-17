@@ -66,7 +66,7 @@ def list_plants(
     service: MasterService = Depends(get_master_service),
     current_user=Depends(get_optional_current_user),
 ):
-    plants = service.list_plants()
+    plants = [plant for plant in service.list_plants() if plant.is_active]
     if current_user:
         visible_codes = set(filter_plant_values(current_user, (plant.code for plant in plants), service.repo.db))
         return [plant for plant in plants if plant.code in visible_codes]

@@ -7,6 +7,7 @@ export function getRequestTrackType(r: Partial<SampleRequestItem>): RequestTrack
   const desc = String(r.productDescription || (r as any)?.product_description || "").toLowerCase();
   const mat = String(r.materialCode || (r as any)?.material_code || "").toLowerCase();
   const sr = String(r.srNumber || (r as any)?.sr_number || "").toLowerCase();
+  const requestCode = String(r.requestCode || (r as any)?.request_code || "").toLowerCase();
   const idStr = String(r.id || "");
   const kind = String(r.requestKind || "").toLowerCase();
 
@@ -39,6 +40,7 @@ export function getRequestTrackType(r: Partial<SampleRequestItem>): RequestTrack
     kind === "program" ||
     idStr.startsWith("program-") ||
     mode === "program_planning" ||
+    requestCode.startsWith("pp-") ||
     mat.startsWith("pg-pl") ||
     sr.startsWith("pg-") ||
     desc.includes("seasonal program:") ||
@@ -55,6 +57,7 @@ export function isDesignRequest(r?: Partial<SampleRequestItem> | null): boolean 
   if (!r) return false;
   if (r.designRequestId && Number(r.designRequestId) > 0) return true;
   if (r.requestKind === "design") return true;
+  if (String(r.requestCode || "").toLowerCase().startsWith("dr-")) return true;
   const idStr = String(r.id || "");
   if (idStr.startsWith("design-")) return true;
   const scopes = r.requestTypes || [];
@@ -76,6 +79,9 @@ export function getDraftReleaseStatus(r: Partial<SampleRequestItem>): string {
     if (isResample) return "Released to Plant";
     if (routing.creativeChangesRequired) return "Creative";
     return "Sampling Review (PMT)";
+  }
+  if (requestTypes.length === 1 && requestTypes[0] === "costing") {
+    return r.costingCreativeInputNeeded ? "Creative" : "Costing";
   }
   return "Creative";
 }

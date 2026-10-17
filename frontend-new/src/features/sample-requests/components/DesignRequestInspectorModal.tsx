@@ -277,7 +277,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
   const refCode = useMemo(() => {
     if (!activeRequest) return "";
-    return activeRequest.srNumber || `DSG-${activeRequest.id}`;
+    return activeRequest.requestCode || activeRequest.srNumber || `DR-${activeRequest.id}`;
   }, [activeRequest]);
 
   const requestedCount = useMemo(() => {

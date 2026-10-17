@@ -32,7 +32,9 @@ export interface BindingHierarchyResponse {
 
 export interface ProductSearchResult {
   id: number;
-  sr_number: string;
+  sr_number: string | null;
+  request_code?: string | null;
+  request_codes?: Partial<Record<"design" | "mockup" | "costing", string>>;
   material_code: string;
   product_description: string;
   customer?: string;

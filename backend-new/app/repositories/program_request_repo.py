@@ -4,7 +4,7 @@ Handles all database operations for `program_requests` and `program_material_spe
 """
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, literal_column, text
+from sqlalchemy import func, literal_column
 from app.repositories.base import BaseRepository
 from app.models.program_request import (
     ProgramActivityLog,
@@ -178,23 +178,3 @@ class ProgramRequestRepository(BaseRepository[ProgramRequest]):
         self.db.delete(mat)
         self.db.commit()
         return True
-
-    def resequence_all(self, yr_suffix: int):
-        """Re-sequence contiguous program request codes."""
-        items = self.db.query(ProgramRequest).order_by(ProgramRequest.id.asc()).all()
-        for item in items:
-            item.request_code = f"PG-TMP-{item.id:04d}"
-            item.sr_number = f"SR-TMP-{item.id:04d}"
-        self.db.flush()
-
-        for idx, item in enumerate(items, start=1):
-            item.request_code = f"PG-{idx:04d}"
-            item.sr_number = f"SR-{yr_suffix:02d}-PG-{idx:03d}"
-        self.db.flush()
-
-        if not items:
-            self.db.execute(text("ALTER SEQUENCE program_requests_id_seq RESTART WITH 1"))
-        else:
-            max_id = max(item.id for item in items)
-            self.db.execute(text(f"SELECT setval('program_requests_id_seq', {max_id}, true)"))
-        self.db.commit()
