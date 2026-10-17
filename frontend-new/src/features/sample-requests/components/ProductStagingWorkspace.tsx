@@ -1655,7 +1655,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   return (
     <div className="flex-1 flex min-h-0 flex-col overflow-y-auto bg-[var(--surface-base)] text-zinc-900 dark:text-zinc-100 font-sans select-text">
       {/* Main Container */}
-      <div className="mx-auto w-full max-w-[1680px] flex-1 space-y-4 px-4 py-4 sm:px-6 lg:px-8">
+      <div className="w-full flex-1 space-y-4 px-4 py-4 sm:px-6 lg:px-8">
 
         {/* 1. Master Workspace Header (Navigation, Program Context & Action Ribbon) */}
         <StagingWorkspaceHeader

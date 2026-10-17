@@ -547,7 +547,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
 
       {/* ── 1. SOLID MARKETING GREETING & COMMAND HEADER ── */}
       <header className="px-5 sm:px-8 py-3.5 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] shrink-0">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-3">
 
           {/* Left: Dynamic Greeting with Role Context */}
           <div className="space-y-0.5">
@@ -635,7 +635,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
       </header>
 
       {/* ── MAIN DASHBOARD BODY ── */}
-      <main className="max-w-7xl w-full mx-auto p-5 sm:p-8 space-y-6">
+      <main className="w-full flex-1 p-5 sm:p-8 space-y-6">
 
         {/* ── 2. MARKETING EXECUTIVE MULTI-FACTOR KPI STRIP (VIEW MODE) ── */}
         <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

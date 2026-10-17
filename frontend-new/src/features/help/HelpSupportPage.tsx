@@ -28,7 +28,7 @@ export const HelpSupportPage: React.FC<{ user?: UserProfile | null }> = ({ user 
   return (
     <DeskWorkspaceLayout title="Help & Support" subtitle="Quick guidance for the shared SAMP workspace and its request workflows.">
       <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-        <div className="mx-auto max-w-5xl space-y-6">
+        <div className="w-full space-y-6">
           <section className="rounded-2xl bg-[var(--surface-lowest)] p-5 sm:p-7">
             <div className="flex items-start gap-4"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"><CircleHelp className="h-5 w-5" /></span><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--accent-primary)]">Workspace guide</p><h2 className="mt-1 text-xl font-bold tracking-tight">Find the next step for your team</h2><p className="mt-2 max-w-3xl text-sm leading-relaxed text-[var(--on-surface-muted)]">Requests move between Marketing, Creative, Studio, Costing, and Sampling. Each team queue shows the assigned stage and keeps a record of decisions and handoffs.</p></div></div>
           </section>

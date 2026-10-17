@@ -124,7 +124,7 @@ export const OperationsLandingPage: React.FC<OperationsLandingPageProps> = ({ ar
       kpiGridCols="grid-cols-1 sm:grid-cols-3"
     >
       <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-        <div className="mx-auto max-w-6xl space-y-6">
+        <div className="w-full space-y-6">
           <section className="flex flex-wrap items-start justify-between gap-4 rounded-2xl bg-[var(--surface-lowest)] p-5 sm:p-7">
             <div><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--accent-primary)]"><CalendarDays className="h-3.5 w-3.5" />{yearLabel(selectedYear)}</p><h2 className="mt-2 text-xl font-bold tracking-tight text-[var(--on-surface)]">Your team workspace</h2><p className="mt-1 max-w-2xl text-sm leading-relaxed text-[var(--on-surface-muted)]">Open a queue to inspect its source record, review the recorded activity, and complete the next available action.</p></div>
             <button type="button" onClick={() => void load()} disabled={isLoading} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--on-surface)] hover:bg-[var(--surface-low)] disabled:opacity-60"><RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />Refresh overview</button>

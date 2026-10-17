@@ -516,7 +516,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
     <div className="flex-1 flex flex-col h-full min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] font-sans select-text overflow-y-auto">
       {/* ── 1. GREETING & CONTEXT HEADER (EXACT MARKETING OVERVIEW BLUEPRINT) ── */}
       <header className="px-5 sm:px-8 py-4 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] shrink-0 transition-colors">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Left Greeting & Context */}
           <div>
             <div className="flex items-center gap-2.5 mb-1">
@@ -605,8 +605,8 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
         </div>
       </header>
 
-      {/* ── MAIN DASHBOARD BODY (MAX-W-7XL P-5 SM:P-8 SPACE-Y-6) ── */}
-      <main className="max-w-7xl w-full mx-auto p-5 sm:p-8 space-y-6">
+      {/* ── MAIN DASHBOARD BODY ── */}
+      <main className="w-full flex-1 p-5 sm:p-8 space-y-6">
         {/* ── 2. CREATIVE MULTI-FACTOR KPI RIBBON (IMAGE 1 EXACT MATCH) ── */}
         <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {/* Tile 1: Total Team Intake */}

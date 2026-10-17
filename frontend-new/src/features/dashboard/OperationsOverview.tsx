@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   fetchAllMarketingRequestsApi,
@@ -16,6 +16,7 @@ import {
   Layers,
   Palette,
   Box,
+  Boxes,
   FlaskConical,
   Calculator,
   RefreshCw,
@@ -31,6 +32,14 @@ import {
   Hourglass,
   Building2,
   Package,
+  LayoutDashboard,
+  Users,
+  ShieldAlert,
+  Flame,
+  Sunrise,
+  Sun,
+  Moon,
+  X,
 } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
@@ -77,19 +86,21 @@ const emptyTeamMix = (): TeamMix => ({
 });
 
 const OVERVIEW_SECTIONS = [
-  { id: "ops-snapshot", label: "Snapshot" },
-  { id: "ops-pipeline", label: "Pipeline" },
-  { id: "ops-trends", label: "Trends" },
-  { id: "ops-portfolio", label: "Portfolio" },
-  { id: "ops-teams", label: "Teams" },
-  { id: "ops-risks", label: "Risks & clients" },
-  { id: "ops-categories", label: "Product mix" },
-  { id: "ops-watchlist", label: "Watchlist" },
+  { id: "ops-snapshot", label: "Snapshot", icon: LayoutDashboard },
+  { id: "ops-pipeline", label: "Pipeline", icon: Layers },
+  { id: "ops-trends", label: "Trends", icon: TrendingUp },
+  { id: "ops-portfolio", label: "Portfolio", icon: BarChart3 },
+  { id: "ops-teams", label: "Teams", icon: Users },
+  { id: "ops-risks", label: "Risks & clients", icon: ShieldAlert },
+  { id: "ops-categories", label: "Product mix", icon: Boxes },
+  { id: "ops-watchlist", label: "Watchlist", icon: Flame },
 ];
 
-export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, embedded = true }) => {
+export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, embedded: _embedded = true }) => {
   const navigate = useNavigate();
   const { selectedYear } = useBusinessYear();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [activeSection, setActiveSection] = useState<string>("ops-snapshot");
 
   const [requests, setRequests] = useState<SampleRequestItem[]>([]);
   const [briefsCount, setBriefsCount] = useState<number>(0);
@@ -107,24 +118,45 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showMonthlyTable, setShowMonthlyTable] = useState<boolean>(false);
 
-  // Returning user greeting check
-  const isReturningUser = useMemo(() => {
-    try {
-      const stored = localStorage.getItem("samp_session_visited");
-      if (stored) return true;
-      localStorage.setItem("samp_session_visited", "true");
-      return false;
-    } catch {
-      return false;
+  // Smooth scroll handler with active section update
+  const scrollToSection = (id: string) => {
+    setActiveSection(id);
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+  };
+
+  // Scroll spy to update active section as user scrolls
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const scrollPos = container.scrollTop + 160;
+      for (let i = OVERVIEW_SECTIONS.length - 1; i >= 0; i--) {
+        const sec = document.getElementById(OVERVIEW_SECTIONS[i].id);
+        if (sec && sec.offsetTop <= scrollPos) {
+          setActiveSection(OVERVIEW_SECTIONS[i].id);
+          break;
+        }
+      }
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Time-based greeting
-  const greetingText = useMemo(() => {
+  // Time-based greeting with adaptive daylight icon
+  const { greetingText, GreetingIcon } = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour >= 4 && hour < 12) return "Good morning";
-    if (hour >= 12 && hour < 17) return "Good afternoon";
-    return "Good evening";
+    if (hour >= 4 && hour < 12) {
+      return { greetingText: "Good morning", GreetingIcon: Sunrise };
+    }
+    if (hour >= 12 && hour < 17) {
+      return { greetingText: "Good afternoon", GreetingIcon: Sun };
+    }
+    return { greetingText: "Good evening", GreetingIcon: Moon };
   }, []);
 
   const firstName = useMemo(() => {
@@ -830,96 +862,251 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
   }, [slaMetrics.classified, watchlistFilter, searchQuery]);
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] font-sans select-text overflow-y-auto">
+    <div ref={containerRef} className="flex-1 flex flex-col h-full min-h-0 bg-[var(--bg-app)] text-[var(--on-surface)] font-sans select-text overflow-y-auto">
 
-      {/* ── 1. CLEAN EXECUTIVE VIEW-MODE HEADER (NO ACTION BUTTONS) ── */}
-      {!embedded && (
-      <header className="px-5 sm:px-8 py-3.5 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] shrink-0">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+      {/* ── 1. GOATED EXECUTIVE COMMAND HEADER (PRODUCTION-GRADE) ── */}
+      <header className="relative px-4 sm:px-6 lg:px-8 py-4 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] shrink-0 transition-colors">
+        <div className="w-full flex flex-col xl:flex-row xl:items-center justify-between gap-4">
 
-          {/* Left Greeting & Context */}
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)] shrink-0" />
-              <h1 className="font-display font-bold text-lg sm:text-xl tracking-tight text-[var(--on-surface)]">
-                {greetingText}, {firstName}! {isReturningUser && <span className="text-[var(--on-surface-muted)] font-normal text-sm sm:text-base">Nice to see you.</span>}
-              </h1>
-            </div>
-            <p className="text-xs text-[var(--on-surface-muted)] flex items-center gap-2">
-              <span>Request volume, team workload and delivery risk</span>
-              <span className="text-[var(--border-strong)]">·</span>
-              <span className="font-mono text-[11px] text-[var(--on-surface-subtle)]">
-                Business Year {selectedYear}
+          {/* Left: Authoritative Title & Telemetry Status */}
+          <div className="space-y-1 min-w-0">
+            {/* Status & Scope Eyebrow */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
+              <span className="font-semibold text-[var(--on-surface)] tracking-tight">Operations Cockpit</span>
+              <span className="text-[var(--border-strong)]">·</span>
+              <span className="inline-flex items-center gap-1 font-mono text-[11px] text-[var(--on-surface-subtle)]">
+                <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)]" />
+                <span>FY {selectedYear === "ALL" ? "Consolidated" : selectedYear}</span>
+              </span>
+              <span className="text-[var(--border-strong)] hidden sm:inline">·</span>
+              <span className="items-center gap-1.5 text-[11px] font-medium text-[var(--on-surface-muted)] hidden sm:inline-flex">
+                <GreetingIcon className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                <span>{greetingText}, {firstName}</span>
+              </span>
+            </div>
+
+            {/* Main Executive Title */}
+            <h1 className="font-display font-bold text-2xl lg:text-3xl tracking-tight text-[var(--on-surface)] leading-none">
+              Operations Overview
+            </h1>
+
+            {/* Minimalist Subtext */}
+            <p className="text-xs text-[var(--on-surface-muted)] flex items-center gap-2">
+              <span>Real-time cross-functional velocity and SLA fidelity across production teams.</span>
             </p>
           </div>
 
-          {/* Right: Clean View Controls Only */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface-muted)] font-mono">
-              <Calendar className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-              <span>BY {selectedYear}</span>
-              <span className="text-[var(--border-strong)]">·</span>
-              <span className="text-[11px] text-[var(--on-surface-subtle)]">
-                {lastRefreshed ? `Updated ${lastRefreshed}` : "Syncing..."}
-              </span>
+          {/* Right: Unified Segmented Telemetry Ribbon + Actions */}
+          <div className="flex items-center gap-3 flex-wrap xl:flex-nowrap shrink-0 xl:justify-end">
+
+            {/* UNIFIED EXECUTIVE TELEMETRY RIBBON */}
+            <div className="flex items-center rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs divide-x divide-[var(--border-subtle)] overflow-hidden">
+              {/* Segment 1: Inflow */}
+              <button
+                type="button"
+                onClick={() => scrollToSection("ops-snapshot")}
+                className="px-3.5 py-2 flex flex-col text-left hover:bg-[var(--surface-container)] transition-colors cursor-pointer group"
+                title="Total scoped requests this fiscal year"
+              >
+                <span className="text-[10px] font-mono font-medium uppercase tracking-wider text-[var(--on-surface-subtle)] leading-tight group-hover:text-[var(--on-surface)]">
+                  Inflow
+                </span>
+                <span className="font-mono font-bold text-sm text-[var(--on-surface)] tabular-nums leading-tight mt-0.5">
+                  {slaMetrics.total.toLocaleString()}
+                </span>
+              </button>
+
+              {/* Segment 2: In-Flight */}
+              <button
+                type="button"
+                onClick={() => scrollToSection("ops-pipeline")}
+                className="px-3.5 py-2 flex flex-col text-left hover:bg-[var(--surface-container)] transition-colors cursor-pointer group"
+                title="Active requests currently in execution"
+              >
+                <span className="text-[10px] font-mono font-medium uppercase tracking-wider text-[var(--on-surface-subtle)] leading-tight group-hover:text-[var(--on-surface)]">
+                  In-Flight
+                </span>
+                <span className="font-mono font-bold text-sm text-blue-600 dark:text-blue-400 tabular-nums leading-tight mt-0.5">
+                  {slaMetrics.inFlightCount.toLocaleString()}
+                </span>
+              </button>
+
+              {/* Segment 3: On-Time SLA */}
+              <button
+                type="button"
+                onClick={() => scrollToSection("ops-risks")}
+                className="px-3.5 py-2 flex flex-col text-left hover:bg-[var(--surface-container)] transition-colors cursor-pointer group"
+                title="Overall SLA on-time delivery rate"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-mono font-medium uppercase tracking-wider text-[var(--on-surface-subtle)] leading-tight group-hover:text-[var(--on-surface)]">
+                    SLA Rate
+                  </span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${slaMetrics.onTimeRate >= 90 ? "bg-emerald-500" : "bg-amber-500"}`} />
+                </div>
+                <span className={`font-mono font-bold text-sm tabular-nums leading-tight mt-0.5 ${
+                  slaMetrics.onTimeRate >= 90 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                }`}>
+                  {slaMetrics.onTimeRate}%
+                </span>
+              </button>
+
+              {/* Segment 4: Overdue Risks */}
+              <button
+                type="button"
+                onClick={() => {
+                  setWatchlistFilter("delayed");
+                  scrollToSection("ops-watchlist");
+                }}
+                className={`px-3.5 py-2 flex flex-col text-left transition-colors cursor-pointer group ${
+                  slaMetrics.totalDelayed > 0 ? "hover:bg-rose-500/10" : "hover:bg-[var(--surface-container)]"
+                }`}
+                title={slaMetrics.totalDelayed > 0 ? `${slaMetrics.totalDelayed} tasks past SLA - click to inspect` : "All tasks within SLA target"}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-mono font-medium uppercase tracking-wider leading-tight ${
+                    slaMetrics.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400 font-bold" : "text-[var(--on-surface-subtle)]"
+                  }`}>
+                    Overdue
+                  </span>
+                  {slaMetrics.totalDelayed > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  )}
+                </div>
+                <span className={`font-mono font-bold text-sm tabular-nums leading-tight mt-0.5 ${
+                  slaMetrics.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface)]"
+                }`}>
+                  {slaMetrics.totalDelayed}
+                </span>
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={loadData}
-              disabled={isRefreshing}
-              title="Refresh telemetry data"
-              className="h-8 w-8 rounded-lg bg-[var(--surface-low)] text-[var(--on-surface)] border border-[var(--border-subtle)] flex items-center justify-center cursor-pointer shadow-2xs hover:bg-[var(--surface-container)] transition-colors"
-            >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${
-                  isRefreshing ? "text-[var(--accent-primary)] animate-spin" : ""
-                }`}
-              />
-            </button>
+            {/* Compact Search & Action Controls */}
+            <div className="flex items-center gap-2">
+              {/* Quick Search */}
+              <div className="relative flex items-center w-48 sm:w-56">
+                <Search className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] absolute left-3 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") scrollToSection("ops-watchlist");
+                  }}
+                  placeholder="Search records..."
+                  className="w-full h-9 pl-8 pr-7 text-xs rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-container)] focus:bg-[var(--surface-lowest)] border border-[var(--border-subtle)] focus:border-[var(--accent-primary)] text-[var(--on-surface)] placeholder-[var(--on-surface-subtle)] outline-none transition-all shadow-2xs font-sans"
+                />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2 p-0.5 rounded-full hover:bg-[var(--surface-high)] text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] transition-colors cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                ) : (
+                  <kbd className="hidden sm:inline-block absolute right-2.5 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-[var(--on-surface-subtle)] bg-[var(--surface-container)] border border-[var(--border-subtle)] rounded shadow-2xs">
+                    /
+                  </kbd>
+                )}
+              </div>
+
+              {/* Sync Button */}
+              <button
+                type="button"
+                onClick={loadData}
+                disabled={isRefreshing}
+                title={lastRefreshed ? `Last synced: ${lastRefreshed} · Click to refresh` : "Sync operational telemetry"}
+                className="h-9 px-3 rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] flex items-center gap-2 cursor-pointer shadow-2xs transition-all active:scale-95 disabled:opacity-50 select-none"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 transition-colors ${
+                    isRefreshing ? "text-[var(--accent-primary)] animate-spin" : "text-[var(--on-surface-muted)]"
+                  }`}
+                />
+                <span className="text-xs font-semibold hidden md:inline">
+                  {isRefreshing ? "Syncing" : "Sync"}
+                </span>
+              </button>
+            </div>
+
           </div>
 
         </div>
       </header>
-      )}
 
       {/* ── MAIN DASHBOARD BODY ── */}
-      <main className="max-w-7xl w-full mx-auto p-5 sm:p-8 space-y-6">
+      <main className="w-full flex-1 p-4 sm:p-6 lg:p-8 space-y-6">
 
+        {/* ── STICKY SECTION NAVIGATOR (SEGMENTED CONTROL PILL BAR) ── */}
         <nav
           aria-label="Operations overview sections"
-          className="sticky top-0 z-30 -mx-5 -mt-5 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/95 px-5 py-2 backdrop-blur sm:-mx-8 sm:-mt-8 sm:px-8"
+          className="sticky top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)]/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-2 transition-all shadow-xs"
         >
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto py-0.5">
-              {OVERVIEW_SECTIONS.map((section) => (
-                <a
-                  key={section.id}
-                  href={`#${section.id}`}
-                  className="shrink-0 rounded-lg border border-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--on-surface-muted)] transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--surface-lowest)] hover:text-[var(--on-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-                >
-                  {section.label}
-                </a>
-              ))}
+          <div className="flex w-full items-center justify-between gap-3">
+            {/* Scrollable Pills Carousel */}
+            <div className="flex min-w-0 items-center gap-1 sm:gap-1.5 overflow-x-auto py-0.5 custom-scrollbar">
+              {OVERVIEW_SECTIONS.map((section) => {
+                const Icon = section.icon;
+                const isActive = activeSection === section.id;
+                const isWatchlist = section.id === "ops-watchlist";
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => scrollToSection(section.id)}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all duration-150 cursor-pointer select-none ${
+                      isActive
+                        ? "bg-[var(--surface-container)] text-[var(--on-surface)] font-bold shadow-2xs border border-[var(--border-strong)]"
+                        : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] border border-transparent font-medium"
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 transition-colors ${isActive ? "text-[var(--accent-primary)]" : "text-[var(--on-surface-subtle)]"}`} />
+                    <span>{section.label}</span>
+                    {isWatchlist && slaMetrics.totalDelayed > 0 && (
+                      <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-rose-500 text-white shadow-2xs">
+                        {slaMetrics.totalDelayed}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            {embedded && (
-              <div className="flex shrink-0 items-center gap-2">
-                <span className="hidden text-[11px] text-[var(--on-surface-subtle)] sm:inline">
-                  {lastRefreshed ? `Updated ${lastRefreshed}` : "Syncing..."}
-                </span>
-                <button
-                  type="button"
-                  onClick={loadData}
-                  disabled={isRefreshing}
-                  title="Refresh operations data"
-                  aria-label="Refresh operations data"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xs transition-colors hover:bg-[var(--surface-container)] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-[var(--accent-primary)]" : ""}`} />
-                </button>
-              </div>
-            )}
+
+            {/* Quick Watchlist Action on Nav Right */}
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  scrollToSection("ops-watchlist");
+                }}
+                className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] border border-[var(--border-subtle)] text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
+                title="Jump directly to watchlist table"
+              >
+                <Flame className="w-3.5 h-3.5 text-amber-500" />
+                <span>Jump to Watchlist</span>
+                {slaMetrics.totalDelayed > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                    {slaMetrics.totalDelayed}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={loadData}
+                disabled={isRefreshing}
+                title="Refresh operations telemetry"
+                className="h-8 w-8 rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] flex items-center justify-center cursor-pointer shadow-2xs transition-colors md:hidden active:scale-95"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[var(--accent-primary)]" : ""}`} />
+              </button>
+            </div>
           </div>
         </nav>
 
@@ -929,51 +1116,76 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
           {/* Tile 1: Annual Inflow */}
           <div
             onClick={() => navigate("/sample-requests")}
-            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] cursor-pointer shadow-2xs transition-colors"
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Annual Inflow
               </span>
-              <Layers className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+              <div className="w-7 h-7 rounded-lg bg-[var(--surface-low)] group-hover:bg-[var(--accent-primary-subtle)] text-[var(--on-surface-muted)] group-hover:text-[var(--accent-primary-strong)] flex items-center justify-center transition-colors">
+                <Layers className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
               {slaMetrics.total.toLocaleString()}
             </div>
-            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              100% total intake
+            <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>100% total intake</span>
+              <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-[var(--accent-primary)] group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
 
           {/* Tile 2: Global SLA Rate */}
-          <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+          <div
+            onClick={() => scrollToSection("ops-risks")}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 On-Time SLA
               </span>
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </div>
             </div>
-            <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
-              {slaMetrics.onTimeRate}%
+            <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums flex items-baseline gap-1.5">
+              <span>{slaMetrics.onTimeRate}%</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mb-1" />
             </div>
             <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-              {slaMetrics.totalOnTime} on-track tasks
+              {slaMetrics.totalOnTime.toLocaleString()} on-track tasks
             </div>
           </div>
 
           {/* Tile 3: Breached / Overdue SLA */}
           <div
-            onClick={() => setWatchlistFilter("delayed")}
-            className={`p-3.5 rounded-xl bg-[var(--surface-lowest)] border cursor-pointer shadow-2xs transition-colors ${slaMetrics.totalDelayed > 0 ? "border-rose-300 dark:border-rose-900/60" : "border-[var(--border-subtle)]"
-              }`}
+            onClick={() => {
+              setWatchlistFilter("delayed");
+              scrollToSection("ops-watchlist");
+            }}
+            className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${
+              slaMetrics.totalDelayed > 0
+                ? "border-rose-500/30 hover:border-rose-500/50 bg-rose-500/[0.02]"
+                : "border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
+            }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
+                slaMetrics.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface-subtle)]"
+              }`}>
                 Overdue Tasks
               </span>
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                slaMetrics.totalDelayed > 0
+                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                  : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
+              }`}>
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </div>
             </div>
-            <div className="text-2xl font-display font-bold tracking-tight text-rose-600 dark:text-rose-400 tabular-nums">
+            <div className={`text-2xl font-display font-bold tracking-tight tabular-nums ${
+              slaMetrics.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface)]"
+            }`}>
               {slaMetrics.totalDelayed}
             </div>
             <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
@@ -983,14 +1195,19 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
 
           {/* Tile 4: Urgent SLA (<72h) */}
           <div
-            onClick={() => setWatchlistFilter("urgent")}
-            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-amber-400 cursor-pointer shadow-2xs transition-colors"
+            onClick={() => {
+              setWatchlistFilter("urgent");
+              scrollToSection("ops-watchlist");
+            }}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-amber-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
           >
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                 Imminent SLA
               </span>
-              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-colors">
+                <Clock className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
               {slaMetrics.urgentCount}
@@ -1001,194 +1218,258 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
           </div>
 
           {/* Tile 5: In-Flight Backlog */}
-          <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+          <div
+            onClick={() => scrollToSection("ops-pipeline")}
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-blue-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Active In-Flight
               </span>
-              <Hourglass className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-colors">
+                <Hourglass className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
               {slaMetrics.inFlightCount}
             </div>
             <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              Pending release
+              Pending completion
             </div>
           </div>
 
           {/* Tile 6: Dispatched / Completed Deals */}
           <div
             onClick={() => navigate("/sample-requests")}
-            className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-400 cursor-pointer shadow-2xs transition-colors"
+            className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Dispatched / Won
               </span>
-              <Zap className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+                <Zap className="w-3.5 h-3.5" />
+              </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
               {slaMetrics.totalCompleted}
             </div>
             <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              Released to client
+              Delivered to client
             </div>
           </div>
 
         </section>
 
-        <section aria-label="Management readout" className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-display text-sm font-bold tracking-tight text-[var(--on-surface)]">Management readout</h2>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)]">Selected business year</span>
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <TrendingUp className="h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
-                <span className="text-xs text-[var(--on-surface-muted)]">Peak intake month</span>
+        {/* ── 2B. MANAGEMENT READOUT INTELLIGENCE STRIP ── */}
+        <section aria-label="Management readout" className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <BarChart3 className="w-4 h-4 text-[var(--accent-primary)]" />
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                  Executive Intelligence Readout
+                </h2>
               </div>
-              <span className="text-right text-xs font-semibold text-[var(--on-surface)] tabular-nums">
+              <p className="text-xs text-[var(--on-surface-muted)]">
+                Automated operational audit highlights for the active business year.
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[11px] font-mono font-semibold text-[var(--on-surface-subtle)] self-start sm:self-auto">
+              BY {selectedYear === "ALL" ? "Consolidated" : selectedYear}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {/* Readout 1: Peak Intake Month */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 hover:border-[var(--border-strong)] transition-all shadow-2xs">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[var(--surface-container)] flex items-center justify-center text-[var(--accent-primary)] shrink-0">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--on-surface-subtle)] block">
+                    Peak Intake
+                  </span>
+                  <span className="text-xs text-[var(--on-surface-muted)] truncate block">
+                    Highest volume month
+                  </span>
+                </div>
+              </div>
+              <span className="text-right text-xs font-bold text-[var(--on-surface)] tabular-nums font-mono shrink-0">
                 {managementReadout.peakMonth?.intake
                   ? `${managementReadout.peakMonth.full} · ${managementReadout.peakMonth.intake}`
                   : "No requests"}
               </span>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <Hourglass className="h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
-                <span className="text-xs text-[var(--on-surface-muted)]">Largest open team queue</span>
+
+            {/* Readout 2: Largest Queue */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 hover:border-[var(--border-strong)] transition-all shadow-2xs">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                  <Hourglass className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--on-surface-subtle)] block">
+                    Busiest Queue
+                  </span>
+                  <span className="text-xs text-[var(--on-surface-muted)] truncate block">
+                    Most active in-flight
+                  </span>
+                </div>
               </div>
-              <span className="text-right text-xs font-semibold text-[var(--on-surface)] tabular-nums">
+              <span className="text-right text-xs font-bold text-[var(--on-surface)] tabular-nums font-mono shrink-0">
                 {managementReadout.busiestOpenTeam?.count
                   ? `${managementReadout.busiestOpenTeam.label} · ${managementReadout.busiestOpenTeam.count}`
                   : "No open requests"}
               </span>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
-                <span className="text-xs text-[var(--on-surface-muted)]">Open requests past target</span>
+
+            {/* Readout 3: Overdue Rate */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 hover:border-[var(--border-strong)] transition-all shadow-2xs">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                  <AlertTriangle className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--on-surface-subtle)] block">
+                    Past Target SLA
+                  </span>
+                  <span className="text-xs text-[var(--on-surface-muted)] truncate block">
+                    SLA breach share
+                  </span>
+                </div>
               </div>
-              <span className="text-right text-xs font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
-                {slaMetrics.totalDelayed} · {managementReadout.overdueShare}%
+              <span className="text-right text-xs font-bold text-rose-600 dark:text-rose-400 tabular-nums font-mono shrink-0">
+                {slaMetrics.totalDelayed} ({managementReadout.overdueShare}%)
               </span>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <BarChart3 className="h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
-                <span className="text-xs text-[var(--on-surface-muted)]">Latest intake vs prior month</span>
+
+            {/* Readout 4: MoM Change */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 hover:border-[var(--border-strong)] transition-all shadow-2xs">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[var(--surface-container)] flex items-center justify-center text-[var(--accent-primary)] shrink-0">
+                  <BarChart3 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--on-surface-subtle)] block">
+                    MoM Velocity
+                  </span>
+                  <span className="text-xs text-[var(--on-surface-muted)] truncate block">
+                    Latest intake delta
+                  </span>
+                </div>
               </div>
-              <span className="text-right text-xs font-semibold text-[var(--on-surface)] tabular-nums">
+              <span className="text-right text-xs font-bold text-[var(--on-surface)] tabular-nums font-mono shrink-0">
                 {managementReadout.latestRecordedMonth && managementReadout.previousMonth && managementReadout.monthChange !== null
-                  ? `${managementReadout.latestRecordedMonth.label} vs ${managementReadout.previousMonth.label} · ${managementReadout.monthChange > 0 ? "+" : ""}${managementReadout.monthChange}${managementReadout.monthChangePct !== null ? ` · ${managementReadout.monthChangePct > 0 ? "+" : ""}${managementReadout.monthChangePct}%` : " vs 0"}`
+                  ? `${managementReadout.latestRecordedMonth.label} vs ${managementReadout.previousMonth.label} (${managementReadout.monthChange > 0 ? "+" : ""}${managementReadout.monthChange})`
                   : managementReadout.latestRecordedMonth?.intake
                     ? `${managementReadout.latestRecordedMonth.full} · ${managementReadout.latestRecordedMonth.intake}`
                     : "No monthly data"}
               </span>
             </div>
           </div>
-          <p className="text-[10px] text-[var(--on-surface-subtle)]">
-            Month comparison uses the latest month with requests and its immediately preceding month in this business year.
-          </p>
         </section>
 
         {/* ── 3. GRAPHICAL PIPELINE LIFECYCLE FUNNEL (PROPORTIONAL DISTRIBUTION STRIP) ── */}
-        <section id="ops-pipeline" className="scroll-mt-16 p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
+        <section id="ops-pipeline" className="scroll-mt-16 p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight">
-                Requests by Current Workflow Stage
-              </h3>
+              <div className="flex items-center gap-2 mb-0.5">
+                <Layers className="w-4 h-4 text-[var(--accent-primary)]" />
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                  Requests by Current Workflow Stage
+                </h2>
+              </div>
               <p className="text-xs text-[var(--on-surface-muted)]">
-                Current distribution of requests across the teams and stages handling them.
+                Proportional distribution of active requests across teams and production stages.
               </p>
             </div>
-            <span className="text-xs font-mono font-semibold text-[var(--on-surface-subtle)]">
-              {slaMetrics.total} Total Units
+            <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs font-mono font-bold text-[var(--on-surface)] self-start sm:self-auto shadow-2xs">
+              {slaMetrics.total.toLocaleString()} Total Units
             </span>
           </div>
 
           {/* Graphical Proportional Stacked Segment Bar */}
-          <div className="w-full h-3 rounded-full overflow-hidden flex bg-[var(--surface-low)]">
+          <div className="w-full h-3 rounded-full overflow-hidden flex bg-[var(--surface-low)] border border-[var(--border-subtle)]">
             <div
               style={{ width: `${slaMetrics.total ? (lifecycleFunnel.draft.count / slaMetrics.total) * 100 : 0}%` }}
-              className="bg-slate-400"
+              className="bg-slate-400 transition-all duration-300"
               title={`Intake / Draft: ${lifecycleFunnel.draft.count} (${lifecycleFunnel.draft.pct}%)`}
             />
             <div
               style={{ width: `${slaMetrics.total ? (lifecycleFunnel.creative.count / slaMetrics.total) * 100 : 0}%` }}
-              className="bg-purple-500"
+              className="bg-purple-500 transition-all duration-300"
               title={`Creative Artwork: ${lifecycleFunnel.creative.count} (${lifecycleFunnel.creative.pct}%)`}
             />
             <div
               style={{ width: `${slaMetrics.total ? (lifecycleFunnel.studio.count / slaMetrics.total) * 100 : 0}%` }}
-              className="bg-indigo-500"
+              className="bg-indigo-500 transition-all duration-300"
               title={`Structural CAD: ${lifecycleFunnel.studio.count} (${lifecycleFunnel.studio.pct}%)`}
             />
             <div
               style={{ width: `${slaMetrics.total ? (lifecycleFunnel.samp.count / slaMetrics.total) * 100 : 0}%` }}
-              className="bg-teal-500"
+              className="bg-teal-500 transition-all duration-300"
               title={`SAMP Lab: ${lifecycleFunnel.samp.count} (${lifecycleFunnel.samp.pct}%)`}
             />
             <div
               style={{ width: `${slaMetrics.total ? (lifecycleFunnel.costing.count / slaMetrics.total) * 100 : 0}%` }}
-              className="bg-amber-500"
+              className="bg-amber-500 transition-all duration-300"
               title={`Costing & BOM: ${lifecycleFunnel.costing.count} (${lifecycleFunnel.costing.pct}%)`}
             />
             <div
               style={{ width: `${slaMetrics.total ? (lifecycleFunnel.dispatched.count / slaMetrics.total) * 100 : 0}%` }}
-              className="bg-emerald-500"
+              className="bg-emerald-500 transition-all duration-300"
               title={`Dispatched / Won: ${lifecycleFunnel.dispatched.count} (${lifecycleFunnel.dispatched.pct}%)`}
             />
           </div>
 
           {/* Segment Badges */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1 text-xs font-mono">
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-1 text-xs font-mono">
+            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors shadow-2xs">
               <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Draft Intake</span>
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase font-semibold">Draft Intake</span>
                 <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.draft.count} ({lifecycleFunnel.draft.pct}%)</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors shadow-2xs">
               <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Creative Artwork</span>
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase font-semibold">Creative Artwork</span>
                 <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.creative.count} ({lifecycleFunnel.creative.pct}%)</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors shadow-2xs">
               <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Studio CAD</span>
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase font-semibold">Studio CAD</span>
                 <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.studio.count} ({lifecycleFunnel.studio.pct}%)</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors shadow-2xs">
               <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">SAMP Lab</span>
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase font-semibold">SAMP Lab</span>
                 <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.samp.count} ({lifecycleFunnel.samp.pct}%)</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors shadow-2xs">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Costing BOM</span>
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase font-semibold">Costing BOM</span>
                 <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.costing.count} ({lifecycleFunnel.costing.pct}%)</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors shadow-2xs">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase">Dispatched</span>
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase font-semibold">Dispatched</span>
                 <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.dispatched.count} ({lifecycleFunnel.dispatched.pct}%)</span>
               </div>
             </div>
@@ -1380,9 +1661,6 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                     );
                   })}
                 </div>
-                <p className="mt-1 text-center text-[10px] text-[var(--on-surface-subtle)]">
-                  Current workstream for requests created each month. Focus a bar for its counts.
-                </p>
               </div>
             )}
 
@@ -1439,71 +1717,41 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
             )}
           </div>
 
-          {/* ── EXPANDABLE 12-MONTH DETAILED NUMERICAL AUDIT MATRIX ── */}
-          <div className="hidden">
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <TrendingUp className="h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
-                <span className="text-xs text-[var(--on-surface-muted)]">Peak intake month</span>
-              </div>
-              <span className="text-right text-xs font-semibold text-[var(--on-surface)] tabular-nums">
-                {managementReadout.peakMonth?.intake
-                  ? `${managementReadout.peakMonth.full} · ${managementReadout.peakMonth.intake}`
-                  : "No requests"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <Hourglass className="h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
-                <span className="text-xs text-[var(--on-surface-muted)]">Largest open team queue</span>
-              </div>
-              <span className="text-right text-xs font-semibold text-[var(--on-surface)] tabular-nums">
-                {managementReadout.busiestOpenTeam?.count
-                  ? `${managementReadout.busiestOpenTeam.label} · ${managementReadout.busiestOpenTeam.count}`
-                  : "No open requests"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
-                <span className="text-xs text-[var(--on-surface-muted)]">Open requests past target</span>
-              </div>
-              <span className="text-right text-xs font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
-                {slaMetrics.totalDelayed} · {managementReadout.overdueShare}%
-              </span>
-            </div>
-          </div>
-
           {showMonthlyTable && (
-            <div className="overflow-x-auto pt-2 border-t border-[var(--border-subtle)]">
+            <div className="overflow-x-auto pt-3 border-t border-[var(--border-subtle)]">
               <table className="w-full text-xs text-left">
                 <thead>
-                  <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
-                    <th className="py-2 px-3">Month</th>
-                    <th className="py-2 px-3 text-right">Inflow</th>
-                    <th className="py-2 px-3 text-right">Design</th>
-                    <th className="py-2 px-3 text-right">CAD</th>
-                    <th className="py-2 px-3 text-right">Sampling</th>
-                    <th className="py-2 px-3 text-right">Costing</th>
-                    <th className="py-2 px-3 text-right">On-Time</th>
-                    <th className="py-2 px-3 text-right">Delayed</th>
-                    <th className="py-2 px-3 text-right">SLA %</th>
+                  <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-low)] text-[10px] font-mono uppercase text-[var(--on-surface-subtle)] font-semibold">
+                    <th className="py-2.5 px-3.5">Month</th>
+                    <th className="py-2.5 px-3.5 text-right">Inflow</th>
+                    <th className="py-2.5 px-3.5 text-right">Design</th>
+                    <th className="py-2.5 px-3.5 text-right">CAD</th>
+                    <th className="py-2.5 px-3.5 text-right">Sampling</th>
+                    <th className="py-2.5 px-3.5 text-right">Costing</th>
+                    <th className="py-2.5 px-3.5 text-right">On-Time</th>
+                    <th className="py-2.5 px-3.5 text-right">Delayed</th>
+                    <th className="py-2.5 px-3.5 text-right">SLA %</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
                   {monthlyTimeline.points.map((m) => (
-                    <tr key={m.key} className="hover:bg-[var(--surface-low)]">
-                      <td className="py-2 px-3 font-semibold text-[var(--on-surface)]">{m.full}</td>
-                      <td className="py-2 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{m.intake}</td>
-                      <td className="py-2 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{m.design}</td>
-                      <td className="py-2 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{m.mockup}</td>
-                      <td className="py-2 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{m.sampling}</td>
-                      <td className="py-2 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{m.costing}</td>
-                      <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
-                      <td className="py-2 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
-                      <td className="py-2 px-3 text-right tabular-nums">
-                        <span className={`px-1.5 py-0.5 rounded font-bold ${m.slaRate >= 90 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : m.slaRate >= 75 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-                          }`}>
+                    <tr key={m.key} className="hover:bg-[var(--surface-low)] transition-colors">
+                      <td className="py-2.5 px-3.5 font-semibold text-[var(--on-surface)]">{m.full}</td>
+                      <td className="py-2.5 px-3.5 text-right font-bold text-[var(--on-surface)] tabular-nums">{m.intake}</td>
+                      <td className="py-2.5 px-3.5 text-right text-[var(--on-surface-muted)] tabular-nums">{m.design}</td>
+                      <td className="py-2.5 px-3.5 text-right text-[var(--on-surface-muted)] tabular-nums">{m.mockup}</td>
+                      <td className="py-2.5 px-3.5 text-right text-[var(--on-surface-muted)] tabular-nums">{m.sampling}</td>
+                      <td className="py-2.5 px-3.5 text-right text-[var(--on-surface-muted)] tabular-nums">{m.costing}</td>
+                      <td className="py-2.5 px-3.5 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
+                      <td className="py-2.5 px-3.5 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
+                      <td className="py-2.5 px-3.5 text-right tabular-nums">
+                        <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                          m.slaRate >= 90
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : m.slaRate >= 75
+                            ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                            : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                        }`}>
                           {m.slaRate}%
                         </span>
                       </td>
@@ -1520,51 +1768,54 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         <section id="ops-portfolio" className="scroll-mt-16 grid grid-cols-1 lg:grid-cols-3 gap-4">
 
           {/* Left: 4 Deliverables Cards with Visual Share Meters */}
-          <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="lg:col-span-2 p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight">
-                  Marketing Requests Decomposition
-                </h3>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <BarChart3 className="w-4 h-4 text-[var(--accent-primary)]" />
+                  <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                    Deliverables Decomposition
+                  </h2>
+                </div>
                 <p className="text-xs text-[var(--on-surface-muted)]">
-                  Decomposition into graphic artwork, structural CAD dielines, physical samples, and costing quotations.
+                  Decomposition into graphic artwork, structural CAD dielines, physical samples, and costing quotes.
                 </p>
               </div>
-              <span className="text-xs font-mono text-[var(--on-surface-subtle)]">
-                Total {marketingDecomposition.total}
+              <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs font-mono font-bold text-[var(--on-surface)] self-start sm:self-auto shadow-2xs">
+                {marketingDecomposition.total.toLocaleString()} Total Units
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
 
               {/* Deliverable 1: Design Requests */}
               <div
                 onClick={() => navigate("/creative-work")}
-                className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-purple-400 cursor-pointer shadow-2xs transition-colors"
+                className="group p-3.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-purple-400/60 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                      <Palette className="w-3.5 h-3.5" />
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                      <Palette className="w-4 h-4" />
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-[var(--on-surface)]">Design Briefs</h4>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Creative Artwork</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-500/20">
                     {marketingDecomposition.design.pct}%
                   </span>
                 </div>
                 {/* Visual Share Bar */}
-                <div className="w-full bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden mb-2">
-                  <div className="bg-purple-500 h-full rounded-full" style={{ width: `${marketingDecomposition.design.pct}%` }} />
+                <div className="w-full bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden mb-2.5">
+                  <div className="bg-purple-500 h-full rounded-full transition-all duration-300" style={{ width: `${marketingDecomposition.design.pct}%` }} />
                 </div>
                 <div className="flex items-baseline justify-between pt-1 border-t border-[var(--border-subtle)]">
                   <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
                     {marketingDecomposition.design.count}
                   </span>
-                  <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-0.5">
+                  <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                     Creative Desk <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
@@ -1573,31 +1824,31 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               {/* Deliverable 2: Mockup Requests */}
               <div
                 onClick={() => navigate("/studio-work")}
-                className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-indigo-400 cursor-pointer shadow-2xs transition-colors"
+                className="group p-3.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-indigo-400/60 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                      <Box className="w-3.5 h-3.5" />
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                      <Box className="w-4 h-4" />
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-[var(--on-surface)]">CAD Mockups</h4>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Dielines & 3D Form</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-500/20">
                     {marketingDecomposition.mockup.pct}%
                   </span>
                 </div>
                 {/* Visual Share Bar */}
-                <div className="w-full bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden mb-2">
-                  <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${marketingDecomposition.mockup.pct}%` }} />
+                <div className="w-full bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden mb-2.5">
+                  <div className="bg-indigo-500 h-full rounded-full transition-all duration-300" style={{ width: `${marketingDecomposition.mockup.pct}%` }} />
                 </div>
                 <div className="flex items-baseline justify-between pt-1 border-t border-[var(--border-subtle)]">
                   <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
                     {marketingDecomposition.mockup.count}
                   </span>
-                  <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-0.5">
+                  <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                     Studio Desk <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
@@ -1606,31 +1857,31 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               {/* Deliverable 3: Sampling Prototypes */}
               <div
                 onClick={() => navigate("/samp-team-work")}
-                className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-emerald-400 cursor-pointer shadow-2xs transition-colors"
+                className="group p-3.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-emerald-400/60 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                      <FlaskConical className="w-3.5 h-3.5" />
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <FlaskConical className="w-4 h-4" />
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-[var(--on-surface)]">Sampling Lab</h4>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Physical Prototypes</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-500/20">
                     {marketingDecomposition.sampling.pct}%
                   </span>
                 </div>
                 {/* Visual Share Bar */}
-                <div className="w-full bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden mb-2">
-                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${marketingDecomposition.sampling.pct}%` }} />
+                <div className="w-full bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden mb-2.5">
+                  <div className="bg-emerald-500 h-full rounded-full transition-all duration-300" style={{ width: `${marketingDecomposition.sampling.pct}%` }} />
                 </div>
                 <div className="flex items-baseline justify-between pt-1 border-t border-[var(--border-subtle)]">
                   <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
                     {marketingDecomposition.sampling.count}
                   </span>
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                     SAMP Lab <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
@@ -1639,31 +1890,31 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               {/* Deliverable 4: Costing Quotes */}
               <div
                 onClick={() => navigate("/costing-team")}
-                className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-amber-400 cursor-pointer shadow-2xs transition-colors"
+                className="group p-3.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-amber-400/60 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                      <Calculator className="w-3.5 h-3.5" />
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                      <Calculator className="w-4 h-4" />
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-[var(--on-surface)]">Costing & BOM</h4>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Pricing & Margins</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-500/20">
                     {marketingDecomposition.costing.pct}%
                   </span>
                 </div>
                 {/* Visual Share Bar */}
-                <div className="w-full bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden mb-2">
-                  <div className="bg-amber-500 h-full rounded-full" style={{ width: `${marketingDecomposition.costing.pct}%` }} />
+                <div className="w-full bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden mb-2.5">
+                  <div className="bg-amber-500 h-full rounded-full transition-all duration-300" style={{ width: `${marketingDecomposition.costing.pct}%` }} />
                 </div>
                 <div className="flex items-baseline justify-between pt-1 border-t border-[var(--border-subtle)]">
                   <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
                     {marketingDecomposition.costing.count}
                   </span>
-                  <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-0.5">
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                     Costing Desk <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
@@ -1673,16 +1924,19 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
           </div>
 
           {/* Right: Intake Creation Mode / Channels Breakdown */}
-          <div className="p-4 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs flex flex-col justify-between">
+          <div className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs flex flex-col justify-between space-y-4">
             <div>
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight mb-1">
-                Intake Channels & Track Origin
-              </h3>
+              <div className="flex items-center gap-2 mb-0.5">
+                <Boxes className="w-4 h-4 text-[var(--accent-primary)]" />
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                  Intake Channels & Origin
+                </h2>
+              </div>
               <p className="text-xs text-[var(--on-surface-muted)] mb-3">
-                Distribution of how client requests enter the system before reaching production.
+                Origin breakdown of client requests entering the operational lifecycle.
               </p>
 
-              <div className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-3">
+              <div className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-3.5">
                 <div className="relative mx-auto h-24 w-24">
                   <svg
                     viewBox="0 0 100 100"
@@ -1721,11 +1975,11 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                     <span className="font-display text-lg font-bold leading-none text-[var(--on-surface)] tabular-nums">
                       {intakeChannels.reduce((sum, channel) => sum + channel.count, 0)}
                     </span>
-                    <span className="mt-1 text-[9px] uppercase tracking-wide text-[var(--on-surface-subtle)]">requests</span>
+                    <span className="mt-1 text-[9px] uppercase tracking-wide text-[var(--on-surface-subtle)] font-mono">requests</span>
                   </div>
                 </div>
 
-                <div className="space-y-2 text-xs font-mono">
+                <div className="space-y-2.5 text-xs font-mono">
                   {intakeChannels.map((channel) => (
                     <div key={channel.key} className="min-w-0">
                       <div className="flex items-center justify-between gap-2">
@@ -1746,10 +2000,10 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs">
-              <span className="text-[var(--on-surface-muted)]">Active Pipeline</span>
-              <span className="font-bold font-mono text-[var(--accent-primary)]">
-                {slaMetrics.inFlightCount} Units Active
+            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs font-mono">
+              <span className="text-[var(--on-surface-muted)]">Track Allocation</span>
+              <span className="font-bold text-[var(--accent-primary)]">
+                100% Accounted
               </span>
             </div>
           </div>
@@ -1760,11 +2014,14 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         <section id="ops-teams" className="scroll-mt-16 p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
-                Team Workload & SLA Health
-              </h2>
+              <div className="flex items-center gap-2 mb-0.5">
+                <Users className="w-4 h-4 text-[var(--accent-primary)]" />
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                  Team Workload & SLA Health
+                </h2>
+              </div>
               <p className="text-xs text-[var(--on-surface-muted)]">
-                Real-time audit comparing workload load balance and SLA fulfillment across all execution teams.
+                Cross-department audit comparing active backlog, throughput capacity, and SLA compliance.
               </p>
             </div>
           </div>
@@ -1772,56 +2029,57 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
-                  <th className="py-2.5 px-3">Department</th>
-                  <th className="py-2.5 px-3">Scope</th>
-                  <th className="py-2.5 px-3 text-right">Workload</th>
-                  <th className="py-2.5 px-3">Workload Share</th>
-                  <th className="py-2.5 px-3 text-right">Active Queue</th>
-                  <th className="py-2.5 px-3 text-right">On-Time</th>
-                  <th className="py-2.5 px-3 text-right">Delayed</th>
-                  <th className="py-2.5 px-3">SLA Fulfillment Gauge</th>
-                  <th className="py-2.5 px-3 text-right">View</th>
+                <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-low)] text-[10px] font-mono uppercase text-[var(--on-surface-subtle)] font-semibold">
+                  <th className="py-2.5 px-3.5">Department</th>
+                  <th className="py-2.5 px-3.5">Scope</th>
+                  <th className="py-2.5 px-3.5 text-right">Workload</th>
+                  <th className="py-2.5 px-3.5">Workload Share</th>
+                  <th className="py-2.5 px-3.5 text-right">Active Queue</th>
+                  <th className="py-2.5 px-3.5 text-right">On-Time</th>
+                  <th className="py-2.5 px-3.5 text-right">Delayed</th>
+                  <th className="py-2.5 px-3.5">SLA Fulfillment Gauge</th>
+                  <th className="py-2.5 px-3.5 text-right">View</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
                 {departmentHealth.map((dept) => {
                   const Icon = dept.icon;
                   return (
-                    <tr key={dept.id} className="hover:bg-[var(--surface-low)]">
-                      <td className="py-3 px-3 font-semibold text-[var(--on-surface)] flex items-center gap-2">
-                        <div className="w-6 h-6 rounded bg-[var(--surface-low)] flex items-center justify-center text-[var(--on-surface)]">
+                    <tr key={dept.id} className="hover:bg-[var(--surface-low)] transition-colors">
+                      <td className="py-3 px-3.5 font-semibold text-[var(--on-surface)] flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-[var(--surface-container)] flex items-center justify-center text-[var(--on-surface)] shrink-0">
                           <Icon className="w-3.5 h-3.5" />
                         </div>
-                        <span>{dept.name}</span>
+                        <span className="font-medium">{dept.name}</span>
                       </td>
-                      <td className="py-3 px-3 text-[var(--on-surface-muted)]">{dept.scope}</td>
-                      <td className="py-3 px-3 text-right font-mono font-bold text-[var(--on-surface)] tabular-nums">{dept.total}</td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3.5 text-[var(--on-surface-muted)]">{dept.scope}</td>
+                      <td className="py-3 px-3.5 text-right font-mono font-bold text-[var(--on-surface)] tabular-nums">{dept.total}</td>
+                      <td className="py-3 px-3.5">
                         <div className="flex items-center gap-2 w-28">
-                          <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-[var(--accent-primary)] h-full rounded-full" style={{ width: `${dept.sharePct}%` }} />
+                          <div className="flex-1 bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-[var(--accent-primary)] h-full rounded-full transition-all duration-300" style={{ width: `${dept.sharePct}%` }} />
                           </div>
                           <span className="font-mono text-[10px] text-[var(--on-surface-muted)] tabular-nums">{dept.sharePct}%</span>
                         </div>
                       </td>
-                      <td className="py-3 px-3 text-right font-mono text-[var(--on-surface)] tabular-nums">{dept.active}</td>
-                      <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{dept.onTime}</td>
-                      <td className="py-3 px-3 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                      <td className="py-3 px-3.5 text-right font-mono text-[var(--on-surface)] tabular-nums">{dept.active}</td>
+                      <td className="py-3 px-3.5 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{dept.onTime}</td>
+                      <td className="py-3 px-3.5 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
                         {dept.delayed > 0 ? (
-                          <span className="px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">
+                          <span className="px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-500/20">
                             {dept.delayed}
                           </span>
                         ) : (
                           "0"
                         )}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3.5">
                         <div className="flex items-center gap-2 w-36">
-                          <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
+                          <div className="flex-1 bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full ${dept.slaRate >= 90 ? "bg-emerald-500" : dept.slaRate >= 75 ? "bg-amber-500" : "bg-rose-500"
-                                }`}
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                dept.slaRate >= 90 ? "bg-emerald-500" : dept.slaRate >= 75 ? "bg-amber-500" : "bg-rose-500"
+                              }`}
                               style={{ width: `${dept.slaRate}%` }}
                             />
                           </div>
@@ -1830,11 +2088,11 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 px-3 text-right">
+                      <td className="py-3 px-3.5 text-right">
                         <button
                           type="button"
                           onClick={() => navigate(dept.route)}
-                          className="px-2 py-1 rounded bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] text-[11px] font-medium cursor-pointer inline-flex items-center gap-1 transition-colors"
+                          className="px-2.5 py-1 rounded-lg bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--on-surface)] border border-[var(--border-subtle)] text-[11px] font-semibold cursor-pointer inline-flex items-center gap-1 shadow-2xs transition-colors"
                         >
                           <span>Open</span>
                           <ExternalLink className="w-3 h-3" />
@@ -1852,19 +2110,21 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         <section id="ops-risks" className="scroll-mt-16 grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Bottleneck Aging Analysis with Graphical Ladder */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
+          <div className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
             <div>
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-0.5">
                 <Clock className="w-4 h-4 text-[var(--accent-primary)]" />
-                <span>Open Request Age & Overdue Risk</span>
-              </h3>
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                  Open Request Age & Risk
+                </h2>
+              </div>
               <p className="text-xs text-[var(--on-surface-muted)]">
-                Aging distribution of in-flight requests since initial client logging.
+                Aging distribution of in-flight requests since initial customer creation.
               </p>
             </div>
 
             {/* Visual Segmented Aging Bar */}
-            <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-[var(--surface-low)]">
+            <div className="w-full h-3 rounded-full overflow-hidden flex bg-[var(--surface-low)] border border-[var(--border-subtle)]">
               <div
                 style={{
                   width: `${slaMetrics.inFlightCount > 0
@@ -1872,7 +2132,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       : 25
                     }%`,
                 }}
-                className="bg-emerald-500"
+                className="bg-emerald-500 transition-all duration-300"
                 title="0-3 Days"
               />
               <div
@@ -1882,7 +2142,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       : 25
                     }%`,
                 }}
-                className="bg-blue-500"
+                className="bg-blue-500 transition-all duration-300"
                 title="4-7 Days"
               />
               <div
@@ -1892,7 +2152,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       : 25
                     }%`,
                 }}
-                className="bg-amber-500"
+                className="bg-amber-500 transition-all duration-300"
                 title="8-14 Days"
               />
               <div
@@ -1902,38 +2162,38 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       : 25
                     }%`,
                 }}
-                className="bg-rose-500"
+                className="bg-rose-500 transition-all duration-300"
                 title=">14 Days"
               />
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-center font-mono">
-              <div className="p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
-                <span className="text-[10px] uppercase text-[var(--on-surface-subtle)] block mb-1">0 - 3 Days</span>
+              <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs">
+                <span className="text-[10px] uppercase font-semibold text-[var(--on-surface-subtle)] block mb-1">0 - 3 Days</span>
                 <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                   {slaMetrics.aging.age0to3}
                 </span>
                 <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Fresh</span>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
-                <span className="text-[10px] uppercase text-[var(--on-surface-subtle)] block mb-1">4 - 7 Days</span>
+              <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs">
+                <span className="text-[10px] uppercase font-semibold text-[var(--on-surface-subtle)] block mb-1">4 - 7 Days</span>
                 <span className="text-xl font-bold text-blue-600 dark:text-blue-400 tabular-nums">
                   {slaMetrics.aging.age4to7}
                 </span>
                 <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Standard</span>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
-                <span className="text-[10px] uppercase text-[var(--on-surface-subtle)] block mb-1">8 - 14 Days</span>
+              <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs">
+                <span className="text-[10px] uppercase font-semibold text-[var(--on-surface-subtle)] block mb-1">8 - 14 Days</span>
                 <span className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
                   {slaMetrics.aging.age8to14}
                 </span>
                 <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Review</span>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
-                <span className="text-[10px] uppercase text-[var(--on-surface-subtle)] block mb-1">&gt;14 Days</span>
+              <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs">
+                <span className="text-[10px] uppercase font-semibold text-[var(--on-surface-subtle)] block mb-1">&gt;14 Days</span>
                 <span className="text-xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
                   {slaMetrics.aging.age15Plus}
                 </span>
@@ -1941,56 +2201,61 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               </div>
             </div>
 
-            <div className="p-2.5 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface-muted)] flex items-center justify-between">
-              <span>Overdue Breakdown:</span>
-              <span className="font-mono text-[11px] text-[var(--on-surface)]">
+            <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface-muted)] flex items-center justify-between">
+              <span className="font-medium">Overdue Age Breakdown:</span>
+              <span className="font-mono text-[11px] text-[var(--on-surface)] font-semibold">
                 {slaMetrics.delaySeverity.delay1to3d} (1-3d) · {slaMetrics.delaySeverity.delay4to7d} (4-7d) · {slaMetrics.delaySeverity.delay7Plus} (&gt;7d)
               </span>
             </div>
           </div>
 
           {/* Top Customer Accounts Concentration with Visual Meters */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
+          <div className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
             <div>
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-0.5">
                 <Building2 className="w-4 h-4 text-[var(--accent-primary)]" />
-                <span>Top Customer Workload & SLA</span>
-              </h3>
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                  Top Customer Workload & SLA
+                </h2>
+              </div>
               <p className="text-xs text-[var(--on-surface-muted)]">
-                Key client portfolio request volume and on-time fulfillment rates.
+                Key client portfolio request volume and on-time delivery rates.
               </p>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
-                  <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)]">
-                    <th className="py-2 px-2">Customer Account</th>
-                    <th className="py-2 px-2 text-right">Total</th>
-                    <th className="py-2 px-2 text-right">Active</th>
-                    <th className="py-2 px-2 text-right">Delayed</th>
-                    <th className="py-2 px-2">On-Time Fulfillment</th>
+                  <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-low)] text-[10px] font-mono uppercase text-[var(--on-surface-subtle)] font-semibold">
+                    <th className="py-2.5 px-3">Customer Account</th>
+                    <th className="py-2.5 px-3 text-right">Total</th>
+                    <th className="py-2.5 px-3 text-right">Active</th>
+                    <th className="py-2.5 px-3 text-right">Delayed</th>
+                    <th className="py-2.5 px-3">On-Time Fulfillment</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
                   {topCustomers.map((cust) => (
-                    <tr key={cust.name} className="hover:bg-[var(--surface-low)]">
-                      <td className="py-2.5 px-2 font-semibold text-[var(--on-surface)] truncate max-w-[140px]">
+                    <tr key={cust.name} className="hover:bg-[var(--surface-low)] transition-colors">
+                      <td className="py-3 px-3 font-semibold text-[var(--on-surface)] truncate max-w-[140px]">
                         {cust.name}
                       </td>
-                      <td className="py-2.5 px-2 text-right font-bold text-[var(--on-surface)] tabular-nums">{cust.total}</td>
-                      <td className="py-2.5 px-2 text-right text-[var(--on-surface-muted)] tabular-nums">{cust.active}</td>
-                      <td className="py-2.5 px-2 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{cust.delayed}</td>
-                      <td className="py-2.5 px-2">
+                      <td className="py-3 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{cust.total}</td>
+                      <td className="py-3 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{cust.active}</td>
+                      <td className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{cust.delayed}</td>
+                      <td className="py-3 px-3">
                         <div className="flex items-center gap-2 w-32">
-                          <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
+                          <div className="flex-1 bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden">
                             <div
-                              className="bg-emerald-500 h-full rounded-full"
+                              className="bg-emerald-500 h-full rounded-full transition-all duration-300"
                               style={{ width: `${cust.onTimeRate}%` }}
                             />
                           </div>
-                          <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${cust.onTimeRate >= 90 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                            }`}>
+                          <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
+                            cust.onTimeRate >= 90
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                          }`}>
                             {cust.onTimeRate}%
                           </span>
                         </div>
@@ -2005,13 +2270,15 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         </section>
 
         {/* ── 8. PACKAGING CATEGORY MIX (VOLUME SHARE BARS) ── */}
-        <section id="ops-categories" className="scroll-mt-16 p-4 sm:p-5 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-3">
+        <section id="ops-categories" className="scroll-mt-16 p-5 sm:p-6 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-0.5">
                 <Package className="w-4 h-4 text-[var(--accent-primary)]" />
-                <span>Product Category Mix</span>
-              </h3>
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight">
+                  Product Category Mix
+                </h2>
+              </div>
               <p className="text-xs text-[var(--on-surface-muted)]">
                 Distribution of client requests by substrate and packaging configuration.
               </p>
@@ -2020,7 +2287,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
             {categoryMix.map((cat) => (
-              <div key={cat.name} className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-1.5">
+              <div key={cat.name} className="p-3.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-all shadow-2xs space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-[var(--on-surface)] truncate" title={cat.name}>
                     {cat.name}
@@ -2028,7 +2295,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   <span className="font-mono font-bold text-[var(--accent-primary)] text-[11px]">{cat.pct}%</span>
                 </div>
                 <div className="w-full bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-[var(--accent-primary)] h-full rounded-full" style={{ width: `${cat.pct}%` }} />
+                  <div className="bg-[var(--accent-primary)] h-full rounded-full transition-all duration-300" style={{ width: `${cat.pct}%` }} />
                 </div>
                 <div className="text-[10px] font-mono text-[var(--on-surface-muted)] tabular-nums">
                   {cat.count} units logged
@@ -2042,40 +2309,43 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         <section id="ops-watchlist" className="scroll-mt-16 rounded-2xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs overflow-hidden">
 
           {/* Header with Search and Deep Filters */}
-          <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="p-5 sm:p-6 border-b border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h3 className="font-display font-bold text-sm text-[var(--on-surface)] tracking-tight flex items-center gap-2">
-                <span>Operations Watchlist</span>
-                <span className="text-xs font-mono font-normal text-[var(--on-surface-subtle)]">
-                  ({filteredWatchlist.length} records shown)
-                </span>
-              </h3>
+              <div className="flex items-center gap-2 mb-0.5">
+                <Flame className="w-4 h-4 text-amber-500" />
+                <h2 className="font-display font-bold text-base text-[var(--on-surface)] tracking-tight flex items-center gap-2">
+                  <span>Operations Watchlist</span>
+                  <span className="px-2 py-0.5 rounded-md bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[11px] font-mono font-semibold text-[var(--on-surface-subtle)]">
+                    {filteredWatchlist.length} records
+                  </span>
+                </h2>
+              </div>
               <p className="text-xs text-[var(--on-surface-muted)]">
-                Live line-by-line inspection of individual requests, active department ownership, and delay turnaround.
+                Live inspection of individual requests, active department ownership, and delay turnaround.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
               {/* Search Box */}
               <div className="relative">
-                <Search className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Filter SR, Customer, Item..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[var(--surface-low)] text-xs text-[var(--on-surface)] placeholder-[var(--on-surface-subtle)] border border-[var(--border-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] w-48 sm:w-56"
+                  className="pl-8 pr-3 py-1.5 rounded-xl bg-[var(--surface-low)] text-xs text-[var(--on-surface)] placeholder-[var(--on-surface-subtle)] border border-[var(--border-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] w-48 sm:w-56 shadow-2xs"
                 />
               </div>
 
               {/* Segmented Filter Pills */}
-              <div className="inline-flex rounded-lg bg-[var(--surface-low)] p-0.5 border border-[var(--border-subtle)] text-xs font-medium">
+              <div className="inline-flex rounded-xl bg-[var(--surface-low)] p-0.5 border border-[var(--border-subtle)] text-xs font-medium shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("all")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "all"
+                  className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${watchlistFilter === "all"
                       ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs"
-                      : "text-[var(--on-surface-muted)]"
+                      : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                 >
                   All ({slaMetrics.total})
@@ -2083,7 +2353,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("delayed")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "delayed"
+                  className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${watchlistFilter === "delayed"
                       ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs"
                       : "text-[var(--on-surface-muted)] hover:text-rose-600"
                     }`}
@@ -2093,7 +2363,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("urgent")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "urgent"
+                  className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${watchlistFilter === "urgent"
                       ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs"
                       : "text-[var(--on-surface-muted)] hover:text-amber-600"
                     }`}
@@ -2103,7 +2373,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                 <button
                   type="button"
                   onClick={() => setWatchlistFilter("ontime")}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-colors ${watchlistFilter === "ontime"
+                  className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${watchlistFilter === "ontime"
                       ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-bold shadow-2xs"
                       : "text-[var(--on-surface-muted)] hover:text-emerald-600"
                     }`}
@@ -2118,7 +2388,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] text-[10px] font-mono uppercase text-[var(--on-surface-muted)] bg-[var(--surface-low)]">
+                <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-low)] text-[10px] font-mono uppercase text-[var(--on-surface-subtle)] font-semibold">
                   <th className="py-2.5 px-4">SR Number</th>
                   <th className="py-2.5 px-3">Customer</th>
                   <th className="py-2.5 px-3">Product Description</th>
