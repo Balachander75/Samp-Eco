@@ -166,7 +166,7 @@ def add_program_note(
     """Add a persistent note/comment to the program planning chatter and audit activity log."""
     require_any_team(current_user, ("marketing", "samp", "plant"))
     _require_program_request_visibility(request_id, service, current_user)
-    return service.add_note(request_id, payload.note, current_user=current_user)
+    return service.add_note(request_id, payload.note, material_id=payload.material_id, current_user=current_user)
 
 
 @router.put(

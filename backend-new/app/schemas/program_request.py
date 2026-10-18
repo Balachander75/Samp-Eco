@@ -113,6 +113,7 @@ class ProgramNoteCreate(BaseModel):
     """Payload for adding a note/comment to the program planning audit chatter."""
 
     note: str = Field(min_length=1, max_length=2000)
+    material_id: Optional[int] = None
 
 
 class ProgramActivityLogOut(BaseModel):

@@ -435,6 +435,7 @@ class ProgramRequestService:
         self,
         request_id: int,
         note: str,
+        material_id: Optional[int] = None,
         current_user: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """Add a persistent communication note to program request chatter audit log."""
@@ -448,12 +449,19 @@ class ProgramRequestService:
 
         actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
 
+        payload_data: Dict[str, Any] = {"note": trimmed_note}
+        if material_id is not None:
+            mat = next((m for m in (item.materials or []) if m.id == material_id), None)
+            payload_data["material_id"] = material_id
+            if mat:
+                payload_data["material_type"] = mat.material_type or f"SKU #{mat.id}"
+
         self.repo.add_activity_log(
             program_request_id=item.id,
             actor_name=actor_name,
             actor_department=actor_dept,
             action="NOTE_POSTED",
-            payload={"note": trimmed_note},
+            payload=payload_data,
             actor_id=actor_id,
         )
 

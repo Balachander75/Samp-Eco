@@ -178,20 +178,23 @@ export async function createProgramRequestApi(
 
 export async function addProgramNoteApi(
   requestId: number | string,
-  note: string
+  note: string,
+  materialId?: number | string
 ): Promise<ProgramRequestRecord> {
   const cleanId = String(requestId).replace(/^program-/, "");
   const data = await apiFetch<Record<string, unknown>>(
     `/api/v1/program-requests/${cleanId}/notes`,
     {
       method: "POST",
-      jsonBody: { note },
+      jsonBody: { note, material_id: materialId != null ? Number(materialId) : null },
     }
   );
+  const record = mapProgramResponse(data);
+  dispatchProgramRequestChanged(record);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("samp:requests-changed"));
   }
-  return mapProgramResponse(data);
+  return record;
 }
 
 export async function updateSingleMaterialSampRemarkApi(

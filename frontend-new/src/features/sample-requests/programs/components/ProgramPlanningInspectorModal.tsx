@@ -263,7 +263,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
         className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 1. TOP CONTROL PANEL WITH STEPPER */}
+        {/* 1. TOP CONTROL PANEL */}
         <ProgramPlanningControlPanel
           activeRequest={activeRequest}
           copiedCode={copiedCode}
@@ -274,159 +274,169 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
           canPause={canPause}
           isTogglingPause={isTogglingPause}
           onTogglePause={handleTogglePause}
+          mode={mode}
         />
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG CHATTER) */}
         <div className="flex-1 flex overflow-hidden">
-          {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
-            <div className="max-w-4xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
-              {/* Dossier Header */}
-              <ProgramPlanningSheetHeader
-                activeRequest={activeRequest}
-              />
+          {/* LEFT: WORKSPACE CANVAS */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-[var(--bg-app)]">
+            {/* Dual Sign-Off Executive Snapshot */}
+            <ProgramPlanningSheetHeader
+              activeRequest={activeRequest}
+              mode={mode}
+              onNavigateToTab={(tab) => setActiveTab(tab)}
+              onClaimTask={handleClaimTask}
+              isClaiming={isClaiming}
+              currentUser={effectiveUser}
+              isAdmin={effectiveUser?.role?.toLowerCase() === "admin"}
+            />
 
-              {/* Notebook Tab Strip matching Feasibility Inspector */}
-              <div className="px-6 sm:px-8 pb-6 pt-3">
-                <div className="border-b border-[var(--border-subtle)] flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
-                  {/* Tab 1: Material Matrix */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("matrix")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                      activeTab === "matrix"
-                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  >
-                    <span>1. Material Allocation Matrix</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
-                      {materials.length} SKUs
-                    </span>
-                  </button>
+            {/* Sleek Minimalist Tab Strip */}
+            <div className="border-b border-[var(--border-subtle)] flex items-center space-x-6 text-xs font-semibold overflow-x-auto pt-1">
+              {/* Tab 1: Substrate Matrix */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("matrix")}
+                className={`pb-2.5 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                  activeTab === "matrix"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                }`}
+              >
+                <span>1. Substrate Matrix</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                  {materials.length} SKUs
+                </span>
+              </button>
 
-                  {/* Tab 2: SAMP Technical Review */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("samp")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                      activeTab === "samp"
-                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  >
-                    <span>2. SAMP Technical Review</span>
-                    {hasSampNote ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                        ✓ Reviewed
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
-                        {activeRequest.samplingSeenAt ? "In Review" : "Awaiting Review"}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Tab 3: Plant Feasibility */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("plant")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                      activeTab === "plant"
-                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  >
-                    <span>3. Plant Feasibility &amp; Capacity</span>
-                    {hasPlantNote ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
-                        ✓ Confirmed
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
-                        {activeRequest.plantSeenAt ? "In Review" : "Awaiting"}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Tab 4: Marketing Review & Pinning */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("marketing")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                      activeTab === "marketing"
-                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  >
-                    <span>4. Marketing Review &amp; Directives</span>
-                    {pinnedCount > 0 ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--border-subtle)]">
-                        {pinnedCount} Pinned
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
-                        {hasSampNote || hasPlantNote ? "Ready" : "Overview"}
-                      </span>
-                    )}
-                  </button>
-                </div>
-
-                {/* Tab 1 Content: Material Allocation Matrix */}
-                {activeTab === "matrix" && (
-                  <ProgramPlanningMaterialMatrixTab
-                    activeRequest={activeRequest}
-                    mode={mode}
-                    readOnly={readOnly}
-                    onNavigateToTab={(tab) => setActiveTab(tab)}
-                    onAddMaterial={handleAddMaterial}
-                    onPromoteSku={canPromote ? handlePromoteSku : undefined}
-                  />
+              {/* Tab 2: SAMP Technical Review */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("samp")}
+                className={`pb-2.5 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                  activeTab === "samp"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                }`}
+              >
+                <span>2. SAMP Review Details</span>
+                {hasSampNote ? (
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                    ✓ Reviewed
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                    {activeRequest.samplingSeenAt ? "In Review" : "Awaiting Review"}
+                  </span>
                 )}
+              </button>
 
-                {/* Tab 2 Content: SAMP Technical Review */}
-                {activeTab === "samp" && (
-                  <ProgramPlanningSampReviewTab
-                    activeRequest={activeRequest}
-                    mode={mode}
-                    readOnly={readOnly}
-                    onSaveOutput={handleSaveOutput}
-                    onRefreshData={handleRefreshData}
-                    onClaimTask={handleClaimTask}
-                    isClaiming={isClaiming}
-                    currentUser={effectiveUser}
-                  />
+              {/* Tab 3: Plant Feasibility */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("plant")}
+                className={`pb-2.5 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                  activeTab === "plant"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                }`}
+              >
+                <span>3. Plant Capacity Details</span>
+                {hasPlantNote ? (
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20">
+                    ✓ Confirmed
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                    {activeRequest.plantSeenAt ? "In Review" : "Awaiting"}
+                  </span>
                 )}
+              </button>
 
-                {/* Tab 3 Content: Plant Feasibility & Capacity */}
-                {activeTab === "plant" && (
-                  <ProgramPlanningPlantReviewTab
-                    activeRequest={activeRequest}
-                    mode={mode}
-                    readOnly={readOnly}
-                    onSaveOutput={handleSaveOutput}
-                    onClaimTask={handleClaimTask}
-                    isClaiming={isClaiming}
-                    currentUser={effectiveUser}
-                  />
+              {/* Tab 4: Marketing Directives */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("marketing")}
+                className={`pb-2.5 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                  activeTab === "marketing"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                }`}
+              >
+                <span>4. Executive Directives</span>
+                {pinnedCount > 0 ? (
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/20">
+                    {pinnedCount} Pinned
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                    {hasSampNote || hasPlantNote ? "Ready" : "Overview"}
+                  </span>
                 )}
-
-                {/* Tab 4 Content: Marketing Review & Directives */}
-                {activeTab === "marketing" && (
-                  <ProgramPlanningMarketingTab
-                    activeRequest={activeRequest}
-                    mode={mode}
-                    readOnly={readOnly}
-                    onPinActivity={handlePinActivity}
-                    onReplyActivity={handleReplyActivity}
-                  />
-                )}
-              </div>
+              </button>
             </div>
+
+            {/* Tab 1 Content: Material Allocation Matrix */}
+            {activeTab === "matrix" && (
+              <ProgramPlanningMaterialMatrixTab
+                activeRequest={activeRequest}
+                mode={mode}
+                readOnly={readOnly}
+                onNavigateToTab={(tab) => setActiveTab(tab)}
+                onAddMaterial={handleAddMaterial}
+                onPromoteSku={canPromote ? handlePromoteSku : undefined}
+                onRefreshData={handleRefreshData}
+                onClaimTask={handleClaimTask}
+                isClaiming={isClaiming}
+                currentUser={effectiveUser}
+              />
+            )}
+
+            {/* Tab 2 Content: SAMP Technical Review */}
+            {activeTab === "samp" && (
+              <ProgramPlanningSampReviewTab
+                activeRequest={activeRequest}
+                mode={mode}
+                readOnly={readOnly}
+                onSaveOutput={handleSaveOutput}
+                onRefreshData={handleRefreshData}
+                onClaimTask={handleClaimTask}
+                isClaiming={isClaiming}
+                currentUser={effectiveUser}
+              />
+            )}
+
+            {/* Tab 3 Content: Plant Feasibility & Capacity */}
+            {activeTab === "plant" && (
+              <ProgramPlanningPlantReviewTab
+                activeRequest={activeRequest}
+                mode={mode}
+                readOnly={readOnly}
+                onSaveOutput={handleSaveOutput}
+                onClaimTask={handleClaimTask}
+                isClaiming={isClaiming}
+                currentUser={effectiveUser}
+              />
+            )}
+
+            {/* Tab 4 Content: Marketing Review & Directives */}
+            {activeTab === "marketing" && (
+              <ProgramPlanningMarketingTab
+                activeRequest={activeRequest}
+                mode={mode}
+                readOnly={readOnly}
+                onPinActivity={handlePinActivity}
+                onReplyActivity={handleReplyActivity}
+              />
+            )}
           </div>
 
           {/* RIGHT: TIME LOG CHATTER FEED PANEL */}
-          <ProgramPlanningChatterFeed activeRequest={activeRequest} />
+          <ProgramPlanningChatterFeed
+            activeRequest={activeRequest}
+            onNoteAdded={handleRefreshData}
+          />
         </div>
       </div>
     </div>,

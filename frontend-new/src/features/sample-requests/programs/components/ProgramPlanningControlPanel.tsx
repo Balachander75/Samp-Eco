@@ -1,6 +1,6 @@
 import React from "react";
 import { SampleRequestItem } from "../../types";
-import { Copy, Check, Trash2, X, ChevronRight, CheckCircle2, Pause, Play, Loader2 } from "lucide-react";
+import { Copy, Check, Trash2, X, Pause, Play, Loader2 } from "lucide-react";
 
 export interface ProgramPlanningControlPanelProps {
   activeRequest: SampleRequestItem;
@@ -12,6 +12,7 @@ export interface ProgramPlanningControlPanelProps {
   canPause?: boolean;
   isTogglingPause?: boolean;
   onTogglePause?: () => void;
+  mode?: "marketing" | "sampling" | "plant";
 }
 
 export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelProps> = ({
@@ -24,89 +25,103 @@ export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelPr
   canPause = false,
   isTogglingPause = false,
   onTogglePause,
+  mode = "marketing",
 }) => {
-  const hasSampNote = Boolean(activeRequest.samplingRemark?.trim());
-  const hasPlantNote = Boolean(activeRequest.plantRemark?.trim());
+  const code =
+    activeRequest.requestCode ||
+    activeRequest.materialCode ||
+    (activeRequest.id ? `PP-${activeRequest.id}` : "");
 
-  const steps = [
-    {
-      label: "1. Campaign Plan",
-      status: "done" as const,
-    },
-    {
-      label: "2. SAMP Review",
-      status: hasSampNote
-        ? ("done" as const)
-        : ("active" as const),
-      badge: hasSampNote ? "Reviewed" : "Awaiting",
-    },
-    {
-      label: "3. Plant Feasibility",
-      status: hasPlantNote
-        ? ("done" as const)
-        : hasSampNote
-        ? ("active" as const)
-        : ("pending" as const),
-      badge: hasPlantNote ? "Confirmed" : "Awaiting",
-    },
-    {
-      label: "4. Production Ready",
-      status: hasSampNote && hasPlantNote
-        ? ("done" as const)
-        : hasSampNote || hasPlantNote
-        ? ("active" as const)
-        : ("pending" as const),
-    },
-  ];
+  const isPaused = activeRequest.isActive === false;
 
   return (
-    <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
-      {/* Left Action Buttons */}
-      <div className="flex items-center space-x-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-4 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-2xs transition-colors cursor-pointer"
-        >
-          <span>Close Inspector</span>
-        </button>
-
-        <div className="h-4 w-px bg-[var(--border-subtle)] mx-1" />
-
+    <header className="px-5 sm:px-6 py-3.5 bg-[var(--surface-base)] border-b border-[var(--border-subtle)] flex items-center justify-between gap-4 shrink-0 shadow-2xs select-text">
+      {/* ── Left: Request ID, Title, Customer & Status ── */}
+      <div className="flex items-center gap-3 min-w-0">
         <button
           type="button"
           onClick={onCopyCode}
-          className="text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] font-medium px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition"
-          title="Copy program code"
+          className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/20 hover:border-[var(--accent-primary)] transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+          title="Click to copy program code"
         >
+          <span>{code}</span>
           {copiedCode ? (
-            <Check className="w-3.5 h-3.5 text-emerald-600" />
+            <Check className="w-3 h-3 text-emerald-500" />
           ) : (
-            <Copy className="w-3.5 h-3.5 text-[var(--on-surface-subtle)]" />
+            <Copy className="w-3 h-3 opacity-60" />
           )}
-          <span>{copiedCode ? "Copied" : "Copy Code"}</span>
         </button>
+
+        <div className="h-4 w-px bg-[var(--border-subtle)] hidden sm:block shrink-0" />
+
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xs sm:text-sm md:text-base font-bold text-[var(--on-surface)] truncate font-display">
+              {activeRequest.programName || activeRequest.programCampaignTitle || "Annual Program Plan"}
+            </h1>
+            <span
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-semibold shrink-0 ${
+                isPaused
+                  ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                  : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isPaused ? "bg-amber-500" : "bg-emerald-500"
+                }`}
+              />
+              <span>{isPaused ? "Paused" : "Active"}</span>
+            </span>
+          </div>
+          <p className="text-[11px] text-[var(--on-surface-muted)] font-medium truncate flex items-center gap-1.5 mt-0.5">
+            <span className="font-semibold text-[var(--on-surface)]">
+              {activeRequest.customer || "General Enterprise"}
+            </span>
+            <span>·</span>
+            <span>FY {activeRequest.programYear || "2026-2027"}</span>
+            <span>·</span>
+            <span className="font-semibold text-[var(--on-surface)]">
+              Plant {activeRequest.targetPlant || "1505"}
+            </span>
+            {activeRequest.createdBy && (
+              <>
+                <span className="hidden md:inline">·</span>
+                <span className="hidden md:inline text-[var(--on-surface-subtle)] font-mono text-[10.5px]">
+                  By {activeRequest.createdBy}
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Right: Role indicator & Action buttons ── */}
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold font-mono bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
+          {mode === "sampling"
+            ? "SAMP Lab Desk"
+            : mode === "plant"
+            ? `Plant ${activeRequest.targetPlant || "1505"}`
+            : "Marketing Desk"}
+        </span>
 
         {canPause && onTogglePause && (
           <button
             type="button"
             onClick={onTogglePause}
             disabled={isTogglingPause}
-            className={`font-semibold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition border disabled:opacity-60 disabled:cursor-not-allowed ${
-              activeRequest.isActive === false
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60 hover:bg-emerald-100"
-                : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60 hover:bg-amber-100"
-            }`}
-            title={activeRequest.isActive === false ? "Resume Program Plan" : "Pause Program Plan"}
+            className="h-8 px-3 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-low)] text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] text-xs font-medium transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+            title={isPaused ? "Resume program execution" : "Pause program plan"}
           >
             {isTogglingPause ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : activeRequest.isActive === false ? (
-              <Play className="w-3.5 h-3.5 fill-current" />
+            ) : isPaused ? (
+              <Play className="w-3.5 h-3.5" />
             ) : (
-              <Pause className="w-3.5 h-3.5 fill-current" />
+              <Pause className="w-3.5 h-3.5" />
             )}
-            <span>{activeRequest.isActive === false ? "Resume Program" : "Pause Program"}</span>
+            <span className="hidden md:inline">{isPaused ? "Resume" : "Pause"}</span>
           </button>
         )}
 
@@ -114,57 +129,23 @@ export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelPr
           <button
             type="button"
             onClick={() => onDeleteRequest(activeRequest)}
-            className="text-[var(--on-surface-subtle)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-medium px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition"
-            title="Delete this program planning request"
+            className="h-8 w-8 rounded-xl border border-[var(--border-subtle)] hover:bg-rose-500/10 hover:border-rose-500/30 text-[var(--on-surface-subtle)] hover:text-rose-500 flex items-center justify-center transition cursor-pointer"
+            title="Delete Program Plan"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete</span>
           </button>
         )}
-      </div>
 
-      {/* Right: Modern Workflow Stepper */}
-      <div className="flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-1.5 p-1 bg-[var(--surface-low)] rounded-xl border border-[var(--border-subtle)]">
-          {steps.map((st, i) => (
-            <React.Fragment key={i}>
-              <div
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-sans transition-all select-none ${
-                  st.status === "done"
-                    ? "bg-[var(--surface-lowest)] text-[var(--accent-primary)] font-bold shadow-2xs"
-                    : st.status === "active"
-                    ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs border border-[var(--accent-primary)]"
-                    : "text-[var(--on-surface-subtle)] font-medium"
-                }`}
-              >
-                {st.status === "done" ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-                ) : st.status === "active" ? (
-                  <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)]" />
-                ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--border-strong)]" />
-                )}
-                <span>{st.label}</span>
-              </div>
-              {i < steps.length - 1 && (
-                <ChevronRight className="w-3 h-3 text-[var(--border-strong)] shrink-0" />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-
-        {/* Modal Close [X] */}
         <button
           type="button"
           onClick={onClose}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition cursor-pointer"
-          title="Close (Esc)"
-          aria-label="Close inspector modal"
+          className="h-8 w-8 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-low)] text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] flex items-center justify-center transition cursor-pointer"
+          title="Close Inspector (Esc)"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
-    </div>
+    </header>
   );
 };
 
