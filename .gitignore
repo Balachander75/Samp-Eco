@@ -41,6 +41,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # Vite & Bundler Cache
 .vite/

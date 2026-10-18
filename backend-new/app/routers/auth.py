@@ -4,7 +4,7 @@ Handles /api/auth/login, /api/auth/refresh, /api/auth/logout, /api/auth/me,
 and /api/auth/audit-logs with full production-level JWT auth, sliding-window
 brute-force rate limiting, refresh token rotation, and security telemetry.
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from sqlalchemy import func
@@ -86,12 +86,12 @@ class LoginResponse(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    refresh_token: str = Field(..., description="Active refresh token")
+    refresh_token: Optional[str] = Field(None, description="Active refresh token (optional when provided via HttpOnly cookie)")
 
 
 class RefreshTokenResponse(BaseModel):
     access_token: str
-    refresh_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     expires_in: int
     user: UserOut
@@ -232,6 +232,26 @@ def _record_audit(
         db.rollback()
 
 
+def _set_refresh_cookie(response: Response, token: str):
+    is_prod = settings.APP_ENV.strip().lower() in ("production", "prod")
+    response.set_cookie(
+        key="refresh_token",
+        value=token,
+        httponly=True,
+        secure=is_prod,
+        samesite="lax",
+        path="/api/auth",
+        max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+    )
+
+
+def _clear_refresh_cookie(response: Response):
+    response.delete_cookie(
+        key="refresh_token",
+        path="/api/auth",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -247,7 +267,7 @@ def _record_audit(
     },
     summary="Sign in to the Navneet SAMP Enterprise Portal",
 )
-def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
+def login(request: Request, response: Response, payload: LoginRequest, db: Session = Depends(get_db)):
     identifier = _resolve_identifier(payload)
     client_ip = _get_client_ip(request)
     user_agent = request.headers.get("user-agent", "unknown")
@@ -382,6 +402,10 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
     )
 
     refresh_token = create_refresh_token(user.id, db) if payload.remember_me else None
+    if refresh_token:
+        _set_refresh_cookie(response, refresh_token)
+    else:
+        _clear_refresh_cookie(response)
 
     return {
         "access_token": access_token,
@@ -397,8 +421,26 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
     response_model=RefreshTokenResponse,
     summary="Rotate refresh token and issue fresh access token",
 )
-def refresh(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
-    user, new_refresh_token = rotate_refresh_token(payload.refresh_token, db)
+def refresh(
+    request: Request,
+    response: Response,
+    payload: Optional[RefreshTokenRequest] = None,
+    db: Session = Depends(get_db),
+):
+    raw_token = (payload.refresh_token if payload and payload.refresh_token else None) or request.cookies.get("refresh_token")
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "success": False,
+                "error": {
+                    "code": "MISSING_REFRESH_TOKEN",
+                    "message": "No refresh token provided in request or cookie.",
+                },
+            },
+        )
+    user, new_refresh_token = rotate_refresh_token(raw_token, db)
+    _set_refresh_cookie(response, new_refresh_token)
     new_access_token = create_access_token(
         subject=user.id,
         role=user.role,
@@ -418,9 +460,16 @@ def refresh(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     "/logout",
     summary="Explicitly revoke session refresh token",
 )
-def logout(payload: LogoutRequest, db: Session = Depends(get_db)):
-    if payload.refresh_token:
-        revoke_refresh_token(payload.refresh_token, db)
+def logout(
+    request: Request,
+    response: Response,
+    payload: Optional[LogoutRequest] = None,
+    db: Session = Depends(get_db),
+):
+    raw_token = (payload.refresh_token if payload and payload.refresh_token else None) or request.cookies.get("refresh_token")
+    if raw_token:
+        revoke_refresh_token(raw_token, db)
+    _clear_refresh_cookie(response)
     return {"success": True, "message": "Session terminated successfully."}
 
 

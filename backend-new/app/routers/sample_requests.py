@@ -441,7 +441,7 @@ def list_plant_sampling_queue(
     current_user=Depends(get_current_user),
 ):
     require_team(current_user, "plant")
-    return service.list_requests(
+    records = service.list_requests(
         year=year,
         status="Released to Plant",
         request_type="sample",

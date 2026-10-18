@@ -1,7 +1,8 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import { SampleRequestItem, FeasibilityActivityItem } from "../../types";
 import { formatOdooLogDate } from "../../utils/dateUtils";
 import { UserProfile } from "@/features/auth";
+import { Send, Loader2 } from "lucide-react";
 
 export interface FeasibilityChatterFeedProps {
   activeRequest: SampleRequestItem;
@@ -53,8 +54,33 @@ function formatTimeOnly(dateInput?: string | Date | null): string {
 export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
   activeRequest,
   classificationLabel,
+  onAddNote,
+  currentUser: _currentUser,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleSubmitNote = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = noteText.trim();
+    if (!clean || !onAddNote || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await onAddNote(clean);
+      setNoteText("");
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    } catch (err: any) {
+      setSubmitError(err?.message || "Failed to post note.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Compile chronological timeline events
   const chatEvents = useMemo<ChatLogEvent[]>(() => {
@@ -467,6 +493,42 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* ── 3. Chatter Note Input Bar ── */}
+      {onAddNote && (
+        <form
+          onSubmit={handleSubmitNote}
+          className="p-3 border-t border-[var(--border-subtle)] bg-[var(--surface-lowest)] shrink-0"
+        >
+          {submitError && (
+            <p className="mb-2 text-[11px] font-medium text-rose-600 dark:text-rose-400">
+              {submitError}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Add an operational note or update..."
+              disabled={isSubmitting}
+              className="flex-1 px-3 py-2 rounded-xl text-xs bg-[var(--surface-base)] border border-[var(--border-subtle)] text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] transition disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={!noteText.trim() || isSubmitting}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white shadow-2xs transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
+              title="Post Note"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 };

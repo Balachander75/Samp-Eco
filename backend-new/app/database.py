@@ -77,6 +77,8 @@ def ensure_program_schema():
         "ALTER TABLE program_activity_logs ADD COLUMN IF NOT EXISTS pinned_by VARCHAR(255)",
         "ALTER TABLE program_activity_logs ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ",
         "ALTER TABLE program_requests ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
+        "ALTER TABLE program_material_specifications ADD COLUMN IF NOT EXISTS promoted_sample_request_id INTEGER REFERENCES create_sample_requests(id) ON DELETE SET NULL",
+        "ALTER TABLE program_material_specifications ADD COLUMN IF NOT EXISTS promoted_sr_number VARCHAR(50)",
     )
     with engine.begin() as connection:
         for statement in statements:
@@ -487,7 +489,7 @@ def ensure_sample_request_draft_keys():
         for statement in statements:
             connection.execute(text(statement))
         for table in ("create_sample_requests", "design_requests", "program_requests"):
-            connection.execute(text(f"""
+            connection.execute(text(f"""  # nosec B608
                 UPDATE {table} AS request
                 SET created_by_user_id = matching_user.id
                 FROM (

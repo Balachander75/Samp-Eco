@@ -1,6 +1,6 @@
 """API endpoints for Seasonal Program Planning and Material Specification Matrix."""
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.schemas.program_request import (
     ProgramOutputSubmit,
     ProgramClaimSubmit,
     ProgramPauseSubmit,
+    ProgramPromoteSkuPayload,
     ProgramRequestCreate,
     ProgramRequestOut,
     ProgramRequestUpdate,
@@ -39,7 +40,10 @@ def _require_marketing_request_owner(request_id: int, service: ProgramRequestSer
     if not user_has_team(current_user, "marketing") or is_admin(current_user) or is_team_head(current_user):
         return
     item = service.get_by_id(request_id)
-    if not item or item.get("created_by_user_id") != current_user.id:
+    if not item:
+        raise HTTPException(status_code=404, detail="Program planning request was not found")
+    creator_id = item.get("created_by_user_id")
+    if creator_id is not None and creator_id != current_user.id:
         raise HTTPException(status_code=404, detail="Program planning request was not found")
 
 
@@ -47,7 +51,8 @@ def _require_program_request_visibility(request_id: int, service: ProgramRequest
     item = service.get_by_id(request_id)
     if not item:
         raise HTTPException(status_code=404, detail="Program planning request was not found")
-    if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user) and item.get("created_by_user_id") != current_user.id:
+    creator_id = item.get("created_by_user_id")
+    if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user) and creator_id is not None and creator_id != current_user.id:
         raise HTTPException(status_code=404, detail="Program planning request was not found")
     if user_has_team(current_user, "samp") and not is_admin(current_user) and not is_team_head(current_user) and item.get("sampling_claimed_by_user_id") not in (None, current_user.id):
         raise HTTPException(status_code=404, detail="Program planning request was not found")
@@ -243,6 +248,25 @@ def delete_program_material(
     if not item:
         raise HTTPException(status_code=404, detail="Program request or material row was not found")
     return item
+
+
+@router.post(
+    "/{request_id}/materials/{material_id}/promote-to-sampling",
+    response_model=Dict[str, Any],
+    summary="Promote a Program SKU into a commercial Sample Request",
+)
+def promote_program_material_to_sampling(
+    request_id: int,
+    material_id: int,
+    payload: Optional[ProgramPromoteSkuPayload] = None,
+    service: ProgramRequestService = Depends(get_program_service),
+    current_user=Depends(get_current_user),
+):
+    """Promote a specific matrix SKU row into an active commercial Sample Request."""
+    require_any_team(current_user, ("marketing", "admin"))
+    _require_marketing_request_owner(request_id, service, current_user)
+    types = payload.request_types if payload and payload.request_types else ["sample"]
+    return service.promote_sku_to_sampling(request_id, material_id, request_types=types, current_user=current_user)
 
 
 @router.post("/{request_id}/outputs", response_model=ProgramRequestOut)

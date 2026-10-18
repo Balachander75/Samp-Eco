@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: samp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: samp_enterprise_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d samp_enterprise_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend-new
+      dockerfile: Dockerfile
+    container_name: samp-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/samp_enterprise_db
+      APP_ENV: production
+      DEBUG: "false"
+      PORT: 8002
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-navneet-samp-erp-production-secret-key-at-least-32-chars}
+      ALLOWED_HOSTS: '["*"]'
+      CORS_ORIGINS: '[]'
+      AUTO_SCHEMA_MIGRATION: "true"
+    ports:
+      - "8002:8002"
+
+  frontend:
+    build:
+      context: ./frontend-new
+      dockerfile: Dockerfile
+    container_name: samp-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:

@@ -1,0 +1,32 @@
+# Git and system files
+.git
+.gitignore
+.dockerignore
+.DS_Store
+
+# Environments and secrets
+.env
+.env.*
+
+# Python caches and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing and linting artifacts
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Legacy and scratch files
+legacy_archive/
+*.log

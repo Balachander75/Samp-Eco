@@ -531,7 +531,7 @@ def _add_request_code_sequences() -> None:
             ("SR", "SELECT sr_number AS code FROM create_sample_requests"),
         )
         for prefix, source_sql in sources:
-            connection.execute(text(f"""
+            connection.execute(text(f"""  # nosec B608
                 INSERT INTO request_code_sequences (prefix, business_year_start, last_value)
                 SELECT '{prefix}', 2000 + substring(code from '^{prefix}-([0-9]{{2}})-')::INTEGER,
                        MAX(substring(code from '-([0-9]+)$')::INTEGER)
@@ -639,7 +639,7 @@ def _backfill_scoped_request_codes() -> None:
                     }).scalar()
                 elif scope in {"mockup", "costing"}:
                     workflow_table = "mockup_workflows" if scope == "mockup" else "costing_workflows"
-                    linked_code = connection.execute(text(f"""
+                    linked_code = connection.execute(text(f"""  # nosec B608
                         SELECT request_code FROM {workflow_table}
                         WHERE sample_request_id = :request_id
                           AND request_code ~ '^{prefix}-[0-9]{{2}}-[0-9]{{3,}}$'

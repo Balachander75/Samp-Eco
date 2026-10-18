@@ -20,6 +20,7 @@ export interface ProgramPlanningMaterialMatrixTabProps {
   readOnly?: boolean;
   onNavigateToTab?: (tab: "samp" | "plant" | "marketing") => void;
   onAddMaterial?: (payload: AddProgramMaterialPayload) => Promise<void>;
+  onPromoteSku?: (materialId: number | string) => Promise<void>;
 }
 
 export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialMatrixTabProps> = ({
@@ -27,6 +28,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
   mode = "marketing",
   readOnly = false,
   onAddMaterial,
+  onPromoteSku,
 }) => {
   const materials = activeRequest.programMaterials || [];
   const skuCount = materials.length;
@@ -36,6 +38,21 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState(false);
+  const [promotingId, setPromotingId] = useState<string | number | null>(null);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
+
+  const handlePromoteClick = async (matId: number | string) => {
+    if (!onPromoteSku || promotingId !== null) return;
+    setPromoteError(null);
+    setPromotingId(matId);
+    try {
+      await onPromoteSku(matId);
+    } catch (err: any) {
+      setPromoteError(err?.message || "Failed to promote SKU to sample request.");
+    } finally {
+      setPromotingId(null);
+    }
+  };
 
   const [draftMaterial, setDraftMaterial] = useState<AddProgramMaterialPayload>({
     material_type: "",
@@ -101,6 +118,20 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
 
   return (
     <div className="py-4 space-y-4 select-text">
+      {promoteError && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-medium">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="flex-1">{promoteError}</span>
+          <button
+            type="button"
+            onClick={() => setPromoteError(null)}
+            className="p-1 hover:opacity-75 transition cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* ── Material Specification Matrix Table ── */}
       <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-2xs">
         {/* Table Header Bar */}
@@ -153,6 +184,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                   <th className="px-3.5 py-3 min-w-[130px]">Color / Finish</th>
                   <th className="px-3.5 py-3 min-w-[180px]">Marketing Directive</th>
                   <th className="px-3.5 py-3 min-w-[180px]">SAMP Review</th>
+                  <th className="px-3.5 py-3 min-w-[160px] text-center">Sampling Promotion</th>
                   <th className="px-3.5 py-3 min-w-[120px] text-center">Added Date</th>
                 </tr>
               </thead>
@@ -231,6 +263,43 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                         <span className="inline-flex items-center gap-1 text-[10.5px] font-mono text-[var(--on-surface-subtle)]">
                           <Clock className="w-3 h-3 text-[var(--on-surface-subtle)]" />
                           <span>Pending review</span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Sampling Promotion */}
+                    <td className="px-3.5 py-3 text-center">
+                      {mat.promotedSrNumber ? (
+                        <div
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                          title={`Promoted to commercial sample request ${mat.promotedSrNumber}`}
+                        >
+                          <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>{mat.promotedSrNumber}</span>
+                        </div>
+                      ) : !readOnly && onPromoteSku && mat.id ? (
+                        <button
+                          type="button"
+                          disabled={promotingId !== null}
+                          onClick={() => handlePromoteClick(mat.id!)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white border border-[var(--accent-primary)]/20 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Promote this SKU specification to a commercial Sample Request"
+                        >
+                          {promotingId === mat.id ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Promoting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <PackagePlus className="w-3.5 h-3.5" />
+                              <span>Promote to Sample</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-[var(--on-surface-subtle)] font-mono text-[11px]">
+                          Planned
                         </span>
                       )}
                     </td>

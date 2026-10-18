@@ -1,0 +1,24 @@
+# Git and system files
+.git
+.gitignore
+.dockerignore
+.DS_Store
+
+# Environments and secrets
+.env
+.env.*
+.env.local
+
+# Dependencies and build outputs
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Test and lint artifacts
+coverage/
+src/__tests__/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

@@ -24,6 +24,8 @@ export function mapProgramMaterial(item: Record<string, unknown>): ProgramMateri
     unit: typeof item.unit === "string" && item.unit ? item.unit : undefined,
     remark: typeof item.remark === "string" ? item.remark : undefined,
     sampRemark: typeof item.samp_remark === "string" ? item.samp_remark : undefined,
+    promotedSampleRequestId: item.promoted_sample_request_id != null ? Number(item.promoted_sample_request_id) : undefined,
+    promotedSrNumber: typeof item.promoted_sr_number === "string" ? item.promoted_sr_number : undefined,
     createdAt: typeof item.created_at === "string" ? item.created_at : undefined,
     updatedAt: typeof item.updated_at === "string" ? item.updated_at : undefined,
   };
@@ -392,5 +394,36 @@ export async function pauseProgramRequestApi(
   const record = mapProgramResponse(data);
   dispatchProgramRequestChanged(record);
   return record;
+}
+
+export async function promoteProgramSkuApi(
+  requestId: number | string,
+  materialId: number | string,
+  requestTypes: string[] = ["sample"]
+): Promise<{
+  program: ProgramRequestRecord;
+  sampleRequestId: number;
+  sampleSrNumber: string;
+  alreadyPromoted?: boolean;
+}> {
+  const cleanId = String(requestId).replace(/^program-/, "");
+  const data = await apiFetch<Record<string, unknown>>(
+    `/api/v1/program-requests/${cleanId}/materials/${materialId}/promote-to-sampling`,
+    {
+      method: "POST",
+      jsonBody: { request_types: requestTypes },
+    }
+  );
+  const record = mapProgramResponse(data.program as Record<string, unknown>);
+  dispatchProgramRequestChanged(record);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  }
+  return {
+    program: record,
+    sampleRequestId: Number(data.sample_request_id),
+    sampleSrNumber: String(data.sample_sr_number || ""),
+    alreadyPromoted: Boolean(data.already_promoted),
+  };
 }
 

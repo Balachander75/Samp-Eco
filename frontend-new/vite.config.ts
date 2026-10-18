@@ -32,6 +32,11 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/__tests__/setup.ts'],
+  },
   esbuild: {
     drop: mode === 'production' ? ['debugger'] : [],
   },

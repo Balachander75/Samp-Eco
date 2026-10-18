@@ -104,6 +104,8 @@ class ProgramRequestService:
                     "unit": m.unit,
                     "remark": m.remark,
                     "samp_remark": m.samp_remark,
+                    "promoted_sample_request_id": getattr(m, "promoted_sample_request_id", None),
+                    "promoted_sr_number": getattr(m, "promoted_sr_number", None),
                     "created_at": m.created_at,
                     "updated_at": m.updated_at,
                 }
@@ -485,6 +487,8 @@ class ProgramRequestService:
             item.sampling_signed_by = actor_name
             item.sampling_seen_at = item.sampling_seen_at or now
             item.sampling_seen_by = item.sampling_seen_by or actor_name
+            if not item.sampling_verdict:
+                item.sampling_verdict = "Feasible"
             action = "SAMP_OUTPUT"
             actor_department = "SAMP Team"
         else:
@@ -494,19 +498,36 @@ class ProgramRequestService:
             item.plant_signed_by = actor_name
             item.plant_seen_at = item.plant_seen_at or now
             item.plant_seen_by = item.plant_seen_by or actor_name
+            if not item.plant_verdict:
+                item.plant_verdict = "Capacity Confirmed"
             action = "PLANT_OUTPUT"
             actor_department = f"Plant ({item.target_plant})"
+
+        item.status = self._compute_status(item)
 
         self.repo.add_activity_log(
             program_request_id=item.id,
             actor_name=actor_name,
             actor_department=actor_department,
             action=action,
-            payload={"remark": trimmed_remark},
+            payload={"remark": trimmed_remark, "status": item.status},
             actor_id=actor_id,
         )
+        self.db.commit()
         self.db.refresh(item)
         return self.serialize(item)
+
+    @staticmethod
+    def _compute_status(item: ProgramRequest) -> str:
+        has_samp = bool((item.sampling_remark or "").strip())
+        has_plant = bool((item.plant_remark or "").strip())
+        if has_samp and has_plant:
+            return "Dual Sign-Off Completed"
+        elif has_samp:
+            return "Pending Plant Review"
+        elif has_plant:
+            return "Pending SAMP Review"
+        return "Pending SAMP Review"
 
     def claim_task(
         self,
@@ -744,3 +765,121 @@ class ProgramRequestService:
         self.db.delete(item)
         self.db.commit()
         return True
+
+    def promote_sku_to_sampling(
+        self,
+        request_id: int,
+        material_id: int,
+        request_types: Optional[List[str]] = None,
+        current_user: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Promote a specific matrix SKU into an active commercial Sample Request."""
+        item = self.repo.get_for_update(request_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Program planning request was not found")
+
+        mat = next((m for m in item.materials if m.id == material_id), None)
+        if not mat:
+            raise HTTPException(status_code=404, detail="Material specification row was not found")
+
+        from app.models.sample_request import CreateSampleRequest
+        from app.services.sample_request_service import SampleRequestService
+
+        selected = {
+            str(v).strip().lower() for v in (request_types or ["sample"]) if str(v).strip()
+        }
+        selected_types = [v for v in ("sample", "costing") if v in selected] or ["sample"]
+
+        # Check if already promoted and linked request exists
+        if getattr(mat, "promoted_sample_request_id", None):
+            linked = self.db.query(CreateSampleRequest).filter(
+                CreateSampleRequest.id == mat.promoted_sample_request_id
+            ).first()
+            if linked:
+                sr_num = linked.sr_number or (linked.request_codes or {}).get("sample") or f"SR-{linked.id}"
+                return {
+                    "program": self.serialize(item),
+                    "sample_request_id": linked.id,
+                    "sample_sr_number": sr_num,
+                    "already_promoted": True,
+                }
+
+        actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
+        sample_service = SampleRequestService(self.db)
+
+        # Format descriptive product description from matrix SKU
+        sku_details = [
+            f"[Seasonal Program: {item.program_campaign_title} | SKU #{mat.id}]",
+            f"Material Type: {mat.material_type or '—'}",
+            f"Planned Volume: {mat.quantity or '1'} {mat.unit or 'pcs'}",
+        ]
+        if mat.grade:
+            sku_details.append(f"Grade: {mat.grade}")
+        if mat.caliper_wt:
+            sku_details.append(f"Caliper/Weight: {mat.caliper_wt}")
+        if mat.supplier_name:
+            sku_details.append(f"Supplier/Mill: {mat.supplier_name}")
+        if mat.color_variant:
+            sku_details.append(f"Color/Finish: {mat.color_variant}")
+        if mat.remark:
+            sku_details.append(f"Marketing Directive: {mat.remark}")
+        if mat.samp_remark:
+            sku_details.append(f"SAMP Lab Review: {mat.samp_remark}")
+        if item.plant_remark:
+            sku_details.append(f"Plant Review: {item.plant_remark}")
+
+        desc = "\n".join(sku_details)
+        today_iso = datetime.now(timezone.utc).date().isoformat()
+        draft_key = f"program-{item.id}-sku-{mat.id}"
+
+        # Create or update commercial sample request (sample_service.create handles draft_key idempotency)
+        converted = sample_service.create({
+            "year": item.program_year or get_current_business_year(),
+            "program_year": item.program_year or get_current_business_year(),
+            "program_name": item.program_campaign_title,
+            "product_description": desc,
+            "customer": item.customer_name,
+            "target_plant": item.target_plant,
+            "date_request_created": today_iso,
+            "created_by": actor_name,
+            "created_by_user_id": actor_id,
+            "material_code": f"MAT-{mat.id}",
+            "source_sample_code": item.request_code,
+            "source_request_code": item.request_code,
+            "qty_for_sampling": str(mat.quantity or "1"),
+            "unit_pc_pack": mat.unit or "pcs",
+            "status": "Draft (Pre-SMT)",
+            "creation_mode": "program_planning",
+            "request_types": selected_types,
+            "client_draft_key": draft_key,
+        }, commit=False)
+
+        converted_id = int(converted["id"])
+        sr_num = converted.get("sr_number") or (converted.get("request_codes") or {}).get("sample") or f"SR-{converted_id}"
+        mat.promoted_sample_request_id = converted_id
+        mat.promoted_sr_number = sr_num
+
+        self.repo.add_activity_log(
+            program_request_id=item.id,
+            actor_name=actor_name,
+            actor_department=actor_dept,
+            action="SKU_PROMOTED_TO_SAMPLE_REQUEST",
+            payload={
+                "material_id": mat.id,
+                "material_type": mat.material_type,
+                "sample_request_id": converted_id,
+                "sr_number": sr_num,
+                "request_types": selected_types,
+            },
+            actor_id=actor_id,
+        )
+
+        self.db.commit()
+        self.db.refresh(item)
+        return {
+            "program": self.serialize(item),
+            "sample_request_id": converted_id,
+            "sample_sr_number": sr_num,
+            "already_promoted": False,
+        }
+

@@ -759,12 +759,29 @@ class FeasibilityService:
             "source_sample_code": req.request_code,
             "sample_required_date": req.required_date.isoformat(),
             "request_types": selected_types,
+            "reference_links": list(req.reference_links or []),
             "status": "Draft (Pre-SMT)",
             "creation_mode": "new",
             "client_draft_key": f"feasibility-conversion-{req.id}",
         }, commit=False)
         generated_sr_num = converted.get("sr_number") or None
         converted_request_id = int(converted["id"])
+
+        # Preserve technical drawings and reference images in commercial request
+        if req.reference_image_records:
+            from app.models.sample_request import SampleRequestReferenceImage
+            for img in req.reference_image_records:
+                for scope in selected_types:
+                    self.db.add(SampleRequestReferenceImage(
+                        sample_request_id=converted_request_id,
+                        scope=scope,
+                        original_name=img.original_name,
+                        content_type=img.content_type,
+                        original_size_bytes=len(img.image_data) if img.image_data else None,
+                        image_data=img.image_data,
+                        sort_order=min(img.sort_order, 1),
+                    ))
+            self.db.flush()
 
         if "costing" in selected_types:
             from app.models.request_workflows import CostingWorkflow, CostingWorkflowLog

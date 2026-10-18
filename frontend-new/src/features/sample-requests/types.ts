@@ -112,6 +112,8 @@ export interface ProgramMaterialItem {
   unit?: string;
   remark?: string;
   sampRemark?: string;
+  promotedSampleRequestId?: number | null;
+  promotedSrNumber?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -15,6 +15,8 @@ class ProgramMaterialBase(BaseModel):
     unit: Optional[str] = None
     remark: Optional[str] = None
     samp_remark: Optional[str] = None
+    promoted_sample_request_id: Optional[int] = None
+    promoted_sr_number: Optional[str] = None
 
 
 class ProgramMaterialCreate(ProgramMaterialBase):
@@ -96,6 +98,15 @@ class ProgramPauseSubmit(BaseModel):
     """Payload to pause or resume a seasonal program plan."""
 
     paused: bool = True
+
+
+class ProgramPromoteSkuPayload(BaseModel):
+    """Payload to promote a matrix SKU into a commercial Sample Request."""
+
+    request_types: Optional[List[str]] = Field(
+        default_factory=lambda: ["sample"],
+        description="Deliverable scopes for the converted request (sample, costing)",
+    )
 
 
 class ProgramNoteCreate(BaseModel):

@@ -123,8 +123,8 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
     if (e) e.preventDefault();
     const trimmed = linkInput.trim();
     if (!trimmed) return;
-    if (webLinks.length >= 1) {
-      setError("Maximum 1 reference link allowed for feasibility check.");
+    if (webLinks.length >= 2) {
+      setError("Maximum 2 reference links allowed for feasibility check.");
       return;
     }
     const formatted = trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
@@ -423,14 +423,14 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
                         </label>
                         <span
                           className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full transition-colors font-mono ${
-                            uploadedImages.length >= 2 && webLinks.length >= 1
+                            uploadedImages.length >= 2 && webLinks.length >= 2
                               ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/40"
                               : totalAttachments > 0
                               ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:bg-[var(--accent-primary)]/20 dark:text-emerald-300 border border-[var(--accent-primary)]/20"
                               : "bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400"
                           }`}
                         >
-                          {uploadedImages.length}/2 images · {webLinks.length}/1 link
+                          {uploadedImages.length}/2 images · {webLinks.length}/2 links
                         </span>
                       </div>
 
@@ -519,11 +519,11 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
                             <input
                               type="url"
                               placeholder={
-                                webLinks.length >= 1
-                                  ? "Maximum 1 reference link reached"
+                                webLinks.length >= 2
+                                  ? "Maximum 2 reference links reached"
                                   : "Paste URL (e.g. drive.google.com, figma...)"
                               }
-                              disabled={webLinks.length >= 1}
+                              disabled={webLinks.length >= 2}
                               value={linkInput}
                               onChange={(e) => setLinkInput(e.target.value)}
                               onKeyDown={(e) => {
@@ -537,7 +537,7 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
                             <button
                               type="button"
                               onClick={handleAddWebLink}
-                              disabled={webLinks.length >= 1 || !linkInput.trim()}
+                              disabled={webLinks.length >= 2 || !linkInput.trim()}
                               className="h-9 px-4 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs flex items-center gap-1.5"
                             >
                               <Plus className="w-3.5 h-3.5" />
@@ -616,7 +616,7 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
                         ) : (
                           <div className="px-3 py-3 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-900/30 text-center">
                             <span className="text-xs text-slate-500">
-                              No attachments yet (optional · up to 2 images and 1 link)
+                              No attachments yet (optional · up to 2 images and 2 links)
                             </span>
                           </div>
                         )}

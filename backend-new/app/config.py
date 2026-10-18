@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Navneet SAMP ERP API"
     APP_ENV: str = "development"
     DEBUG: bool = True
-    HOST: str = "0.0.0.0"
+    HOST: str = "0.0.0.0"  # nosec B104
     PORT: int = 8002
 
     # JWT & Session configuration

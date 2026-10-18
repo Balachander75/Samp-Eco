@@ -51,6 +51,27 @@ async def _refresh_token_cleanup_loop():
         except Exception:
             logger.exception("[Maintenance] Refresh-token cleanup failed.")
 
+
+def _auto_accept_feasibility_proposals_once() -> int:
+    from app.services.feasibility_service import FeasibilityService
+    db = SessionLocal()
+    try:
+        return FeasibilityService.auto_accept_due_counter_dates(db)
+    finally:
+        db.close()
+
+
+async def _feasibility_auto_accept_loop():
+    while True:
+        await asyncio.sleep(60)
+        try:
+            count = await asyncio.to_thread(_auto_accept_feasibility_proposals_once)
+            if count:
+                logger.info("[Maintenance] Auto-accepted %s due feasibility counter-dates.", count)
+        except Exception:
+            logger.exception("[Maintenance] Feasibility counter-date auto-accept background loop failed.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("[Startup] Navneet SAMP backend-new initialized.")
@@ -62,14 +83,17 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("[Startup] Runtime schema DDL disabled; deployment migrations must be applied before traffic.")
     cleanup_task = asyncio.create_task(_refresh_token_cleanup_loop())
+    counter_date_task = asyncio.create_task(_feasibility_auto_accept_loop())
     try:
         yield
     finally:
         cleanup_task.cancel()
-        try:
-            await cleanup_task
-        except asyncio.CancelledError:
-            pass
+        counter_date_task.cancel()
+        for task in (cleanup_task, counter_date_task):
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         engine.dispose()
 
 app = FastAPI(
@@ -94,16 +118,25 @@ async def add_security_headers(request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https:;",
+    )
     if request.url.path.startswith("/api/"):
         response.headers.setdefault("Cache-Control", "private, no-store")
     if settings.APP_ENV.strip().lower() in ("production", "prod"):
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
     return response
 
+
+
 # Mount Routers
 app.include_router(auth.router)
 app.include_router(master.router)
-app.include_router(feasibility.router)
+app.include_router(
+    feasibility.router,
+    dependencies=[Depends(require_workflow_write_access)],
+)
 app.include_router(
     program_requests.router,
     dependencies=[Depends(require_workflow_write_access)],

@@ -12,6 +12,7 @@ import {
   claimProgramTaskApi,
   addProgramMaterialApi,
   pauseProgramRequestApi,
+  promoteProgramSkuApi,
 } from "@/infrastructure/api/programsApi";
 
 // Modular Sub-Components matching Feasibility Inspector
@@ -43,6 +44,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
   isOpen,
   onClose,
   mode = "marketing",
+  userRole,
   user,
   currentUser,
   onDeleteRequest,
@@ -188,6 +190,20 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
     await onRefresh?.();
   };
 
+  // Promote SKU Material specification row to a commercial Sample Request
+  const handlePromoteSku = async (materialId: number | string) => {
+    if (!activeRequest?.id) return;
+    try {
+      const res = await promoteProgramSkuApi(activeRequest.id, materialId, ["sample"]);
+      setLocalOverride(mapProgramRequestToSampleRequest(res.program));
+      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
+    } catch (err: any) {
+      console.error("Failed to promote program SKU:", err);
+      throw err;
+    }
+  };
+
   // Refresh latest data helper
   const handleRefreshData = async () => {
     if (!activeRequest?.id) return;
@@ -201,8 +217,15 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
   };
 
   const [isTogglingPause, setIsTogglingPause] = useState(false);
-  const isMarketing = effectiveUser?.team === "marketing" || user?.team === "marketing";
+  const userTeam = (effectiveUser?.team || user?.team || "").toLowerCase();
+  const userRoleStr = (userRole || effectiveUser?.role || "").toLowerCase();
+  const isMarketing = userTeam === "marketing" || mode === "marketing";
   const canPause = !readOnly && isMarketing;
+  const isMarketingOrAdmin =
+    isMarketing ||
+    userRoleStr.includes("marketing") ||
+    userRoleStr.includes("admin");
+  const canPromote = !readOnly && isMarketingOrAdmin;
 
   const handleTogglePause = async () => {
     if (!activeRequest?.id || isTogglingPause) return;
@@ -357,6 +380,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                     readOnly={readOnly}
                     onNavigateToTab={(tab) => setActiveTab(tab)}
                     onAddMaterial={handleAddMaterial}
+                    onPromoteSku={canPromote ? handlePromoteSku : undefined}
                   />
                 )}
 

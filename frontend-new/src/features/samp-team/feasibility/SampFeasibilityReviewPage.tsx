@@ -255,7 +255,11 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
         awaitingClaim++;
       } else if (isClaimed && !hasVerdict) {
         inReview++;
-        if (currentUserName && claimedBy === currentUserName) {
+        const isMyClaim = Boolean(
+          (r.takenBySampUserId != null && user?.id != null && r.takenBySampUserId === user.id) ||
+          (currentUserName && claimedBy === currentUserName)
+        );
+        if (isMyClaim) {
           myClaimed++;
         }
       }
@@ -301,9 +305,11 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       }
       if (filterTab === "my_claimed") {
         if (!r.takenBySamp || r.samplingFeasibilityResponse) return false;
-        if (!currentUserName || (r.takenBySamp || "").toLowerCase() !== currentUserName) {
-          return false;
-        }
+        const isMyClaim = Boolean(
+          (r.takenBySampUserId != null && user?.id != null && r.takenBySampUserId === user.id) ||
+          (currentUserName && (r.takenBySamp || "").toLowerCase() === currentUserName)
+        );
+        if (!isMyClaim) return false;
       }
       if (filterTab === "completed" && !r.samplingFeasibilityResponse) return false;
 
@@ -331,7 +337,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
 
       return true;
     });
-  }, [feasibilityRequests, filterTab, customerFilter, searchTerm, user?.name]);
+  }, [feasibilityRequests, filterTab, customerFilter, searchTerm, user?.name, user?.id]);
 
   // Open inspector modal
   const handleOpenInspect = (req: SampleRequestItem) => {

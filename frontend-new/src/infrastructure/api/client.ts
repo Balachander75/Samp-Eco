@@ -173,11 +173,10 @@ async function refreshAccessToken(failedAccessToken: string): Promise<string | n
       }
 
       const refreshToken = readAuthRefreshToken();
-      if (!refreshToken) return null;
 
       const response = await apiRawFetch("/api/auth/refresh", {
         method: "POST",
-        jsonBody: { refresh_token: refreshToken },
+        jsonBody: refreshToken ? { refresh_token: refreshToken } : {},
         timeoutMs: AUTH_TIMEOUT_MS,
         skipAuthRefresh: true,
       });
@@ -194,8 +193,8 @@ async function refreshAccessToken(failedAccessToken: string): Promise<string | n
       }
 
       const session = (await response.json()) as RefreshedSession;
-      if (!session.access_token || !session.refresh_token) return null;
-      updateAuthSessionTokens(session.access_token, session.refresh_token, session.user);
+      if (!session.access_token) return null;
+      updateAuthSessionTokens(session.access_token, session.refresh_token || "", session.user);
       return session.access_token;
     }).finally(() => {
       refreshInFlight = null;
@@ -275,7 +274,7 @@ export async function apiRawFetch(endpoint: string, options: ApiRequestInit = {}
     if (token) headers.set("Authorization", `Bearer ${token}`);
   } else if (!apiRequest) headers.delete("Authorization");
 
-  const config: RequestInit = { ...requestInit, headers };
+  const config: RequestInit = { credentials: "include", ...requestInit, headers };
   let response = await fetchWithTimeout(url, config, timeoutMs);
 
   if (
