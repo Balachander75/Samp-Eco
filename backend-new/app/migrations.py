@@ -531,7 +531,8 @@ def _add_request_code_sequences() -> None:
             ("SR", "SELECT sr_number AS code FROM create_sample_requests"),
         )
         for prefix, source_sql in sources:
-            connection.execute(text(f"""  # nosec B608
+            connection.execute(
+                text(f"""
                 INSERT INTO request_code_sequences (prefix, business_year_start, last_value)
                 SELECT '{prefix}', 2000 + substring(code from '^{prefix}-([0-9]{{2}})-')::INTEGER,
                        MAX(substring(code from '-([0-9]+)$')::INTEGER)
@@ -540,7 +541,8 @@ def _add_request_code_sequences() -> None:
                 GROUP BY substring(code from '^{prefix}-([0-9]{{2}})-')::INTEGER
                 ON CONFLICT (prefix, business_year_start) DO UPDATE
                 SET last_value = GREATEST(request_code_sequences.last_value, EXCLUDED.last_value)
-            """))
+            """)  # nosec B608
+            )
         connection.execute(text("""
             UPDATE mockup_workflows AS workflow
             SET request_code = request.request_codes->>'mockup'
@@ -639,12 +641,15 @@ def _backfill_scoped_request_codes() -> None:
                     }).scalar()
                 elif scope in {"mockup", "costing"}:
                     workflow_table = "mockup_workflows" if scope == "mockup" else "costing_workflows"
-                    linked_code = connection.execute(text(f"""  # nosec B608
+                    linked_code = connection.execute(
+                        text(f"""
                         SELECT request_code FROM {workflow_table}
                         WHERE sample_request_id = :request_id
                           AND request_code ~ '^{prefix}-[0-9]{{2}}-[0-9]{{3,}}$'
                         LIMIT 1
-                    """), {"request_id": row["id"]}).scalar()
+                    """),  # nosec B608
+                        {"request_id": row["id"]},
+                    ).scalar()
                 request_codes[scope] = linked_code or allocate_code(
                     prefix,
                     business_year_start(row["year"], row["date_request_created"] or row["created_at"]),

@@ -490,7 +490,8 @@ def ensure_sample_request_draft_keys():
         for statement in statements:
             connection.execute(text(statement))
         for table in ("create_sample_requests", "design_requests", "program_requests"):
-            connection.execute(text(f"""  # nosec B608
+            connection.execute(
+                text(f"""
                 UPDATE {table} AS request
                 SET created_by_user_id = matching_user.id
                 FROM (
@@ -504,7 +505,8 @@ def ensure_sample_request_draft_keys():
                     SELECT count(*) FROM users AS candidate
                     WHERE lower(trim(coalesce(candidate.name, ''))) = matching_user.normalized_name
                   )
-            """))
+            """)  # nosec B608
+            )
 
 
 def ensure_mockup_workflow_columns():

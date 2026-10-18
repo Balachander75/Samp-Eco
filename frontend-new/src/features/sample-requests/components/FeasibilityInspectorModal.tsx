@@ -486,6 +486,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                 onClaimTask={handleClaimTask}
                 onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
                 onCounterDateDecision={handleCounterDateDecision}
+                currentUserName={user?.name}
+                currentUserId={user?.id}
               />
 
               {/* Notebook Tab Strip */}

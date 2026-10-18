@@ -9,6 +9,7 @@ export interface MarketingCounterDateBannerProps {
   requestedAt?: string | null;
   isMarketingMode?: boolean;
   proposerTitle?: string;
+  extensionDays?: number | null;
   onAccept: () => Promise<void> | void;
   onReject: (rejectionNotes?: string) => Promise<void> | void;
 }
@@ -21,6 +22,7 @@ export const MarketingCounterDateBanner: React.FC<MarketingCounterDateBannerProp
   requestedAt,
   isMarketingMode = false,
   proposerTitle = "Sampling Team",
+  extensionDays,
   onAccept,
   onReject,
 }) => {
@@ -108,6 +110,12 @@ export const MarketingCounterDateBanner: React.FC<MarketingCounterDateBannerProp
                   <span className="font-mono">{proposedDate || "—"}</span>
                 </div>
               </div>
+
+              {Boolean(extensionDays && extensionDays > 0) && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-100/90 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-xs font-mono font-bold text-amber-900 dark:text-amber-200">
+                  <span>+{extensionDays} workdays extension</span>
+                </div>
+              )}
             </div>
 
             {/* Justification Reason Box */}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { SampleRequestItem } from "../../types";
 import { formatOdooDate } from "../../utils/dateUtils";
 import {
@@ -8,9 +8,23 @@ import {
   AlertTriangle,
   XCircle,
   ShieldCheck,
+  Eye,
 } from "lucide-react";
 import { MarketingCounterDateBanner } from "../inspector/MarketingCounterDateBanner";
 import { FeasibilityClaimStrip } from "./FeasibilityClaimStrip";
+import { indiaDateKey, operationalWorkdaysBetween } from "@/lib/operationalWorkdays";
+
+const formatRelativeTime = (timestamp?: string): string => {
+  if (!timestamp) return "";
+  const diffMs = Date.now() - new Date(timestamp).getTime();
+  if (diffMs < 60_000) return "just now";
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 export interface FeasibilitySheetHeaderProps {
   activeRequest: SampleRequestItem;
@@ -22,6 +36,8 @@ export interface FeasibilitySheetHeaderProps {
   onClaimTask?: () => void;
   onOpenCounterDateModal?: () => void;
   onCounterDateDecision?: (accepted: boolean, notes?: string) => Promise<void> | void;
+  currentUserName?: string;
+  currentUserId?: number;
 }
 
 export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
@@ -33,9 +49,40 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
   onClaimTask,
   onOpenCounterDateModal,
   onCounterDateDecision,
+  currentUserName,
+  currentUserId,
 }) => {
   const code = activeRequest.materialCode || `FC-${String(activeRequest.id).padStart(4, "0")}`;
   const isEvaluated = Boolean(activeRequest.samplingFeasibilityResponse);
+
+  const lastViewer = useMemo(() => {
+    const activities = activeRequest.activities || [];
+    const myName = (currentUserName || "").trim().toLowerCase();
+    for (let i = activities.length - 1; i >= 0; i--) {
+      const act = activities[i];
+      if (act.action === "VIEWED") {
+        const isSelf =
+          (currentUserId != null && act.actorId === currentUserId) ||
+          (myName && (act.actorName || "").trim().toLowerCase() === myName);
+        if (!isSelf) {
+          return {
+            actorName: act.actorName || "Team Member",
+            actorDepartment: act.actorDepartment || "Operations",
+            timeAgo: formatRelativeTime(act.createdAt),
+          };
+        }
+      }
+    }
+    return null;
+  }, [activeRequest.activities, currentUserId, currentUserName]);
+
+  const extensionDays = useMemo(() => {
+    if (!activeRequest.sampleRequiredDate || !activeRequest.sampCounterDate) return 0;
+    const origKey = indiaDateKey(activeRequest.sampleRequiredDate);
+    const propKey = indiaDateKey(activeRequest.sampCounterDate);
+    if (!origKey || !propKey || propKey <= origKey) return 0;
+    return operationalWorkdaysBetween(origKey, propKey);
+  }, [activeRequest.sampleRequiredDate, activeRequest.sampCounterDate]);
 
   return (
     <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
@@ -118,6 +165,14 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
                   : "—"}
               </span>
             </p>
+            {lastViewer && (
+              <p className="text-[11px] text-[var(--on-surface-subtle)] mt-1 flex items-center gap-1.5 font-mono">
+                <Eye className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>
+                  Last reviewed by <strong className="text-[var(--on-surface-muted)] font-semibold">{lastViewer.actorName}</strong> ({lastViewer.actorDepartment}) {lastViewer.timeAgo}
+                </span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -251,6 +306,7 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
               requestedAt={activeRequest.sampCounterDateProposedAt}
               isMarketingMode={sourceDesk === "marketing"}
               proposerTitle="Sampling Team"
+              extensionDays={extensionDays}
               onAccept={() => onCounterDateDecision?.(true)}
               onReject={(notes) => onCounterDateDecision?.(false, notes)}
             />
