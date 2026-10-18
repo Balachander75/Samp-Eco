@@ -744,6 +744,16 @@ def _backfill_scoped_request_codes() -> None:
             })
 
 
+def _index_feasibility_workflow() -> None:
+    statements = (
+        "CREATE INDEX IF NOT EXISTS ix_feasibility_requests_status ON feasibility_requests (status)",
+        "CREATE INDEX IF NOT EXISTS ix_feasibility_activity_logs_feasibility_request_id ON feasibility_activity_logs (feasibility_request_id)",
+    )
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
 MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0001_legacy_schema_bootstrap", "Record and run existing schema upgrades", _bootstrap_existing_schema),
     ("0002_feasibility_conversion_relations", "Connect Feasibility conversions to sample requests", _link_feasibility_conversions),
@@ -760,6 +770,7 @@ MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0013_scoped_request_reference_images", "Store scope-specific Sample, Mockup, and Costing images", _add_scoped_request_reference_images),
     ("0014_backfill_scoped_request_codes", "Assign request codes to legacy scoped requests", _backfill_scoped_request_codes),
     ("0015_reconcile_released_costing_workflows", "Route released Costing requests out of Marketing", _reconcile_released_costing_workflows),
+    ("0016_index_feasibility_workflow", "Index feasibility requests status and activity logs request_id", _index_feasibility_workflow),
 ]
 
 

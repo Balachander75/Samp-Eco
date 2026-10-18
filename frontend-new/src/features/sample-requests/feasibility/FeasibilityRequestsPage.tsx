@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { CopyBadge, StatusPill, Select } from "@/components/ui";
 import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
+import { exportRecordsToCsv } from "@/lib/csvExport";
+import { indiaDateKey, addOperationalWorkdays } from "@/lib/operationalWorkdays";
 import { FeasibilityInspectorModal } from "../components/FeasibilityInspectorModal";
 import { NewFeasibilityModal } from "../components/NewFeasibilityModal";
 import {
@@ -371,42 +373,24 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
   // Export CSV handler
   const handleExportCSV = () => {
     if (filteredRequests.length === 0) return;
-    const headers = [
-      "Request Code",
-      "Customer",
-      "Category",
-      "Scope / Description",
-      "Target Date",
-      "Requester",
-      "SAMP Reviewer",
-      "SAMP Verdict",
-      "Marketing Decision",
-      "Status",
-      "Created Date",
-    ];
-    const rows = filteredRequests.map((r) => [
-      r.materialCode || `FC-${r.id}`,
-      r.customer || "",
-      r.customFeasibilityType || r.feasibilityType || "",
-      (r.productDescription || "").replace(/"/g, '""'),
-      r.sampleRequiredDate || "",
-      r.createdBy || "",
-      r.takenBySamp || "",
-      r.samplingFeasibilityResponse || "Pending",
-      r.marketingDecision || "",
-      r.status || "",
-      r.dateRequestCreated || r.createdAt || "",
-    ]);
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `feasibility_checks_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    exportRecordsToCsv({
+      filename: `feasibility_checks_${dateStr}.csv`,
+      columns: [
+        { header: "Request Code", accessor: (r) => r.materialCode || `FC-${r.id}` },
+        { header: "Customer", accessor: (r) => r.customer || "" },
+        { header: "Category", accessor: (r) => r.customFeasibilityType || r.feasibilityType || "" },
+        { header: "Scope / Description", accessor: (r) => r.productDescription || "" },
+        { header: "Target Date", accessor: (r) => r.sampleRequiredDate || "" },
+        { header: "Requester", accessor: (r) => r.createdBy || "" },
+        { header: "SAMP Reviewer", accessor: (r) => r.takenBySamp || "" },
+        { header: "SAMP Verdict", accessor: (r) => r.samplingFeasibilityResponse || "Pending" },
+        { header: "Marketing Decision", accessor: (r) => r.marketingDecision || "" },
+        { header: "Status", accessor: (r) => r.status || "" },
+        { header: "Created Date", accessor: (r) => r.dateRequestCreated || r.createdAt || "" },
+      ],
+      data: filteredRequests,
+    });
   };
 
   // Inspect request handler
@@ -505,15 +489,18 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
             (req.status || "").toLowerCase().includes("closed");
 
           let isPastDue = false;
-          if (!isFinalDecision && req.sampleRequiredDate) {
-            const reqTime = new Date(req.sampleRequiredDate).setHours(0, 0, 0, 0);
-            const todayTime = new Date().setHours(0, 0, 0, 0);
-            if (!isNaN(reqTime) && reqTime < todayTime) {
-              isPastDue = true;
+          if (!isFinalDecision && req.counterDateDecision !== "pending" && req.sampleRequiredDate) {
+            const reqKey = indiaDateKey(req.sampleRequiredDate);
+            const todayKey = indiaDateKey(new Date());
+            if (reqKey && todayKey) {
+              const deadline = addOperationalWorkdays(reqKey, Math.max(0, req.sampSlaPausedWorkdays || 0));
+              if (todayKey > deadline) {
+                isPastDue = true;
+              }
             }
           }
 
-          const isDelayed = isPastDue || req.isRespondedOnTime === false;
+          const isDelayed = req.counterDateDecision !== "pending" && (isPastDue || req.isRespondedOnTime === false);
 
           return (
             <div className="space-y-0.5">

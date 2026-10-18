@@ -4,14 +4,16 @@ Creates all required tables in the new PostgreSQL database and seeds initial
 Admin user and master plants.
 """
 import sys
+import app.models  # noqa: F401 - registers all tables on Base.metadata
 from app.database import engine, Base, SessionLocal
 from app.models.master import User, Plant, Customer, RefreshToken, LoginAuditLog
 from app.auth.security import hash_password
+from app.migrations import apply_database_migrations
 
 def init_and_seed():
-    print("Creating all tables in samp_enterprise_db...")
-    Base.metadata.create_all(bind=engine)
-    print("Tables created successfully!")
+    print("Applying all migrations and initializing tables...")
+    apply_database_migrations()
+    print("Database migrations applied successfully!")
 
     db = SessionLocal()
     try:

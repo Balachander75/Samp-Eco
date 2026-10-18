@@ -100,7 +100,7 @@ class ProgramMaterialSpecification(Base):
     samp_remark = Column(Text, nullable=True)
 
     # Link to commercial Sample Request if promoted
-    promoted_sample_request_id = Column(Integer, ForeignKey("create_sample_requests.id", ondelete="SET NULL"), nullable=True)
+    promoted_sample_request_id = Column(Integer, ForeignKey("create_sample_requests.id", ondelete="SET NULL"), nullable=True, index=True)
     promoted_sr_number = Column(String(50), nullable=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

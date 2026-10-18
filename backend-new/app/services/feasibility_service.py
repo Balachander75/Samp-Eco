@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover
     ImageOps = None
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from app.auth.permissions import user_has_team
 from app.repositories.feasibility_repo import FeasibilityRepository
 from app.models.feasibility import (
     FeasibilityRequest,
@@ -417,7 +418,7 @@ class FeasibilityService:
             feasibility_request_id=req.id,
             actor_id=actor_id,
             actor_name=actor_name,
-            actor_department="SAMP",
+            actor_department="SAMP Team",
             action="SAMP_EVALUATED",
             payload={"verdict": payload.response, "remark": payload.remark},
         )
@@ -531,7 +532,7 @@ class FeasibilityService:
             feasibility_request_id=req.id,
             actor_id=actor_id,
             actor_name=actor_name or "SAMP Team",
-            actor_department="SAMP",
+            actor_department="SAMP Team",
             action="SAMP_COUNTER_DATE_PROPOSED",
             payload={
                 "original_date": req.required_date.isoformat(),
@@ -682,7 +683,7 @@ class FeasibilityService:
             feasibility_request_id=req.id,
             actor_id=actor_id,
             actor_name=actor_name,
-            actor_department="SAMP",
+            actor_department="SAMP Team",
             action="TASK_CLAIMED",
             payload={"claimed_by": actor_name},
         )
@@ -862,12 +863,17 @@ class FeasibilityService:
 
         actor_name = current_user.name if current_user else "Team Member"
         actor_id = current_user.id if current_user else None
-        roles = f"{getattr(current_user, 'role', '') or ''} {getattr(current_user, 'sub_role', '') or ''}".lower() if current_user else ""
-        actor_department = (
-            "SAMP Team" if "samp" in roles or "sampling" in roles
-            else "Marketing" if "marketing" in roles
-            else (getattr(current_user, "sub_role", None) or getattr(current_user, "role", None) or "Operations") if current_user else "Operations"
-        )
+        if current_user and user_has_team(current_user, "samp"):
+            actor_department = "SAMP Team"
+        elif current_user and user_has_team(current_user, "marketing"):
+            actor_department = "Marketing"
+        else:
+            actor_department = (
+                getattr(current_user, "team", None)
+                or getattr(current_user, "sub_role", None)
+                or getattr(current_user, "role", None)
+                or "Operations"
+            ) if current_user else "Operations"
 
         self.repo.add_activity_log(
             feasibility_request_id=req.id,
@@ -887,12 +893,17 @@ class FeasibilityService:
 
         actor_name = current_user.name if current_user else "Operator"
         actor_id = current_user.id if current_user else None
-        roles = f"{getattr(current_user, 'role', '') or ''} {getattr(current_user, 'sub_role', '') or ''}".lower() if current_user else ""
-        actor_department = (
-            "SAMP Team" if "samp" in roles or "sampling" in roles
-            else "Marketing" if "marketing" in roles
-            else "Operations"
-        )
+        if current_user and user_has_team(current_user, "samp"):
+            actor_department = "SAMP Team"
+        elif current_user and user_has_team(current_user, "marketing"):
+            actor_department = "Marketing"
+        else:
+            actor_department = (
+                getattr(current_user, "team", None)
+                or getattr(current_user, "sub_role", None)
+                or getattr(current_user, "role", None)
+                or "Operations"
+            ) if current_user else "Operations"
 
         # Smart deduplication: check if the latest activity was already a VIEWED event by this user
         last_log = (req.activities or [])[-1] if req.activities else None

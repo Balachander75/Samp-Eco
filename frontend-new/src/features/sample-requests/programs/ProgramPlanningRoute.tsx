@@ -149,9 +149,11 @@ export const ProgramPlanningRoute: React.FC<ProgramPlanningRouteProps> = ({ user
           isOpen={Boolean(selectedRequest)}
           onClose={() => setSelectedRequest(null)}
           mode={mode}
+          userRole={admin ? "admin" : user?.role || mode}
           currentUser={user}
           readOnly={readOnly}
           onDeleteRequest={mode === "marketing" && admin ? handleDeleteRequest : undefined}
+          onRefresh={loadRequests}
         />
       )}
 

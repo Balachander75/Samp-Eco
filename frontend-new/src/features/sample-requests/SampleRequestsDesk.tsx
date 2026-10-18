@@ -739,9 +739,11 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
             isOpen={isInspectorOpen}
             onClose={() => setIsInspectorOpen(false)}
             mode="marketing"
-            userRole="Marketing Specialist"
+            userRole={isAdmin ? "admin" : "marketing"}
             currentUser={user}
             readOnly={isReadOnly}
+            onRefresh={loadRequests}
+            onDeleteRequest={isAdmin ? (req) => handleDeleteRequest(req) : undefined}
           />
         ) : (
           <SampleRequestInspector

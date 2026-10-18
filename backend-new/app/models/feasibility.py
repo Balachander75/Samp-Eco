@@ -33,7 +33,7 @@ class FeasibilityRequest(Base):
 
     reference_links = Column(JSON, nullable=False, default=list, server_default="[]")
 
-    status = Column(String(64), nullable=False, default="Pending Feasibility", server_default="Pending Feasibility")
+    status = Column(String(64), nullable=False, default="Pending Feasibility", server_default="Pending Feasibility", index=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_by = Column(String(255), nullable=True)
     request_raised_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
@@ -107,6 +107,7 @@ class FeasibilityActivityLog(Base):
         Integer,
         ForeignKey("feasibility_requests.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     request_code = Column(String(32), nullable=True)
     actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

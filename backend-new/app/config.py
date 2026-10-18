@@ -98,7 +98,7 @@ class Settings(BaseSettings):
                 raise ValueError("FATAL SECURITY ERROR: JWT_SECRET_KEY in production must be at least 32 characters long.")
             if self.DATABASE_URL == DEFAULT_DEV_DATABASE_URL:
                 raise ValueError("FATAL CONFIGURATION ERROR: DATABASE_URL must be explicitly configured in production.")
-            if not self.DATABASE_URL.startswith(("postgresql://", "postgresql+psycopg2://")):
+            if not self.DATABASE_URL.startswith(("postgresql://", "postgresql+psycopg://", "postgresql+psycopg2://")):
                 raise ValueError("FATAL CONFIGURATION ERROR: Production DATABASE_URL must use PostgreSQL.")
             for origin in self.CORS_ORIGINS:
                 parsed_origin = urlsplit(origin)

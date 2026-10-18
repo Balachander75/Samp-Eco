@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { OperationalDatePicker } from "@/components/erp";
 import { getNextWorkingDate } from "@/lib/holidayUtils";
+import { operationalWorkdaysBetween } from "@/lib/operationalWorkdays";
 
 export interface FeasibilityCounterDateModalProps {
   isOpen: boolean;
@@ -33,6 +34,12 @@ export const FeasibilityCounterDateModal: React.FC<FeasibilityCounterDateModalPr
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const originalDateOnly = (originalDate || "").split("T", 1)[0].slice(0, 10);
+
+  const extensionWorkdays = useMemo(() => {
+    if (!proposedDate || !originalDateOnly) return 0;
+    if (proposedDate <= originalDateOnly) return 0;
+    return operationalWorkdaysBetween(originalDateOnly, proposedDate);
+  }, [proposedDate, originalDateOnly]);
 
   useEffect(() => {
     if (isOpen) return;
@@ -206,6 +213,14 @@ export const FeasibilityCounterDateModal: React.FC<FeasibilityCounterDateModalPr
               disabled={!isEligible || isSubmitting}
               className="w-full"
             />
+            {extensionWorkdays > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-200">
+                <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>
+                  Timeline adjustment: <strong className="font-mono text-amber-950 dark:text-amber-100 font-bold">+{extensionWorkdays} operational workday{extensionWorkdays === 1 ? "" : "s"}</strong> extension requested
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Field 2: Remark / Operational Reason */}

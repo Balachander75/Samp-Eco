@@ -97,7 +97,7 @@ jobs:
 
       - name: Database Initialization & Migrations
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/samp_enterprise_db
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/samp_enterprise_db
           JWT_SECRET_KEY: test-secret-key-at-least-32-chars-long-for-ci
           APP_ENV: development
           DEBUG: "true"
@@ -107,7 +107,7 @@ jobs:
 
       - name: Run Backend Pytest Suite with Coverage
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/samp_enterprise_db
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/samp_enterprise_db
           JWT_SECRET_KEY: test-secret-key-at-least-32-chars-long-for-ci
           APP_ENV: development
           DEBUG: "true"

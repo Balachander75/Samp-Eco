@@ -126,7 +126,7 @@ export const ProgramPlanningMarketingTab: React.FC<ProgramPlanningMarketingTabPr
             const isSamp = entry.action === "SAMP_OUTPUT";
             const department = isSamp ? "SAMP Team" : `Plant Desk (${activeRequest.targetPlant || "1505"})`;
             const threadReplies = replies.filter(
-              (reply) => Number(reply.payload.output_activity_id) === entry.id
+              (reply) => Number(reply.payload?.output_activity_id ?? reply.payload?.outputActivityId) === entry.id
             );
 
             return (

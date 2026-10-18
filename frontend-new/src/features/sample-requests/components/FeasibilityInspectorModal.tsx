@@ -90,6 +90,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
   // Feasibility flow states
   const [isClaiming, setIsClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [sampVerdictChoice, setSampVerdictChoice] = useState<"Yes" | "No" | "Maybe">("Yes");
   const [sampVerdictRemark, setSampVerdictRemark] = useState("");
@@ -276,13 +277,15 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   const handleClaimTask = async () => {
     if (!activeRequest?.id || isClaiming || !canEvaluateTechnical) return;
     setIsClaiming(true);
+    setClaimError(null);
     try {
       const updated = await claimFeasibilityTaskApi(activeRequest.id);
       setLocalOverride(updated);
       window.dispatchEvent(new CustomEvent("samp:requests-changed"));
       await onRefresh?.();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to claim feasibility task:", err);
+      setClaimError(err?.message || "Failed to claim feasibility task.");
     } finally {
       setIsClaiming(false);
     }
@@ -757,6 +760,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     sampConditions={sampConditions}
                     sampLeadTimeNote={sampLeadTimeNote}
                     sampVerdictError={sampVerdictError}
+                    claimError={claimError}
                     isSubmittingSampVerdict={isSubmittingSampVerdict}
                     onClaimTask={handleClaimTask}
                     onSampVerdictChoiceChange={(choice) => {

@@ -19,6 +19,7 @@ export interface FeasibilityTechnicalReviewTabProps {
   sampConditions?: string;
   sampLeadTimeNote?: string;
   sampVerdictError?: string | null;
+  claimError?: string | null;
   isSubmittingSampVerdict: boolean;
   onClaimTask: () => void;
   onSampVerdictChoiceChange: (choice: "Yes" | "No" | "Maybe") => void;
@@ -45,6 +46,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
   sampVerdictChoice,
   sampVerdictRemark,
   sampVerdictError,
+  claimError,
   isSubmittingSampVerdict,
   onClaimTask,
   onSampVerdictChoiceChange,
@@ -190,6 +192,12 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
               <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span><strong>Admin Self-Review:</strong> You created this request. Operating with Super Admin privileges.</span>
+              </div>
+            )}
+            {claimError && (
+              <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 px-3.5 py-2 text-xs text-rose-900 dark:text-rose-200 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{claimError}</span>
               </div>
             )}
             <div className="p-8 rounded-xl border-2 border-dashed border-[var(--border-strong)] bg-[var(--surface-low)] text-center space-y-3.5">
