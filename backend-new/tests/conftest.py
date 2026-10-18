@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.main import app
 from app.database import SessionLocal
-from app.auth.security import create_access_token
+from app.auth.security import create_access_token, hash_password
 from app.models.master import User
 
 
@@ -25,11 +25,48 @@ def client():
         yield c
 
 
+def _get_or_create_user(
+    db: Session,
+    userid: str,
+    name: str,
+    email: str,
+    role: str = "user",
+    team: str = "marketing",
+    is_team_head: bool = False,
+) -> User:
+    user = db.query(User).filter(User.userid == userid).first()
+    if not user:
+        user = User(
+            name=name,
+            userid=userid,
+            email=email,
+            password_hash=hash_password("Password123"),
+            role=role,
+            sub_role="Executive",
+            team=team,
+            is_team_head=is_team_head,
+            plant_code="1505",
+            theme_id="emerald",
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+
+
 @pytest.fixture(scope="session")
 def admin_headers(db_session: Session):
     """Provides Authorization headers for the root Admin user."""
-    admin = db_session.query(User).filter(User.role == "admin").first()
-    assert admin is not None, "Admin user must exist in the database for tests"
+    admin = _get_or_create_user(
+        db_session,
+        userid="Admin",
+        name="Administrator",
+        email="admin.test@navneet.com",
+        role="admin",
+        team="Management",
+        is_team_head=True,
+    )
     token = create_access_token(
         subject=admin.id,
         role=admin.role,
@@ -41,10 +78,15 @@ def admin_headers(db_session: Session):
 @pytest.fixture(scope="session")
 def marketing_headers(db_session: Session):
     """Provides Authorization headers for a Marketing team member."""
-    user = db_session.query(User).filter(User.team == "marketing", User.is_team_head.is_(False)).first()
-    if not user:
-        user = db_session.query(User).filter(User.role != "admin").first()
-    assert user is not None, "A regular user must exist in database"
+    user = _get_or_create_user(
+        db_session,
+        userid="TestMarketing",
+        name="Marketing Tester",
+        email="marketing.tester@navneet.com",
+        role="user",
+        team="marketing",
+        is_team_head=False,
+    )
     token = create_access_token(
         subject=user.id,
         role=user.role,
@@ -56,8 +98,15 @@ def marketing_headers(db_session: Session):
 @pytest.fixture(scope="session")
 def samp_headers(db_session: Session):
     """Provides Authorization headers for a SAMP team member."""
-    user = db_session.query(User).filter(User.team.in_(["samp", "sampling"]), User.is_team_head.is_(False)).first()
-    assert user is not None, "A SAMP user must exist in database"
+    user = _get_or_create_user(
+        db_session,
+        userid="TestSamp",
+        name="Samp Specialist",
+        email="samp.tester@navneet.com",
+        role="user",
+        team="samp",
+        is_team_head=False,
+    )
     token = create_access_token(
         subject=user.id,
         role=user.role,
@@ -69,8 +118,15 @@ def samp_headers(db_session: Session):
 @pytest.fixture(scope="session")
 def team_head_headers(db_session: Session):
     """Provides Authorization headers for a Team Head user."""
-    user = db_session.query(User).filter(User.is_team_head.is_(True), User.role != "admin").first()
-    assert user is not None, "A team head user must exist in database"
+    user = _get_or_create_user(
+        db_session,
+        userid="TestTeamHead",
+        name="Team Head Tester",
+        email="teamhead.tester@navneet.com",
+        role="user",
+        team="marketing",
+        is_team_head=True,
+    )
     token = create_access_token(
         subject=user.id,
         role=user.role,
