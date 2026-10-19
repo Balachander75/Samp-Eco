@@ -818,6 +818,34 @@ def _link_design_requests_to_sample_requests() -> None:
         """))
 
 
+def _optimize_product_details_and_queries() -> None:
+    """Add functional normalized index on product_details to accelerate list summaries and catalog lookups."""
+    with engine.begin() as connection:
+        connection.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_product_details_normalized_char_name
+            ON product_details (
+                sample_request_id,
+                regexp_replace(upper(COALESCE(characteristic_name, '')), '[^A-Z0-9]+', '', 'g')
+            )
+        """))
+
+
+def _add_high_performance_workflow_and_queue_indexes() -> None:
+    """Add targeted composite indexes for plant queues, user requests, and workflow stages."""
+    statements = (
+        "CREATE INDEX IF NOT EXISTS ix_create_sample_requests_plant_status ON create_sample_requests (target_plant, status, updated_at DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_create_sample_requests_created_by_user ON create_sample_requests (created_by_user_id, id DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_mockup_workflows_current_stage ON mockup_workflows (current_stage, updated_at DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_costing_workflows_current_stage ON costing_workflows (current_stage, updated_at DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_design_requests_program_year ON design_requests (program_year, updated_at DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_mockup_workflow_logs_workflow_id ON mockup_workflow_logs (workflow_id, id DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_costing_workflow_logs_workflow_id ON costing_workflow_logs (workflow_id, id DESC)",
+    )
+    with engine.begin() as connection:
+        for stmt in statements:
+            connection.execute(text(stmt))
+
+
 MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0001_legacy_schema_bootstrap", "Record and run existing schema upgrades", _bootstrap_existing_schema),
     ("0002_feasibility_conversion_relations", "Connect Feasibility conversions to sample requests", _link_feasibility_conversions),
@@ -837,6 +865,8 @@ MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0016_index_feasibility_workflow", "Index feasibility requests status and activity logs request_id", _index_feasibility_workflow),
     ("0017_costing_claim_tracking", "Add Costing task ownership and Costing administrator access", _add_costing_claim_fields),
     ("0018_design_sample_request_link", "Link Design workflow records to their Sample Request parent", _link_design_requests_to_sample_requests),
+    ("0019_optimize_product_details_and_queries", "Add functional normalized index on product_details for fast listing summaries", _optimize_product_details_and_queries),
+    ("0020_high_performance_workflow_and_queue_indexes", "Add targeted composite indexes for plant queues, user requests, and workflow stages", _add_high_performance_workflow_and_queue_indexes),
 ]
 
 

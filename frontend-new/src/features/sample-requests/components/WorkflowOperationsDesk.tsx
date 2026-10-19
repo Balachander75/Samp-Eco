@@ -16,15 +16,25 @@ import { useBusinessYear } from "@/context/BusinessYearContext";
 import { DataTable, DeskWorkspaceLayout, type ColumnDef } from "@/components/erp";
 import type { UserProfile } from "@/features/auth";
 import { hasWorkflowTeam, isAdmin as isAdminUser } from "@/features/auth/permissions";
+import { TopLoadingBar } from "@/components/ui/loading";
 import {
   fetchCostingWorkflowsApi,
   fetchSamplingWorkflowReviewsApi,
   type RequestWorkflowRecord,
 } from "@/infrastructure/api";
-import { CostingWorkflowInspectorModal } from "./CostingWorkflowInspectorModal";
-import { MockupSamplingInspectorModal } from "./MockupSamplingInspectorModal";
-import { SampleRequestInspector } from "./SampleRequestInspector";
-import { DesignRequestInspectorModal } from "./DesignRequestInspectorModal";
+
+const CostingWorkflowInspectorModal = React.lazy(() =>
+  import("./CostingWorkflowInspectorModal").then((m) => ({ default: m.CostingWorkflowInspectorModal }))
+);
+const MockupSamplingInspectorModal = React.lazy(() =>
+  import("./MockupSamplingInspectorModal").then((m) => ({ default: m.MockupSamplingInspectorModal }))
+);
+const SampleRequestInspector = React.lazy(() =>
+  import("./SampleRequestInspector").then((m) => ({ default: m.SampleRequestInspector }))
+);
+const DesignRequestInspectorModal = React.lazy(() =>
+  import("./DesignRequestInspectorModal").then((m) => ({ default: m.DesignRequestInspectorModal }))
+);
 import {
   fetchDesignRequestApi,
   fetchSampleRequestByIdApi,
@@ -772,19 +782,20 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
             )}
           </section>
         )}
-        {isLoading && <div role="status" className="sr-only">Refreshing workflow records</div>}
+        {isLoading && <TopLoadingBar isLoading={true} />}
       </div>
 
-      {/* Costing Workspace Inspector */}
-      {selected && mode === "costing" && (
-        <CostingWorkflowInspectorModal
-          record={selected}
-          mode="costing"
-          user={user}
-          onClose={() => setSelectedKey(null)}
-          onSaved={load}
-        />
-      )}
+      <React.Suspense fallback={null}>
+        {/* Costing Workspace Inspector */}
+        {selected && mode === "costing" && (
+          <CostingWorkflowInspectorModal
+            record={selected}
+            mode="costing"
+            user={user}
+            onClose={() => setSelectedKey(null)}
+            onSaved={load}
+          />
+        )}
 
       {/* Sampling: Sample Request Inspector (with full Sampling role controls) */}
       {selected && mode === "sampling" && selected.workflow_type === "sample" && sampleDetail && (
@@ -864,6 +875,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
           onSaved={load}
         />
       )}
+      </React.Suspense>
     </DeskWorkspaceLayout>
   );
 };

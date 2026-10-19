@@ -20,15 +20,10 @@ import {
   Factory,
   Download,
   Printer,
+  Loader2,
 } from "lucide-react";
 import { ProductDetailItem } from "@/infrastructure/api/masterApi";
 import { ProductSearchResult } from "../../types";
-import {
-  productDocketSectionTitle,
-  downloadProductDocketPdf,
-  downloadProductDocketCsv,
-  printProductDocketView,
-} from "./productDocketPdf";
 
 export interface ProductDocketViewProps {
   product: ProductSearchResult;
@@ -58,16 +53,52 @@ export function isClassPresent(specs: ProductDetailItem[] | undefined | null): b
   return specs.some((s) => !isMissingSpec(s.value));
 }
 
-// Clean helper to get characteristic value with optional UOM
+export function productDocketSectionTitle(className: string): string {
+  if (className === "NB_BINDING") return "Binding Details";
+  if (className === "NB_COMPONENT_1") return "Cover Details";
+  if (className.startsWith("NB_COMPONENT_")) return `Component ${className.substring("NB_COMPONENT_".length)} Details`;
+  if (className === "NB_DIVIDER_SPECS") return "Inside Accessories Details";
+  if (className === "PACKAGING_SPECS_1") return "Packaging Details";
+  if (className === "PACKING_DETAILS") return "Packing Details";
+  if (className === "RULLING_DETAILS") return "Inside Details";
+  return className.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+// High-performance normalized key cache to eliminate repeated regex parsing
+const normalizedKeyCache = new Map<string, string>();
+function getNormalizedCharKey(name: string): string {
+  let key = normalizedKeyCache.get(name);
+  if (!key) {
+    key = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    normalizedKeyCache.set(name, key);
+  }
+  return key;
+}
+
+// O(1) Spec lookup map cached by spec array reference via WeakMap
+const specMapCache = new WeakMap<ProductDetailItem[], Map<string, ProductDetailItem>>();
+function getSpecLookupMap(specs: ProductDetailItem[]): Map<string, ProductDetailItem> {
+  let map = specMapCache.get(specs);
+  if (!map) {
+    map = new Map<string, ProductDetailItem>();
+    for (let i = 0; i < specs.length; i++) {
+      const item = specs[i];
+      map.set(getNormalizedCharKey(item.characteristicName), item);
+    }
+    specMapCache.set(specs, map);
+  }
+  return map;
+}
+
+// Clean helper to get characteristic value with optional UOM in O(1) time
 function formatCharValue(
   specs: ProductDetailItem[],
   charName: string,
   fallback: string = "NA"
 ): { value: string; isNa: boolean; uom?: string } {
-  const normalizedTarget = charName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  const spec = specs.find(
-    (s) => s.characteristicName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() === normalizedTarget
-  );
+  if (!specs || specs.length === 0) return { value: fallback, isNa: true };
+  const map = getSpecLookupMap(specs);
+  const spec = map.get(getNormalizedCharKey(charName));
   if (!spec || isMissingSpec(spec.value)) {
     return { value: fallback, isNa: true };
   }
@@ -107,8 +138,8 @@ function getColSpanClass(colSpan: number = 1): string {
   }
 }
 
-// Laser-straight, aligned Docket Cell component
-const DocketCell: React.FC<CellProps> = ({ cell, searchFilter }) => {
+// Laser-straight, aligned Docket Cell component (Memoized to eliminate re-render cascades)
+const DocketCell: React.FC<CellProps> = React.memo(({ cell, searchFilter }) => {
   const { label, value, uom, colSpan = 1 } = cell;
   const rawVal = value ? String(value).trim() : "";
   const isNa = isMissingSpec(rawVal);
@@ -159,10 +190,10 @@ const DocketCell: React.FC<CellProps> = ({ cell, searchFilter }) => {
       </div>
     </div>
   );
-};
+});
 
 // Subtle placeholder cell to balance rows that have fewer than 6 columns
-const DocketEmptyCell: React.FC<{ colSpan?: number }> = ({ colSpan = 1 }) => {
+const DocketEmptyCell: React.FC<{ colSpan?: number }> = React.memo(({ colSpan = 1 }) => {
   const colClass = getColSpanClass(colSpan);
   return (
     <div
@@ -171,13 +202,13 @@ const DocketEmptyCell: React.FC<{ colSpan?: number }> = ({ colSpan = 1 }) => {
       <span className="text-slate-200 dark:text-zinc-800 text-xs font-mono">—</span>
     </div>
   );
-};
+});
 
 // Strict 6-column container row. All rows sum up to exactly 6 columns.
 const DocketRow: React.FC<{
   cells: DocketCellDef[];
   searchFilter?: string;
-}> = ({ cells, searchFilter }) => {
+}> = React.memo(({ cells, searchFilter }) => {
   const totalCols = cells.reduce((acc, c) => acc + (c.colSpan || 1), 0);
   const remainingCols = 6 - (totalCols % 6 || 6);
 
@@ -189,7 +220,7 @@ const DocketRow: React.FC<{
       {remainingCols > 0 && <DocketEmptyCell colSpan={remainingCols} />}
     </div>
   );
-};
+});
 
 // Section Header Banner with title, icon, spec count badge, and clean styling
 const DocketSectionBanner: React.FC<{
@@ -200,7 +231,7 @@ const DocketSectionBanner: React.FC<{
   totalCount?: number;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
-}> = ({
+}> = React.memo(({
   icon,
   sectionNumber,
   title,
@@ -242,7 +273,7 @@ const DocketSectionBanner: React.FC<{
       )}
     </div>
   </div>
-);
+));
 
 // Helper to chunk remaining characteristics into strictly aligned rows of 6
 function chunkIntoStrict6Cols(
@@ -273,7 +304,76 @@ function chunkIntoStrict6Cols(
   return rows;
 }
 
-export const ProductDocketView: React.FC<ProductDocketViewProps> = ({
+// Module-level static sets to avoid allocating new Set objects on every render cycle
+const HANDLED_PRODUCT_SPECS = new Set([
+  "PRODUCTCLOSESIZELENGTH",
+  "PRODUCTCLOSESIZEWIDTH",
+  "CLAIMAPPLICABLETOPRODUCT",
+  "FSCEUTR_REQUIREMENT",
+  "PERCENTAGE_TYPE",
+  "SIZEAFTERPERFORATION",
+  "PRODUCTARTWORKNOS",
+  "PACKINGARTWORKNOS",
+  "OVERALLPRODUCTNOTE",
+  "PRODUCTDESCRIPTION",
+  "CUSTOMERNAME",
+  "PRODUCTCODE",
+  "BRAND",
+]);
+
+const HANDLED_BINDING_SPECS = new Set([
+  "BINDINGSIDE",
+  "BINDINGTYPE1",
+  "BINDINGTYPE2",
+  "NOOFSHEETS",
+  "NOOFFILINGHOLESREQUIRE",
+  "CORNERROUNDREQUIREON",
+  "EDGEFINISHIGTYPE",
+  "OPENINGOFPRODUCT",
+  "BINDINGMATERIAL",
+  "BINDINGCOLOR_STYLE",
+  "SPECIALBINDING",
+  "ADDITIONALPROCESSONBINDING",
+  "SPIRAL-WIROBINDINGHOLEPUNCH",
+  "SHEETGATHERINGSTYLE",
+]);
+
+const HANDLED_RULING_SPECS = new Set([
+  "INSIDE_PAPER_GSM",
+  "SPECIAL_RULING",
+  "RULLING_DISTANCE",
+  "RULLING_SHADE",
+  "TOP_MARGIN",
+  "TOP_MARGIN_COLOR",
+  "BOTTOM_MARGIN",
+  "BOTTOM_MARGIN_COLOR",
+  "LEFT_MARGIN",
+  "LEFT_MARGIN_COLOR",
+  "RIGHT_MARGIN",
+  "RIGHT_MARGIN_COLOR",
+  "INSTRUCTION_RULLING",
+]);
+
+const HANDLED_DIVIDER_SPECS = new Set([
+  "DIVIDERSTYPE1",
+  "DIVIDER1SIZEINCLTABLENGTH",
+  "DIVIDERMATERIALTYPE1",
+  "D1PRINTINGTYPE",
+  "D1NAMEOFCOLORSF_B",
+  "D1DIVIDERCALIPER_WEIGHT",
+  "TABSTYLEOF1STDIVIDERS",
+  "D1PRINTFINISHING",
+  "DIVIDERSTYPE2",
+  "DIVIDERSIZEINCLTABLENGTH",
+  "DIVIDERMATERIALTYPE2",
+  "D2PRINTINGTYPE",
+  "D2NAMEOFCOLORSF_B",
+  "D2DIVIDERCALIPER_WEIGHT",
+  "TABSTYLEOF2NDDIVIDERS",
+  "D2PRINTFINISHING",
+]);
+
+export const ProductDocketView: React.FC<ProductDocketViewProps> = React.memo(({
   product,
   classGroups,
   searchQuery: externalSearchQuery = "",
@@ -283,8 +383,43 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = ({
   const [viewFilter, setViewFilter] = useState<"all" | "configured">("all");
   const [activeSection, setActiveSection] = useState<string>("all");
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
 
   const effectiveSearch = externalSearchQuery || internalSearch;
+
+  const handleDownloadPdf = async () => {
+    try {
+      setIsExportingPdf(true);
+      const { downloadProductDocketPdf } = await import("./productDocketPdf");
+      await downloadProductDocketPdf(product, allPresentClasses);
+    } catch (err) {
+      console.error("Failed to generate PDF docket:", err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleDownloadCsv = async () => {
+    try {
+      setIsExportingCsv(true);
+      const { downloadProductDocketCsv } = await import("./productDocketPdf");
+      await downloadProductDocketCsv(product, allPresentClasses);
+    } catch (err) {
+      console.error("Failed to generate CSV docket:", err);
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    try {
+      const { printProductDocketView } = await import("./productDocketPdf");
+      printProductDocketView(product, containerId);
+    } catch (err) {
+      console.error("Failed to trigger print dialog:", err);
+    }
+  };
 
   const toggleSectionCollapse = (secId: string) => {
     setCollapsedSections((prev) => ({
@@ -324,54 +459,21 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = ({
       ? `${lengthVal.value} CM`
       : "NA";
 
-  const handledProductSpecs = new Set([
-    "PRODUCTCLOSESIZELENGTH",
-    "PRODUCTCLOSESIZEWIDTH",
-    "CLAIMAPPLICABLETOPRODUCT",
-    "FSCEUTR_REQUIREMENT",
-    "PERCENTAGE_TYPE",
-    "SIZEAFTERPERFORATION",
-    "PRODUCTARTWORKNOS",
-    "PACKINGARTWORKNOS",
-    "OVERALLPRODUCTNOTE",
-    "PRODUCTDESCRIPTION",
-    "CUSTOMERNAME",
-    "PRODUCTCODE",
-    "BRAND",
-  ]);
-
   const remainingProductSpecs = useMemo(() => {
     return productSpecs.filter(
-      (item) => !handledProductSpecs.has(item.characteristicName.toUpperCase())
+      (item) => !HANDLED_PRODUCT_SPECS.has(item.characteristicName.toUpperCase())
     );
-  }, [productSpecs, handledProductSpecs]);
+  }, [productSpecs]);
 
   // 2. NB_BINDING specs (Only present if at least one characteristic has data)
   const bindingSpecs = presentClassesMap.get("NB_BINDING") || [];
   const hasBinding = isClassPresent(bindingSpecs);
 
-  const handledBindingSpecs = new Set([
-    "BINDINGSIDE",
-    "BINDINGTYPE1",
-    "BINDINGTYPE2",
-    "NOOFSHEETS",
-    "NOOFFILINGHOLESREQUIRE",
-    "CORNERROUNDREQUIREON",
-    "EDGEFINISHIGTYPE",
-    "OPENINGOFPRODUCT",
-    "BINDINGMATERIAL",
-    "BINDINGCOLOR_STYLE",
-    "SPECIALBINDING",
-    "ADDITIONALPROCESSONBINDING",
-    "SPIRAL-WIROBINDINGHOLEPUNCH",
-    "SHEETGATHERINGSTYLE",
-  ]);
-
   const remainingBindingSpecs = useMemo(() => {
     return bindingSpecs.filter(
-      (item) => !handledBindingSpecs.has(item.characteristicName.toUpperCase())
+      (item) => !HANDLED_BINDING_SPECS.has(item.characteristicName.toUpperCase())
     );
-  }, [bindingSpecs, handledBindingSpecs]);
+  }, [bindingSpecs]);
 
   // 3. Components 1 to 7 (Only present if at least one characteristic in that component has data)
   const componentGroups = useMemo(() => {
@@ -402,56 +504,21 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = ({
   const rulingSpecs = presentClassesMap.get("RULLING_DETAILS") || [];
   const hasRuling = isClassPresent(rulingSpecs);
 
-  const handledRulingSpecs = new Set([
-    "INSIDE_PAPER_GSM",
-    "SPECIAL_RULING",
-    "RULLING_DISTANCE",
-    "RULLING_SHADE",
-    "TOP_MARGIN",
-    "TOP_MARGIN_COLOR",
-    "BOTTOM_MARGIN",
-    "BOTTOM_MARGIN_COLOR",
-    "LEFT_MARGIN",
-    "LEFT_MARGIN_COLOR",
-    "RIGHT_MARGIN",
-    "RIGHT_MARGIN_COLOR",
-    "INSTRUCTION_RULLING",
-  ]);
-
   const remainingRulingSpecs = useMemo(() => {
     return rulingSpecs.filter(
-      (item) => !handledRulingSpecs.has(item.characteristicName.toUpperCase())
+      (item) => !HANDLED_RULING_SPECS.has(item.characteristicName.toUpperCase())
     );
-  }, [rulingSpecs, handledRulingSpecs]);
+  }, [rulingSpecs]);
 
   // 5. NB_DIVIDER_SPECS specs (Only present if at least one characteristic has data)
   const dividerSpecs = presentClassesMap.get("NB_DIVIDER_SPECS") || [];
   const hasDividers = isClassPresent(dividerSpecs);
 
-  const handledDividerSpecs = new Set([
-    "DIVIDERSTYPE1",
-    "DIVIDER1SIZEINCLTABLENGTH",
-    "DIVIDERMATERIALTYPE1",
-    "D1PRINTINGTYPE",
-    "D1NAMEOFCOLORSF_B",
-    "D1DIVIDERCALIPER_WEIGHT",
-    "TABSTYLEOF1STDIVIDERS",
-    "D1PRINTFINISHING",
-    "DIVIDERSTYPE2",
-    "DIVIDERSIZEINCLTABLENGTH",
-    "DIVIDERMATERIALTYPE2",
-    "D2PRINTINGTYPE",
-    "D2NAMEOFCOLORSF_B",
-    "D2DIVIDERCALIPER_WEIGHT",
-    "TABSTYLEOF2NDDIVIDERS",
-    "D2PRINTFINISHING",
-  ]);
-
   const remainingDividerSpecs = useMemo(() => {
     return dividerSpecs.filter(
-      (item) => !handledDividerSpecs.has(item.characteristicName.toUpperCase())
+      (item) => !HANDLED_DIVIDER_SPECS.has(item.characteristicName.toUpperCase())
     );
-  }, [dividerSpecs, handledDividerSpecs]);
+  }, [dividerSpecs]);
 
   // 6. PACKAGING_SPECS_1 and PACKING_DETAILS (Only present if at least one characteristic has data)
   const packagingSpecs1 = presentClassesMap.get("PACKAGING_SPECS_1") || [];
@@ -746,25 +813,35 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = ({
             <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-zinc-900 p-1 rounded-lg border border-slate-200 dark:border-zinc-800 text-xs shadow-2xs">
               <button
                 type="button"
-                onClick={() => downloadProductDocketPdf(product, allPresentClasses)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-rose-50 text-slate-800 hover:text-rose-700 dark:bg-zinc-800 dark:hover:bg-rose-950/40 dark:text-zinc-200 dark:hover:text-rose-300 font-semibold shadow-2xs transition cursor-pointer text-[11px] border border-slate-200 dark:border-zinc-700"
+                onClick={handleDownloadPdf}
+                disabled={isExportingPdf}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-rose-50 text-slate-800 hover:text-rose-700 dark:bg-zinc-800 dark:hover:bg-rose-950/40 dark:text-zinc-200 dark:hover:text-rose-300 font-semibold shadow-2xs transition cursor-pointer text-[11px] border border-slate-200 dark:border-zinc-700 disabled:opacity-50"
                 title="Download Official Docket as High-Fidelity PDF"
               >
-                <FileText className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                <span>PDF</span>
+                {isExportingPdf ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                ) : (
+                  <FileText className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                )}
+                <span>{isExportingPdf ? "Generating..." : "PDF"}</span>
               </button>
               <button
                 type="button"
-                onClick={() => downloadProductDocketCsv(product, allPresentClasses)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-emerald-50 text-slate-800 hover:text-emerald-700 dark:bg-zinc-800 dark:hover:bg-emerald-950/40 dark:text-zinc-200 dark:hover:text-emerald-300 font-semibold shadow-2xs transition cursor-pointer text-[11px] border border-slate-200 dark:border-zinc-700"
+                onClick={handleDownloadCsv}
+                disabled={isExportingCsv}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-emerald-50 text-slate-800 hover:text-emerald-700 dark:bg-zinc-800 dark:hover:bg-emerald-950/40 dark:text-zinc-200 dark:hover:text-emerald-300 font-semibold shadow-2xs transition cursor-pointer text-[11px] border border-slate-200 dark:border-zinc-700 disabled:opacity-50"
                 title="Export Structured Technical Specifications as CSV (Excel Compatible)"
               >
-                <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>CSV</span>
+                {isExportingCsv ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                )}
+                <span>{isExportingCsv ? "Exporting..." : "CSV"}</span>
               </button>
               <button
                 type="button"
-                onClick={() => printProductDocketView(product, containerId)}
+                onClick={handlePrint}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-sky-50 text-slate-800 hover:text-sky-700 dark:bg-zinc-800 dark:hover:bg-sky-950/40 dark:text-zinc-200 dark:hover:text-sky-300 font-semibold shadow-2xs transition cursor-pointer text-[11px] border border-slate-200 dark:border-zinc-700"
                 title="Print or Save as PDF via Browser Print Dialog"
               >
@@ -1607,6 +1684,6 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default ProductDocketView;

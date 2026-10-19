@@ -348,7 +348,7 @@ def _list_workflows(db, model, log_model, kind, year, stage, limit, viewer=None)
         ).filter(log_model.workflow_id.in_(workflow_ids)).subquery()
         logs = db.query(log_model).join(
             recent_log_ids, recent_log_ids.c.id == log_model.id
-        ).filter(recent_log_ids.c.row_num <= 100).order_by(log_model.workflow_id, log_model.id).all()
+        ).filter(recent_log_ids.c.row_num <= 10).order_by(log_model.workflow_id, log_model.id).all()
         for log in logs:
             logs_by_workflow.setdefault(log.workflow_id, []).append(log)
     return [

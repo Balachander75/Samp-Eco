@@ -8,7 +8,12 @@ import {
   recordFeasibilityViewedApi,
   fetchFeasibilityRequestsApi,
 } from "@/infrastructure/api";
-import { FeasibilityInspectorModal } from "@/features/sample-requests/components/FeasibilityInspectorModal";
+import { TopLoadingBar } from "@/components/ui/loading";
+const FeasibilityInspectorModal = React.lazy(() =>
+  import("@/features/sample-requests/components/FeasibilityInspectorModal").then((m) => ({
+    default: m.FeasibilityInspectorModal,
+  }))
+);
 import { formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 import {
   CopyBadge,
@@ -727,21 +732,25 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
           }
         />
 
+        {isLoading && <TopLoadingBar isLoading={true} />}
+
         {/* ── SAMP Technical Inspector & Verdict Modal ── */}
-        {selectedRequest && (
-          <FeasibilityInspectorModal
-            request={selectedRequest}
-            isOpen={isInspectorOpen}
-            onRefresh={handleRefresh}
-            onClose={() => {
-              setIsInspectorOpen(false);
-              void handleRefresh();
-            }}
-            user={user}
-            isAdmin={isAdmin}
-            sourceDesk="samp"
-          />
-        )}
+        <React.Suspense fallback={null}>
+          {selectedRequest && isInspectorOpen && (
+            <FeasibilityInspectorModal
+              request={selectedRequest}
+              isOpen={isInspectorOpen}
+              onRefresh={handleRefresh}
+              onClose={() => {
+                setIsInspectorOpen(false);
+                void handleRefresh();
+              }}
+              user={user}
+              isAdmin={isAdmin}
+              sourceDesk="samp"
+            />
+          )}
+        </React.Suspense>
       </DeskWorkspaceLayout>
     </>
   );

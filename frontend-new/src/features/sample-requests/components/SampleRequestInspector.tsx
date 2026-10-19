@@ -18,7 +18,6 @@ import {
   Factory,
   Search,
   FileText,
-  LoaderCircle,
   Box,
   MessageSquare,
   Truck,
@@ -29,6 +28,7 @@ import {
   Download,
   Printer,
   FileSpreadsheet,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -57,7 +57,7 @@ import { ImageLightboxModal } from "./inspector/ImageLightboxModal";
 import { fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
 import { isMockupCreativeCharacteristic } from "./staging/mockupCreativeFields";
 import { ProductDocketView } from "./staging/ProductDocketView";
-import { downloadProductDocketPdf, downloadProductDocketCsv, printProductDocketView } from "./staging/productDocketPdf";
+import { DocketSkeleton } from "@/components/ui/loading";
 import type { ProductSearchResult } from "../types";
 import { getPrimaryRequestCode } from "../sampling/utils/requestTypeUtils";
 
@@ -161,6 +161,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [charSearchQuery, setCharSearchQuery] = useState("");
   const [charFilter, setCharFilter] = useState<"all" | "configured" | "docket">("docket");
+  const [isExportingDocketPdf, setIsExportingDocketPdf] = useState(false);
+  const [isExportingDocketCsv, setIsExportingDocketCsv] = useState(false);
 
   // Creative section state
   const [creativeShutterstockNo, setCreativeShutterstockNo] = useState("");
@@ -1405,23 +1407,62 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                             <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => downloadProductDocketPdf(sampleDocketProduct, groupedCharacteristics)}
-                                className="inline-flex h-6 items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2 text-[10px] font-semibold text-[var(--on-surface)] transition hover:bg-[var(--surface-low)] cursor-pointer"
+                                disabled={isExportingDocketPdf}
+                                onClick={async () => {
+                                  try {
+                                    setIsExportingDocketPdf(true);
+                                    const { downloadProductDocketPdf } = await import("./staging/productDocketPdf");
+                                    await downloadProductDocketPdf(sampleDocketProduct, groupedCharacteristics);
+                                  } catch (err) {
+                                    console.error("Failed to download PDF:", err);
+                                  } finally {
+                                    setIsExportingDocketPdf(false);
+                                  }
+                                }}
+                                className="inline-flex h-6 items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2 text-[10px] font-semibold text-[var(--on-surface)] transition hover:bg-[var(--surface-low)] cursor-pointer disabled:opacity-50"
                                 title="Download Complete Technical Docket PDF"
                               >
-                                <Download className="h-3 w-3" /> PDF
+                                {isExportingDocketPdf ? (
+                                  <Loader2 className="h-3 w-3 animate-spin text-rose-500" />
+                                ) : (
+                                  <Download className="h-3 w-3" />
+                                )}
+                                <span>{isExportingDocketPdf ? "PDF..." : "PDF"}</span>
                               </button>
                               <button
                                 type="button"
-                                onClick={() => downloadProductDocketCsv(sampleDocketProduct, groupedCharacteristics)}
-                                className="inline-flex h-6 items-center gap-1 rounded-md border border-emerald-300/60 bg-emerald-50 px-2 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer"
+                                disabled={isExportingDocketCsv}
+                                onClick={async () => {
+                                  try {
+                                    setIsExportingDocketCsv(true);
+                                    const { downloadProductDocketCsv } = await import("./staging/productDocketPdf");
+                                    await downloadProductDocketCsv(sampleDocketProduct, groupedCharacteristics);
+                                  } catch (err) {
+                                    console.error("Failed to download CSV:", err);
+                                  } finally {
+                                    setIsExportingDocketCsv(false);
+                                  }
+                                }}
+                                className="inline-flex h-6 items-center gap-1 rounded-md border border-emerald-300/60 bg-emerald-50 px-2 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer disabled:opacity-50"
                                 title="Export Docket Specifications to CSV (Excel Ready)"
                               >
-                                <FileSpreadsheet className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> CSV
+                                {isExportingDocketCsv ? (
+                                  <Loader2 className="h-3 w-3 animate-spin text-emerald-600" />
+                                ) : (
+                                  <FileSpreadsheet className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                )}
+                                <span>{isExportingDocketCsv ? "CSV..." : "CSV"}</span>
                               </button>
                               <button
                                 type="button"
-                                onClick={() => printProductDocketView(sampleDocketProduct, `sample-request-docket-${activeRequest.id}`)}
+                                onClick={async () => {
+                                  try {
+                                    const { printProductDocketView } = await import("./staging/productDocketPdf");
+                                    printProductDocketView(sampleDocketProduct, `sample-request-docket-${activeRequest.id}`);
+                                  } catch (err) {
+                                    console.error("Failed to print docket:", err);
+                                  }
+                                }}
                                 className="inline-flex h-6 items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
                                 title="Print or Save Complete Docket as PDF"
                               >
@@ -1464,10 +1505,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                       </div>
 
                       {isLoadingDetails ? (
-                        <div className="py-8 flex items-center justify-center gap-2 text-xs text-[var(--on-surface-subtle)]">
-                          <LoaderCircle className="w-4 h-4 animate-spin text-teal-600" />
-                          <span>Loading product specifications...</span>
-                        </div>
+                        <DocketSkeleton sections={2} />
                       ) : groupedCharacteristics.length === 0 ? (
                         <div className="py-8 text-center text-xs text-[var(--on-surface-subtle)] font-mono">
                           No characteristics matched your filter.

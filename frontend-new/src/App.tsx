@@ -45,11 +45,14 @@ const PlantSamplingQueue = lazy(() => import("@/features/plant/PlantSamplingQueu
 const StudioWorkDesk = lazy(() => import("@/features/creative/StudioWorkDesk"));
 const HelpSupportPage = lazy(() => import("@/features/help/HelpSupportPage"));
 
+import { WorkspaceSkeleton, TopLoadingBar } from "@/components/ui/loading";
+
 function RouteLoadingFallback() {
   return (
-    <div className="flex min-h-48 flex-1 items-center justify-center p-6" role="status" aria-live="polite">
-      <span className="text-sm text-onSurface-muted">Loading workspace…</span>
-    </div>
+    <>
+      <TopLoadingBar isLoading={true} />
+      <WorkspaceSkeleton />
+    </>
   );
 }
 

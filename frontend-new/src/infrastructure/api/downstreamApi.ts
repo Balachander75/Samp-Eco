@@ -87,3 +87,24 @@ export async function updateCostingEstimationApi(
     return null;
   }
 }
+
+// ==========================================
+// TELEMETRY COUNTS API (FAST INDEXED AGGREGATIONS)
+// ==========================================
+
+export interface OperationsTelemetryCounts {
+  briefs_count: number;
+  dielines_count: number;
+  costings_count: number;
+}
+
+export async function fetchOperationsTelemetryCountsApi(): Promise<OperationsTelemetryCounts> {
+  try {
+    const data = await apiFetch<OperationsTelemetryCounts>("/api/v1/operations/telemetry-counts");
+    return data || { briefs_count: 0, dielines_count: 0, costings_count: 0 };
+  } catch (err) {
+    console.error("fetchOperationsTelemetryCountsApi error:", err);
+    return { briefs_count: 0, dielines_count: 0, costings_count: 0 };
+  }
+}
+

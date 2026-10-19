@@ -20,8 +20,13 @@ import { CopyBadge, StatusPill, Select } from "@/components/ui";
 import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { indiaDateKey, addOperationalWorkdays } from "@/lib/operationalWorkdays";
-import { FeasibilityInspectorModal } from "../components/FeasibilityInspectorModal";
-import { NewFeasibilityModal } from "../components/NewFeasibilityModal";
+import { TopLoadingBar } from "@/components/ui/loading";
+const FeasibilityInspectorModal = React.lazy(() =>
+  import("../components/FeasibilityInspectorModal").then((m) => ({ default: m.FeasibilityInspectorModal }))
+);
+const NewFeasibilityModal = React.lazy(() =>
+  import("../components/NewFeasibilityModal").then((m) => ({ default: m.NewFeasibilityModal }))
+);
 import {
   fetchFeasibilityRequestsApi,
   createFeasibilityRequestApi,
@@ -805,30 +810,38 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
         />
       </DeskWorkspaceLayout>
 
-      {/* Inspector Modal */}
-      <FeasibilityInspectorModal
-        request={selectedRequest}
-        isOpen={isInspectorOpen}
-        onClose={() => {
-          setIsInspectorOpen(false);
-          setSelectedRequest(null);
-        }}
-        onRefresh={loadRequests}
-        user={user}
-        isAdmin={isAdmin}
-        sourceDesk={sourceDesk}
-      />
+      {isLoading && <TopLoadingBar isLoading={true} />}
 
-      {/* New Feasibility Request Modal */}
-      <NewFeasibilityModal
-        isOpen={isNewModalOpen && canRaiseRequest && !isReadOnly}
-        onClose={() => setIsNewModalOpen(false)}
-        onSubmit={handleCreateRequest}
-        customers={masterCustomers}
-        existingCustomers={customerList}
-        requestCreatedBy={user?.name || user?.userid}
-        defaultPlant={selectedPlant && selectedPlant !== "All Plants" ? selectedPlant : "Navneet - Khaniwade"}
-      />
+      <React.Suspense fallback={null}>
+        {/* Inspector Modal */}
+        {selectedRequest && isInspectorOpen && (
+          <FeasibilityInspectorModal
+            request={selectedRequest}
+            isOpen={isInspectorOpen}
+            onClose={() => {
+              setIsInspectorOpen(false);
+              setSelectedRequest(null);
+            }}
+            onRefresh={loadRequests}
+            user={user}
+            isAdmin={isAdmin}
+            sourceDesk={sourceDesk}
+          />
+        )}
+
+        {/* New Feasibility Request Modal */}
+        {isNewModalOpen && canRaiseRequest && !isReadOnly && (
+          <NewFeasibilityModal
+            isOpen={isNewModalOpen && canRaiseRequest && !isReadOnly}
+            onClose={() => setIsNewModalOpen(false)}
+            onSubmit={handleCreateRequest}
+            customers={masterCustomers}
+            existingCustomers={customerList}
+            requestCreatedBy={user?.name || user?.userid}
+            defaultPlant={selectedPlant && selectedPlant !== "All Plants" ? selectedPlant : "Navneet - Khaniwade"}
+          />
+        )}
+      </React.Suspense>
     </>
   );
 };

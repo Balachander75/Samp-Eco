@@ -122,7 +122,9 @@ async def add_security_headers(request, call_next):
         "Content-Security-Policy",
         "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https:;",
     )
-    if request.url.path.startswith("/api/"):
+    if request.url.path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif request.url.path.startswith("/api/"):
         response.headers.setdefault("Cache-Control", "private, no-store")
     if settings.APP_ENV.strip().lower() in ("production", "prod"):
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")

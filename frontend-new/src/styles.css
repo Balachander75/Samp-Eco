@@ -627,6 +627,77 @@
 
 
 /* Smooth Hardware-Accelerated Micro-Animations (Zero Jitter) */
+@keyframes luminousShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes luminousGlowPulse {
+  0%, 100% {
+    opacity: 0.65;
+    filter: drop-shadow(0 0 4px rgba(var(--accent-primary-rgb), 0.3));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px rgba(var(--accent-primary-rgb), 0.55));
+  }
+}
+
+@keyframes topBarIndeterminate {
+  0% {
+    left: -35%;
+    right: 100%;
+  }
+  60% {
+    left: 100%;
+    right: -90%;
+  }
+  100% {
+    left: 100%;
+    right: -90%;
+  }
+}
+
+.shimmer-luminous {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-luminous::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--accent-primary-rgb), 0.07) 35%,
+    rgba(var(--accent-primary-rgb), 0.16) 50%,
+    rgba(var(--accent-primary-rgb), 0.07) 65%,
+    transparent 100%
+  );
+  animation: luminousShimmer 1.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.dark .shimmer-luminous::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.02) 35%,
+    rgba(var(--accent-primary-rgb), 0.15) 50%,
+    rgba(255, 255, 255, 0.02) 65%,
+    transparent 100%
+  );
+}
+
 @keyframes smoothDrawerSlideIn {
   from {
     transform: translate3d(100%, 0, 0);

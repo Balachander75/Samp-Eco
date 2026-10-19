@@ -30,6 +30,7 @@ import {
 import type { UpdateSampleRequestPayload } from "@/infrastructure/api";
 import type { DraftPackageContext } from "./DraftPackagesView";
 import { getDraftReleaseStatus, isDesignRequest } from "../utils/trackTypes";
+import { TopLoadingBar, TableShimmerSkeleton } from "@/components/ui/loading";
 
 export interface DraftWorkspacePageProps {
   user?: UserProfile | null;
@@ -523,6 +524,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--surface-base)] text-[var(--on-surface)]">
+      {isLoading && <TopLoadingBar isLoading={true} />}
       {/* Toast */}
       {toastMessage && (
         <div className={`fixed right-4 top-4 z-50 flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold shadow-xl animate-in fade-in slide-in-from-top-2 ${
@@ -663,11 +665,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]/60">
                 {isLoading ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-sm text-[var(--on-surface-muted)]">
-                      Loading package items...
-                    </td>
-                  </tr>
+                  <TableShimmerSkeleton rows={5} columns={8} />
                 ) : packageItems.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-14 text-center">

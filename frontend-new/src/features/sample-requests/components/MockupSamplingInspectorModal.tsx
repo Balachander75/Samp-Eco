@@ -35,11 +35,6 @@ import { formatWorkflowAction } from "./workflowPresentation";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ScopeReferenceImagesGallery } from "@/features/sample-requests/components/staging/ScopeReferenceImagesGallery";
 import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
-import {
-  downloadProductDocketPdf,
-  downloadProductDocketCsv,
-  printProductDocketView,
-} from "@/features/sample-requests/components/staging/productDocketPdf";
 import type { ProductSearchResult, SampleRequestItem } from "../types";
 
 interface MockupSamplingInspectorModalProps {
@@ -786,7 +781,14 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => downloadProductDocketPdf(docketProduct, docketClassGroups)}
+                            onClick={async () => {
+                              try {
+                                const { downloadProductDocketPdf } = await import("@/features/sample-requests/components/staging/productDocketPdf");
+                                await downloadProductDocketPdf(docketProduct, docketClassGroups);
+                              } catch (err) {
+                                console.error("Failed to download PDF:", err);
+                              }
+                            }}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[10px] font-semibold text-rose-800 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50 cursor-pointer"
                             title="Download Complete Technical Docket PDF"
                           >
@@ -794,7 +796,14 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                           </button>
                           <button
                             type="button"
-                            onClick={() => downloadProductDocketCsv(docketProduct, docketClassGroups)}
+                            onClick={async () => {
+                              try {
+                                const { downloadProductDocketCsv } = await import("@/features/sample-requests/components/staging/productDocketPdf");
+                                await downloadProductDocketCsv(docketProduct, docketClassGroups);
+                              } catch (err) {
+                                console.error("Failed to download CSV:", err);
+                              }
+                            }}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 cursor-pointer"
                             title="Export Structured Specifications to CSV (Excel Compatible)"
                           >
@@ -802,7 +811,14 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                           </button>
                           <button
                             type="button"
-                            onClick={() => printProductDocketView(docketProduct, `mockup-docket-${record.sample_request_id}`)}
+                            onClick={async () => {
+                              try {
+                                const { printProductDocketView } = await import("@/features/sample-requests/components/staging/productDocketPdf");
+                                printProductDocketView(docketProduct, `mockup-docket-${record.sample_request_id}`);
+                              } catch (err) {
+                                console.error("Failed to print docket:", err);
+                              }
+                            }}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
                             title="Print or Save Complete Docket as PDF"
                           >
@@ -858,7 +874,14 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => downloadProductDocketPdf(docketProduct, docketClassGroups)}
+                            onClick={async () => {
+                              try {
+                                const { downloadProductDocketPdf } = await import("@/features/sample-requests/components/staging/productDocketPdf");
+                                await downloadProductDocketPdf(docketProduct, docketClassGroups);
+                              } catch (err) {
+                                console.error("Failed to download PDF:", err);
+                              }
+                            }}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-[10px] font-semibold text-[var(--on-surface)] transition hover:bg-[var(--surface-low)] cursor-pointer"
                             title="Download Complete Technical Docket PDF"
                           >
@@ -866,7 +889,14 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                           </button>
                           <button
                             type="button"
-                            onClick={() => downloadProductDocketCsv(docketProduct, docketClassGroups)}
+                            onClick={async () => {
+                              try {
+                                const { downloadProductDocketCsv } = await import("@/features/sample-requests/components/staging/productDocketPdf");
+                                await downloadProductDocketCsv(docketProduct, docketClassGroups);
+                              } catch (err) {
+                                console.error("Failed to download CSV:", err);
+                              }
+                            }}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-300/60 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer"
                             title="Export Docket Specifications to CSV (Excel Ready)"
                           >
@@ -874,7 +904,14 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                           </button>
                           <button
                             type="button"
-                            onClick={() => printProductDocketView(docketProduct, `mockup-docket-${record.sample_request_id}`)}
+                            onClick={async () => {
+                              try {
+                                const { printProductDocketView } = await import("@/features/sample-requests/components/staging/productDocketPdf");
+                                printProductDocketView(docketProduct, `mockup-docket-${record.sample_request_id}`);
+                              } catch (err) {
+                                console.error("Failed to print docket:", err);
+                              }
+                            }}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
                             title="Print or Save Complete Docket as PDF"
                           >

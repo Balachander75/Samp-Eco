@@ -1,5 +1,5 @@
 """Customer, manufacturing plant, and enterprise user master-data endpoints."""
-from typing import Optional, List
+from typing import Optional, List, Any
 from sqlalchemy import Integer, case, cast, func
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -76,6 +76,11 @@ def list_plants(
 from app.utils.business_year import get_current_business_year
 
 
+import time
+
+_BUSINESS_YEARS_CACHE: dict[str, Any] = {"timestamp": 0.0, "data": None}
+_BUSINESS_YEARS_TTL_SECONDS = 60.0
+
 # ---------------------------------------------------------------------------
 # Business Years (Used by Header Business Year Dropdown)
 # ---------------------------------------------------------------------------
@@ -85,6 +90,13 @@ def list_business_years(
     db: Session = Depends(get_db),
     current_user=Depends(get_optional_current_user),
 ):
+    now_ts = time.time()
+    if (
+        _BUSINESS_YEARS_CACHE["data"] is not None
+        and (now_ts - _BUSINESS_YEARS_CACHE["timestamp"]) < _BUSINESS_YEARS_TTL_SECONDS
+    ):
+        return _BUSINESS_YEARS_CACHE["data"]
+
     current_by = get_current_business_year()
     year_counts: dict[str, int] = {}
 
@@ -166,11 +178,14 @@ def list_business_years(
         }
         for year, count in sorted(year_counts.items(), key=lambda item: year_sort_key(item[0]), reverse=True)
     ]
-    return {
+    result = {
         "current_business_year": current_by,
         "total_records": sum(year_counts.values()),
         "years": years,
     }
+    _BUSINESS_YEARS_CACHE["timestamp"] = now_ts
+    _BUSINESS_YEARS_CACHE["data"] = result
+    return result
 
 
 # ---------------------------------------------------------------------------

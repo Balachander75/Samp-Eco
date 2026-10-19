@@ -6,15 +6,29 @@ import { fetchAllMarketingRequestsApi } from "@/infrastructure/api/sampleRequest
 import { fetchCostingWorkflowsApi, type RequestWorkflowRecord } from "@/infrastructure/api/workflowApi";
 import { useBusinessYear } from "@/context/BusinessYearContext";
 import { CreativeBriefItem, SampleRequestItem } from "@/features/sample-requests/types";
-import { CreativeOverviewPage } from "./CreativeOverviewPage";
-import { CreativeDesignPage } from "./CreativeDesignPage";
-import { CreativeSamplingMockupPage } from "./CreativeSamplingMockupPage";
-import { CreativeCostingPage } from "./CreativeCostingPage";
-import { MockupWorkflowInspectorModal } from "@/features/sample-requests/components/staging/MockupWorkflowInspectorModal";
 import { getRequestTrackType } from "@/features/sample-requests/utils/trackTypes";
 import { isDirectPlantResampleRequest } from "@/features/sample-requests/utils/sampleRouting";
+import { TopLoadingBar, WorkspaceSkeleton } from "@/components/ui/loading";
 import { TeamHeadReadOnlyNotice } from "@/components/ui/TeamHeadReadOnlyNotice";
 import { isReadOnlyTeamHead, isAdmin as isAdminUser } from "@/features/auth/permissions";
+
+const CreativeOverviewPage = React.lazy(() =>
+  import("./CreativeOverviewPage").then((m) => ({ default: m.CreativeOverviewPage }))
+);
+const CreativeDesignPage = React.lazy(() =>
+  import("./CreativeDesignPage").then((m) => ({ default: m.CreativeDesignPage }))
+);
+const CreativeSamplingMockupPage = React.lazy(() =>
+  import("./CreativeSamplingMockupPage").then((m) => ({ default: m.CreativeSamplingMockupPage }))
+);
+const CreativeCostingPage = React.lazy(() =>
+  import("./CreativeCostingPage").then((m) => ({ default: m.CreativeCostingPage }))
+);
+const MockupWorkflowInspectorModal = React.lazy(() =>
+  import("@/features/sample-requests/components/staging/MockupWorkflowInspectorModal").then((m) => ({
+    default: m.MockupWorkflowInspectorModal,
+  }))
+);
 
 const DesignRequestInspectorModal = React.lazy(() =>
   import("@/features/sample-requests/components/DesignRequestInspectorModal").then((m) => ({
@@ -285,7 +299,10 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
         </div>
       )}
 
+      {isLoading && <TopLoadingBar isLoading={true} />}
+
       {/* Active Sub-View Body */}
+      <React.Suspense fallback={<WorkspaceSkeleton />}>
       {activeView === "overview" && (
         <CreativeOverviewPage
           briefs={briefs}
@@ -341,6 +358,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
           onRefresh={loadData}
         />
       )}
+      </React.Suspense>
 
       {/* Modals & Inspectors */}
       <React.Suspense fallback={null}>

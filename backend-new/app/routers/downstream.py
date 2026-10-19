@@ -82,3 +82,24 @@ def update_costing_estimation(
     if updated is None:
         raise HTTPException(status_code=404, detail="Costing estimation not found")
     return updated
+
+
+@router.get("/api/v1/operations/telemetry-counts", summary="Fast indexed counts for downstream operations")
+def get_downstream_telemetry_counts(
+    service: DownstreamService = Depends(get_downstream_service),
+    current_user=Depends(get_current_user),
+):
+    """Return lightweight counts for executive overview without transferring records."""
+    from app.models.downstream import CostingEstimation, CreativeBrief, StudioDieline
+    from sqlalchemy import func
+
+    briefs_count = service.db.query(func.count(CreativeBrief.id)).scalar() or 0
+    dielines_count = service.db.query(func.count(StudioDieline.id)).scalar() or 0
+    costings_count = service.db.query(func.count(CostingEstimation.id)).scalar() or 0
+
+    return {
+        "briefs_count": briefs_count,
+        "dielines_count": dielines_count,
+        "costings_count": costings_count,
+    }
+

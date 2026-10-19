@@ -21,6 +21,7 @@ import { isMaterialAddedRecently, formatOdooDate } from "../utils/dateUtils";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { Select } from "@/components/ui/Select";
 import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
+import { TopLoadingBar } from "@/components/ui/loading";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { pauseProgramRequestApi } from "@/infrastructure/api/programsApi";
 
@@ -645,6 +646,8 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
           </div>
         }
       />
+
+      {isLoading && <TopLoadingBar isLoading={true} />}
 
       {/* New Seasonal Program Planning Modal */}
       {isNewModalOpen && (

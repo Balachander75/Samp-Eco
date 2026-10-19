@@ -14,12 +14,30 @@ FROM nginx:alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Custom Nginx configuration for SPA routing fallback
+# Custom Nginx configuration with immutable asset caching and SPA routing fallback
 RUN echo 'server { \
     listen 80; \
     server_name localhost; \
     root /usr/share/nginx/html; \
     index index.html; \
+    gzip on; \
+    gzip_vary on; \
+    gzip_proxied any; \
+    gzip_comp_level 6; \
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml; \
+    location /assets/ { \
+        expires 1y; \
+        add_header Cache-Control "public, max-age=31536000, immutable"; \
+        access_log off; \
+    } \
+    location = /index.html { \
+        expires -1; \
+        add_header Cache-Control "no-cache, no-store, must-revalidate"; \
+    } \
+    location = /sw.js { \
+        expires -1; \
+        add_header Cache-Control "no-cache, no-store, must-revalidate"; \
+    } \
     location / { \
         try_files $uri $uri/ /index.html; \
     } \

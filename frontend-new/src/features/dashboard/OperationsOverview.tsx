@@ -2,9 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useNavigate } from "react-router-dom";
 import {
   fetchAllMarketingRequestsApi,
-  fetchCreativeBriefsApi,
-  fetchStudioDielinesApi,
-  fetchCostingEstimationsApi,
+  fetchOperationsTelemetryCountsApi,
 } from "@/infrastructure/api";
 import { SampleRequestItem } from "@/features/sample-requests/types";
 import { UserProfile } from "@/features/auth";
@@ -168,16 +166,18 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
   const loadData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [requestsData, briefsData, dielinesData, costingsData] = await Promise.all([
+      const [requestsData, counts] = await Promise.all([
         fetchAllMarketingRequestsApi(selectedYear).catch(() => []),
-        fetchCreativeBriefsApi().catch(() => []),
-        fetchStudioDielinesApi().catch(() => []),
-        fetchCostingEstimationsApi().catch(() => []),
+        fetchOperationsTelemetryCountsApi().catch(() => ({
+          briefs_count: 0,
+          dielines_count: 0,
+          costings_count: 0,
+        })),
       ]);
       setRequests(requestsData);
-      setBriefsCount(briefsData.length);
-      setDielinesCount(dielinesData.length);
-      setCostingsCount(costingsData.length);
+      setBriefsCount(counts.briefs_count);
+      setDielinesCount(counts.dielines_count);
+      setCostingsCount(counts.costings_count);
       const now = new Date();
       setLastRefreshed(
         now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })

@@ -9,28 +9,48 @@ interface MasterDataState {
   error: string | null;
 }
 
-/** Load customer and plant masters from the backend-new database with reactive updates. */
+let masterDataCache: { customers: CustomerItem[]; plants: PlantItem[] } | null = null;
+let masterDataInFlight: Promise<{ customers: CustomerItem[]; plants: PlantItem[] }> | null = null;
+
+export function clearMasterDataCache(): void {
+  masterDataCache = null;
+  masterDataInFlight = null;
+}
+
+/** Load customer and plant masters from the backend-new database with reactive updates and memory caching. */
 export function useMasterData(enabled = true): MasterDataState {
-  const [customers, setCustomers] = useState<CustomerItem[]>([]);
-  const [plants, setPlants] = useState<PlantItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [customers, setCustomers] = useState<CustomerItem[]>(() => masterDataCache?.customers || []);
+  const [plants, setPlants] = useState<PlantItem[]>(() => masterDataCache?.plants || []);
+  const [isLoading, setIsLoading] = useState(!masterDataCache && enabled);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
 
+    if (masterDataCache) {
+      setCustomers(masterDataCache.customers);
+      setPlants(masterDataCache.plants);
+      setIsLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setIsLoading(true);
 
-    Promise.all([fetchCustomersApi(), fetchPlantsApi()])
-      .then(([customerRows, plantRows]) => {
+    if (!masterDataInFlight) {
+      masterDataInFlight = Promise.all([fetchCustomersApi(), fetchPlantsApi()]).then(([customerRows, plantRows]) => {
+        const cleanCustomers = customerRows && customerRows.length > 0 ? customerRows : [];
+        const cleanPlants = plantRows && plantRows.length > 0 ? plantRows.filter((p) => p.isActive !== false) : [];
+        masterDataCache = { customers: cleanCustomers, plants: cleanPlants };
+        return masterDataCache;
+      });
+    }
+
+    masterDataInFlight
+      .then((data) => {
         if (cancelled) return;
-        if (customerRows && customerRows.length > 0) {
-          setCustomers(customerRows);
-        }
-        if (plantRows && plantRows.length > 0) {
-          setPlants(plantRows.filter((plant) => plant.isActive !== false));
-        }
+        setCustomers(data.customers);
+        setPlants(data.plants);
       })
       .catch((err) => {
         console.warn("Could not load backend master data:", err);
@@ -49,3 +69,4 @@ export function useMasterData(enabled = true): MasterDataState {
 
   return { customers, plants, isLoading, error };
 }
+

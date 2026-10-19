@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowUp,
   ArrowDown,
@@ -7,6 +8,7 @@ import {
   ChevronRight,
   PackageOpen,
 } from "lucide-react";
+import { TableShimmerSkeleton } from "@/components/ui/loading";
 
 export interface ColumnDef<T> {
   id: string;
@@ -47,6 +49,7 @@ export interface DataTableProps<T> {
   tableClassName?: string;
   containerClassName?: string;
   density?: "compact" | "normal";
+  enableVirtualization?: boolean;
   // Toolbar slots
   toolbarLeft?: React.ReactNode;
   toolbarRight?: React.ReactNode;
@@ -74,9 +77,39 @@ export function DataTable<T>({
   tableClassName,
   containerClassName,
   density = "normal",
+  enableVirtualization = true,
   toolbarLeft,
   toolbarRight,
 }: DataTableProps<T>) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const shouldVirtualize = enableVirtualization && data.length > 40;
+
+  const rowVirtualizer = useVirtualizer({
+    count: data.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => (density === "compact" ? 36 : 42),
+    overscan: 10,
+    enabled: shouldVirtualize,
+  });
+
+  const virtualItems = shouldVirtualize ? rowVirtualizer.getVirtualItems() : [];
+  const totalVirtualHeight = shouldVirtualize ? rowVirtualizer.getTotalSize() : 0;
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0]?.start ?? 0 : 0;
+  const paddingBottom =
+    virtualItems.length > 0
+      ? totalVirtualHeight - (virtualItems[virtualItems.length - 1]?.end ?? 0)
+      : 0;
+
+  const rowsToRender = useMemo(() => {
+    if (!shouldVirtualize) {
+      return data.map((row, index) => ({ row, index }));
+    }
+    return virtualItems.map((virtualItem) => ({
+      row: data[virtualItem.index],
+      index: virtualItem.index,
+    }));
+  }, [shouldVirtualize, data, virtualItems]);
+
   const isAllSelected = useMemo(() => {
     if (!enableSelection || !selectedIds || data.length === 0) return false;
     return data.every((item) => selectedIds.has(keyExtractor(item)));
@@ -129,7 +162,10 @@ export function DataTable<T>({
       </div>
 
       {/* Main Table Container */}
-      <div className={`flex-1 min-h-0 relative ${containerClassName ?? "overflow-auto"}`}>
+      <div
+        ref={parentRef}
+        className={`flex-1 min-h-0 relative ${containerClassName ?? "overflow-auto"}`}
+      >
         <table className={`w-full text-left ${density === "compact" ? "text-[12px]" : "text-[13px]"} border-collapse ${tableClassName ?? "min-w-[1080px]"}`}>
           {/* Sticky Header */}
           <thead className="sticky top-0 z-20 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] shadow-2xs">
@@ -203,24 +239,11 @@ export function DataTable<T>({
           {/* Table Body */}
           <tbody className="divide-y divide-[var(--border-subtle)]">
             {isLoading ? (
-              Array.from({ length: 12 }).map((_, rIdx) => (
-                <tr key={rIdx} className="animate-pulse">
-                  {enableSelection && (
-                    <td className="px-4 py-2.5 text-center">
-                      <div className="h-3.5 w-3.5 bg-[var(--surface-container)] rounded mx-auto" />
-                    </td>
-                  )}
-                  {columns.map((_col, cIdx) => (
-                    <td key={cIdx} className={density === "compact" ? "px-2 py-1.5" : "px-4 py-2.5"}>
-                      <div
-                        className={`h-3.5 bg-[var(--surface-low)] rounded ${
-                          cIdx === 0 ? "w-3/4" : cIdx % 3 === 0 ? "w-2/5" : "w-3/5"
-                        }`}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))
+              <TableShimmerSkeleton
+                rows={pageSize > 0 ? Math.min(pageSize, 12) : 10}
+                columns={columns.length}
+                hasCheckbox={enableSelection}
+              />
             ) : data.length === 0 ? (
               <tr>
                 <td
@@ -243,10 +266,16 @@ export function DataTable<T>({
                 </td>
               </tr>
             ) : (
-              data.map((row, index) => {
-                const rowKey = keyExtractor(row);
-                const isSelected = selectedRowId === rowKey;
-                const isChecked = selectedIds?.has(rowKey) ?? false;
+              <>
+                {paddingTop > 0 && (
+                  <tr style={{ height: `${paddingTop}px` }}>
+                    <td colSpan={columns.length + (enableSelection ? 1 : 0)} />
+                  </tr>
+                )}
+                {rowsToRender.map(({ row, index }) => {
+                  const rowKey = keyExtractor(row);
+                  const isSelected = selectedRowId === rowKey;
+                  const isChecked = selectedIds?.has(rowKey) ?? false;
 
                 return (
                   <tr
@@ -325,7 +354,13 @@ export function DataTable<T>({
                     })}
                   </tr>
                 );
-              })
+              })}
+              {paddingBottom > 0 && (
+                <tr style={{ height: `${paddingBottom}px` }}>
+                  <td colSpan={columns.length + (enableSelection ? 1 : 0)} />
+                </tr>
+              )}
+            </>
             )}
           </tbody>
         </table>

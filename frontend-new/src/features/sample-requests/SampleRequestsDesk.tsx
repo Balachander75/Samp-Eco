@@ -29,6 +29,7 @@ import { useBusinessYear } from "@/context/BusinessYearContext";
 import { exportRecordsToCsv } from "@/lib/csvExport";
 import { Building2 } from "lucide-react";
 import { TeamHeadReadOnlyNotice } from "@/components/ui/TeamHeadReadOnlyNotice";
+import { TopLoadingBar, WorkspaceSkeleton } from "@/components/ui/loading";
 import { getRequestRequiredDate } from "./sampling/utils/requestTypeUtils";
 
 // Keep each large sub-desk out of the initial request-workspace chunk.
@@ -196,12 +197,21 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
     }
   }, [activeView, samplingDraftOnly, selectedYear, showToast]);
 
+  const lastLoadedAtRef = useRef<number>(Date.now());
+
   useEffect(() => {
     loadRequests();
+    lastLoadedAtRef.current = Date.now();
   }, [loadRequests, location.state]);
 
   useEffect(() => {
-    const handleFocus = () => void loadRequests();
+    const handleFocus = () => {
+      // Avoid hammering the database on rapid window switching; only refresh if stale (> 60s)
+      if (Date.now() - lastLoadedAtRef.current > 60_000) {
+        lastLoadedAtRef.current = Date.now();
+        void loadRequests();
+      }
+    };
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, [loadRequests]);
@@ -548,6 +558,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[var(--bg-app)] text-[var(--on-surface)] overflow-hidden select-none relative">
+      <TopLoadingBar isLoading={isLoading} />
       <TeamHeadReadOnlyNotice user={user} />
       {/* Toast Notification Popup */}
       {toastMessage && (
@@ -576,13 +587,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
       ) : null}
 
       {/* Render Active Sub-Page */}
-      <React.Suspense
-        fallback={(
-          <div className="flex min-h-48 flex-1 items-center justify-center p-6" role="status" aria-live="polite">
-            <span className="text-sm text-[var(--on-surface-muted)]">Loading request workspace…</span>
-          </div>
-        )}
-      >
+      <React.Suspense fallback={<WorkspaceSkeleton />}>
       {activeView === "overview" && (
         <MarketingOverviewPage
           requests={visibleRequests}

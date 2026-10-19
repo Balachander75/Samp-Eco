@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
+import { MetricRibbonSkeleton } from "@/components/ui/loading";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getRequestRequiredDate } from "../sampling/utils/requestTypeUtils";
 
@@ -809,7 +810,12 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
       <main className="w-full flex-1 p-4 sm:p-6 lg:p-8 space-y-6">
 
         {/* ── 2. EXECUTIVE MULTI-FACTOR KPI STRIP ── */}
-        <section id="mkt-snapshot" className="scroll-mt-16 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {isLoading ? (
+          <div id="mkt-snapshot" className="scroll-mt-16">
+            <MetricRibbonSkeleton count={6} />
+          </div>
+        ) : (
+          <section id="mkt-snapshot" className="scroll-mt-16 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
 
           {/* Tile 1: Intake Volume */}
           <div
@@ -966,6 +972,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
           </div>
 
         </section>
+        )}
 
         {/* ── 3. WORKSTREAMS & DESKS ── */}
         <section id="mkt-workstreams" className="scroll-mt-16 space-y-3">

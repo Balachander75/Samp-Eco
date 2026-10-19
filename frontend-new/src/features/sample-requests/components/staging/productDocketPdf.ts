@@ -54,15 +54,38 @@ export function isClassPresent(specs: ProductDetailItem[] | undefined | null): b
   return specs.some((s) => !isMissingSpec(s.value));
 }
 
+const pdfCharKeyCache = new Map<string, string>();
+function getPdfNormalizedCharKey(name: string): string {
+  let key = pdfCharKeyCache.get(name);
+  if (!key) {
+    key = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    pdfCharKeyCache.set(name, key);
+  }
+  return key;
+}
+
+const pdfSpecMapCache = new WeakMap<ProductDetailItem[], Map<string, ProductDetailItem>>();
+function getPdfSpecLookupMap(specs: ProductDetailItem[]): Map<string, ProductDetailItem> {
+  let map = pdfSpecMapCache.get(specs);
+  if (!map) {
+    map = new Map<string, ProductDetailItem>();
+    for (let i = 0; i < specs.length; i++) {
+      const item = specs[i];
+      map.set(getPdfNormalizedCharKey(item.characteristicName), item);
+    }
+    pdfSpecMapCache.set(specs, map);
+  }
+  return map;
+}
+
 function getCharValue(
   specs: ProductDetailItem[],
   charName: string,
   fallback: string = "NA"
 ): { value: string; isNa: boolean; uom?: string } {
-  const target = charName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  const spec = specs.find(
-    (s) => s.characteristicName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() === target
-  );
+  if (!specs || specs.length === 0) return { value: fallback, isNa: true };
+  const map = getPdfSpecLookupMap(specs);
+  const spec = map.get(getPdfNormalizedCharKey(charName));
   if (!spec || isMissingSpec(spec.value)) {
     return { value: fallback, isNa: true };
   }

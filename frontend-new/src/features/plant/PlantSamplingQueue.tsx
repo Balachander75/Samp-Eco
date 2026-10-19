@@ -12,7 +12,12 @@ import {
 } from "lucide-react";
 import { useBusinessYear } from "@/context/BusinessYearContext";
 import { DeskWorkspaceLayout, DataTable, type ColumnDef } from "@/components/erp";
-import { SampleRequestInspector } from "@/features/sample-requests/components/SampleRequestInspector";
+import { TopLoadingBar } from "@/components/ui/loading";
+const SampleRequestInspector = React.lazy(() =>
+  import("@/features/sample-requests/components/SampleRequestInspector").then((m) => ({
+    default: m.SampleRequestInspector,
+  }))
+);
 import type { SampleRequestItem } from "@/features/sample-requests/types";
 import type { UserProfile } from "@/features/auth";
 import { isAdmin as isAdminUser } from "@/features/auth/permissions";
@@ -765,17 +770,23 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
         }
       />
 
-      <SampleRequestInspector
-        request={selected}
-        isOpen={Boolean(selected)}
-        onClose={() => setSelected(null)}
-        role="plant"
-        readOnly={readOnly}
-        isAdmin={isAdminUser(user)}
-        actorName={user?.name || user?.userid}
-        actorUserId={user?.id}
-        onRefresh={load}
-      />
+      {loading && <TopLoadingBar isLoading={true} />}
+
+      <React.Suspense fallback={null}>
+        {selected && (
+          <SampleRequestInspector
+            request={selected}
+            isOpen={Boolean(selected)}
+            onClose={() => setSelected(null)}
+            role="plant"
+            readOnly={readOnly}
+            isAdmin={isAdminUser(user)}
+            actorName={user?.name || user?.userid}
+            actorUserId={user?.id}
+            onRefresh={load}
+          />
+        )}
+      </React.Suspense>
     </DeskWorkspaceLayout>
   );
 };

@@ -31,13 +31,20 @@ import { DeliverableScopeId, ReferenceImageScopeId, ScopeReferenceImages, Staged
 import {
   StagingWorkspaceHeader,
   StagingProductList,
-  StagedProductDrawer,
   AddProductScopesStep,
   AddProductDesignStep,
   AddProductSamplingStep,
-  CatalogProductInspectModal,
-  StagedProductEditModal,
 } from "./staging";
+
+const StagedProductDrawer = React.lazy(() =>
+  import("./staging/StagedProductDrawer").then((m) => ({ default: m.StagedProductDrawer }))
+);
+const StagedProductEditModal = React.lazy(() =>
+  import("./staging/StagedProductEditModal").then((m) => ({ default: m.StagedProductEditModal }))
+);
+const CatalogProductInspectModal = React.lazy(() =>
+  import("./staging/CatalogProductInspectModal").then((m) => ({ default: m.CatalogProductInspectModal }))
+);
 
 export interface ProductStagingWorkspaceProps {
   user?: UserProfile | null;
@@ -2110,42 +2117,44 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         </div>
       )}
 
-      {/* 4. Inspect Specification Modal Drawer */}
-      <StagedProductDrawer
-        inspectingProduct={inspectingProduct}
-        programYear={programContext.programYear}
-        programContext={programContext}
-        onClose={() => setInspectingProduct(null)}
-        onRemoveProduct={(id) => {
-          setInspectingProduct(null);
-          handleRemoveStagedItem(id);
-        }}
-        onDuplicateProduct={(item) => {
-          setInspectingProduct(null);
-          handleDuplicateStagedItem(item);
-        }}
-        onEditProduct={(item) => {
-          setInspectingProduct(null);
-          handleEditProduct(item);
-        }}
-        onSaveCustomDetails={handleSaveStagedCustomDetails}
-      />
-
-      {editingDetailsProduct && (
-        <StagedProductEditModal
-          key={editingDetailsProduct.id}
-          item={editingDetailsProduct}
-          mockupOnly={editingMockupOnly}
-          isSaving={isSavingDetails}
-          onClose={() => { setEditingDetailsProduct(null); setEditingMockupOnly(false); }}
-          onSave={handleSaveStagedRequestDetails}
+      {/* 4. Inspect Specification Modal Drawer & Modals */}
+      <React.Suspense fallback={null}>
+        <StagedProductDrawer
+          inspectingProduct={inspectingProduct}
+          programYear={programContext.programYear}
+          programContext={programContext}
+          onClose={() => setInspectingProduct(null)}
+          onRemoveProduct={(id) => {
+            setInspectingProduct(null);
+            handleRemoveStagedItem(id);
+          }}
+          onDuplicateProduct={(item) => {
+            setInspectingProduct(null);
+            handleDuplicateStagedItem(item);
+          }}
+          onEditProduct={(item) => {
+            setInspectingProduct(null);
+            handleEditProduct(item);
+          }}
+          onSaveCustomDetails={handleSaveStagedCustomDetails}
         />
-      )}
 
-      <CatalogProductInspectModal
-        product={inspectingCatalogProduct}
-        onClose={() => setInspectingCatalogProduct(null)}
-      />
+        {editingDetailsProduct && (
+          <StagedProductEditModal
+            key={editingDetailsProduct.id}
+            item={editingDetailsProduct}
+            mockupOnly={editingMockupOnly}
+            isSaving={isSavingDetails}
+            onClose={() => { setEditingDetailsProduct(null); setEditingMockupOnly(false); }}
+            onSave={handleSaveStagedRequestDetails}
+          />
+        )}
+
+        <CatalogProductInspectModal
+          product={inspectingCatalogProduct}
+          onClose={() => setInspectingCatalogProduct(null)}
+        />
+      </React.Suspense>
 
       {/* 5. Floating Bottom Popup Toast Notification */}
       {toastMsg && (

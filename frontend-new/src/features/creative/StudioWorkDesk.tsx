@@ -3,11 +3,21 @@ import { useLocation } from "react-router-dom";
 import type { UserProfile } from "@/features/auth";
 import { isReadOnlyTeamHead } from "@/features/auth/permissions";
 import type { SampleRequestItem } from "@/features/sample-requests/types";
-import { MockupWorkflowInspectorModal } from "@/features/sample-requests/components/staging/MockupWorkflowInspectorModal";
-import { MockupWorkflowQueuePage } from "@/features/sample-requests/components/staging/MockupWorkflowQueuePage";
+import { TopLoadingBar, WorkspaceSkeleton } from "@/components/ui/loading";
 import { fetchSampleRequestsApi } from "@/infrastructure/api/sampleRequestsApi";
 import { isDirectPlantResampleRequest } from "@/features/sample-requests/utils/sampleRouting";
 import { useBusinessYear } from "@/context/BusinessYearContext";
+
+const MockupWorkflowQueuePage = React.lazy(() =>
+  import("@/features/sample-requests/components/staging/MockupWorkflowQueuePage").then((m) => ({
+    default: m.MockupWorkflowQueuePage,
+  }))
+);
+const MockupWorkflowInspectorModal = React.lazy(() =>
+  import("@/features/sample-requests/components/staging/MockupWorkflowInspectorModal").then((m) => ({
+    default: m.MockupWorkflowInspectorModal,
+  }))
+);
 
 interface StudioWorkDeskProps {
   user?: UserProfile | null;
@@ -57,23 +67,28 @@ export const StudioWorkDesk: React.FC<StudioWorkDeskProps> = ({ user }) => {
 
   return (
     <>
-      <MockupWorkflowQueuePage
-        requests={requests}
-        role={pageRole}
-        isLoading={isLoading}
-        readOnly={isReadOnlyTeamHead(user)}
-        onInspect={(request) => void inspect(request)}
-        onRefresh={load}
-      />
-      {selectedRequest && <MockupWorkflowInspectorModal
-        request={selectedRequest}
-        role="studio"
-        readOnly={isReadOnlyTeamHead(user)}
-        actorName={user?.name || user?.userid}
-        actorUserId={user?.id}
-        onClose={() => setSelectedRequest(null)}
-        onRefresh={load}
-      />}
+      {isLoading && <TopLoadingBar isLoading={true} />}
+      <React.Suspense fallback={<WorkspaceSkeleton />}>
+        <MockupWorkflowQueuePage
+          requests={requests}
+          role={pageRole}
+          isLoading={isLoading}
+          readOnly={isReadOnlyTeamHead(user)}
+          onInspect={(request) => void inspect(request)}
+          onRefresh={load}
+        />
+        {selectedRequest && (
+          <MockupWorkflowInspectorModal
+            request={selectedRequest}
+            role="studio"
+            readOnly={isReadOnlyTeamHead(user)}
+            actorName={user?.name || user?.userid}
+            actorUserId={user?.id}
+            onClose={() => setSelectedRequest(null)}
+            onRefresh={load}
+          />
+        )}
+      </React.Suspense>
       {isSamplingRoute && <span className="sr-only">Studio sampling route</span>}
     </>
   );
