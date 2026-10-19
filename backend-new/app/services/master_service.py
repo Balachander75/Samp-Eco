@@ -51,6 +51,9 @@ class MasterService:
         is_active = payload.is_active if payload.is_active is not None else True
         role = self._canonical_account_role(payload.role)
         team = self._canonical_team(payload.team)
+        is_costing_admin = bool(payload.is_costing_admin)
+        if is_costing_admin and team != "costing":
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Costing administrator access requires the Costing team.")
         is_head = bool(payload.is_team_head) and role != "admin"
         if is_head and not team:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="A team head must be assigned to a team.")
@@ -68,6 +71,7 @@ class MasterService:
             sub_role=payload.sub_role,
             team=team,
             is_team_head=is_head,
+            is_costing_admin=is_costing_admin,
             plant_code=plant_codes[0] if plant_codes else None,
             is_active=is_active,
         )
@@ -82,6 +86,8 @@ class MasterService:
         next_role = self._canonical_account_role(payload.role if payload.role is not None else user.role)
         next_is_active = payload.is_active if payload.is_active is not None else user.is_active
         next_team = self._canonical_team(payload.team if payload.team is not None else user.team)
+        if payload.is_costing_admin is True and next_team != "costing":
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Costing administrator access requires the Costing team.")
         if actor_user_id is not None and actor_user_id == user_id and user.is_active and not next_is_active:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -122,6 +128,10 @@ class MasterService:
             updates["is_team_head"] = next_is_head
         elif next_role == "admin" and user.is_team_head:
             updates["is_team_head"] = False
+        if payload.is_costing_admin is not None:
+            updates["is_costing_admin"] = bool(payload.is_costing_admin) and next_team == "costing"
+        elif payload.team is not None and next_team != "costing" and user.is_costing_admin:
+            updates["is_costing_admin"] = False
         plant_codes_to_set = None
         if payload.plant_codes is not None:
             plant_codes_to_set = self.repo.validate_plant_codes(payload.plant_codes)
@@ -174,7 +184,7 @@ class MasterService:
         if actor_user_id is not None and actor_user_id == user_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="You cannot deactivate your own account.",
+                detail="You cannot delete your own account.",
             )
         self._ensure_admin_survives(user, self._canonical_account_role(user.role), False)
         return self.repo.delete_user(user_id)

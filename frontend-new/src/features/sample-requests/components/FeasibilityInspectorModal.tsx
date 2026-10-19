@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { UserProfile } from "@/features/auth";
 import { SampleRequestItem } from "../types";
 import {
   claimFeasibilityTaskApi,
   recordFeasibilitySampVerdictApi,
   recordFeasibilityMarketingDecisionApi,
-  convertFeasibilityToSamplingApi,
   cleanFeasibilityDescription,
   addFeasibilityNoteApi,
   proposeFeasibilityCounterDateApi,
@@ -49,7 +49,6 @@ export interface FeasibilityInspectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRefresh?: () => Promise<void>;
-  onDeleteRequest?: (req: SampleRequestItem) => void;
   user?: UserProfile | null;
   isAdmin?: boolean;
   sourceDesk?: "marketing" | "samp";
@@ -60,11 +59,11 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   isOpen,
   onClose,
   onRefresh,
-  onDeleteRequest,
   user,
   isAdmin = false,
   sourceDesk = "marketing",
 }) => {
+  const navigate = useNavigate();
   const [localOverride, setLocalOverride] = useState<SampleRequestItem | null>(null);
 
   useEffect(() => {
@@ -92,6 +91,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
   const [sampVerdictChoice, setSampVerdictChoice] = useState<"Yes" | "No" | "Maybe">("Yes");
   const [sampVerdictRemark, setSampVerdictRemark] = useState("");
   const [sampConditions, setSampConditions] = useState("");
@@ -116,6 +116,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     setSampConditions("");
     setSampLeadTimeNote("");
     setDecisionRemark("");
+    setConversionError(null);
     setCounterDate("");
     setCounterDateReason("");
     setCounterDateError(null);
@@ -295,6 +296,10 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   const handleSubmitSampVerdict = async () => {
     if (!activeRequest?.id || isSubmittingSampVerdict || !canEvaluateTechnical) return;
     setSampVerdictError(null);
+    if (sampVerdictChoice !== "Yes" && !sampVerdictRemark.trim()) {
+      setSampVerdictError(`A remark is required for a ${sampVerdictChoice} verdict.`);
+      return;
+    }
     setIsSubmittingSampVerdict(true);
     try {
       const updated = await recordFeasibilitySampVerdictApi(activeRequest.id, {
@@ -388,7 +393,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
         marketingDecisionBy: updated.marketingDecisionBy || decider,
         marketingDecisionAt: updated.marketingDecisionAt || new Date().toISOString(),
         marketingDecisionRemark: decisionRemark.trim(),
-        status: approved ? "Feasibility Approved" : "Feasibility Rejected",
+        status: updated.status,
       });
       window.dispatchEvent(new CustomEvent("samp:requests-changed"));
       await onRefresh?.();
@@ -400,31 +405,44 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     }
   };
 
-  // Convert to Commercial Sampling Request
-  const handleConvertToSampling = async (requestTypes: Array<"sample" | "costing"> = ["sample"]) => {
+  // Open Product Staging. The commercial request is created only after Marketing
+  // completes and stages the actual product details there.
+  const handleConvertToSampling = async (requestTypes: Array<"sample" | "mockup">) => {
     if (!activeRequest?.id || isConverting || !canMakeCommercialDecision) return;
+    if (!requestTypes || requestTypes.length === 0) {
+      setConversionError("Select at least one request type (Sample, Mockup, or both).");
+      return;
+    }
+    if (activeRequest.samplingFeasibilityResponse === "No") {
+      setConversionError("SAMP marked this request Not Feasible. Sample and Mockup requests are blocked.");
+      return;
+    }
+    if (activeRequest.marketingDecision !== "Accepted") {
+      setConversionError("Marketing must accept this feasibility result before staging a Sample or Mockup request.");
+      return;
+    }
+    setConversionError(null);
     setIsConverting(true);
     try {
-      const converter = user?.name || user?.userid || "Marketing Team";
-      const result = await convertFeasibilityToSamplingApi(activeRequest.id, requestTypes);
-      if (result && result.sampleRequestId) {
-        setLocalOverride({
-          ...activeRequest,
-          convertedSampleRequestId: result.sampleRequestId,
-          convertedSrNumber: result.sampleSrNumber,
-          convertedRequestCode: result.sampleRequestCode,
-          convertedRequestTypes: result.requestTypes,
-          convertedBy: converter,
-          convertedAt: new Date().toISOString(),
-          status: result.requestTypes.includes("sample")
-            ? result.requestTypes.includes("costing") ? "Converted to Sampling and Costing" : "Converted to Sampling"
-            : "Converted to Costing",
-        });
-        window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-        await onRefresh?.();
-      }
+      navigate("/sample-requests/product-staging", {
+        state: {
+          feasibilityRequestId: activeRequest.id,
+          feasibilityRequestTypes: requestTypes,
+          feasibilityRequestType: requestTypes[0],
+          feasibilityRequestCode: activeRequest.requestCode || activeRequest.materialCode,
+          feasibilityDescription: activeRequest.feasibilityDescription || activeRequest.productDescription,
+          feasibilityRequiredDate: activeRequest.sampleRequiredDate,
+          feasibilityReferenceLinks: activeRequest.referenceLinks || [],
+          customer: activeRequest.customer,
+          programName: activeRequest.programName || activeRequest.feasibilityType || "Feasibility Request",
+          programYear: activeRequest.programYear || activeRequest.year,
+          year: activeRequest.year,
+          targetPlant: activeRequest.targetPlant,
+        },
+      });
     } catch (err) {
-      console.error("Failed to convert feasibility to sampling request:", err);
+      console.error("Could not open Product Staging for feasibility request:", err);
+      setConversionError("Could not open Product Staging. Please try again.");
     } finally {
       setIsConverting(false);
     }
@@ -468,7 +486,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
           copiedCode={copiedCode}
           onClose={onClose}
           onCopyCode={handleCopyCode}
-          onDeleteRequest={onDeleteRequest}
+          mode={sourceDesk === "samp" ? "samp" : "marketing"}
         />
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG) */}
@@ -798,6 +816,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     decisionError={decisionError}
                     isSubmittingDecision={isSubmittingDecision}
                     isConverting={isConverting}
+                    conversionError={conversionError}
                     onDecisionRemarkChange={setDecisionRemark}
                     onMarketingFinalApprove={handleMarketingFinalApprove}
                     onCounterDateDecision={handleCounterDateDecision}

@@ -7,7 +7,7 @@ import re
 from datetime import date, datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import case, func, literal_column, or_, and_
 
@@ -23,7 +23,13 @@ from app.auth.permissions import (
     filter_plant_records,
     require_plant_access,
 )
-from app.models.sample_request import CreateSampleRequest, DesignRequest, ProductCharacteristic, ProductDetail
+from app.models.sample_request import (
+    CreateSampleRequest,
+    DesignRequest,
+    ProductCharacteristic,
+    ProductDetail,
+    SampleRequestType,
+)
 from app.models.request_workflows import (
     CostingWorkflow,
     CostingWorkflowLog,
@@ -75,6 +81,13 @@ def _linked_sample_for_design(
     *,
     for_update: bool = False,
 ) -> Optional[CreateSampleRequest]:
+    if design_request.sample_request_id:
+        linked = sample_service.repo.get_for_update(
+            design_request.sample_request_id,
+            include_product_details=False,
+        ) if for_update else sample_service.repo.get_by_id(design_request.sample_request_id)
+        if linked:
+            return linked
     linked = sample_service.repo.get_by_scope_code(
         "design", design_request.request_code, for_update=for_update
     ) if design_request.request_code else None
@@ -485,6 +498,7 @@ def create_sample_request(
     payload["created_by_user_id"] = current_user.id
     payload["actor_user_id"] = current_user.id
     payload["actor_name"] = _marketing_actor(current_user)
+    payload.pop("linked_request_codes", None)
     if not payload.get("target_plant"):
         payload["target_plant"] = service.get_default_plant()
 
@@ -527,6 +541,7 @@ def create_sample_requests_batch(
         raise HTTPException(status_code=422, detail="Payload must be a list or object with items array")
 
     for item in normalized_items:
+        item.pop("linked_request_codes", None)
         item["created_by"] = _marketing_actor(current_user)
         item["created_by_user_id"] = current_user.id
         item["actor_user_id"] = current_user.id
@@ -844,63 +859,6 @@ def release_single_sample_request(
         design_service.sync_sample_request({**updated, "status": new_status})
 
     return {"success": True, "data": updated}
-
-
-@router.delete("/api/v1/sample-requests/{id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete sample request")
-def delete_sample_request(
-    id: str,
-    service: SampleRequestService = Depends(get_sample_request_service),
-    design_service: DesignRequestService = Depends(get_design_request_service),
-    current_user=Depends(get_current_user),
-):
-    require_admin(current_user)
-    num_id = int(id) if id.isdigit() else None
-    if not num_id:
-        req = service.repo.get_by_sr_number(id)
-        if req:
-            num_id = req.id
-    if not num_id:
-        raise HTTPException(status_code=404, detail="Sample request not found")
-
-    record = service.repo.get_for_update(num_id, include_product_details=False)
-    if not record:
-        raise HTTPException(status_code=404, detail="Sample request not found")
-
-    if "design" in (record.request_types or []):
-        design_code = (record.request_codes or {}).get("design")
-        linked_design = design_service.repo.get_model_by_request_code(design_code) if design_code else None
-        if not linked_design and record.sr_number:
-            linked_design = design_service.repo.get_model_by_sr_number(record.sr_number)
-        if linked_design:
-            service.db.delete(linked_design)
-
-    service.delete(num_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.post("/api/v1/sample-requests/batch-delete", summary="Batch delete sample requests")
-def batch_delete_sample_requests(
-    body: Dict[str, Any] = Body(...),
-    service: SampleRequestService = Depends(get_sample_request_service),
-    design_service: DesignRequestService = Depends(get_design_request_service),
-    current_user=Depends(get_current_user),
-):
-    require_admin(current_user)
-    ids = body.get("ids") or []
-    for id_val in ids:
-        num_id = int(id_val) if str(id_val).isdigit() else None
-        if num_id:
-            record = service.repo.get_by_id(num_id)
-            if record and "design" in (record.request_types or []):
-                design_code = (record.request_codes or {}).get("design")
-                linked_design = design_service.repo.get_model_by_request_code(design_code) if design_code else None
-                if not linked_design and record.sr_number:
-                    linked_design = design_service.repo.get_model_by_sr_number(record.sr_number)
-                if linked_design:
-                    service.db.delete(linked_design)
-            if record:
-                service.delete(num_id)
-    return {"success": True, "deleted_count": len(ids)}
 
 
 @router.post("/api/v1/sample-requests/batch-status", summary="Batch update status")
@@ -1443,6 +1401,34 @@ def _is_design_creative_stage(item: DesignRequest) -> bool:
         or "remaining requested" in status_value
         or decision == "remaining_requested"
     )
+
+
+def _design_claim_deadline(item: DesignRequest, state: Dict[str, Any]) -> Optional[datetime]:
+    released_at = state.get("releasedAt") or state.get("released_at")
+    base_time: Optional[datetime] = None
+    if released_at:
+        try:
+            base_time = datetime.fromisoformat(str(released_at).replace("Z", "+00:00"))
+        except ValueError:
+            base_time = None
+    if base_time is None:
+        base_time = item.created_at
+    if base_time is None:
+        return None
+    if base_time.tzinfo is None:
+        base_time = base_time.replace(tzinfo=timezone.utc)
+    return base_time + timedelta(hours=48)
+
+
+def _require_design_claim_window(item: DesignRequest, state: Dict[str, Any]) -> None:
+    deadline = _design_claim_deadline(item, state)
+    if deadline is None:
+        raise HTTPException(status_code=409, detail="The release time is unavailable. Ask Marketing to refresh the request.")
+    if datetime.now(timezone.utc) >= deadline:
+        raise HTTPException(
+            status_code=409,
+            detail="The 48-hour claim and counter-date window has expired. Ask Marketing to review the deadline.",
+        )
 
 
 @router.post("/api/v1/sample-requests/{sample_id}/mockup/claim", summary="Claim the current Mockup workflow task")
@@ -2135,80 +2121,152 @@ def get_design_request(
     return record
 
 
-@router.delete("/api/v1/design-requests/{id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete design request")
-def delete_design_request(
-    id: int,
-    service: DesignRequestService = Depends(get_design_request_service),
-    sample_service: SampleRequestService = Depends(get_sample_request_service),
-    current_user=Depends(get_current_user),
-):
-    require_admin(current_user)
-    record = service.get_by_id(id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Design request not found")
-
-    linked_sample = (
-        sample_service.db.query(CreateSampleRequest)
-        .filter(CreateSampleRequest.sr_number == record.get("sr_number"))
-        .with_for_update()
-        .first()
-    ) if record.get("sr_number") else None
-    if linked_sample:
-        previous_types = list(linked_sample.request_types or [])
-        remaining_types = [value for value in previous_types if str(value).strip().casefold() != "design"]
-        if len(remaining_types) != len(previous_types):
-            previous_status = linked_sample.status
-            linked_sample.request_types = remaining_types
-            sample_service._apply_request_type_audit(linked_sample, {"request_types": remaining_types})
-            linked_sample.updated_at = datetime.now(timezone.utc)
-            sample_service.add_activity_log(
-                linked_sample,
-                action="REQUEST_SCOPE_REMOVED",
-                actor_id=getattr(current_user, "id", None),
-                actor_name=getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Admin",
-                actor_department="Admin",
-                from_status=previous_status,
-                to_status=linked_sample.status,
-                payload={
-                    "removed_request_types": ["design"],
-                    "previous_request_types": previous_types,
-                    "request_types": remaining_types,
-                },
-            )
-            if not remaining_types:
-                sample_service.add_activity_log(
-                    linked_sample,
-                    action="REQUEST_DELETED",
-                    actor_id=getattr(current_user, "id", None),
-                    actor_name=getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Admin",
-                    actor_department="Admin",
-                    from_status=previous_status,
-                    payload={
-                        "sr_number": linked_sample.sr_number,
-                        "material_code": linked_sample.material_code,
-                        "customer": linked_sample.customer,
-                        "request_types": previous_types,
-                    },
-                )
-                sample_service.db.delete(linked_sample)
-
-    if not service.delete(id):
-        raise HTTPException(status_code=404, detail="Design request not found")
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
 @router.post("/api/v1/design-requests", status_code=status.HTTP_201_CREATED, summary="Create a design request directly")
 def create_design_request(
     payload: Dict[str, Any] = Body(...),
     service: DesignRequestService = Depends(get_design_request_service),
+    sample_service: SampleRequestService = Depends(get_sample_request_service),
     current_user=Depends(get_current_user),
 ):
     require_team(current_user, "marketing")
-    payload.pop("request_code", None)
-    payload["created_by"] = _marketing_actor(current_user)
-    payload["created_by_user_id"] = current_user.id
-    created = service.create(payload)
+    description = str(payload.get("product_description") or "").strip()
+    customer = str(payload.get("customer_name") or "").strip()
+    try:
+        number_of_designs = int(payload.get("number_of_designs") or 0)
+    except (TypeError, ValueError):
+        number_of_designs = 0
+    if not customer or not description:
+        raise HTTPException(status_code=422, detail="Customer and product description are required")
+    if not 1 <= number_of_designs <= 100:
+        raise HTTPException(status_code=422, detail="Request between 1 and 100 designs")
+    required_date = str(payload.get("design_required_date") or "").strip() or None
+    if required_date:
+        try:
+            date.fromisoformat(required_date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Design required date must use YYYY-MM-DD format")
+
+    actor = _marketing_actor(current_user)
+    created_date = datetime.now(timezone.utc).date().isoformat()
+    sample_payload = {
+        "customer": customer,
+        "program_name": str(payload.get("program_name") or "").strip(),
+        "program_year": str(payload.get("program_year") or "").strip(),
+        "date_request_created": created_date,
+        "created_by": actor,
+        "created_by_user_id": current_user.id,
+        "actor_user_id": current_user.id,
+        "actor_name": actor,
+        "actor_department": "Marketing",
+        "request_types": ["design"],
+        "status": "Draft (Pre-SMT)",
+        "product_description": description,
+        "number_of_designs": number_of_designs,
+        "product_artwork_nos": str(number_of_designs),
+        "designs_customer_creative": str(number_of_designs),
+        "sample_required_date": required_date,
+        "target_artwork_date_creative": required_date,
+        "trend": str(payload.get("trend") or "").strip(),
+        "target_audience": str(payload.get("target_audience") or "").strip(),
+        "design_remarks": str(payload.get("design_remarks") or "").strip(),
+        "reference_image": str(payload.get("reference_image") or "").strip(),
+        "product_image_path": str(payload.get("reference_image") or "").strip(),
+        "reference_images": payload.get("reference_images") if isinstance(payload.get("reference_images"), list) else [],
+        "reference_links": payload.get("reference_links") if isinstance(payload.get("reference_links"), list) else [],
+    }
+    try:
+        created_sample = sample_service.create(sample_payload, commit=False)
+        sample_record = sample_service.repo.get_for_update(int(created_sample["id"]))
+        if not sample_record:
+            raise HTTPException(status_code=500, detail="Design request intake could not be linked")
+        _initialize_scoped_workflows(sample_service.repo.db, sample_record, current_user)
+        created_sample = sample_service.serialize(sample_record)
+        service.sync_sample_request({**sample_payload, **created_sample}, commit=False)
+        design_code = (created_sample.get("request_codes") or {}).get("design")
+        created = service.get_by_request_code(design_code)
+        if not created:
+            raise HTTPException(status_code=500, detail="Design workflow could not be created")
+        sample_service.repo.db.commit()
+    except Exception:
+        sample_service.repo.db.rollback()
+        raise
     return {"success": True, "data": created, **created}
+
+
+@router.patch("/api/v1/design-requests/{id}", summary="Update a Marketing Design draft")
+def update_design_request(
+    id: int,
+    payload: Dict[str, Any] = Body(...),
+    service: DesignRequestService = Depends(get_design_request_service),
+    sample_service: SampleRequestService = Depends(get_sample_request_service),
+    current_user=Depends(get_current_user),
+):
+    require_team(current_user, "marketing")
+    if is_team_head(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
+    item = (
+        sample_service.repo.db.query(DesignRequest)
+        .filter(DesignRequest.id == id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Design request not found")
+    if not str(item.status or "").casefold().startswith("draft"):
+        raise HTTPException(status_code=409, detail="Only Marketing drafts can be edited")
+    if not is_admin(current_user) and item.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Design request not found")
+
+    try:
+        count = int(payload.get("number_of_designs", item.number_of_designs))
+    except (TypeError, ValueError):
+        count = 0
+    if not 1 <= count <= 100:
+        raise HTTPException(status_code=422, detail="Request between 1 and 100 designs")
+    required_date = payload.get("design_required_date", item.design_required_date)
+    if required_date:
+        try:
+            date.fromisoformat(str(required_date).split("T")[0])
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Design required date must use YYYY-MM-DD format")
+
+    sample_record = _linked_sample_for_design(sample_service, item, for_update=True)
+    if not sample_record:
+        sample_record = _create_linked_sample_for_draft(item, sample_service, current_user)
+    actor = _marketing_actor(current_user)
+    updates = {
+        "product_description": str(payload.get("product_description", item.product_description) or "").strip(),
+        "product_artwork_nos": str(count),
+        "designs_customer_creative": str(count),
+        "target_artwork_date_creative": required_date or None,
+        "sample_required_date": required_date or None,
+        "reference_image": payload.get("reference_image", item.reference_image) or "",
+        "product_image_path": payload.get("reference_image", item.reference_image) or "",
+        "reference_images": payload.get("reference_images", item.reference_images or []),
+        "reference_links": payload.get("reference_links", item.reference_links or []),
+        "custom_details": [
+            {"class_name": "Design", "characteristic_name": "TREND", "value": payload.get("trend", item.trend) or ""},
+            {"class_name": "Design", "characteristic_name": "TARGET_AUDIENCE", "value": payload.get("target_audience", item.target_audience) or ""},
+            {"class_name": "Design", "characteristic_name": "DESIGN_REMARKS", "value": payload.get("design_remarks", item.design_remarks) or ""},
+        ],
+        "actor_user_id": current_user.id,
+        "actor_name": actor,
+        "actor_department": "Marketing",
+    }
+    try:
+        updated_sample = sample_service.update(sample_record.id, updates, commit=False)
+        if not updated_sample:
+            raise HTTPException(status_code=404, detail="Design request intake not found")
+        service.sync_sample_request({**updated_sample, **updates}, commit=False)
+        sample_service.repo.db.commit()
+    except Exception:
+        sample_service.repo.db.rollback()
+        raise
+    saved = service.get_by_id(id)
+    if not saved:
+        raise HTTPException(status_code=404, detail="Design request not found")
+    return saved
 
 
 @router.post("/api/v1/design-requests/{id}/claim", summary="Claim a Creative design request")
@@ -2219,6 +2277,8 @@ def claim_design_request(
     current_user=Depends(get_current_user),
 ):
     require_team(current_user, "creative_studio")
+    if is_team_head(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
     actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Creative Designer").strip()[:100]
 
     def mutate(item: DesignRequest):
@@ -2230,6 +2290,7 @@ def claim_design_request(
         if current_claim_id is not None and str(current_claim_id) != str(current_user.id):
             raise HTTPException(status_code=409, detail=f"This task is already claimed by {current_claim}")
         if current_claim_id is None:
+            _require_design_claim_window(item, state)
             now = datetime.now(timezone.utc).isoformat()
             state.update({"claimedBy": actor, "claimedByUserId": current_user.id, "claimedAt": now})
             events = list(state.get("events") or [])
@@ -2257,8 +2318,50 @@ def claim_design_request(
 
 
 @router.delete("/api/v1/design-requests/{id}/claim", summary="Release claim")
-def release_design_request_claim(id: int):
-    raise HTTPException(status_code=409, detail="A Creative claim cannot be released after assignment")
+def release_design_request_claim(
+    id: int,
+    service: DesignRequestService = Depends(get_design_request_service),
+    current_user=Depends(get_current_user),
+):
+    require_team(current_user, "creative_studio")
+    if is_team_head(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
+    actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Creative Designer").strip()[:100]
+
+    def mutate(item: DesignRequest):
+        if not _is_design_creative_stage(item):
+            raise HTTPException(status_code=409, detail="This design request is no longer in Creative work")
+        state = dict(item.workflow_state or {})
+        claim_id = state.get("claimedByUserId")
+        if claim_id is None and not state.get("claimedBy"):
+            raise HTTPException(status_code=409, detail="This design request is not claimed")
+        if not is_admin(current_user) and str(claim_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Only the assigned designer or a global admin can release this claim")
+        previous_owner = str(state.get("claimedBy") or "the assigned designer")
+        for key in ("claimedBy", "claimedByUserId", "claimedAt"):
+            state.pop(key, None)
+        events = list(state.get("events") or [])
+        events.insert(
+            0,
+            {
+                "id": f"event-{uuid4().hex}",
+                "actorName": actor,
+                "actorDepartment": "Creative Studio" if not is_admin(current_user) else "Administration",
+                "action": "TASK_CLAIM_RELEASED",
+                "title": "Creative claim released",
+                "body": f"{actor} released the claim held by {previous_owner}. The request is available for another designer.",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "isNote": False,
+                "badge": {"text": "Claim Released", "variant": "amber"},
+            },
+        )
+        state["events"] = events[:500]
+        item.workflow_state = state
+
+    saved = service.mutate(id, mutate, actor_user_id=current_user.id)
+    if not saved:
+        raise HTTPException(status_code=404, detail="Design request not found")
+    return saved
 
 
 @router.post("/api/v1/design-requests/{id}/counter-date-proposal", summary="Propose a revised design target date")
@@ -2269,6 +2372,8 @@ def propose_design_counter_date(
     current_user=Depends(get_current_user),
 ):
     require_team(current_user, "creative_studio")
+    if is_team_head(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
     proposed_date = str(body.get("proposed_date") or "").strip()
     reason = str(body.get("reason") or "").strip()[:500]
     if not proposed_date or not reason:
@@ -2285,6 +2390,7 @@ def propose_design_counter_date(
         if not _is_design_creative_stage(item):
             raise HTTPException(status_code=409, detail="This design request is not waiting for Creative work")
         _require_design_request_claim(state, current_user)
+        _require_design_claim_window(item, state)
         if any(state.get(key) for key in ("isCounterDateActive", "counterDateRequestedAt", "proposedTargetDate", "counterDateDecision")):
             raise HTTPException(status_code=409, detail="A counter-date proposal has already been used for this request")
         now = datetime.now(timezone.utc).isoformat()
@@ -2383,6 +2489,93 @@ def decide_design_counter_date(
     return saved
 
 
+def _create_linked_sample_for_design(
+    item: DesignRequest,
+    sample_service: SampleRequestService,
+    current_user: Any,
+) -> CreateSampleRequest:
+    """Repair legacy standalone Design rows before they enter Sampling follow-up."""
+    created_date = datetime.now(timezone.utc).date().isoformat()
+    actor = _marketing_actor(current_user)
+    payload = {
+        "customer": item.customer_name,
+        "program_name": item.program_name or "",
+        "program_year": item.program_year or "",
+        "date_request_created": created_date,
+        "created_by": actor,
+        "created_by_user_id": current_user.id,
+        "actor_user_id": current_user.id,
+        "actor_name": actor,
+        "actor_department": "Marketing",
+        "target_plant": sample_service.get_default_plant(),
+        "request_types": ["design"],
+        "linked_request_codes": {"design": item.request_code},
+        "status": "Approved / Closed",
+        "product_description": item.product_description,
+        "product_artwork_nos": str(item.number_of_designs or 1),
+        "designs_customer_creative": str(item.number_of_designs or 1),
+        "target_artwork_date_creative": item.design_required_date,
+        "product_image_path": item.reference_image or "",
+        "reference_images": item.reference_images or [],
+        "reference_links": item.reference_links or [],
+        "custom_details": [
+            {"class_name": "Design", "characteristic_name": "TREND", "value": item.trend or ""},
+            {"class_name": "Design", "characteristic_name": "TARGET_AUDIENCE", "value": item.target_audience or ""},
+            {"class_name": "Design", "characteristic_name": "DESIGN_REMARKS", "value": item.design_remarks or ""},
+        ],
+    }
+    created = sample_service.create(payload, commit=False)
+    record = sample_service.repo.get_for_update(int(created["id"]))
+    if not record:
+        raise HTTPException(status_code=500, detail="Could not create the linked intake record for Sampling")
+    item.sample_request_id = record.id
+    return record
+
+
+def _create_linked_sample_for_draft(
+    item: DesignRequest,
+    sample_service: SampleRequestService,
+    current_user: Any,
+) -> CreateSampleRequest:
+    """Repair a legacy standalone Design draft before editing its canonical intake."""
+    actor = _marketing_actor(current_user)
+    created_at = item.created_at or datetime.now(timezone.utc)
+    payload = {
+        "customer": item.customer_name,
+        "program_name": item.program_name or "",
+        "program_year": item.program_year or "",
+        "date_request_created": created_at.date().isoformat(),
+        "created_by": item.created_by or actor,
+        "created_by_user_id": item.created_by_user_id or current_user.id,
+        "actor_user_id": current_user.id,
+        "actor_name": actor,
+        "actor_department": "Marketing",
+        "request_types": ["design"],
+        "linked_request_codes": {"design": item.request_code},
+        "status": item.status or "Draft (Pre-SMT)",
+        "product_description": item.product_description or "",
+        "number_of_designs": item.number_of_designs or 1,
+        "product_artwork_nos": str(item.number_of_designs or 1),
+        "designs_customer_creative": str(item.number_of_designs or 1),
+        "sample_required_date": item.design_required_date,
+        "target_artwork_date_creative": item.design_required_date,
+        "trend": item.trend or "",
+        "target_audience": item.target_audience or "",
+        "design_remarks": item.design_remarks or "",
+        "reference_image": item.reference_image or "",
+        "product_image_path": item.reference_image or "",
+        "reference_images": item.reference_images or [],
+        "reference_links": item.reference_links or [],
+    }
+    created = sample_service.create(payload, commit=False)
+    record = sample_service.repo.get_for_update(int(created["id"]))
+    if not record:
+        raise HTTPException(status_code=500, detail="Could not create the linked Design draft intake")
+    _initialize_scoped_workflows(sample_service.repo.db, record, current_user)
+    item.sample_request_id = record.id
+    return record
+
+
 @router.post("/api/v1/design-requests/{id}/notes", summary="Add a design workflow note")
 def add_design_workflow_note(
     id: int,
@@ -2471,6 +2664,8 @@ def submit_creative_design_output(
     current_user=Depends(get_current_user),
 ):
     require_team(current_user, "creative_studio")
+    if is_team_head(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
     file_url = str(body.get("design_file_url") or "").strip()
     rows = body.get("rows")
     if not file_url:
@@ -2671,11 +2866,11 @@ def request_post_design_deliverables(
     actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Marketing")
 
     def mutate(item: DesignRequest):
-        sample = _linked_sample_for_design(sample_service, item, for_update=True)
-        if not sample:
-            raise HTTPException(status_code=409, detail="Linked sample request not found")
         if item.marketing_decision != "accepted":
             raise HTTPException(status_code=409, detail="Accept the submitted artwork before requesting Mockup or Sampling")
+        sample = _linked_sample_for_design(sample_service, item, for_update=True)
+        if not sample and "sample" in deliverables:
+            sample = _create_linked_sample_for_design(item, sample_service, current_user)
 
         available_designs: Dict[str, Dict[str, Any]] = {}
         for batch in item.creative_submissions or []:
@@ -2707,15 +2902,27 @@ def request_post_design_deliverables(
 
         requested_at = datetime.now(timezone.utc).isoformat()
         if "sample" in deliverables:
+            if not sample:
+                raise HTTPException(status_code=409, detail="Could not link this Design Request to a Sample intake record")
             current_types = list(sample.request_types or [])
             if "sample" not in current_types:
                 current_types.append("sample")
             sample.request_types = current_types
+            type_audit = sample.request_type_audit
+            if type_audit is None:
+                type_audit = SampleRequestType(sample_request_id=sample.id)
+                sample.request_type_audit = type_audit
+            if not type_audit.sample:
+                type_audit.sample = True
+                type_audit.sample_selected_at = datetime.now(timezone.utc)
             if not sample.sr_number:
                 sample_service._reserve_sr_number(sample)
             sample.status = "Sampling Review (PMT)"
             sample.material_code = item.request_code
             sample_state = dict(sample.mockup_workflow_state or {})
+            sampling_routing = dict(sample_state.get("samplingRouting") or {})
+            sampling_routing["stage"] = "sampling_review"
+            sample_state["samplingRouting"] = sampling_routing
             design_followups = dict(sample_state.get("designFollowups") or {})
             design_followups["sample"] = {
                 "designs": selected_designs_by_scope["sample"],
@@ -2753,9 +2960,11 @@ def request_post_design_deliverables(
                     raise HTTPException(status_code=422, detail="Only standalone Mockup requests can be released from this handoff")
                 if str(mockup_record.creation_mode or "").strip().lower() not in {"material_code", "binding"}:
                     raise HTTPException(status_code=422, detail="Choose an existing Material Code or Binding product in Product Staging")
-                mockup_material_code = str(mockup_record.material_code or "").strip()
                 source_material_code = str(mockup_record.source_sample_code or "").strip()
-                if not mockup_material_code or not source_material_code or mockup_material_code != source_material_code:
+                # Standalone Mockup rows do not receive a material_code: that
+                # field is reserved for the Sample request number/code. The
+                # selected catalog product is persisted in source_sample_code.
+                if not source_material_code:
                     raise HTTPException(status_code=422, detail="Each Mockup request must include its selected product Material Code")
                 source_product = sample_service.repo.db.query(CreateSampleRequest).filter(
                     func.trim(CreateSampleRequest.material_code) == source_material_code,

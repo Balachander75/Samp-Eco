@@ -39,6 +39,9 @@ def user_has_team(user, team: str) -> bool:
     normalized_values = (_normalized(primary_team),) if primary_team else ()
     return any(term in value for term in terms for value in normalized_values)
 
+def can_view_costing_claims(user) -> bool:
+    return is_admin(user) or (user_has_team(user, "costing") and bool(getattr(user, "is_costing_admin", False)))
+
 def require_admin(user=Depends(get_current_user)):
     if not is_admin(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access is required")

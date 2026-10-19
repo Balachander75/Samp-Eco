@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import {
   X,
   Copy,
-  Trash2,
   ExternalLink,
   Pencil,
   Check,
@@ -12,16 +11,11 @@ import {
   ImageIcon,
   Lock,
   Calendar,
-  Download,
-  Printer,
 } from "lucide-react";
 import { StagedProductItem, DELIVERABLES } from "../../types/staging";
-import type { ProductSearchResult } from "../../types";
 import { fetchProductDetailsApi, ProductDetailItem } from "@/infrastructure/api/masterApi";
 import { isMockupCreativeCharacteristic } from "./mockupCreativeFields";
-import { ProductDocketView } from "./ProductDocketView";
 import { ScopeReferenceImagesGallery } from "./ScopeReferenceImagesGallery";
-import { downloadProductDocketPdf, printProductDocketView } from "./productDocketPdf";
 
 const editableCharacteristicValue = (value: unknown) => {
   const normalized = String(value ?? "").trim();
@@ -67,30 +61,11 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const [productDescription, setProductDescription] = useState("");
   const [editedDescription, setEditedDescription] = useState("");
-  const [specView, setSpecView] = useState<"configured" | "all" | "docket">("configured");
+  const [specView, setSpecView] = useState<"configured" | "all">("configured");
   const sourceProductId = inspectingProduct?.sourceSampleRequestId
     || inspectingProduct?.catalogMetadata?.sourceProductId
     || inspectingProduct?.samplingMetadata?.sourceSampleId;
   const detailsRequestId = sourceProductId || inspectingProduct?.savedRequestId;
-  const docketRequestId = inspectingProduct?.savedRequestId || sourceProductId;
-  const docketProduct = useMemo<(ProductSearchResult & { brandName?: string }) | null>(() => {
-    if (!inspectingProduct) return null;
-    const requestId = Number(docketRequestId);
-    return {
-      id: Number.isFinite(requestId) ? requestId : 0,
-      sr_number: inspectingProduct.savedSrNumber || inspectingProduct.catalogMetadata?.sourceRequestNumber || "",
-      material_code: inspectingProduct.materialCode,
-      product_description: productDescription || inspectingProduct.productDescription,
-      customer: programContext?.customer || "",
-      target_plant: inspectingProduct.plant,
-      source_sample_code: [
-        inspectingProduct.barcode,
-        inspectingProduct.customerProductCode,
-        inspectingProduct.sourceSampleCode,
-      ].filter(Boolean).join(" / ") || "NA",
-      brandName: inspectingProduct.brandName || "NA",
-    };
-  }, [docketRequestId, inspectingProduct, productDescription, programContext?.customer]);
 
   const isDesignBrief = Boolean(
     inspectingProduct &&
@@ -683,18 +658,7 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
                   <div role="group" aria-label="Product specifications view" className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-white/10 dark:bg-white/[0.04]">
                     <button type="button" aria-pressed={specView === "configured"} onClick={() => setSpecView("configured")} className={`rounded-md px-2.5 py-1.5 text-[10px] font-semibold ${specView === "configured" ? "bg-white text-slate-900 shadow-sm dark:bg-white/10 dark:text-white" : "text-slate-500 dark:text-zinc-400"}`}>Configured <span className="ml-1 font-mono">{configuredCharacteristicCount}</span></button>
                     <button type="button" aria-pressed={specView === "all"} onClick={() => setSpecView("all")} className={`rounded-md px-2.5 py-1.5 text-[10px] font-semibold ${specView === "all" ? "bg-white text-slate-900 shadow-sm dark:bg-white/10 dark:text-white" : "text-slate-500 dark:text-zinc-400"}`}>All</button>
-                    <button type="button" aria-pressed={specView === "docket"} onClick={() => { setIsEditingDetails(false); setSpecView("docket"); }} className={`rounded-md px-2.5 py-1.5 text-[10px] font-semibold ${specView === "docket" ? "bg-white text-slate-900 shadow-sm dark:bg-white/10 dark:text-white" : "text-slate-500 dark:text-zinc-400"}`}>Docket</button>
                   </div>
-                  {specView === "docket" && docketProduct && (
-                    <div className="flex items-center gap-1.5">
-                      <button type="button" onClick={() => void downloadProductDocketPdf(docketProduct, characteristicGroups)} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                        <Download className="h-3 w-3" /> PDF
-                      </button>
-                      <button type="button" onClick={() => printProductDocketView(docketProduct, "staged-product-docket-container")} className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[10px] font-semibold text-sky-800 hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60">
-                        <Printer className="h-3 w-3" /> Print
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
               {inspectingProduct.scopes.includes("mockup") && inspectingProduct.mockupMetadata?.designNeeded === true && (
@@ -704,16 +668,6 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
               )}
               {isLoadingDetails ? (
                 <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-4 text-xs text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-400"><LoaderCircle className="h-4 w-4 animate-spin" /> Loading product specifications…</div>
-              ) : specView === "docket" && docketProduct ? (
-                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 dark:border-white/10 dark:bg-zinc-950">
-                  <div className="min-w-[740px]">
-                    <ProductDocketView
-                      product={docketProduct}
-                      classGroups={characteristicGroups}
-                      containerId="staged-product-docket-container"
-                    />
-                  </div>
-                </div>
               ) : characteristicGroups.length ? (
                 <div className="space-y-2">
                   {characteristicGroups.map(([className, details]) => (
@@ -1002,14 +956,15 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
             <button
               type="button"
               onClick={() => {
-                const toDelete = inspectingProduct.id;
+                const toRemove = inspectingProduct.id;
                 onClose();
-                onRemoveProduct(toDelete);
+                onRemoveProduct(toRemove);
               }}
-              className="h-8 px-3 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 dark:text-rose-400 dark:hover:bg-rose-950/40"
+              className="h-8 px-3 rounded-xl text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5"
+              title="Remove from staging"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Remove from Batch</span>
+              <X className="w-3.5 h-3.5" />
+              <span>Remove from Staging</span>
             </button>
 
             <div className="flex items-center gap-2">

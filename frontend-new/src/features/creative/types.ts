@@ -13,6 +13,7 @@ export interface CreativeDesignSubmission {
 
 export interface DesignRequest {
   id: number;
+  sampleRequestId?: number | null;
   srNumber?: string;
   requestCode?: string;
   customerName: string;
@@ -33,6 +34,7 @@ export interface DesignRequest {
   remainingDesignCount?: number;
   releasedAt?: string | null;
   claimedBy?: string | null;
+  claimedByUserId?: number | null;
   claimedAt?: string | null;
   isCounterDateActive?: boolean;
   proposedTargetDate?: string | null;

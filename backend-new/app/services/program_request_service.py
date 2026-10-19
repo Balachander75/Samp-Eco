@@ -14,6 +14,8 @@ from app.schemas.program_request import (
     ProgramRequestUpdate,
     ProgramBatchSampRemarksUpdate,
     SingleSampRemarkUpdate,
+    ProgramBatchPlantRemarksUpdate,
+    SinglePlantRemarkUpdate,
     ProgramMaterialCreate,
     ProgramSeenSubmit,
 )
@@ -104,6 +106,7 @@ class ProgramRequestService:
                     "unit": m.unit,
                     "remark": m.remark,
                     "samp_remark": m.samp_remark,
+                    "plant_remark": getattr(m, "plant_remark", None),
                     "promoted_sample_request_id": getattr(m, "promoted_sample_request_id", None),
                     "promoted_sr_number": getattr(m, "promoted_sr_number", None),
                     "created_at": m.created_at,
@@ -334,6 +337,80 @@ class ProgramRequestService:
             actor_name=actor_name,
             actor_department=actor_dept,
             action="SAMP_REMARK_UPDATED",
+            payload={
+                "material_id": material_id,
+                "material_type": mat.material_type,
+                "old_remark": old_remark,
+                "new_remark": new_remark,
+            },
+            actor_id=actor_id,
+        )
+
+        self.db.commit()
+        self.db.refresh(item)
+        return self.serialize(item)
+
+    def update_batch_plant_remarks(
+        self,
+        request_id: int,
+        payload: ProgramBatchPlantRemarksUpdate,
+        current_user: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Batch update Plant remarks on materials."""
+        item = self.repo.get_for_update(request_id)
+        if not item:
+            return None
+
+        self._claim_team_task(item, "plant", current_user)
+        actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
+        mat_map = {mat.id: mat for mat in item.materials}
+        updated_count = 0
+
+        for remark_update in payload.remarks:
+            mat = mat_map.get(remark_update.material_id)
+            if mat:
+                mat.plant_remark = (remark_update.plant_remark or "").strip() or None
+                updated_count += 1
+
+        self.repo.add_activity_log(
+            program_request_id=item.id,
+            actor_name=actor_name,
+            actor_department=actor_dept,
+            action="PLANT_REMARKS_UPDATED",
+            payload={"updated_count": updated_count},
+            actor_id=actor_id,
+        )
+
+        self.db.commit()
+        self.db.refresh(item)
+        return self.serialize(item)
+
+    def update_single_plant_remark(
+        self,
+        request_id: int,
+        material_id: int,
+        payload: SinglePlantRemarkUpdate,
+        current_user: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Update single Plant remark."""
+        item = self.repo.get_for_update(request_id)
+        if not item:
+            return None
+        self._claim_team_task(item, "plant", current_user)
+        mat = next((m for m in item.materials if m.id == material_id), None)
+        if not mat:
+            return None
+
+        actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
+        old_remark = getattr(mat, "plant_remark", None)
+        new_remark = (payload.plant_remark or "").strip() or None
+        mat.plant_remark = new_remark
+
+        self.repo.add_activity_log(
+            program_request_id=item.id,
+            actor_name=actor_name,
+            actor_department=actor_dept,
+            action="PLANT_REMARK_UPDATED",
             payload={
                 "material_id": material_id,
                 "material_type": mat.material_type,
@@ -609,21 +686,20 @@ class ProgramRequestService:
     def _claim_team_task(item: ProgramRequest, department: str, current_user: Optional[Any]) -> None:
         """Ensure the user has claimed the SAMP/Plant review lane before submitting remarks."""
         if not current_user:
-            return
+            raise HTTPException(status_code=401, detail="Sign in and claim this review before submitting remarks.")
         field_prefix = "sampling" if department == "sampling" else "plant"
         id_field = f"{field_prefix}_claimed_by_user_id"
         name_field = f"{field_prefix}_claimed_by"
-        actor_id, actor_name, _ = ProgramRequestService._actor_info_for_claim(current_user)
+        actor_id, _, _ = ProgramRequestService._actor_info_for_claim(current_user)
         current_id = getattr(item, id_field)
         current_name = getattr(item, name_field)
-        is_admin_user = is_admin(current_user) if current_user else False
 
-        if not current_id and not is_admin_user:
+        if current_id is None:
             raise HTTPException(
                 status_code=409,
                 detail=f"Please claim this {department} review task before submitting observations or line remarks."
             )
-        if current_id and current_id != actor_id and not is_admin_user:
+        if actor_id is None or current_id != actor_id:
             raise HTTPException(
                 status_code=409,
                 detail=f"This {department} review is already claimed by {current_name or 'another team member'}."

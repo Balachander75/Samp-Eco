@@ -33,7 +33,6 @@ export interface SamplingRequestsTableProps {
   onOpenDraftInStaging: (row: SampleRequestItem, e?: React.MouseEvent) => void;
   onInspectRequest: (row: SampleRequestItem) => void;
   onReleaseDraft: (row: SampleRequestItem) => Promise<void>;
-  onDeleteRequest: (row: SampleRequestItem, e?: React.MouseEvent) => Promise<void>;
   onPageChange: (page: number) => void;
   onOpenNewModal?: () => void;
   onResetFilters?: () => void;
@@ -219,7 +218,6 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
   onOpenDraftInStaging,
   onInspectRequest,
   onReleaseDraft: _onReleaseDraft,
-  onDeleteRequest: _onDeleteRequest,
   onPageChange,
 }) => {
   const draftColumns: ColumnDef<SampleRequestItem>[] = useMemo(

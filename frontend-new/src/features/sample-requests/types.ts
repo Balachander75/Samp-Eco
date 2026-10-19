@@ -92,7 +92,7 @@ export interface FeasibilityRequestRecord extends FeasibilityRequestPayload {
   convertedSampleRequestId?: number | string | null;
   convertedSrNumber?: string | null;
   convertedRequestCode?: string | null;
-  convertedRequestTypes?: Array<"sample" | "costing">;
+  convertedRequestTypes?: Array<"sample" | "mockup" | "costing">;
   convertedAt?: string | null;
   convertedBy?: string | null;
   activities?: FeasibilityActivityItem[];
@@ -112,6 +112,7 @@ export interface ProgramMaterialItem {
   unit?: string;
   remark?: string;
   sampRemark?: string;
+  plantRemark?: string;
   promotedSampleRequestId?: number | null;
   promotedSrNumber?: string | null;
   createdAt?: string;
@@ -128,6 +129,7 @@ export interface AddProgramMaterialPayload {
   unit?: string | null;
   remark?: string | null;
   samp_remark?: string | null;
+  plant_remark?: string | null;
 }
 
 export interface ProgramActivityItem {
@@ -292,7 +294,7 @@ export interface SampleRequestItem {
   convertedSampleRequestId?: number | string | null;
   convertedSrNumber?: string | null;
   convertedRequestCode?: string | null;
-  convertedRequestTypes?: Array<"sample" | "costing">;
+  convertedRequestTypes?: Array<"sample" | "mockup" | "costing">;
   convertedAt?: string | null;
   convertedBy?: string | null;
   activities?: FeasibilityActivityItem[];
@@ -317,6 +319,7 @@ export interface SampleRequestItem {
 
   // Design Request & Staging Attributes
   designRequestId?: number;
+  sampleRequestId?: number | null;
   designRequestStatus?: string;
   designRequestCreatedAt?: string | null;
   designRemarks?: string | null;
@@ -329,6 +332,7 @@ export interface SampleRequestItem {
   targetAudience?: string | null;
   releasedAt?: string | null;
   claimedBy?: string | null;
+  claimedByUserId?: number | null;
   claimedAt?: string | null;
   isCounterDateActive?: boolean;
   proposedTargetDate?: string | null;

@@ -13,9 +13,11 @@ from app.schemas.program_request import (
     ProgramActivityReplySubmit,
     ProgramActivityLogOut,
     ProgramBatchSampRemarksUpdate,
+    ProgramBatchPlantRemarksUpdate,
     ProgramMaterialCreate,
     ProgramMaterialOut,
     ProgramMaterialRemarkUpdate,
+    ProgramMaterialPlantRemarkUpdate,
     ProgramNoteCreate,
     ProgramOutputSubmit,
     ProgramRequestCreate,
@@ -23,6 +25,7 @@ from app.schemas.program_request import (
     ProgramRequestUpdate,
     ProgramSeenSubmit,
     SingleSampRemarkUpdate,
+    SinglePlantRemarkUpdate,
 )
 
 __all__ = [
@@ -38,9 +41,11 @@ __all__ = [
     "ProgramActivityReplySubmit",
     "ProgramActivityLogOut",
     "ProgramBatchSampRemarksUpdate",
+    "ProgramBatchPlantRemarksUpdate",
     "ProgramMaterialCreate",
     "ProgramMaterialOut",
     "ProgramMaterialRemarkUpdate",
+    "ProgramMaterialPlantRemarkUpdate",
     "ProgramNoteCreate",
     "ProgramOutputSubmit",
     "ProgramRequestCreate",
@@ -48,4 +53,5 @@ __all__ = [
     "ProgramRequestUpdate",
     "ProgramSeenSubmit",
     "SingleSampRemarkUpdate",
+    "SinglePlantRemarkUpdate",
 ]

@@ -3,7 +3,6 @@ import { UserProfile } from "@/features/auth";
 import { UserItem } from "@/infrastructure/api/masterApi";
 import { PlantItem } from "@/features/sample-requests/types";
 import {
-  Building2,
   Calculator,
   Crown,
   Edit2,
@@ -27,6 +26,7 @@ interface MembersTeamsPageProps {
   users: UserItem[];
   plants: PlantItem[];
   isLoading: boolean;
+  deletingUserId?: number | null;
   onRefresh: () => void;
   onOpenUserModal: (user?: UserItem) => void;
   onDeleteUser: (userId: number, name: string) => void;
@@ -52,17 +52,6 @@ function departmentKey(team?: string): string {
   if (["costing", "commercial costing"].includes(value)) return "costing";
   if (["creative", "creative studio"].includes(value)) return "creative";
   return value;
-}
-
-function plantLabel(user: UserItem, plants: PlantItem[]): string {
-  const code = user.plantCode || user.plantCodes?.[0];
-  if (!code) return "Unassigned";
-  const plant = plants.find((item) => item.code.toLowerCase() === code.toLowerCase());
-  if (!plant) return code;
-  const name = plant.name.trim();
-  return name.toLowerCase().startsWith(`${plant.code.toLowerCase()} -`)
-    ? name
-    : `${plant.code} - ${name}`;
 }
 
 export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
@@ -151,7 +140,7 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
           <table className="w-full text-left text-xs border-collapse">
             <thead className="sticky top-0 z-10 bg-zinc-50/95 dark:bg-[#0c0e14]/95 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800/80">
               <tr className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono select-none">
-                <th className="py-2.5 px-5">Member</th><th className="py-2.5 px-4">Department</th><th className="py-2.5 px-4">Role Title</th><th className="py-2.5 px-4">System Access</th><th className="py-2.5 px-4">Facility / Plant</th><th className="py-2.5 px-4">Contact</th><th className="py-2.5 px-4">Status</th><th className="py-2.5 px-5 text-right w-24">Actions</th>
+                <th className="py-2.5 px-5">Member</th><th className="py-2.5 px-4">Department</th><th className="py-2.5 px-4">Role Title</th><th className="py-2.5 px-4">System Access</th><th className="py-2.5 px-4">Contact</th><th className="py-2.5 px-4">Status</th><th className="py-2.5 px-5 text-right w-24">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
@@ -166,7 +155,6 @@ export const MembersTeamsPage: React.FC<MembersTeamsPageProps> = ({
                     <td className="py-3 px-4 whitespace-nowrap"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium border shrink-0 ${department.badge}` }><DepartmentIcon className="w-3 h-3" /><span>{department.label}</span></span></td>
                     <td className="py-3 px-4 whitespace-nowrap"><span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium">{member.subRole || "Staff"}</span></td>
                     <td className="py-3 px-4 whitespace-nowrap">{isAdmin ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-900 text-white dark:bg-white dark:text-zinc-950"><ShieldCheck className="w-3 h-3" />Admin</span> : member.isTeamHead ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"><Crown className="w-2.5 h-2.5" />Team Head</span> : <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">Member</span>}</td>
-                    <td className="py-3 px-4 whitespace-nowrap"><div className="flex items-center gap-1.5 text-xs text-zinc-700 dark:text-zinc-300 font-mono"><Building2 className="w-3 h-3 text-zinc-400 shrink-0" /><span>{plantLabel(member, plants)}</span></div></td>
                     <td className="py-3 px-4 whitespace-nowrap"><a href={`mailto:${member.email}`} className="inline-flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors font-mono"><Mail className="w-3 h-3 text-zinc-400" /><span>{member.email}</span></a></td>
                     <td className="py-3 px-4 whitespace-nowrap">{member.isActive ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Active</span> : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-100 text-zinc-600 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"><span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />Inactive</span>}</td>
                     <td className="py-3 px-5 text-right whitespace-nowrap"><div className="flex items-center justify-end gap-1 opacity-90 group-hover:opacity-100"><button type="button" onClick={() => onOpenUserModal(member)} className="h-7 w-7 rounded-md border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center justify-center transition-colors cursor-pointer" title="Edit Member"><Edit2 className="w-3.5 h-3.5" /></button><button type="button" onClick={() => onDeleteUser(member.id, member.name)} disabled={isSelf || !member.isActive} className="h-7 w-7 rounded-md border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" title={isSelf ? "You cannot remove your own account" : "Remove Member"}><Trash2 className="w-3.5 h-3.5" /></button></div></td>

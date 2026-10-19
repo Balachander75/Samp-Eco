@@ -22,6 +22,7 @@ export interface DesignMetadataStripProps {
   mode: "marketing" | "creative" | "sampling";
   requestedCount: number;
   isCounterDatePending: boolean;
+  canProposeCounterDate: boolean;
   slaStatus: {
     isEligible: boolean;
     hoursRemaining: number;
@@ -37,6 +38,7 @@ export const DesignMetadataStrip: React.FC<DesignMetadataStripProps> = React.mem
   requestedCount,
   isCounterDatePending,
   slaStatus,
+  canProposeCounterDate,
   onOpenCounterDateModal,
 }) => {
   return (
@@ -71,7 +73,7 @@ export const DesignMetadataStrip: React.FC<DesignMetadataStripProps> = React.mem
               <>
                 <button
                   type="button"
-                  disabled={!activeRequest.claimedBy || !slaStatus.isEligible}
+                  disabled={!canProposeCounterDate}
                   onClick={onOpenCounterDateModal}
                   className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] dark:text-emerald-300 hover:underline disabled:opacity-40 disabled:no-underline cursor-pointer"
                   title={
@@ -79,6 +81,10 @@ export const DesignMetadataStrip: React.FC<DesignMetadataStripProps> = React.mem
                       ? slaStatus.isEligible
                         ? "Claim task first to propose a counter date"
                         : "The 48-hour claim and counter-date window has expired"
+                      : !canProposeCounterDate && slaStatus.isEligible
+                      ? activeRequest.claimedByUserId == null
+                        ? "Confirm ownership before proposing a counter date"
+                        : "Only the assigned designer can propose a counter date"
                       : !slaStatus.isEligible
                       ? slaStatus.label === "Counter proposal already used"
                         ? "Only one counter-date proposal is allowed for this request"

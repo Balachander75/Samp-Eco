@@ -80,6 +80,7 @@ def ensure_program_schema():
         "ALTER TABLE program_material_specifications ADD COLUMN IF NOT EXISTS promoted_sample_request_id INTEGER REFERENCES create_sample_requests(id) ON DELETE SET NULL",
         "ALTER TABLE program_material_specifications ADD COLUMN IF NOT EXISTS promoted_sr_number VARCHAR(50)",
         "CREATE INDEX IF NOT EXISTS ix_pms_promoted_sample_request_id ON program_material_specifications (promoted_sample_request_id)",
+        "ALTER TABLE program_material_specifications ADD COLUMN IF NOT EXISTS plant_remark TEXT",
     )
     with engine.begin() as connection:
         for statement in statements:

@@ -637,6 +637,7 @@ export interface UserItem {
   subRole?: string;
   team?: string;
   isTeamHead: boolean;
+  isCostingAdmin: boolean;
   plantCode?: string;
   plantCodes?: string[];
   isActive: boolean;
@@ -652,6 +653,7 @@ export interface CreateUserPayload {
   sub_role?: string;
   team?: string;
   is_team_head?: boolean;
+  is_costing_admin?: boolean;
   plant_code?: string;
   plant_codes?: string[];
   is_active?: boolean;
@@ -666,6 +668,7 @@ export interface UpdateUserPayload {
   sub_role?: string;
   team?: string;
   is_team_head?: boolean;
+  is_costing_admin?: boolean;
   plant_code?: string;
   plant_codes?: string[];
   is_active?: boolean;
@@ -684,6 +687,7 @@ export async function fetchUsersApi(team?: string): Promise<UserItem[]> {
       subRole: u.sub_role || undefined,
       team: u.team || undefined,
       isTeamHead: Boolean(u.is_team_head),
+      isCostingAdmin: Boolean(u.is_costing_admin),
       plantCode: u.plant_code || undefined,
       plantCodes: u.plant_codes || (u.plant_code ? [u.plant_code] : []),
       isActive: Boolean(u.is_active),
@@ -709,6 +713,7 @@ export async function createUserApi(payload: CreateUserPayload): Promise<UserIte
     subRole: u.sub_role || undefined,
     team: u.team || undefined,
     isTeamHead: Boolean(u.is_team_head),
+    isCostingAdmin: Boolean(u.is_costing_admin),
     plantCode: u.plant_code || undefined,
     plantCodes: u.plant_codes || (u.plant_code ? [u.plant_code] : []),
     isActive: Boolean(u.is_active),
@@ -730,6 +735,7 @@ export async function updateUserApi(id: number, payload: UpdateUserPayload): Pro
     subRole: u.sub_role || undefined,
     team: u.team || undefined,
     isTeamHead: Boolean(u.is_team_head),
+    isCostingAdmin: Boolean(u.is_costing_admin),
     plantCode: u.plant_code || undefined,
     plantCodes: u.plant_codes || (u.plant_code ? [u.plant_code] : []),
     isActive: Boolean(u.is_active),
@@ -737,14 +743,8 @@ export async function updateUserApi(id: number, payload: UpdateUserPayload): Pro
   };
 }
 
-export async function deleteUserApi(id: number): Promise<boolean> {
-  try {
-    await apiFetch(`/api/v1/users/${id}`, { method: "DELETE" });
-    return true;
-  } catch (err) {
-    console.error("Error deleting user:", err);
-    return false;
-  }
+export async function deleteUserApi(id: number): Promise<void> {
+  await apiFetch(`/api/v1/users/${id}`, { method: "DELETE" });
 }
 
 

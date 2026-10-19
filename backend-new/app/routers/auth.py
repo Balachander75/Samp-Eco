@@ -67,6 +67,7 @@ class UserOut(BaseModel):
     sub_role: Optional[str] = None
     team: Optional[str] = None
     is_team_head: bool = False
+    is_costing_admin: bool = False
     plant_code: Optional[str] = None
     plant_codes: List[str] = Field(default_factory=list)
     theme_id: ThemeId = "emerald"
@@ -154,6 +155,7 @@ def _user_to_out(user: User) -> dict:
         "sub_role": user.sub_role,
         "team": getattr(user, "team", None),
         "is_team_head": getattr(user, "is_team_head", False),
+        "is_costing_admin": getattr(user, "is_costing_admin", False),
         "plant_code": getattr(user, "plant_code", None),
         "plant_codes": getattr(user, "plant_codes", []),
         "theme_id": getattr(user, "theme_id", "emerald"),

@@ -5,7 +5,6 @@ import { SampleRequestItem } from "../types";
 import { getRequestTrackType } from "../utils/trackTypes";
 import {
   Plus,
-  Trash2,
   Layers,
   Clock,
   CheckCircle2,
@@ -14,8 +13,11 @@ import {
   X,
   Pause,
   Play,
+  Building2,
+  Calendar,
+  User,
 } from "lucide-react";
-import { isMaterialAddedRecently } from "../utils/dateUtils";
+import { isMaterialAddedRecently, formatOdooDate } from "../utils/dateUtils";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { Select } from "@/components/ui/Select";
 import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
@@ -30,15 +32,12 @@ export interface ProgramPlanningPageProps {
   requests: SampleRequestItem[];
   isLoading: boolean;
   selectedYear: string;
-  selectedPlant: string;
-  uniquePlants: string[];
   uniqueCustomers?: string[];
   user?: UserProfile | null;
   isAdmin: boolean;
   isReadOnly?: boolean;
   onOpenNewModal: () => void;
   onInspectRequest: (req: SampleRequestItem) => void;
-  onDeleteRequest: (req: SampleRequestItem, e?: React.MouseEvent) => Promise<void>;
   onRefresh: () => Promise<void>;
 }
 
@@ -56,13 +55,11 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
   isAdmin,
   isReadOnly = false,
   onInspectRequest,
-  onDeleteRequest,
   onRefresh,
 }) => {
   const navigate = useNavigate();
   const [filterTab, setFilterTab] = useState<ProgramStageTab>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPlantFilter, setSelectedPlantFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -112,15 +109,6 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
     return Array.from(set).sort();
   }, [programRequests, uniqueCustomers]);
 
-  // Derived Plants List strictly from programRequests
-  const plantList = useMemo(() => {
-    const set = new Set<string>();
-    programRequests.forEach((r) => {
-      if (r.targetPlant && r.targetPlant.trim()) set.add(r.targetPlant.trim());
-    });
-    return Array.from(set).sort();
-  }, [programRequests]);
-
   // Program Statistics
   const programStats = useMemo(() => {
     let totalSkus = 0;
@@ -159,10 +147,6 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       if (filterTab === "samp_added" && !hasSampOutput(r)) return false;
       if (filterTab === "plant_added" && !hasPlantOutput(r)) return false;
 
-      if (selectedPlantFilter !== "all" && r.targetPlant !== selectedPlantFilter) {
-        return false;
-      }
-
       if (customerFilter !== "all" && r.customer !== customerFilter) {
         return false;
       }
@@ -180,26 +164,7 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
 
       return true;
     });
-  }, [programRequests, filterTab, selectedPlantFilter, customerFilter, searchTerm]);
-
-  const clearFilters = () => {
-    setFilterTab("all");
-    setSearchTerm("");
-    setSelectedPlantFilter("all");
-    setCustomerFilter("all");
-  };
-
-  const handleOpenInspector = (row: SampleRequestItem) => {
-    onInspectRequest(row);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filteredRequests.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredRequests.map((r) => r.id)));
-    }
-  };
+  }, [programRequests, filterTab, customerFilter, searchTerm]);
 
   const toggleSelectRow = (id: string | number) => {
     setSelectedIds((prev) => {
@@ -208,6 +173,24 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       else next.add(id);
       return next;
     });
+  };
+
+  const toggleSelectAll = () => {
+    if (filteredRequests.length > 0 && filteredRequests.every((request) => selectedIds.has(request.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRequests.map((request) => request.id)));
+    }
+  };
+
+  const clearFilters = () => {
+    setFilterTab("all");
+    setSearchTerm("");
+    setCustomerFilter("all");
+  };
+
+  const handleOpenInspector = (row: SampleRequestItem) => {
+    onInspectRequest(row);
   };
 
   // Export CSV
@@ -219,7 +202,13 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
         { header: "Program Code", accessor: (r) => r.requestCode || r.materialCode || "" },
         { header: "Campaign Title", accessor: (r) => r.programName || r.productDescription || "" },
         { header: "Customer", accessor: (r) => r.customer || "" },
-        { header: "Target Plant", accessor: (r) => r.targetPlant || "" },
+        {
+          header: "Substrates",
+          accessor: (r) =>
+            Array.from(new Set((r.programMaterials || []).map((m) => m.materialType).filter(Boolean))).join(
+              "; "
+            ) || "Standard",
+        },
         { header: "Program Year", accessor: (r) => r.programYear || "2026" },
         { header: "Total SKUs", accessor: (r) => (r.programMaterials || []).length || 1 },
         { header: "SAMP Remark", accessor: (r) => r.samplingRemark || "Awaiting" },
@@ -296,12 +285,12 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       {
         id: "program_id",
         header: "Program ID",
-        width: "w-[135px]",
+        width: "w-[105px]",
         sortable: true,
         cell: (row) => (
-          <div className="flex flex-col gap-0.5 items-start">
-            <CopyBadge text={row.requestCode || row.materialCode || `PP-${row.id}`} />
-            <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] font-medium">
+          <div className="flex flex-col gap-0.5 items-start min-w-0">
+            <CopyBadge text={row.requestCode || row.materialCode || `PP-${row.id}`} className="max-w-full font-semibold text-[11px] px-1.5 py-0.5" />
+            <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] font-medium truncate max-w-full">
               BY {row.programYear || "2026"}
             </span>
           </div>
@@ -309,44 +298,74 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       },
       {
         id: "campaign",
-        header: "Campaign Title & Product Scope",
+        header: "Campaign Title",
+        width: "w-[180px]",
         cell: (row) => (
-          <div className="max-w-md">
-            <div
-              className="truncate font-semibold text-xs text-[var(--on-surface)]"
-              title={row.programName || row.programCampaignTitle || "Seasonal Program"}
-            >
-              {row.programName || row.programCampaignTitle || "Seasonal Program"}
-            </div>
-            <div className="mt-0.5 truncate text-[10.5px] font-mono text-[var(--on-surface-subtle)]">
-              {row.productDescription || "Multi-SKU scholastic program range"}
-            </div>
-          </div>
+          <span
+            className="truncate font-semibold text-xs text-[var(--on-surface)] block"
+            title={row.programName || row.programCampaignTitle || "Seasonal Program"}
+          >
+            {row.programName || row.programCampaignTitle || "Seasonal Program"}
+          </span>
         ),
       },
       {
         id: "customer",
-        header: "Customer & Plant",
-        width: "w-[160px]",
+        header: "Customer",
+        width: "w-[125px]",
         cell: (row) => (
-          <div className="flex flex-col gap-0.5 items-start min-w-0">
+          <div className="flex items-center gap-1 min-w-0">
+            <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
             <span
-              className="font-semibold text-xs text-[var(--on-surface)] truncate max-w-full"
+              className="font-semibold text-xs text-[var(--on-surface)] truncate"
               title={row.customer || "—"}
             >
               {row.customer || "—"}
-            </span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--on-surface-muted)]">
-              <Factory className="w-2.5 h-2.5 opacity-70 shrink-0" />
-              <span>Plant {row.targetPlant || "1505"}</span>
             </span>
           </div>
         ),
       },
       {
+        id: "substrates",
+        header: "Substrates",
+        width: "w-[120px]",
+        cell: (row) => {
+          const materials = row.programMaterials || [];
+          const substrates = Array.from(
+            new Set(materials.map((m) => m.materialType?.trim()).filter(Boolean) as string[])
+          );
+          const calipers = Array.from(
+            new Set(materials.map((m) => m.caliperWt?.trim()).filter(Boolean) as string[])
+          );
+
+          if (substrates.length === 0) {
+            return <span className="text-[var(--on-surface-subtle)] font-mono text-[11px]">—</span>;
+          }
+
+          const label = substrates.slice(0, 2).join(", ") + (substrates.length > 2 ? ` +${substrates.length - 2}` : "");
+          const detail = calipers.length > 0 ? calipers[0] : "";
+
+          return (
+            <div
+              className="flex flex-col min-w-0"
+              title={`Substrates: ${substrates.join(", ")}${calipers.length > 0 ? ` | Weight/Caliper: ${calipers.join(", ")}` : ""}`}
+            >
+              <span className="font-semibold text-xs text-[var(--on-surface)] truncate">
+                {label}
+              </span>
+              {detail && (
+                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] truncate">
+                  {detail}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
         id: "skus",
-        header: "Matrix SKUs",
-        width: "w-[95px]",
+        header: "SKUs",
+        width: "w-[75px]",
         align: "center",
         cell: (row) => {
           const materials = row.programMaterials || [];
@@ -354,11 +373,11 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
           const hasRecent = materials.some((m) => isMaterialAddedRecently(m.createdAt));
           return (
             <div className="flex items-center justify-center gap-1">
-              <span className="inline-flex items-center rounded-full bg-[var(--accent-primary-subtle)] px-2 py-0.5 font-mono text-[10.5px] font-bold text-[var(--accent-primary)]">
+              <span className="inline-flex items-center rounded-full bg-[var(--accent-primary-subtle)] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--accent-primary)] whitespace-nowrap">
                 {skuCount} SKU{skuCount !== 1 ? "s" : ""}
               </span>
               {hasRecent && (
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.2 text-[9px] font-semibold uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-1 py-0.2 text-[8.5px] font-semibold uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                   New
                 </span>
               )}
@@ -367,14 +386,26 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
         },
       },
       {
+        id: "created_date",
+        header: "Created",
+        width: "w-[95px]",
+        cell: (row) => (
+          <div className="flex items-center gap-1 text-[11px] text-[var(--on-surface)] whitespace-nowrap">
+            <Calendar className="w-3 h-3 text-[var(--on-surface-subtle)] shrink-0" />
+            <span>{row.dateRequestCreated ? formatOdooDate(row.dateRequestCreated) : "Recent"}</span>
+          </div>
+        ),
+      },
+      {
         id: "samp_review",
-        header: "SAMP Review",
-        width: "w-[130px]",
+        header: "SAMP",
+        width: "w-[100px]",
+        align: "center",
         cell: (row) => {
           const samp = hasSampOutput(row);
           return (
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap ${
                 samp
                   ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60"
                   : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)] border border-[var(--border-subtle)]"
@@ -388,13 +419,14 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       },
       {
         id: "plant_review",
-        header: "Plant Review",
-        width: "w-[130px]",
+        header: "Plant",
+        width: "w-[100px]",
+        align: "center",
         cell: (row) => {
           const plant = hasPlantOutput(row);
           return (
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap ${
                 plant
                   ? "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/60"
                   : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)] border border-[var(--border-subtle)]"
@@ -409,19 +441,19 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
       {
         id: "status",
         header: "Status",
-        width: "w-[145px]",
+        width: "w-[110px]",
         cell: (row) => {
           const isPaused = row.isActive === false;
           const canPause = !isReadOnly && user?.team === "marketing";
           return (
-            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
               {isPaused ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-                  <Pause className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap">
+                  <Pause className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
                   <span>Paused</span>
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                   <span>Active</span>
                 </span>
@@ -431,14 +463,14 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
                   type="button"
                   onClick={(e) => handleTogglePause(row, e)}
                   disabled={togglingId === row.id}
-                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer select-none active:scale-95 ${
+                  className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9.5px] font-medium transition-colors cursor-pointer select-none active:scale-95 ${
                     isPaused
                       ? "text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/60"
                       : "text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/60"
                   }`}
                   title={isPaused ? "Resume this program" : "Pause this program"}
                 >
-                  {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                  {isPaused ? <Play className="w-2 h-2" /> : <Pause className="w-2 h-2" />}
                   <span>{isPaused ? "Resume" : "Pause"}</span>
                 </button>
               )}
@@ -446,6 +478,27 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
           );
         },
       },
+      ...(isAdmin
+        ? [
+            {
+              id: "raised_by",
+              header: "Raised By",
+              width: "w-[110px]",
+              cell: (row: SampleRequestItem) => (
+                <div className="flex items-center gap-1 min-w-0" title={row.createdBy || "Marketing"}>
+                  <div className="w-4.5 h-4.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/80 flex items-center justify-center shrink-0">
+                    <User className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <span
+                    className="truncate text-xs font-medium text-[var(--on-surface)]"
+                  >
+                    {row.createdBy || "Marketing"}
+                  </span>
+                </div>
+              ),
+            },
+          ]
+        : []),
     ],
     [isAdmin, isReadOnly, user, togglingId]
   );
@@ -546,23 +599,10 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
             />
           )}
 
-          {/* Plant Filter Dropdown */}
-          {plantList.length > 0 && (
-            <Select
-              aria-label="Filter by plant"
-              value={selectedPlantFilter}
-              onChange={(e) => setSelectedPlantFilter(e.target.value)}
-              className="min-w-[110px] max-w-[140px]"
-              options={[
-                { value: "all", label: `Plants (${plantList.length})` },
-                ...plantList.map((p) => ({ value: p, label: `Plant ${p}` })),
-              ]}
-            />
-          )}
         </>
       }
       hasActiveFilters={Boolean(
-        customerFilter !== "all" || selectedPlantFilter !== "all" || filterTab !== "all" || searchTerm
+        customerFilter !== "all" || filterTab !== "all" || searchTerm
       )}
       onResetFilters={clearFilters}
       resetFiltersLabel="Clear Filters"
@@ -573,15 +613,17 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
         keyExtractor={(req) => req.id}
         isLoading={isLoading}
         emptyMessage={
-          searchTerm || customerFilter !== "all" || filterTab !== "all" || selectedPlantFilter !== "all"
+          searchTerm || customerFilter !== "all" || filterTab !== "all"
             ? "No programs match your search or active filter criteria."
             : "There are currently no seasonal program planning requests submitted."
         }
         onRowClick={handleOpenInspector}
-        enableSelection={isAdmin}
+        enableSelection={true}
         selectedIds={selectedIds}
         onToggleSelectRow={toggleSelectRow}
         onToggleSelectAll={toggleSelectAll}
+        tableClassName="w-full table-fixed min-w-0"
+        containerClassName="overflow-y-auto overflow-x-hidden"
         toolbarLeft={
           <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <span className="truncate">
@@ -596,26 +638,11 @@ export const ProgramPlanningPage: React.FC<ProgramPlanningPageProps> = ({
               programs
             </span>
             {selectedIds.size > 0 && (
-              <span className="shrink-0 rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700 dark:text-indigo-300 font-bold">
+              <span className="shrink-0 rounded-md border border-indigo-300 bg-indigo-50 px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
                 {selectedIds.size} selected
               </span>
             )}
           </div>
-        }
-        toolbarRight={
-          selectedIds.size > 0 && isAdmin ? (
-            <button
-              type="button"
-              onClick={() => {
-                const targets = programRequests.filter((r) => selectedIds.has(r.id));
-                targets.forEach((t) => onDeleteRequest(t));
-                setSelectedIds(new Set());
-              }}
-              className="inline-flex h-7 select-none items-center gap-1 rounded-md bg-rose-600 px-2.5 text-[11px] font-semibold text-white transition-colors hover:bg-rose-700 cursor-pointer shadow-2xs"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete Selected ({selectedIds.size})
-            </button>
-          ) : undefined
         }
       />
 

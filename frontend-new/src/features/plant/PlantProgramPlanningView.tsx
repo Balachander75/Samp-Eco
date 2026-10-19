@@ -9,16 +9,21 @@ import {
   Search,
   X,
   Pause,
+  Building2,
+  Calendar,
+  User,
 } from "lucide-react";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { Select } from "@/components/ui/Select";
 import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
 import { exportRecordsToCsv } from "@/lib/csvExport";
+import { isMaterialAddedRecently, formatOdooDate } from "@/features/sample-requests/utils/dateUtils";
 
 export interface PlantProgramPlanningViewProps {
   requests: SampleRequestItem[];
   isLoading: boolean;
   selectedPlant: string;
+  isAdmin?: boolean;
   onInspectRequest: (req: SampleRequestItem) => void;
   onRefresh: () => Promise<void>;
   showToast: (msg: string) => void;
@@ -38,6 +43,7 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
   requests,
   isLoading,
   selectedPlant,
+  isAdmin = false,
   onInspectRequest,
   onRefresh,
   showToast,
@@ -45,8 +51,25 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
   const [filterTab, setFilterTab] = useState<PlantProgramTab>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [customerFilter, setCustomerFilter] = useState("all");
-  const [plantFilter, setPlantFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredRequests.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRequests.map((r) => r.id)));
+    }
+  };
+
+  const toggleSelectRow = (id: string | number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -97,15 +120,6 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
     return Array.from(set).sort();
   }, [plantScopedRequests]);
 
-  // Unique plant list
-  const plantList = useMemo(() => {
-    const set = new Set<string>();
-    programRequests.forEach((r) => {
-      if (r.targetPlant?.trim()) set.add(r.targetPlant.trim());
-    });
-    return Array.from(set).sort();
-  }, [programRequests]);
-
   // Operational metrics
   const metrics = useMemo(() => {
     const total = plantScopedRequests.length;
@@ -137,10 +151,6 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
         return false;
       }
 
-      if (plantFilter !== "all" && r.targetPlant !== plantFilter) {
-        return false;
-      }
-
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
         const code = (r.materialCode || r.srNumber || "").toLowerCase();
@@ -154,12 +164,11 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
 
       return true;
     });
-  }, [plantScopedRequests, filterTab, customerFilter, plantFilter, searchTerm]);
+  }, [plantScopedRequests, filterTab, customerFilter, searchTerm]);
 
   const clearFilters = () => {
     setFilterTab("all");
     setCustomerFilter("all");
-    setPlantFilter("all");
     setSearchTerm("");
   };
 
@@ -171,7 +180,13 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
         { header: "Program ID", accessor: (r) => r.materialCode || r.srNumber || "" },
         { header: "Campaign Title", accessor: (r) => r.programName || r.productDescription || "" },
         { header: "Customer", accessor: (r) => r.customer || "" },
-        { header: "Plant", accessor: (r) => r.targetPlant || "" },
+        {
+          header: "Substrates",
+          accessor: (r) =>
+            Array.from(new Set((r.programMaterials || []).map((m) => m.materialType).filter(Boolean))).join(
+              "; "
+            ) || "Standard",
+        },
         { header: "Year", accessor: (r) => r.programYear || "2026" },
         { header: "SKUs", accessor: (r) => (r.programMaterials || []).length || 1 },
         { header: "SAMP Note", accessor: (r) => r.samplingRemark || "Awaiting" },
@@ -188,7 +203,7 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
       value: metrics.total,
       detail: `${metrics.totalSKUs} total SKUs`,
       color: "bg-indigo-500",
-      isActive: filterTab === "all" && customerFilter === "all" && plantFilter === "all" && !searchTerm,
+      isActive: filterTab === "all" && customerFilter === "all" && !searchTerm,
       onClick: clearFilters,
     },
     {
@@ -230,12 +245,12 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
       {
         id: "program_id",
         header: "Program ID",
-        width: "w-[135px]",
+        width: "w-[105px]",
         sortable: true,
         cell: (row) => (
-          <div className="flex flex-col gap-0.5 items-start">
-            <CopyBadge text={row.requestCode || row.materialCode || `PP-${row.id}`} />
-            <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] font-medium">
+          <div className="flex flex-col gap-0.5 items-start min-w-0">
+            <CopyBadge text={row.requestCode || row.materialCode || `PP-${row.id}`} className="max-w-full font-semibold text-[11px] px-1.5 py-0.5" />
+            <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] font-medium truncate max-w-full">
               BY {row.programYear || "2026"}
             </span>
           </div>
@@ -243,59 +258,64 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
       },
       {
         id: "campaign",
-        header: "Campaign Title & Product Scope",
+        header: "Campaign Title",
+        width: "w-[180px]",
         cell: (row) => (
-          <div className="max-w-md">
-            <div
-              className="truncate font-semibold text-xs text-[var(--text-primary)]"
-              title={row.programName || row.programCampaignTitle || "Seasonal Program"}
-            >
-              {row.programName || row.programCampaignTitle || "Seasonal Program"}
-            </div>
-            <div className="mt-0.5 truncate text-[10.5px] font-mono text-[var(--text-muted)]">
-              {row.productDescription || "Multi-SKU scholastic program range"}
-            </div>
-          </div>
+          <span
+            className="truncate font-semibold text-xs text-[var(--on-surface)] block"
+            title={row.programName || row.programCampaignTitle || "Seasonal Program"}
+          >
+            {row.programName || row.programCampaignTitle || "Seasonal Program"}
+          </span>
         ),
       },
       {
         id: "customer",
-        header: "Customer & Plant",
-        width: "w-[170px]",
+        header: "Customer",
+        width: "w-[125px]",
         cell: (row) => (
-          <div className="flex flex-col gap-0.5 items-start min-w-0">
+          <div className="flex items-center gap-1 min-w-0">
+            <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
             <span
-              className="font-semibold text-xs text-[var(--text-primary)] truncate max-w-full"
+              className="font-semibold text-xs text-[var(--on-surface)] truncate"
               title={row.customer || "—"}
             >
               {row.customer || "—"}
-            </span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--text-secondary)]">
-              <Factory className="w-2.5 h-2.5 opacity-70 shrink-0" />
-              <span>Plant {row.targetPlant || "1505"}</span>
             </span>
           </div>
         ),
       },
       {
-        id: "skus",
-        header: "Matrix SKUs",
-        width: "w-[105px]",
-        align: "center",
+        id: "substrates",
+        header: "Substrates",
+        width: "w-[120px]",
         cell: (row) => {
           const materials = row.programMaterials || [];
-          const skuCount = materials.length > 0 ? materials.length : 1;
           const substrates = Array.from(
             new Set(materials.map((m) => m.materialType?.trim()).filter(Boolean) as string[])
-          ).slice(0, 2);
+          );
+          const calipers = Array.from(
+            new Set(materials.map((m) => m.caliperWt?.trim()).filter(Boolean) as string[])
+          );
+
+          if (substrates.length === 0) {
+            return <span className="text-[var(--on-surface-subtle)] font-mono text-[11px]">—</span>;
+          }
+
+          const label = substrates.slice(0, 2).join(", ") + (substrates.length > 2 ? ` +${substrates.length - 2}` : "");
+          const detail = calipers.length > 0 ? calipers[0] : "";
+
           return (
-            <div className="flex flex-col items-center gap-0.5 font-mono">
-              <span className="rounded-full bg-[var(--accent-primary-subtle)] px-2 py-0.5 text-[10.5px] font-bold text-[var(--accent-primary)]">
-                {skuCount} SKU{skuCount !== 1 ? "s" : ""}
+            <div
+              className="flex flex-col min-w-0"
+              title={`Substrates: ${substrates.join(", ")}${calipers.length > 0 ? ` | Weight/Caliper: ${calipers.join(", ")}` : ""}`}
+            >
+              <span className="font-semibold text-xs text-[var(--on-surface)] truncate">
+                {label}
               </span>
-              {substrates.length > 0 && (
-                <span className="text-[9.5px] text-[var(--text-muted)] truncate max-w-[95px]">
-                  {substrates.join(" · ")}
+              {detail && (
+                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] truncate">
+                  {detail}
                 </span>
               )}
             </div>
@@ -303,17 +323,52 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
         },
       },
       {
+        id: "skus",
+        header: "SKUs",
+        width: "w-[75px]",
+        align: "center",
+        cell: (row) => {
+          const materials = row.programMaterials || [];
+          const skuCount = materials.length > 0 ? materials.length : 1;
+          const hasRecent = materials.some((m) => isMaterialAddedRecently(m.createdAt));
+          return (
+            <div className="flex items-center justify-center gap-1">
+              <span className="inline-flex items-center rounded-full bg-[var(--accent-primary-subtle)] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--accent-primary)] whitespace-nowrap">
+                {skuCount} SKU{skuCount !== 1 ? "s" : ""}
+              </span>
+              {hasRecent && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-1 py-0.2 text-[8.5px] font-semibold uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  New
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: "created_date",
+        header: "Created",
+        width: "w-[95px]",
+        cell: (row) => (
+          <div className="flex items-center gap-1 text-[11px] text-[var(--on-surface)] whitespace-nowrap">
+            <Calendar className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
+            <span>{row.dateRequestCreated ? formatOdooDate(row.dateRequestCreated) : "Recent"}</span>
+          </div>
+        ),
+      },
+      {
         id: "samp_review",
-        header: "SAMP Review",
-        width: "w-[125px]",
+        header: "SAMP",
+        width: "w-[100px]",
+        align: "center",
         cell: (row) => {
           const samp = hasSampNote(row);
           return (
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap ${
                 samp
                   ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60"
-                  : "bg-[var(--surface-low)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
+                  : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)] border border-[var(--border-subtle)]"
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${samp ? "bg-emerald-500" : "bg-neutral-400"}`} />
@@ -324,16 +379,17 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
       },
       {
         id: "plant_review",
-        header: "Plant Review",
-        width: "w-[125px]",
+        header: "Plant",
+        width: "w-[100px]",
+        align: "center",
         cell: (row) => {
           const plant = hasPlantNote(row);
           return (
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap ${
                 plant
                   ? "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/60"
-                  : "bg-[var(--surface-low)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
+                  : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)] border border-[var(--border-subtle)]"
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${plant ? "bg-teal-500" : "bg-neutral-400"}`} />
@@ -345,24 +401,45 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
       {
         id: "status",
         header: "Status",
-        width: "w-[105px]",
+        width: "w-[110px]",
         cell: (row) => {
           const isPaused = row.isActive === false;
           return isPaused ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 text-[10.5px] font-semibold text-amber-700 dark:text-amber-300">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap">
               <Pause className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
               <span>Paused</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-300">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
               <span>Active</span>
             </span>
           );
         },
       },
+      ...(isAdmin
+        ? [
+            {
+              id: "raised_by",
+              header: "Raised By",
+              width: "w-[110px]",
+              cell: (row: SampleRequestItem) => (
+                <div className="flex items-center gap-1 min-w-0" title={row.createdBy || "Marketing"}>
+                  <div className="w-4.5 h-4.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/80 flex items-center justify-center shrink-0">
+                    <User className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <span
+                    className="truncate text-xs font-medium text-[var(--on-surface)]"
+                  >
+                    {row.createdBy || "Marketing"}
+                  </span>
+                </div>
+              ),
+            },
+          ]
+        : []),
     ],
-    []
+    [isAdmin]
   );
 
   return (
@@ -450,23 +527,10 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
             />
           )}
 
-          {/* Plant Filter Dropdown */}
-          {plantList.length > 0 && (
-            <Select
-              aria-label="Filter by plant"
-              value={plantFilter}
-              onChange={(e) => setPlantFilter(e.target.value)}
-              className="min-w-[110px] max-w-[140px]"
-              options={[
-                { value: "all", label: `Plants (${plantList.length})` },
-                ...plantList.map((plant) => ({ value: plant, label: `Plant ${plant}` })),
-              ]}
-            />
-          )}
         </>
       }
       hasActiveFilters={Boolean(
-        customerFilter !== "all" || plantFilter !== "all" || filterTab !== "all" || searchTerm
+        customerFilter !== "all" || filterTab !== "all" || searchTerm
       )}
       onResetFilters={clearFilters}
       resetFiltersLabel="Clear Filters"
@@ -477,11 +541,17 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
         keyExtractor={(req) => req.id}
         isLoading={isLoading}
         emptyMessage={
-          searchTerm || customerFilter !== "all" || filterTab !== "all" || plantFilter !== "all"
+          searchTerm || customerFilter !== "all" || filterTab !== "all"
             ? "No programs match your search or active filter criteria."
             : `There are currently no seasonal program planning requests assigned to plant ${selectedPlant || "ALL"}.`
         }
         onRowClick={onInspectRequest}
+        enableSelection={true}
+        selectedIds={selectedIds}
+        onToggleSelectRow={toggleSelectRow}
+        onToggleSelectAll={toggleSelectAll}
+        tableClassName="w-full table-fixed min-w-0"
+        containerClassName="overflow-y-auto overflow-x-hidden"
         toolbarLeft={
           <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <span className="truncate">
@@ -495,6 +565,11 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
               </span>{" "}
               programs
             </span>
+            {selectedIds.size > 0 && (
+              <span className="shrink-0 rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700 dark:text-indigo-300 font-bold">
+                {selectedIds.size} selected
+              </span>
+            )}
           </div>
         }
       />

@@ -34,17 +34,21 @@ export const NewProgramPlanningModal: React.FC<NewProgramPlanningModalProps> = (
   const [programYear, setProgramYear] = useState(() => getProgramYearOptions()[0]);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize defaults on open
+  // Reset the campaign form whenever the modal opens; customer must be chosen explicitly.
   useEffect(() => {
-    if (isOpen) {
-      setError(null);
-      setProgramName("");
-      setProgramYear(getProgramYearOptions()[0]);
-      if (customers.length > 0) setCustomer(customers[0].name);
-      if (plants.length > 0) setTargetPlant(plants[0].name);
-      else setTargetPlant("Plant 1");
-    }
-  }, [isOpen, customers, plants]);
+    if (!isOpen) return;
+    setError(null);
+    setCustomer("");
+    setTargetPlant("");
+    setProgramName("");
+    setProgramYear(getProgramYearOptions()[0]);
+  }, [isOpen]);
+
+  // Resolve the hidden target-plant default when master data finishes loading.
+  useEffect(() => {
+    if (!isOpen || plants.length === 0) return;
+    setTargetPlant((current) => current || plants[0].name);
+  }, [isOpen, plants]);
 
   if (!isOpen) return null;
 
@@ -119,17 +123,17 @@ export const NewProgramPlanningModal: React.FC<NewProgramPlanningModalProps> = (
             {/* 1. Customer Account */}
             <div className="space-y-1.5">
               <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-slate-700">
-                Customer Account <span className="text-rose-500">*</span>
+                Customer / Country <span className="text-rose-500">*</span>
               </label>
               <CustomerCombobox
                 customers={customers}
                 value={customer}
                 onChange={setCustomer}
-                placeholder="Select or enter customer account..."
+                placeholder="Select a customer and country..."
                 className="w-full"
               />
               <p className="text-[11px] text-slate-400">
-                Select the customer account associated with this seasonal program line.
+                Choose a customer from the list; its registered country will appear in the selection.
               </p>
             </div>
 

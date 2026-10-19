@@ -215,7 +215,7 @@ def update_user(
 @router.delete(
     "/api/v1/users/{id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Deactivate an enterprise user while preserving request history",
+    summary="Permanently delete an enterprise user while preserving request history",
 )
 def delete_user(
     id: int,

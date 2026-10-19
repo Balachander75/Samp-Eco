@@ -40,6 +40,11 @@ export interface RequestWorkflowRecord {
   reviewer_notes?: string | null;
   reviewer_name?: string | null;
   reviewed_at?: string | null;
+  claimed_by?: string | null;
+  claimed_by_user_id?: number | null;
+  claimed_at?: string | null;
+  is_claimed?: boolean;
+  is_claimed_by_me?: boolean;
   marketing_decision?: string | null;
   logs: RequestWorkflowLog[];
 }
@@ -99,6 +104,16 @@ export function completeCostingWorkflowApi(
   return apiFetch<RequestWorkflowRecord>(`/api/v1/workflows/costing/${sampleRequestId}/complete`, {
     method: "POST",
     jsonBody: { costing_output_path: payload.outputPath, notes: payload.notes },
+  }).then((result) => {
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+    return result;
+  });
+}
+
+export function claimCostingWorkflowApi(sampleRequestId: number): Promise<RequestWorkflowRecord> {
+  return apiFetch<RequestWorkflowRecord>(`/api/v1/workflows/costing/${sampleRequestId}/claim`, {
+    method: "POST",
+    jsonBody: {},
   }).then((result) => {
     if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("samp:requests-changed"));
     return result;

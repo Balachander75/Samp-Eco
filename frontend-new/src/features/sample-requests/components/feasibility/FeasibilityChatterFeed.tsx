@@ -1,8 +1,20 @@
-import React, { useMemo, useRef, useEffect, useState } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import { SampleRequestItem, FeasibilityActivityItem } from "../../types";
 import { formatOdooLogDate } from "../../utils/dateUtils";
 import { UserProfile } from "@/features/auth";
-import { Send, Loader2 } from "lucide-react";
+import {
+  History,
+  Layers,
+  Clock,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  PackageCheck,
+  ShieldCheck,
+  Lock,
+  FileText,
+} from "lucide-react";
 
 export interface FeasibilityChatterFeedProps {
   activeRequest: SampleRequestItem;
@@ -11,282 +23,239 @@ export interface FeasibilityChatterFeedProps {
   currentUser?: UserProfile | null;
 }
 
-interface ChatLogEvent {
+interface ActivityLogEvent {
   id: string | number;
-  kind: "system_event" | "marketing_message" | "sampling_message";
+  kind: "system_announcement" | "marketing_card" | "sampling_card" | "note_card";
   actorName: string;
   actorDepartment: string;
   title: string;
   summary: string;
+  detail?: string;
+  subdetail?: string;
   timestamp: string;
-  badge?: {
-    text: string;
-    variant: "emerald" | "sky" | "rose" | "indigo" | "neutral";
-  };
-}
-
-function getInitials(name?: any): string {
-  if (!name) return "US";
-  const clean = String(name).trim();
-  if (!clean) return "US";
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return ((parts[0][0] || "") + (parts[1][0] || "")).toUpperCase() || "US";
-  }
-  return clean.slice(0, 2).toUpperCase() || "US";
-}
-
-function formatTimeOnly(dateInput?: string | Date | null): string {
-  if (!dateInput) return "";
-  try {
-    const d = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
-    if (isNaN(d.getTime())) return "";
-    return d.toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-  } catch {
-    return "";
-  }
+  verdictTag?: "Yes" | "No" | "Maybe";
+  decisionTag?: "Accepted" | "Rejected";
 }
 
 export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
   activeRequest,
   classificationLabel,
-  onAddNote,
-  currentUser: _currentUser,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const [noteText, setNoteText] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSubmitNote = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const clean = noteText.trim();
-    if (!clean || !onAddNote || isSubmitting) return;
-
-    setIsSubmitting(true);
-    setSubmitError(null);
-    try {
-      await onAddNote(clean);
-      setNoteText("");
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    } catch (err: any) {
-      setSubmitError(err?.message || "Failed to post note.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Compile chronological timeline events
-  const chatEvents = useMemo<ChatLogEvent[]>(() => {
-    const events: ChatLogEvent[] = [];
+  // Compile chronological audit & activity events
+  const auditEvents = useMemo<ActivityLogEvent[]>(() => {
+    const events: ActivityLogEvent[] = [];
     const recordedActions = new Set<string>();
 
     const rawActivities: FeasibilityActivityItem[] = Array.isArray(activeRequest.activities)
-      ? activeRequest.activities
+      ? (activeRequest.activities as FeasibilityActivityItem[])
       : [];
 
-    // 1. Process persisted DB activities (excluding VIEWED)
+    // 1. Process persisted DB activities (filtering out VIEW events)
     rawActivities
-      .filter((act) => act.action !== "VIEWED")
+      .filter((act) => {
+        const action = (act.action || "").toUpperCase();
+        return (
+          !action.includes("VIEW") &&
+          action !== "FEASIBILITY_VIEWED" &&
+          action !== "SAMP_VIEWED" &&
+          action !== "VIEWED"
+        );
+      })
       .forEach((act) => {
         recordedActions.add(act.action);
-        const payload = act.payload || {};
+        const payload = (act.payload || {}) as Record<string, any>;
+        const time = act.createdAt || "";
 
         if (act.action === "CREATED") {
           const author = act.actorName || activeRequest.createdBy || "Marketing Desk";
           events.push({
             id: act.id,
-            kind: "marketing_message",
+            kind: "system_announcement",
             actorName: author,
             actorDepartment: act.actorDepartment || "Marketing",
-            title: "Request raised",
-            summary: `Raised · ${activeRequest.customer || "General Client"} · ${classificationLabel}`,
-            timestamp: act.createdAt || activeRequest.createdAt || activeRequest.dateRequestCreated || "",
-            badge: { text: "Intake", variant: "indigo" },
+            title: "Request Raised",
+            summary: `${author} raised this feasibility request for ${activeRequest.customer || "Client"} (${classificationLabel})`,
+            timestamp: time || activeRequest.createdAt || activeRequest.dateRequestCreated || "",
           });
         } else if (act.action === "TASK_CLAIMED") {
           const assignee = act.actorName || payload.claimed_by || activeRequest.takenBySamp || "SAMP Engineer";
           events.push({
             id: act.id,
-            kind: "system_event",
+            kind: "system_announcement",
             actorName: assignee,
-            actorDepartment: "SAMP",
-            title: "Claimed",
-            summary: `Claimed by ${assignee}`,
-            timestamp: act.createdAt || activeRequest.takenAtSamp || "",
-            badge: { text: "Assigned", variant: "sky" },
+            actorDepartment: "SAMP Team",
+            title: "Review Claimed",
+            summary: `${assignee} claimed the Feasibility Review task`,
+            timestamp: time || activeRequest.takenAtSamp || "",
+          });
+        } else if (act.action === "SAMP_COUNTER_DATE_PROPOSED") {
+          const proposed = payload.proposed_date || activeRequest.sampCounterDate || "a revised date";
+          const reason = payload.reason || activeRequest.sampCounterDateReason || "";
+          events.push({
+            id: act.id,
+            kind: "system_announcement",
+            actorName: act.actorName || activeRequest.sampCounterDateProposedBy || "SAMP Team",
+            actorDepartment: "SAMP Team",
+            title: "Revised Date Proposed",
+            summary: `${act.actorName || "SAMP Team"} proposed revised target date: ${proposed}${reason ? ` (${reason})` : ""}`,
+            timestamp: time || activeRequest.sampCounterDateProposedAt || "",
+          });
+        } else if (act.action === "COUNTER_DATE_ACCEPTED") {
+          events.push({
+            id: act.id,
+            kind: "system_announcement",
+            actorName: act.actorName || "Marketing Team",
+            actorDepartment: "Marketing",
+            title: "Revised Date Accepted",
+            summary: `${act.actorName || "Marketing Team"} accepted the revised target date`,
+            timestamp: time || activeRequest.counterDateDecisionAt || "",
+          });
+        } else if (act.action === "COUNTER_DATE_REJECTED") {
+          events.push({
+            id: act.id,
+            kind: "system_announcement",
+            actorName: act.actorName || "Marketing Team",
+            actorDepartment: "Marketing",
+            title: "Revised Date Rejected",
+            summary: `${act.actorName || "Marketing Team"} rejected revised date; keeping original timeline`,
+            timestamp: time || activeRequest.counterDateDecisionAt || "",
+          });
+        } else if (act.action === "COUNTER_DATE_AUTO_ACCEPTED") {
+          events.push({
+            id: act.id,
+            kind: "system_announcement",
+            actorName: "System",
+            actorDepartment: "System",
+            title: "Auto-Accepted",
+            summary: "System automatically accepted revised target date after 4 working days",
+            timestamp: time || activeRequest.counterDateDecisionAt || "",
           });
         } else if (act.action === "SAMP_EVALUATED") {
-          const verdict = payload.verdict || activeRequest.samplingFeasibilityResponse || "Yes";
+          const verdict = (payload.verdict || activeRequest.samplingFeasibilityResponse || "Yes") as "Yes" | "No" | "Maybe";
           const reviewer = act.actorName || activeRequest.samplingFeasibilityApprovedBy || "SAMP Team";
           events.push({
             id: act.id,
-            kind: "sampling_message",
+            kind: "sampling_card",
             actorName: reviewer,
             actorDepartment: "SAMP Team",
-            title: "SAMP review",
-            summary: verdict === "Maybe" ? "Conditional" : verdict === "Yes" ? "Feasible" : "Not feasible",
-            timestamp: act.createdAt || activeRequest.feasibilityClosedAt || "",
-            badge: {
-              text: verdict === "Yes" ? "Feasible" : verdict === "No" ? "Not Feasible" : "Maybe",
-              variant: verdict === "Yes" ? "emerald" : verdict === "No" ? "rose" : "sky",
-            },
-          });
-        } else if (act.action === "SAMP_COUNTER_DATE_PROPOSED") {
-          events.push({
-            id: act.id,
-            kind: "sampling_message",
-            actorName: act.actorName || activeRequest.sampCounterDateProposedBy || "SAMP Team",
-            actorDepartment: "SAMP Team",
-            title: "Date proposed",
-            summary: `Proposed ${payload.proposed_date || activeRequest.sampCounterDate || "a revised date"}${payload.reason ? ` · ${payload.reason}` : ""}`,
-            timestamp: act.createdAt || activeRequest.sampCounterDateProposedAt || "",
-            badge: { text: "Date proposed", variant: "sky" },
-          });
-        } else if (act.action === "COUNTER_DATE_ACCEPTED" || act.action === "COUNTER_DATE_REJECTED" || act.action === "COUNTER_DATE_AUTO_ACCEPTED") {
-          const autoAccepted = act.action === "COUNTER_DATE_AUTO_ACCEPTED";
-          const accepted = act.action !== "COUNTER_DATE_REJECTED";
-          events.push({
-            id: act.id,
-            kind: autoAccepted ? "system_event" : "marketing_message",
-            actorName: act.actorName || "Marketing",
-            actorDepartment: autoAccepted ? "System" : "Marketing",
-            title: autoAccepted ? "Date auto-accepted" : "Date decision",
-            summary: `${autoAccepted ? "System auto-accepted" : accepted ? "Marketing accepted" : "Marketing kept original date"} · ${payload.effective_date || payload.proposed_date || activeRequest.sampleRequiredDate || ""}`,
-            timestamp: act.createdAt || activeRequest.counterDateDecisionAt || "",
-            badge: { text: autoAccepted ? "Auto-accepted" : accepted ? "Accepted" : "Rejected", variant: accepted ? "emerald" : "rose" },
+            title: "SAMP Technical Sign-Off",
+            summary: payload.remark || activeRequest.samplingFeasibilityRemark || (verdict === "Yes" ? "Feasible for factory sampling" : verdict === "Maybe" ? "Conditional approval" : "Not feasible"),
+            detail: payload.conditions || activeRequest.feasibilityConditions || undefined,
+            subdetail: payload.lead_time_note || activeRequest.leadTimeNote || undefined,
+            timestamp: time || activeRequest.feasibilityClosedAt || "",
+            verdictTag: verdict,
           });
         } else if (act.action === "MARKETING_DECIDED") {
-          const decision = payload.decision || activeRequest.marketingDecision || "Accepted";
+          const decision = (payload.decision || activeRequest.marketingDecision || "Accepted") as "Accepted" | "Rejected";
           const decider = act.actorName || activeRequest.marketingDecisionBy || "Marketing Authority";
           events.push({
             id: act.id,
-            kind: "marketing_message",
+            kind: "marketing_card",
             actorName: decider,
             actorDepartment: "Marketing",
-            title: "Marketing decision",
-            summary: decision === "Accepted" ? "Request accepted" : "Request rejected",
-            timestamp: act.createdAt || activeRequest.marketingDecisionAt || "",
-            badge: {
-              text: decision === "Accepted" ? "Approved" : "Dropped",
-              variant: decision === "Accepted" ? "emerald" : "rose",
-            },
+            title: "Commercial Decision",
+            summary: payload.remark || activeRequest.marketingDecisionRemark || (decision === "Accepted" ? "Approved for commercial sampling" : "Dropped by marketing"),
+            timestamp: time || activeRequest.marketingDecisionAt || "",
+            decisionTag: decision,
           });
         } else if (act.action === "CONVERTED_TO_SAMPLING") {
           const srNum = payload.sample_request_code || activeRequest.convertedRequestCode || activeRequest.convertedSrNumber || "";
-          const scopes = (Array.isArray(payload.request_types) ? payload.request_types : activeRequest.convertedRequestTypes || [])
-            .map((scope: string) => scope === "costing" ? "Costing" : "Sampling");
           events.push({
             id: act.id,
-            kind: "system_event",
+            kind: "system_announcement",
             actorName: act.actorName || activeRequest.convertedBy || "Marketing Lead",
             actorDepartment: "Operations",
-            title: "Commercial request created",
-            summary: [srNum, scopes.join(" + ")].filter(Boolean).join(" · ") || "Converted from feasibility",
-            timestamp: act.createdAt || activeRequest.convertedAt || "",
-            badge: { text: srNum ? `Code: ${srNum}` : "Converted", variant: "emerald" },
+            title: "Commercial Conversion",
+            summary: `${act.actorName || "Marketing"} converted this feasibility to commercial request ${srNum || ""}`.trim(),
+            timestamp: time || activeRequest.convertedAt || "",
           });
         } else if (act.action === "NOTE_ADDED") {
           const dept = (act.actorDepartment || "").toLowerCase();
           const isSamp = dept.includes("samp");
           events.push({
             id: act.id,
-            kind: isSamp ? "sampling_message" : "marketing_message",
+            kind: "note_card",
             actorName: act.actorName || "Team Member",
             actorDepartment: act.actorDepartment || (isSamp ? "SAMP Team" : "Marketing"),
             title: "Note",
-            summary: payload.note ? `Note · ${payload.note}` : "Note added",
-            timestamp: act.createdAt || "",
-            badge: { text: "Note", variant: "neutral" },
+            summary: String(payload.note || payload.text || "Note added"),
+            timestamp: time,
           });
         }
       });
 
-    // 2. Synthesize canonical timeline events if not present in DB activities
+    // 2. Synthesize canonical milestones if database activities are unpopulated
     if (!recordedActions.has("CREATED")) {
       const author = activeRequest.createdBy || "Marketing Desk";
       events.push({
         id: "synth-create",
-        kind: "marketing_message",
+        kind: "system_announcement",
         actorName: author,
         actorDepartment: "Marketing",
-        title: "Request raised",
-        summary: `Raised · ${activeRequest.customer || "General Client"} · ${classificationLabel}`,
+        title: "Request Raised",
+        summary: `${author} raised this feasibility request for ${activeRequest.customer || "Client"} (${classificationLabel})`,
         timestamp: activeRequest.createdAt || activeRequest.dateRequestCreated || "",
-        badge: { text: "Intake", variant: "indigo" },
       });
     }
 
     if (!recordedActions.has("TASK_CLAIMED") && activeRequest.takenBySamp) {
       events.push({
         id: "synth-claim",
-        kind: "system_event",
+        kind: "system_announcement",
         actorName: activeRequest.takenBySamp,
         actorDepartment: "SAMP Team",
-        title: "Claimed",
-        summary: `Claimed by ${activeRequest.takenBySamp}`,
+        title: "Review Claimed",
+        summary: `${activeRequest.takenBySamp} claimed the Feasibility Review task`,
         timestamp: activeRequest.takenAtSamp || activeRequest.createdAt || "",
-        badge: { text: "Under Review", variant: "sky" },
       });
     }
 
     if (!recordedActions.has("SAMP_EVALUATED") && activeRequest.samplingFeasibilityResponse) {
-      const verdict = activeRequest.samplingFeasibilityResponse;
+      const verdict = activeRequest.samplingFeasibilityResponse as "Yes" | "No" | "Maybe";
       events.push({
         id: "synth-evaluated",
-        kind: "sampling_message",
+        kind: "sampling_card",
         actorName: activeRequest.samplingFeasibilityApprovedBy || "SAMP Team",
         actorDepartment: "SAMP Team",
-        title: "SAMP review",
-        summary: verdict === "Maybe" ? "Conditional" : verdict === "Yes" ? "Feasible" : "Not feasible",
+        title: "SAMP Technical Sign-Off",
+        summary: activeRequest.samplingFeasibilityRemark || (verdict === "Yes" ? "Feasible for factory sampling" : verdict === "Maybe" ? "Conditional approval" : "Not feasible"),
+        detail: activeRequest.feasibilityConditions || undefined,
+        subdetail: activeRequest.leadTimeNote || undefined,
         timestamp: activeRequest.feasibilityClosedAt || activeRequest.takenAtSamp || "",
-        badge: {
-          text: verdict === "Yes" ? "Feasible" : verdict === "No" ? "Not Feasible" : "Maybe",
-          variant: verdict === "Yes" ? "emerald" : verdict === "No" ? "rose" : "sky",
-        },
+        verdictTag: verdict,
       });
     }
 
     if (!recordedActions.has("MARKETING_DECIDED") && activeRequest.marketingDecision) {
-      const decision = activeRequest.marketingDecision;
+      const decision = activeRequest.marketingDecision as "Accepted" | "Rejected";
       events.push({
         id: "synth-decision",
-        kind: "marketing_message",
+        kind: "marketing_card",
         actorName: activeRequest.marketingDecisionBy || "Marketing Authority",
         actorDepartment: "Marketing",
-        title: "Marketing decision",
-        summary: decision === "Accepted" ? "Request accepted" : "Request rejected",
+        title: "Commercial Decision",
+        summary: activeRequest.marketingDecisionRemark || (decision === "Accepted" ? "Approved for commercial sampling" : "Dropped by marketing"),
         timestamp: activeRequest.marketingDecisionAt || "",
-        badge: {
-          text: decision === "Accepted" ? "Approved" : "Dropped",
-          variant: decision === "Accepted" ? "emerald" : "rose",
-        },
+        decisionTag: decision,
       });
     }
 
     if (!recordedActions.has("CONVERTED_TO_SAMPLING") && (activeRequest.convertedRequestCode || activeRequest.convertedSrNumber || activeRequest.convertedSampleRequestId)) {
+      const srNum = activeRequest.convertedRequestCode || activeRequest.convertedSrNumber || "";
       events.push({
         id: "synth-converted",
-        kind: "system_event",
+        kind: "system_announcement",
         actorName: activeRequest.convertedBy || "Marketing Lead",
         actorDepartment: "Operations",
-        title: "Commercial request created",
-        summary: [
-          activeRequest.convertedRequestCode || activeRequest.convertedSrNumber,
-          (activeRequest.convertedRequestTypes || []).map((scope) => scope === "costing" ? "Costing" : "Sampling").join(" + "),
-        ].filter(Boolean).join(" · "),
+        title: "Commercial Conversion",
+        summary: `${activeRequest.convertedBy || "Marketing"} converted this feasibility to commercial request ${srNum || ""}`.trim(),
         timestamp: activeRequest.convertedAt || "",
-        badge: { text: `Code: ${activeRequest.convertedRequestCode || activeRequest.convertedSrNumber || "Created"}`, variant: "emerald" },
       });
     }
 
-    // Sort ascending (chronological: oldest at top, newest at bottom)
+    // Sort ascending (chronological: oldest at top, latest at bottom)
     return events.sort((a, b) => {
       const timeA = new Date(a.timestamp).getTime() || 0;
       const timeB = new Date(b.timestamp).getTime() || 0;
@@ -294,197 +263,197 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
     });
   }, [activeRequest, classificationLabel]);
 
-  // Scroll to bottom on load or new events
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatEvents.length]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [auditEvents.length]);
 
   return (
-    <div
-      className="w-80 lg:w-[390px] flex flex-col h-full overflow-hidden select-text border-l shadow-[-12px_0_36px_rgba(11,28,48,0.03)] z-10 relative"
-      style={{
-        backgroundColor: "var(--surface-lowest)",
-        borderColor: "var(--border-subtle)",
-      }}
-    >
-      {/* ── 1. Top Header ── */}
-      <div
-        className="px-4 py-3 flex items-center justify-between sticky top-0 z-20 border-b shadow-2xs"
-        style={{
-          backgroundColor: "var(--surface-base)",
-          borderColor: "var(--border-subtle)",
-        }}
-      >
-        <div>
-          <h2
-            className="font-display font-bold text-xs tracking-tight leading-none"
-            style={{ color: "var(--on-surface)" }}
-          >
-            Activity &amp; Chatter
-          </h2>
+    <aside className="w-80 sm:w-84 lg:w-[360px] shrink-0 border-l border-[var(--border-subtle)] bg-[var(--surface-lowest)] flex flex-col h-full min-h-0 text-xs select-text">
+      {/* ── Top Header: Audit & Activity Log ── */}
+      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 py-2.5 shrink-0 shadow-2xs">
+        <div className="flex items-center gap-2 font-display font-bold text-xs text-[var(--on-surface)]">
+          <History className="w-4 h-4 text-[var(--accent-primary)]" />
+          <span>Audit &amp; Activity Log</span>
         </div>
-
-        <span
-          className="text-[10.5px] font-mono px-2.5 py-0.5 rounded-full font-bold border"
-          style={{
-            backgroundColor: "var(--accent-primary-subtle)",
-            color: "var(--accent-primary)",
-            borderColor: "color-mix(in srgb, var(--accent-primary) 30%, transparent)",
-          }}
-        >
-          {chatEvents.length}
+        <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2.5 py-0.5 font-mono text-[10px] font-bold text-[var(--accent-primary)] shadow-2xs">
+          {auditEvents.length} {auditEvents.length === 1 ? "event" : "events"}
         </span>
       </div>
 
-      {/* ── 2. Chronological Stream ── */}
-      <div className="flex-1 overflow-y-auto p-3.5 space-y-3 font-sans">
-        {chatEvents.length === 0 ? (
-          <div
-            className="py-12 text-center font-display text-xs"
-            style={{ color: "var(--on-surface-subtle)" }}
-          >
-            No updates yet.
+      {/* ── Scrollable Audit Log Feed ── */}
+      <div className="flex-1 overflow-y-auto p-3.5 space-y-3 min-h-0 bg-[var(--surface-lowest)] font-sans">
+        {auditEvents.length === 0 ? (
+          <div className="p-6 text-center text-xs text-[var(--on-surface-subtle)] border border-dashed border-[var(--border-subtle)] rounded-xl my-4">
+            No activity events recorded yet. Claims, reviews, and decisions will appear here in chronological sequence.
           </div>
         ) : (
-          chatEvents.map((evt) => {
-            // Case A: System Event Pill (Task Claimed, Converted to Sampling)
-            if (evt.kind === "system_event") {
+          auditEvents.map((evt) => {
+            const dateDisplay = formatOdooLogDate(evt.timestamp);
+
+            // ── Milestone / System Announcement Pill ──
+            if (evt.kind === "system_announcement") {
               const isClaim = evt.title.includes("Claim");
+              const isDate = evt.title.includes("Date");
+              const isConvert = evt.title.includes("Conversion");
+
               return (
-                <div key={evt.id} className="flex justify-center my-2.5 select-none">
-                  <div
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium shadow-2xs border ${isClaim
-                        ? "bg-sky-50 text-sky-900 border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-200 dark:border-sky-800/40"
-                        : "bg-emerald-50 text-emerald-900 border-emerald-200/80 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800/40"
-                      }`}
-                  >
+                <div key={evt.id} className="flex flex-col items-center my-2 select-none animate-in fade-in">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-sans font-medium text-[var(--on-surface-muted)] bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs max-w-[95%] text-center">
+                    {isClaim ? (
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    ) : isDate ? (
+                      <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    ) : isConvert ? (
+                      <PackageCheck className="w-3.5 h-3.5 text-[var(--accent-primary)] shrink-0" />
+                    ) : (
+                      <Layers className="w-3.5 h-3.5 text-[var(--accent-primary)] shrink-0" />
+                    )}
                     <span>{evt.summary}</span>
-                    <span className="text-[9.5px] opacity-75 font-mono ml-0.5">
-                      · {formatTimeOnly(evt.timestamp)}
+                  </div>
+                  {dateDisplay && dateDisplay !== "Recent" && (
+                    <span className="text-[9.5px] font-mono text-[var(--on-surface-subtle)] mt-0.5">
+                      {dateDisplay}
                     </span>
-                  </div>
+                  )}
                 </div>
               );
             }
 
-            // Case B: Marketing Desk Message Bubble
-            if (evt.kind === "marketing_message") {
+            // ── Sampling Team (SAMP) Technical Sign-Off Card ──
+            if (evt.kind === "sampling_card") {
               return (
-                <div key={evt.id} className="flex flex-col items-start select-text max-w-[94%]">
-                  <div
-                    className="w-full rounded-2xl rounded-tl-xs p-3.5 border shadow-2xs"
-                    style={{
-                      backgroundColor: "var(--surface-base)",
-                      borderColor: "color-mix(in srgb, var(--accent-primary) 25%, var(--border-subtle))",
-                    }}
-                  >
+                <div key={evt.id} className="flex flex-col items-start w-full animate-in fade-in duration-100">
+                  <div className="w-full rounded-xl p-3 shadow-2xs border text-xs space-y-2 bg-emerald-500/5 border-emerald-500/25 dark:bg-emerald-950/20 dark:border-emerald-800/40">
                     {/* Header */}
-                    <div
-                      className="flex items-center justify-between gap-2 pb-1.5 border-b"
-                      style={{ borderColor: "var(--border-subtle)" }}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div
-                          className="w-6 h-6 rounded-full text-white font-bold text-[10px] font-mono flex items-center justify-center shrink-0 shadow-2xs"
-                          style={{ backgroundColor: "var(--accent-primary)" }}
-                        >
-                          {getInitials(evt.actorName)}
-                        </div>
-                        <div className="min-w-0 truncate">
-                          <span
-                            className="font-display font-bold text-xs truncate block"
-                            style={{ color: "var(--on-surface)" }}
-                          >
-                            {evt.actorName}
-                          </span>
-                        </div>
-                        <span
-                          className="px-1.5 py-0.5 rounded text-[9.5px] font-bold font-mono border shrink-0"
-                          style={{
-                            backgroundColor: "var(--accent-primary-subtle)",
-                            color: "var(--accent-primary)",
-                            borderColor: "color-mix(in srgb, var(--accent-primary) 30%, transparent)",
-                          }}
-                        >
-                          Marketing
-                        </span>
-                      </div>
-                      <span
-                        className="text-[9.5px] font-mono whitespace-nowrap"
-                        style={{ color: "var(--on-surface-subtle)" }}
-                      >
-                        {formatOdooLogDate(evt.timestamp)}
-                      </span>
-                    </div>
-
-                    {/* Status / Content */}
-                    <p
-                      className="mt-2 line-clamp-2 text-xs leading-relaxed font-sans"
-                      style={{ color: "var(--on-surface)" }}
-                    >
-                      {evt.summary}
-                    </p>
-                  </div>
-                </div>
-              );
-            }
-
-            // Case C: Sampling Team (SAMP Team) Message Bubble
-            return (
-              <div key={evt.id} className="flex flex-col items-end select-text ml-auto max-w-[94%]">
-                <div
-                  className="w-full rounded-2xl rounded-tr-xs p-3.5 border shadow-2xs"
-                  style={{
-                    backgroundColor: "var(--surface-low)",
-                    borderColor: "var(--border-subtle)",
-                  }}
-                >
-                  {/* Header */}
-                  <div
-                    className="flex items-center justify-between gap-2 pb-1.5 border-b"
-                    style={{ borderColor: "var(--border-subtle)" }}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div
-                        className="w-6 h-6 rounded-full text-white font-bold text-[10px] font-mono flex items-center justify-center shrink-0 shadow-2xs"
-                        style={{ backgroundColor: "var(--accent-primary)" }}
-                      >
-                        {getInitials(evt.actorName)}
-                      </div>
-                      <div className="min-w-0 truncate">
-                        <span
-                          className="font-display font-bold text-xs truncate block"
-                          style={{ color: "var(--on-surface)" }}
-                        >
+                    <div className="flex items-center justify-between gap-2 border-b border-emerald-500/15 dark:border-emerald-500/20 pb-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-display font-bold text-[11px] text-emerald-700 dark:text-emerald-300 truncate">
                           {evt.actorName}
                         </span>
+                        <span className="px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-800 dark:text-emerald-200">
+                          SAMP
+                        </span>
                       </div>
-                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold font-mono bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-300 dark:border-sky-800/40 shrink-0">
-                        SAMP Team
+                      {evt.verdictTag && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-display font-bold ${
+                            evt.verdictTag === "Yes"
+                              ? "bg-emerald-600 text-white"
+                              : evt.verdictTag === "No"
+                              ? "bg-rose-600 text-white"
+                              : "bg-amber-500 text-white"
+                          }`}
+                        >
+                          {evt.verdictTag === "Yes" && <CheckCircle2 className="w-2.5 h-2.5" />}
+                          {evt.verdictTag === "No" && <XCircle className="w-2.5 h-2.5" />}
+                          {evt.verdictTag === "Maybe" && <AlertTriangle className="w-2.5 h-2.5" />}
+                          <span>{evt.verdictTag === "Yes" ? "Feasible" : evt.verdictTag === "No" ? "Not Feasible" : "Conditional"}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Technical Remark Text */}
+                    <p className="text-xs text-[var(--on-surface)] leading-relaxed whitespace-pre-wrap font-sans">
+                      {evt.summary}
+                    </p>
+
+                    {/* Conditions Callout */}
+                    {evt.detail && (
+                      <div className="p-2 rounded-lg bg-[var(--surface-base)] border border-amber-500/30 text-[11px] space-y-0.5">
+                        <div className="font-bold text-amber-700 dark:text-amber-400">Technical Conditions:</div>
+                        <div className="text-[var(--on-surface-muted)]">{evt.detail}</div>
+                      </div>
+                    )}
+
+                    {/* Lead time note */}
+                    {evt.subdetail && (
+                      <div className="text-[10.5px] font-mono text-[var(--on-surface-muted)] flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>Lead Time: <strong className="text-[var(--on-surface)]">{evt.subdetail}</strong></span>
+                      </div>
+                    )}
+
+                    {/* Footer timestamp */}
+                    <div className="flex items-center justify-end gap-1 pt-0.5 text-[9.5px] font-mono text-[var(--on-surface-subtle)]">
+                      <Clock className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      <span>{dateDisplay}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // ── Marketing Team Commercial Decision Card ──
+            if (evt.kind === "marketing_card") {
+              return (
+                <div key={evt.id} className="flex flex-col items-start w-full animate-in fade-in duration-100">
+                  <div className="w-full rounded-xl p-3 shadow-2xs border text-xs space-y-2 bg-[var(--accent-primary)]/5 border-[var(--accent-primary)]/20 dark:bg-[var(--accent-primary)]/10 dark:border-[var(--accent-primary)]/30">
+                    {/* Header */}
+                    <div className="flex items-center justify-between gap-2 border-b border-[var(--accent-primary)]/15 dark:border-[var(--accent-primary)]/20 pb-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-display font-bold text-[11px] text-[var(--accent-primary)] truncate">
+                          {evt.actorName}
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold uppercase tracking-wider bg-[var(--accent-primary)]/20 text-[var(--accent-primary)]">
+                          MARKETING
+                        </span>
+                      </div>
+                      {evt.decisionTag && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-display font-bold ${
+                            evt.decisionTag === "Accepted"
+                              ? "bg-emerald-600 text-white"
+                              : "bg-rose-600 text-white"
+                          }`}
+                        >
+                          {evt.decisionTag === "Accepted" ? "Approved" : "Dropped"}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Decision Remark Text */}
+                    <p className="text-xs text-[var(--on-surface)] leading-relaxed whitespace-pre-wrap font-sans">
+                      {evt.summary}
+                    </p>
+
+                    {/* Footer timestamp */}
+                    <div className="flex items-center justify-end gap-1 pt-0.5 text-[9.5px] font-mono text-[var(--on-surface-subtle)]">
+                      <Clock className="w-3 h-3 text-[var(--accent-primary)]" />
+                      <span>{dateDisplay}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // ── General Audit Note Card ──
+            const isSampNote = evt.actorDepartment?.toLowerCase().includes("samp");
+            return (
+              <div key={evt.id} className="flex flex-col items-start w-full animate-in fade-in duration-100">
+                <div
+                  className={`w-full rounded-xl p-3 shadow-2xs border text-xs space-y-1.5 ${
+                    isSampNote
+                      ? "bg-emerald-500/5 border-emerald-500/20 dark:bg-emerald-950/20"
+                      : "bg-[var(--surface-base)] border-[var(--border-subtle)]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-1">
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="w-3 h-3 text-[var(--on-surface-muted)]" />
+                      <span className={`font-display font-bold text-[11px] ${isSampNote ? "text-emerald-700 dark:text-emerald-300" : "text-[var(--accent-primary)]"}`}>
+                        {evt.actorName}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold uppercase tracking-wider bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                        {evt.actorDepartment || "DESK"}
                       </span>
                     </div>
-                    <span
-                      className="text-[9.5px] font-mono whitespace-nowrap"
-                      style={{ color: "var(--on-surface-subtle)" }}
-                    >
-                      {formatOdooLogDate(evt.timestamp)}
-                    </span>
                   </div>
-
-                  {/* Verdict Line */}
-                  <div className="flex items-center gap-2 mt-2">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${evt.badge?.variant === "emerald"
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
-                          : evt.badge?.variant === "rose"
-                            ? "bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800"
-                            : "bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800"
-                        }`}
-                    >
-                      {evt.badge?.text || "Evaluated"}
-                    </span>
+                  <p className="text-xs text-[var(--on-surface)] leading-relaxed whitespace-pre-wrap font-sans">
+                    {evt.summary}
+                  </p>
+                  <div className="flex items-center justify-end gap-1 pt-0.5 text-[9.5px] font-mono text-[var(--on-surface-subtle)]">
+                    <Clock className="w-3 h-3" />
+                    <span>{dateDisplay}</span>
                   </div>
                 </div>
               </div>
@@ -494,42 +463,15 @@ export const FeasibilityChatterFeed: React.FC<FeasibilityChatterFeedProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── 3. Chatter Note Input Bar ── */}
-      {onAddNote && (
-        <form
-          onSubmit={handleSubmitNote}
-          className="p-3 border-t border-[var(--border-subtle)] bg-[var(--surface-lowest)] shrink-0"
-        >
-          {submitError && (
-            <p className="mb-2 text-[11px] font-medium text-rose-600 dark:text-rose-400">
-              {submitError}
-            </p>
-          )}
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Add an operational note or update..."
-              disabled={isSubmitting}
-              className="flex-1 px-3 py-2 rounded-xl text-xs bg-[var(--surface-base)] border border-[var(--border-subtle)] text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] transition disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={!noteText.trim() || isSubmitting}
-              className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white shadow-2xs transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
-              title="Post Note"
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Send className="w-3.5 h-3.5" />
-              )}
-            </button>
-          </div>
-        </form>
-      )}
-    </div>
+      {/* ── Bottom Verification Strip ── */}
+      <div className="px-3.5 py-2.5 border-t border-[var(--border-subtle)] bg-[var(--surface-base)] shrink-0 flex items-center justify-between text-[10px] font-mono text-[var(--on-surface-subtle)] select-none">
+        <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
+          <Lock className="w-3 h-3" />
+          <span>Audit Log Verified</span>
+        </span>
+        <span>{auditEvents.length} {auditEvents.length === 1 ? "Event" : "Events"}</span>
+      </div>
+    </aside>
   );
 };
 

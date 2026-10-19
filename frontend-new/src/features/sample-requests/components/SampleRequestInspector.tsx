@@ -26,6 +26,9 @@ import {
   ShieldAlert,
   Lock,
   Edit3,
+  Download,
+  Printer,
+  FileSpreadsheet,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -54,6 +57,7 @@ import { ImageLightboxModal } from "./inspector/ImageLightboxModal";
 import { fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
 import { isMockupCreativeCharacteristic } from "./staging/mockupCreativeFields";
 import { ProductDocketView } from "./staging/ProductDocketView";
+import { downloadProductDocketPdf, downloadProductDocketCsv, printProductDocketView } from "./staging/productDocketPdf";
 import type { ProductSearchResult } from "../types";
 import { getPrimaryRequestCode } from "../sampling/utils/requestTypeUtils";
 
@@ -101,7 +105,6 @@ export interface SampleRequestInspectorProps {
     requestId: string | number,
     updatedMaterials: ProgramMaterialItem[]
   ) => void;
-  onDeleteRequest?: (request: SampleRequestItem) => void;
   onReleaseDraft?: (request: SampleRequestItem) => Promise<void> | void;
   isAdmin?: boolean;
   readOnly?: boolean;
@@ -353,6 +356,24 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
     return Array.from(map.entries());
   }, [productDetails, charSearchQuery, charFilter]);
+
+  const sampleDocketProduct = useMemo<ProductSearchResult & { brand?: string; brandName?: string }>(() => {
+    if (!activeRequest) return {} as any;
+    return {
+      id: Number(String(activeRequest.id).replace(/^sample-/, "")),
+      sr_number: getDisplayedRequestCode(activeRequest),
+      material_code: activeRequest.materialCode || "",
+      product_description: activeRequest.productDescription || "",
+      customer: activeRequest.customer || "",
+      target_plant: activeRequest.targetPlant || "",
+      source_sample_code: [activeRequest.barcode, activeRequest.customerProductCode].filter(Boolean).join(" / "),
+      product_category: activeRequest.productCategory || "",
+      product_sub_category: activeRequest.productSubCategory || "",
+      product_third_category: activeRequest.productThirdCategory || "",
+      brand: activeRequest.brandName || "",
+      brandName: activeRequest.brandName || "",
+    };
+  }, [activeRequest]);
 
   // Workflow Gates & Status Flags
   const ws: Partial<MockupWorkflowState> = activeRequest?.mockupWorkflowState || {};
@@ -902,7 +923,9 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
           
           {/* ── LEFT: FORM SHEET (DOCUMENT BODY) ── */}
           <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto bg-[var(--bg-app)] p-4 md:p-6">
-            <div className="max-w-4xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
+            <div className={`mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-300 ${
+              activeTab === "specs" && charFilter === "docket" ? "max-w-[98%]" : "max-w-4xl"
+            }`}>
               
               {/* Paper Sheet Header */}
               <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-base)]">
@@ -1378,6 +1401,35 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                             />
                           </div>
 
+                          {charFilter === "docket" && groupedCharacteristics.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => downloadProductDocketPdf(sampleDocketProduct, groupedCharacteristics)}
+                                className="inline-flex h-6 items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2 text-[10px] font-semibold text-[var(--on-surface)] transition hover:bg-[var(--surface-low)] cursor-pointer"
+                                title="Download Complete Technical Docket PDF"
+                              >
+                                <Download className="h-3 w-3" /> PDF
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => downloadProductDocketCsv(sampleDocketProduct, groupedCharacteristics)}
+                                className="inline-flex h-6 items-center gap-1 rounded-md border border-emerald-300/60 bg-emerald-50 px-2 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer"
+                                title="Export Docket Specifications to CSV (Excel Ready)"
+                              >
+                                <FileSpreadsheet className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> CSV
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => printProductDocketView(sampleDocketProduct, `sample-request-docket-${activeRequest.id}`)}
+                                className="inline-flex h-6 items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
+                                title="Print or Save Complete Docket as PDF"
+                              >
+                                <Printer className="h-3 w-3" /> Print
+                              </button>
+                            </div>
+                          )}
+
                           <div className="flex items-center gap-1 bg-[var(--surface-low)] p-0.5 rounded-lg text-[10px] font-mono">
                             <button
                               type="button"
@@ -1422,21 +1474,10 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         </div>
                       ) : charFilter === "docket" ? (
                         <>
-                        <div className="overflow-x-auto rounded-xl border border-sky-300 bg-white p-2 dark:border-sky-900 dark:bg-zinc-950 sm:p-3">
-                          <div className="min-w-[740px]">
+                        <div className="overflow-x-auto rounded-xl border border-slate-300 bg-slate-50/50 p-2 dark:border-zinc-800 dark:bg-zinc-950 sm:p-3">
+                          <div className="min-w-[960px]">
                             <ProductDocketView
-                              product={{
-                                id: Number(String(activeRequest.id).replace(/^sample-/, "")),
-                                sr_number: getDisplayedRequestCode(activeRequest),
-                                material_code: activeRequest.materialCode || "",
-                                product_description: activeRequest.productDescription || "",
-                                customer: activeRequest.customer || "",
-                                target_plant: activeRequest.targetPlant || "",
-                                source_sample_code: [activeRequest.barcode, activeRequest.customerProductCode].filter(Boolean).join(" / "),
-                                product_category: activeRequest.productCategory || "",
-                                product_sub_category: activeRequest.productSubCategory || "",
-                                product_third_category: activeRequest.productThirdCategory || "",
-                              } as ProductSearchResult & { brand?: string; brandName?: string }}
+                              product={sampleDocketProduct}
                               classGroups={groupedCharacteristics}
                               searchQuery={charSearchQuery}
                               containerId={`sample-request-docket-${activeRequest.id}`}

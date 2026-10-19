@@ -198,7 +198,7 @@ export default function App() {
       userId={currentUser?.id}
       initialTheme={currentUser?.theme_id}
     >
-      <BrowserRouter>
+      <BrowserRouter {...({ future: { v7_startTransition: true, v7_relativeSplatPath: true } } as Record<string, unknown>)}>
         <Routes>
           <Route
             path="/signin"

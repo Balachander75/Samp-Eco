@@ -193,6 +193,58 @@ def test_feasibility_full_lifecycle_and_conversion(
     assert len(copied_images) >= 1
     assert copied_images[0].original_name == "spec-drawing-1.png"
 
-    # 10. Clean up test record via admin delete endpoint
+    # Request deletion is disabled; remove this test data through the DB fixture.
     del_res = client.delete(f"/api/v1/feasibility-requests/{req_id}", headers=admin_headers)
-    assert del_res.status_code == 204
+    assert del_res.status_code == 405
+    db_session.delete(db_session.get(FeasibilityRequest, req_id))
+    db_session.commit()
+
+def test_feasibility_convert_both_sample_and_mockup_together(
+    client: TestClient,
+    marketing_headers: dict,
+    samp_headers: dict,
+    db_session: Session,
+):
+    """Verify converting an accepted feasibility request to BOTH Sample and Mockup together."""
+    workday = _get_upcoming_workday(3)
+    create_payload = {
+        "customer": "Both Types Enterprise",
+        "feasibility_type": "new_format",
+        "description_notes": "Both sample and mockup conversion test",
+        "required_date": workday,
+        "marketing_remarks": "Dual request conversion",
+    }
+    res = client.post("/api/v1/feasibility-requests", headers=marketing_headers, json=create_payload)
+    assert res.status_code == 201
+    req_id = res.json()["id"]
+
+    # Claim & Sign-off by SAMP
+    client.post(f"/api/v1/feasibility-requests/{req_id}/claim", headers=samp_headers)
+    client.put(
+        f"/api/v1/feasibility-requests/{req_id}/samp-verdict",
+        headers=samp_headers,
+        json={"response": "Yes", "remark": "Compatible for both sampling and mockups."},
+    )
+
+    # Marketing accepts
+    client.post(
+        f"/api/v1/feasibility-requests/{req_id}/marketing-decision",
+        headers=marketing_headers,
+        json={"decision": "Accepted", "decision_remark": "Approved for full commercial sampling and mockup."},
+    )
+
+    # Convert to BOTH Sample and Mockup together
+    conv_res = client.post(
+        f"/api/v1/feasibility-requests/{req_id}/convert-to-sampling",
+        headers=marketing_headers,
+        json={"request_types": ["sample", "mockup"]},
+    )
+    assert conv_res.status_code == 200
+    conv_data = conv_res.json()
+    assert "sample" in conv_data["request_types"]
+    assert "mockup" in conv_data["request_types"]
+    assert conv_data["feasibility"]["status"] == "Converted to Sample & Mockup"
+
+    # Cleanup
+    db_session.delete(db_session.get(FeasibilityRequest, req_id))
+    db_session.commit()

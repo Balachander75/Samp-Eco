@@ -7,7 +7,6 @@ import { SampleRequestItem, FeasibilityRequestPayload } from "../types";
 import { formatOdooDate } from "../utils/dateUtils";
 import {
   Plus,
-  Trash2,
   Clock,
   AlertTriangle,
   Search,
@@ -26,7 +25,6 @@ import { NewFeasibilityModal } from "../components/NewFeasibilityModal";
 import {
   fetchFeasibilityRequestsApi,
   createFeasibilityRequestApi,
-  deleteFeasibilityRequestApi,
 } from "@/infrastructure/api";
 import { useMasterData } from "../hooks/useMasterData";
 import { getFeasibilityTypeDisplay } from "../utils/feasibilityParsers";
@@ -72,7 +70,6 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
   const [outcomeFilter, setOutcomeFilter] = useState<MarketingFeasibilityOutcome>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [customerFilter, setCustomerFilter] = useState("all");
-  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Global '/' keyboard shortcut to focus search input
@@ -87,10 +84,32 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Reset selection when stage or outcome filter changes
+
+  // Multi-row selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectRow = (id: string | number) => {
+    const key = String(id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (filteredRequests.length > 0 && filteredRequests.every((r) => selectedIds.has(String(r.id)))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRequests.map((r) => String(r.id))));
+    }
+  };
+
+  // Clear selection on filter changes
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filterTab, outcomeFilter]);
+  }, [filterTab, outcomeFilter, customerFilter, searchTerm]);
 
   // Modal states
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -286,27 +305,6 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
     });
   }, [requests, selectedPlant, filterTab, outcomeFilter, customerFilter, searchTerm]);
 
-  // Selection handlers
-  const handleToggleSelectRow = (id: string | number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleToggleSelectAll = () => {
-    const visibleIds = filteredRequests.map((r) => r.id);
-    const allVisibleSelected =
-      visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      visibleIds.forEach((id) => (allVisibleSelected ? next.delete(id) : next.add(id)));
-      return next;
-    });
-  };
-
   const clearFilters = () => {
     setSearchTerm("");
     setCustomerFilter("all");
@@ -326,47 +324,6 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
     } catch (err: any) {
       console.error("Failed to create feasibility request:", err);
       throw err;
-    }
-  };
-
-  // Delete request handler
-  const handleDeleteRequest = async (req: SampleRequestItem, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const reqCode = req.materialCode || `FC-${String(req.id).padStart(4, "0")}`;
-    if (
-      !window.confirm(
-        `Permanently delete feasibility check ${reqCode} (${req.customer || "Unspecified"}) from database?`
-      )
-    )
-      return;
-
-    try {
-      await deleteFeasibilityRequestApi(req.id);
-      if (selectedRequest?.id === req.id) {
-        setIsInspectorOpen(false);
-        setSelectedRequest(null);
-      }
-      await loadRequests();
-    } catch (err) {
-      console.error("Failed to delete request:", err);
-      alert("Error deleting feasibility request.");
-    }
-  };
-
-  // Batch delete handler
-  const handleBatchDelete = async (ids: Set<string | number>) => {
-    if (ids.size === 0) return;
-    if (!window.confirm(`Delete ${ids.size} selected feasibility check(s) from database?`)) return;
-
-    try {
-      for (const id of Array.from(ids)) {
-        await deleteFeasibilityRequestApi(id);
-      }
-      setSelectedIds(new Set());
-      await loadRequests();
-    } catch (err) {
-      console.error("Failed to batch delete:", err);
-      await loadRequests();
     }
   };
 
@@ -406,7 +363,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
       {
         id: "request",
         header: "Request",
-        width: "w-[130px]",
+        width: "w-[125px]",
         cell: (req) => (
           <div className="min-w-0">
             <CopyBadge text={req.materialCode || `FC-${String(req.id).padStart(4, "0")}`} />
@@ -424,7 +381,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
       {
         id: "customer",
         header: "Customer",
-        width: "w-[150px]",
+        width: "w-[140px]",
         cell: (req) => (
           <div className="min-w-0">
             <div
@@ -439,13 +396,13 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
       {
         id: "feasibility_type",
         header: "Feasibility Type",
-        width: "w-[145px]",
+        width: "w-[130px]",
         cell: (req) => {
           const typeLabel = getFeasibilityTypeDisplay(req);
           return (
             <div className="min-w-0">
               <span
-                className="inline-block max-w-[135px] truncate rounded border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-[10.5px] font-semibold text-[var(--on-surface)]"
+                className="inline-block max-w-[120px] truncate rounded border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-[10.5px] font-semibold text-[var(--on-surface)]"
                 title={typeLabel}
               >
                 {typeLabel}
@@ -457,7 +414,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
       {
         id: "description",
         header: "Scope / Description",
-        width: "min-w-[220px]",
+        width: "min-w-0 flex-1",
         cell: (req) => {
           const desc =
             req.productDescription ||
@@ -480,7 +437,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
       {
         id: "target_date",
         header: "Target Date",
-        width: "w-[130px]",
+        width: "w-[115px]",
         cell: (req) => {
           const isFinalDecision =
             Boolean(req.marketingDecision) ||
@@ -806,18 +763,20 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
         <DataTable
           data={filteredRequests}
           columns={columns}
-          keyExtractor={(req) => req.id}
+          keyExtractor={(req) => String(req.id)}
           isLoading={isLoading}
+          enableSelection={true}
+          selectedIds={selectedIds}
+          onToggleSelectRow={toggleSelectRow}
+          onToggleSelectAll={toggleSelectAll}
+          tableClassName="w-full table-fixed min-w-0"
+          containerClassName="overflow-y-auto overflow-x-hidden"
           emptyMessage={
             requests.length === 0
               ? "No feasibility requests recorded yet for this year."
               : "No requests match the specified feasibility filters."
           }
           onRowClick={handleInspectRequest}
-          enableSelection={isAdmin}
-          selectedIds={selectedIds}
-          onToggleSelectRow={handleToggleSelectRow}
-          onToggleSelectAll={handleToggleSelectAll}
           toolbarLeft={
             <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--on-surface-muted)]">
               <span className="truncate">
@@ -832,26 +791,16 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
                 feasibility checks
               </span>
               {selectedIds.size > 0 && (
-                <span className="shrink-0 rounded-md border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-emerald-700 dark:text-emerald-300 font-bold">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary)] text-white shadow-2xs">
                   {selectedIds.size} selected
                 </span>
               )}
             </div>
           }
           toolbarRight={
-            selectedIds.size > 0 && isAdmin ? (
-              <button
-                type="button"
-                onClick={() => void handleBatchDelete(selectedIds)}
-                className="inline-flex h-7 select-none items-center gap-1 rounded-md bg-rose-600 px-2.5 text-[11px] font-semibold text-white transition-colors hover:bg-rose-700 cursor-pointer shadow-2xs"
-              >
-                <Trash2 className="h-3.5 w-3.5" /> Delete Selected
-              </button>
-            ) : (
-              <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">
-                Sampling Feasibility Queue
-              </span>
-            )
+            <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">
+              Sampling Feasibility Queue
+            </span>
           }
         />
       </DeskWorkspaceLayout>
@@ -865,7 +814,6 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
           setSelectedRequest(null);
         }}
         onRefresh={loadRequests}
-        onDeleteRequest={(req) => handleDeleteRequest(req)}
         user={user}
         isAdmin={isAdmin}
         sourceDesk={sourceDesk}

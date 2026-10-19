@@ -12,7 +12,6 @@ import {
   claimProgramTaskApi,
   addProgramMaterialApi,
   pauseProgramRequestApi,
-  promoteProgramSkuApi,
 } from "@/infrastructure/api/programsApi";
 
 // Modular Sub-Components matching Feasibility Inspector
@@ -32,7 +31,6 @@ export interface ProgramPlanningInspectorModalProps {
   userRole?: string;
   user?: UserProfile | null;
   currentUser?: UserProfile | null;
-  onDeleteRequest?: (req: SampleRequestItem) => void;
   readOnly?: boolean;
   onRefresh?: () => Promise<void>;
 }
@@ -44,10 +42,9 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
   isOpen,
   onClose,
   mode = "marketing",
-  userRole,
+  userRole: _userRole,
   user,
   currentUser,
-  onDeleteRequest,
   readOnly = false,
   onRefresh,
 }) => {
@@ -190,20 +187,6 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
     await onRefresh?.();
   };
 
-  // Promote SKU Material specification row to a commercial Sample Request
-  const handlePromoteSku = async (materialId: number | string) => {
-    if (!activeRequest?.id) return;
-    try {
-      const res = await promoteProgramSkuApi(activeRequest.id, materialId, ["sample"]);
-      setLocalOverride(mapProgramRequestToSampleRequest(res.program));
-      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-      await onRefresh?.();
-    } catch (err: any) {
-      console.error("Failed to promote program SKU:", err);
-      throw err;
-    }
-  };
-
   // Refresh latest data helper
   const handleRefreshData = async () => {
     if (!activeRequest?.id) return;
@@ -218,14 +201,8 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
 
   const [isTogglingPause, setIsTogglingPause] = useState(false);
   const userTeam = (effectiveUser?.team || user?.team || "").toLowerCase();
-  const userRoleStr = (userRole || effectiveUser?.role || "").toLowerCase();
   const isMarketing = userTeam === "marketing" || mode === "marketing";
   const canPause = !readOnly && isMarketing;
-  const isMarketingOrAdmin =
-    isMarketing ||
-    userRoleStr.includes("marketing") ||
-    userRoleStr.includes("admin");
-  const canPromote = !readOnly && isMarketingOrAdmin;
 
   const handleTogglePause = async () => {
     if (!activeRequest?.id || isTogglingPause) return;
@@ -254,13 +231,13 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 select-text"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-3 bg-slate-950/75 backdrop-blur-sm select-text animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
+        className="relative w-full max-w-[98vw] xl:max-w-[1360px] h-[93vh] max-h-[93vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.3)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 1. TOP CONTROL PANEL */}
@@ -269,7 +246,6 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
           copiedCode={copiedCode}
           onClose={onClose}
           onCopyCode={handleCopyCode}
-          onDeleteRequest={onDeleteRequest}
           readOnly={readOnly}
           canPause={canPause}
           isTogglingPause={isTogglingPause}
@@ -278,9 +254,9 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
         />
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG CHATTER) */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* LEFT: WORKSPACE CANVAS */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 bg-[var(--bg-app)]">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-3.5 space-y-2.5 bg-[var(--bg-app)] min-w-0">
             {/* Dual Sign-Off Executive Snapshot */}
             <ProgramPlanningSheetHeader
               activeRequest={activeRequest}
@@ -292,20 +268,24 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
               isAdmin={effectiveUser?.role?.toLowerCase() === "admin"}
             />
 
-            {/* Sleek Minimalist Tab Strip */}
-            <div className="border-b border-[var(--border-subtle)] flex items-center space-x-6 text-xs font-semibold overflow-x-auto pt-1">
+            {/* Sleek Segmented Tab Strip */}
+            <div className="flex items-center gap-1 p-1 bg-[var(--surface-low)] rounded-xl border border-[var(--border-subtle)] overflow-x-auto shadow-2xs shrink-0">
               {/* Tab 1: Substrate Matrix */}
               <button
                 type="button"
                 onClick={() => setActiveTab("matrix")}
-                className={`pb-2.5 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg font-display text-xs transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                   activeTab === "matrix"
-                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    ? "bg-[var(--surface-lowest)] text-[var(--accent-primary)] font-bold shadow-2xs border border-[var(--border-subtle)]"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50 border border-transparent"
                 }`}
               >
                 <span>1. Substrate Matrix</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
+                  activeTab === "matrix"
+                    ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]"
+                    : "bg-[var(--surface-base)] text-[var(--on-surface-muted)]"
+                }`}>
                   {materials.length} SKUs
                 </span>
               </button>
@@ -314,20 +294,20 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
               <button
                 type="button"
                 onClick={() => setActiveTab("samp")}
-                className={`pb-2.5 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg font-display text-xs transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                   activeTab === "samp"
-                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    ? "bg-[var(--surface-lowest)] text-emerald-700 dark:text-emerald-400 font-bold shadow-2xs border border-[var(--border-subtle)]"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50 border border-transparent"
                 }`}
               >
                 <span>2. SAMP Review Details</span>
                 {hasSampNote ? (
-                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
                     ✓ Reviewed
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
-                    {activeRequest.samplingSeenAt ? "In Review" : "Awaiting Review"}
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-[var(--surface-base)] text-[var(--on-surface-subtle)]">
+                    {activeRequest.samplingSeenAt ? "In Review" : "Pending"}
                   </span>
                 )}
               </button>
@@ -336,20 +316,20 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
               <button
                 type="button"
                 onClick={() => setActiveTab("plant")}
-                className={`pb-2.5 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg font-display text-xs transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                   activeTab === "plant"
-                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    ? "bg-[var(--surface-lowest)] text-teal-700 dark:text-teal-400 font-bold shadow-2xs border border-[var(--border-subtle)]"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50 border border-transparent"
                 }`}
               >
-                <span>3. Plant Capacity Details</span>
+                <span>3. Plant Capacity</span>
                 {hasPlantNote ? (
-                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20">
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20">
                     ✓ Confirmed
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
-                    {activeRequest.plantSeenAt ? "In Review" : "Awaiting"}
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-[var(--surface-base)] text-[var(--on-surface-subtle)]">
+                    {activeRequest.plantSeenAt ? "In Review" : "Pending"}
                   </span>
                 )}
               </button>
@@ -358,19 +338,19 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
               <button
                 type="button"
                 onClick={() => setActiveTab("marketing")}
-                className={`pb-2.5 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg font-display text-xs transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                   activeTab === "marketing"
-                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    ? "bg-[var(--surface-lowest)] text-[var(--accent-primary)] font-bold shadow-2xs border border-[var(--border-subtle)]"
+                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50 border border-transparent"
                 }`}
               >
-                <span>4. Executive Directives</span>
+                <span>4. Directives</span>
                 {pinnedCount > 0 ? (
-                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/20">
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/20">
                     {pinnedCount} Pinned
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-[var(--surface-base)] text-[var(--on-surface-subtle)]">
                     {hasSampNote || hasPlantNote ? "Ready" : "Overview"}
                   </span>
                 )}
@@ -385,7 +365,6 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                 readOnly={readOnly}
                 onNavigateToTab={(tab) => setActiveTab(tab)}
                 onAddMaterial={handleAddMaterial}
-                onPromoteSku={canPromote ? handlePromoteSku : undefined}
                 onRefreshData={handleRefreshData}
                 onClaimTask={handleClaimTask}
                 isClaiming={isClaiming}
@@ -414,6 +393,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                 mode={mode}
                 readOnly={readOnly}
                 onSaveOutput={handleSaveOutput}
+                onRefreshData={handleRefreshData}
                 onClaimTask={handleClaimTask}
                 isClaiming={isClaiming}
                 currentUser={effectiveUser}

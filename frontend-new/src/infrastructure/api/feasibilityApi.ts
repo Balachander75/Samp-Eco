@@ -79,7 +79,7 @@ export function mapFeasibilityResponse(item: Record<string, unknown>): Feasibili
     convertedSrNumber: typeof item.converted_sr_number === "string" ? item.converted_sr_number : null,
     convertedRequestCode: typeof item.converted_request_code === "string" ? item.converted_request_code : null,
     convertedRequestTypes: Array.isArray(item.converted_request_types)
-      ? item.converted_request_types.filter((value): value is "sample" | "costing" => value === "sample" || value === "costing")
+      ? item.converted_request_types.filter((value): value is "sample" | "mockup" | "costing" => value === "sample" || value === "mockup" || value === "costing")
       : [],
     convertedAt: typeof item.converted_at === "string" ? item.converted_at : null,
     convertedBy: typeof item.converted_by === "string" ? item.converted_by : null,
@@ -296,14 +296,19 @@ export async function claimFeasibilityTaskApi(
 
 export async function convertFeasibilityToSamplingApi(
   id: number | string,
-  requestTypes: Array<"sample" | "costing"> = ["sample"]
-): Promise<{ feasibility: SampleRequestItem; sampleRequestId: number; sampleSrNumber: string | null; sampleRequestCode: string | null; requestTypes: Array<"sample" | "costing"> }> {
+  requestType: Array<"sample" | "mockup" | "costing"> | ("sample" | "mockup" | "costing") = "sample",
+  stagedSampleRequestId?: number | string,
+): Promise<{ feasibility: SampleRequestItem; sampleRequestId: number; sampleSrNumber: string | null; sampleRequestCode: string | null; requestTypes: Array<"sample" | "mockup" | "costing"> }> {
   const rawId = String(id).replace(/^feasibility-/, "");
-  const data = await apiFetch<{ feasibility: Record<string, unknown>; sample_request_id: number; sample_sr_number: string | null; sample_request_code: string | null; request_types: Array<"sample" | "costing"> }>(
+  const types = Array.isArray(requestType) ? requestType : [requestType];
+  const data = await apiFetch<{ feasibility: Record<string, unknown>; sample_request_id: number; sample_sr_number: string | null; sample_request_code: string | null; request_types: Array<"sample" | "mockup" | "costing"> }>(
     `/api/v1/feasibility-requests/${Number(rawId)}/convert-to-sampling`,
     {
       method: "POST",
-      jsonBody: { request_types: requestTypes },
+      jsonBody: {
+        request_types: types,
+        ...(stagedSampleRequestId !== undefined ? { sample_request_id: stagedSampleRequestId } : {}),
+      },
     }
   );
   const feasibility = mapFeasibilityRequestToSampleRequest(mapFeasibilityResponse(data.feasibility));
@@ -315,7 +320,7 @@ export async function convertFeasibilityToSamplingApi(
     sampleRequestId: data.sample_request_id,
     sampleSrNumber: data.sample_sr_number,
     sampleRequestCode: data.sample_request_code,
-    requestTypes: data.request_types || requestTypes,
+    requestTypes: data.request_types || types,
   };
 }
 
@@ -345,19 +350,5 @@ export async function recordFeasibilityViewedApi(
     });
   } catch (err) {
     console.debug("Telemetry view tracking skipped:", err);
-  }
-}
-
-export async function deleteFeasibilityRequestApi(requestId: number | string): Promise<boolean> {
-  const cleanId = String(requestId).replace(/^feasibility-/, "");
-  try {
-    await apiFetch(`/api/v1/feasibility-requests/${cleanId}`, { method: "DELETE" });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-    }
-    return true;
-  } catch (err) {
-    console.error("Error deleting feasibility request:", err);
-    throw err;
   }
 }

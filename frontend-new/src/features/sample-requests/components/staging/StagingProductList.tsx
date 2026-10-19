@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Copy, Eye, Layers, Plus, Trash2 } from "lucide-react";
+import { Copy, Eye, Layers, Plus, X } from "lucide-react";
 import { OperationalDatePicker } from "@/components/erp";
 import { StagedProductItem, DELIVERABLES } from "../../types/staging";
 
@@ -606,11 +606,11 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                     <button
                       type="button"
                       onClick={() => onRemoveProduct(prod.id)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-rose-200/90 dark:border-rose-900/40 bg-rose-50/70 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 shadow-2xs transition-all hover:bg-rose-100 dark:hover:bg-rose-900/60 hover:text-rose-700 active:scale-95 cursor-pointer"
-                      title="Delete staged product"
-                      aria-label="Delete staged product"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] shadow-2xs transition-all hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] active:scale-95 cursor-pointer"
+                      title="Remove from staging"
+                      aria-label="Remove from staging"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </td>

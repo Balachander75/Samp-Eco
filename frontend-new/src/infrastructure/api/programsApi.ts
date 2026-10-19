@@ -24,6 +24,7 @@ export function mapProgramMaterial(item: Record<string, unknown>): ProgramMateri
     unit: typeof item.unit === "string" && item.unit ? item.unit : undefined,
     remark: typeof item.remark === "string" ? item.remark : undefined,
     sampRemark: typeof item.samp_remark === "string" ? item.samp_remark : undefined,
+    plantRemark: typeof item.plant_remark === "string" ? item.plant_remark : undefined,
     promotedSampleRequestId: item.promoted_sample_request_id != null ? Number(item.promoted_sample_request_id) : undefined,
     promotedSrNumber: typeof item.promoted_sr_number === "string" ? item.promoted_sr_number : undefined,
     createdAt: typeof item.created_at === "string" ? item.created_at : undefined,
@@ -57,7 +58,7 @@ export function mapProgramResponse(item: Record<string, unknown>): ProgramReques
     customerName: String(item.customer_name || ""),
     targetPlant: String(item.target_plant || ""),
     programCampaignTitle: String(item.program_campaign_title || ""),
-    programYear: String(item.program_year || "2026-2027"),
+    programYear: String(item.program_year || ""),
     status: String(item.status || "Pending SAMP Review"),
     isActive: item.is_active !== false,
     createdBy: typeof item.created_by === "string" ? item.created_by : null,
@@ -86,16 +87,6 @@ export function mapProgramResponse(item: Record<string, unknown>): ProgramReques
 
 export function mapProgramRequestToSampleRequest(record: ProgramRequestRecord): SampleRequestItem {
   const createdDate = record.createdAt ? record.createdAt.split("T")[0] : "";
-  const matrixSummary =
-    record.materials.length > 0
-      ? "\n\nMaterial Specification Matrix:\n" +
-        record.materials
-          .map(
-            (r, i) =>
-              `#${i + 1} | Type: ${r.materialType || "—"} | Supplier: ${r.supplierName || "—"} | Grade: ${r.grade || "—"} | Color: ${r.colorVariant || "—"} | Caliper: ${r.caliperWt || "—"} | Qty: ${r.quantity || "—"} | Unit: ${r.unit || "—"} | Remark: ${r.remark || "—"}${r.sampRemark ? ` | SAMP Remark: ${r.sampRemark}` : ""}`
-          )
-          .join("\n")
-      : "";
 
   return {
     id: `program-${record.id}`,
@@ -104,7 +95,10 @@ export function mapProgramRequestToSampleRequest(record: ProgramRequestRecord): 
     materialCode: record.requestCode,
     customer: record.customerName,
     targetPlant: record.targetPlant,
-    productDescription: `[Seasonal Program: ${record.programCampaignTitle}]\nProgram Year: ${record.programYear}\nTarget Plant: ${record.targetPlant}${matrixSummary}`,
+    productDescription:
+      record.materials.length > 0
+        ? `${record.materials.length} SKU${record.materials.length === 1 ? "" : "s"} scheduled for production`
+        : "Seasonal program range",
     year: record.programYear && String(record.programYear).includes("-") ? String(record.programYear) : getBusinessYearForDate(createdDate),
     programYear: record.programYear,
     programName: record.programCampaignTitle,
@@ -234,6 +228,24 @@ export async function updateBatchProgramSampRemarksApi(
   return mapProgramResponse(data);
 }
 
+export async function updateBatchProgramPlantRemarksApi(
+  requestId: number | string,
+  remarks: Array<{ material_id: number; plant_remark: string }>
+): Promise<ProgramRequestRecord> {
+  const cleanId = String(requestId).replace(/^program-/, "");
+  const data = await apiFetch<Record<string, unknown>>(
+    `/api/v1/program-requests/${cleanId}/plant-remarks`,
+    {
+      method: "PUT",
+      jsonBody: { remarks },
+    }
+  );
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  }
+  return mapProgramResponse(data);
+}
+
 export async function addProgramMaterialApi(
   requestId: number | string,
   payload: AddProgramMaterialPayload
@@ -267,20 +279,6 @@ export async function deleteProgramMaterialApi(
     window.dispatchEvent(new CustomEvent("samp:requests-changed"));
   }
   return mapProgramResponse(data);
-}
-
-export async function deleteProgramRequestApi(requestId: number | string): Promise<boolean> {
-  const cleanId = String(requestId).replace(/^program-/, "");
-  try {
-    await apiFetch(`/api/v1/program-requests/${cleanId}`, { method: "DELETE" });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-    }
-    return true;
-  } catch (err) {
-    console.error("Error deleting program request from DB:", err);
-    return false;
-  }
 }
 
 export async function updateProgramRequestStatusApi(

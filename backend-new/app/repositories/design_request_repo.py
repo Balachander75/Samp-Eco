@@ -69,7 +69,6 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             normalized_statuses = [s.strip().lower() for s in status_in if s and s.strip()]
             if normalized_statuses:
                 query = query.filter(func.lower(func.coalesce(DesignRequest.status, "")).in_(normalized_statuses))
-
         query = query.order_by(DesignRequest.id.desc())
         if offset is not None and offset > 0:
             query = query.offset(offset)
@@ -99,8 +98,16 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
         request_code: Optional[str],
         sr_number: Optional[str] = None,
         *,
+        sample_request_id: Optional[int] = None,
         for_update: bool = False,
     ) -> Optional[CreateSampleRequest]:
+        if sample_request_id:
+            query = self.db.query(CreateSampleRequest).filter(CreateSampleRequest.id == sample_request_id)
+            if for_update:
+                query = query.with_for_update().populate_existing()
+            linked = query.first()
+            if linked:
+                return linked
         if request_code:
             query = self.db.query(CreateSampleRequest).filter(
                 CreateSampleRequest.request_codes["design"].astext == request_code
@@ -155,6 +162,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
 
         item = DesignRequest(
             request_code=temporary_request_code(),
+            sample_request_id=data.get("sample_request_id"),
             # Creative Design requests use their DR material/request code.
             # Keep SR only on the actual Sample request, not its design mirror.
             sr_number=None,
@@ -190,7 +198,11 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             item.request_code = data.get("request_code") or next_request_code(
                 self.db, REQUEST_CODE_PREFIX_BY_SCOPE["design"], now
             )
-            linked_sample = self._get_linked_sample(item.request_code, data.get("sr_number"))
+            linked_sample = self._get_linked_sample(
+                item.request_code,
+                data.get("sr_number"),
+                sample_request_id=item.sample_request_id,
+            )
             self.db.add(
                 SampleRequestActivityLog(
                     sample_request_id=linked_sample.id if linked_sample else None,
@@ -296,7 +308,12 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
         if not item:
             return None
         try:
-            linked_sample = self._get_linked_sample(item.request_code, item.sr_number, for_update=True)
+            linked_sample = self._get_linked_sample(
+                item.request_code,
+                item.sr_number,
+                sample_request_id=item.sample_request_id,
+                for_update=True,
+            )
             previous_sample_status = linked_sample.status if linked_sample else None
             previous_state = item.workflow_state if isinstance(item.workflow_state, dict) else {}
             previous_events = previous_state.get("events") if isinstance(previous_state.get("events"), list) else []
@@ -307,6 +324,15 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
             }
 
             mutator(item)
+            if linked_sample is None and item.sample_request_id:
+                linked_sample = self._get_linked_sample(
+                    item.request_code,
+                    item.sr_number,
+                    sample_request_id=item.sample_request_id,
+                    for_update=True,
+                )
+            if linked_sample and item.sample_request_id != linked_sample.id:
+                item.sample_request_id = linked_sample.id
             item.updated_at = datetime.now(timezone.utc)
             next_state = item.workflow_state if isinstance(item.workflow_state, dict) else {}
             next_events = next_state.get("events") if isinstance(next_state.get("events"), list) else []
@@ -435,12 +461,15 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
                     "design_remarks": design_remarks,
                     "created_by": sample_req.get("created_by") or "",
                     "created_by_user_id": sample_req.get("created_by_user_id"),
+                    "sample_request_id": sample_req.get("id"),
                     "workflow_state": {},
                 },
                 commit=commit,
             )
 
         updates: Dict[str, Any] = {}
+        if sample_req.get("id") is not None:
+            updates["sample_request_id"] = sample_req.get("id")
         # Normalize older mirrored rows as they are touched. The link is now
         # resolved through DR code, with the legacy SR retained as fallback.
         if current.sr_number is not None:
@@ -506,6 +535,7 @@ class DesignRequestRepository(BaseRepository[DesignRequest]):
         return {
             "id": item.id,
             "request_code": item.request_code,
+            "sample_request_id": item.sample_request_id,
             "sr_number": item.sr_number,
             "customer_name": item.customer_name,
             "program_name": item.program_name,

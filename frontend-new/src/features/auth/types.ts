@@ -9,6 +9,7 @@ export interface UserProfile {
   sub_role?: string;
   team?: string;
   is_team_head?: boolean;
+  is_costing_admin?: boolean;
   plant_code?: string;
   plant_codes?: string[];
   theme_id?: ThemeId;

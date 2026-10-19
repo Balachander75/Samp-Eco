@@ -87,6 +87,31 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
   const [todayKey, setTodayKey] = useState(() => indiaDateKey(new Date()) || "");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Multi-row selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectRow = (id: string | number) => {
+    const key = String(id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (filteredRequests.length > 0 && filteredRequests.every((r) => selectedIds.has(String(r.id)))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRequests.map((r) => String(r.id))));
+    }
+  };
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filterTab, customerFilter, searchTerm]);
+
   const notify = useCallback(
     (msg: string) => {
       if (showToast) {
@@ -383,7 +408,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "customer",
         header: "Customer",
-        width: "w-[150px]",
+        width: "w-[140px]",
         cell: (req) => (
           <div className="min-w-0">
             <div
@@ -398,13 +423,13 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "feasibility_type",
         header: "Feasibility Type",
-        width: "w-[145px]",
+        width: "w-[130px]",
         cell: (req) => {
           const typeLabel = getFeasibilityTypeDisplay(req);
           return (
             <div className="min-w-0">
               <span
-                className="inline-block max-w-[135px] truncate rounded border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-[10.5px] font-semibold text-[var(--on-surface)]"
+                className="inline-block max-w-[120px] truncate rounded border border-[var(--border-subtle)] bg-[var(--surface-low)] px-2 py-0.5 font-mono text-[10.5px] font-semibold text-[var(--on-surface)]"
                 title={typeLabel}
               >
                 {typeLabel}
@@ -416,7 +441,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "description",
         header: "Scope / Description",
-        width: "min-w-[220px]",
+        width: "min-w-0 flex-1",
         cell: (req) => {
           const desc =
             req.productDescription ||
@@ -439,7 +464,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "required_date",
         header: "Required Date",
-        width: "w-[125px]",
+        width: "w-[115px]",
         cell: (req) => (
           <div className="whitespace-nowrap font-mono text-xs font-semibold tabular-nums text-[var(--on-surface)]">
             {req.sampleRequiredDate ? formatOdooDate(req.sampleRequiredDate) : "Flexible"}
@@ -449,7 +474,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "sla",
         header: "SLA / Timeline",
-        width: "w-[140px]",
+        width: "w-[130px]",
         cell: (req) => {
           const sla = getSlaDisplay(req, todayKey);
           const tone =
@@ -470,7 +495,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
             {
               id: "requester",
               header: "Requester",
-              width: "w-[120px]",
+              width: "w-[110px]",
               cell: (req: SampleRequestItem) => (
                 <div className="min-w-0">
                   <span
@@ -487,7 +512,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "reviewer",
         header: "Assigned Reviewer",
-        width: "w-[150px]",
+        width: "w-[140px]",
         cell: (req) => {
           if (req.takenBySamp) {
             return (
@@ -516,7 +541,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       {
         id: "verdict",
         header: "Review Status",
-        width: "w-[135px]",
+        width: "w-[130px]",
         cell: (req) => {
           const verdict = req.samplingFeasibilityResponse;
           if (verdict === "Yes") return <StatusPill status="Feasible" tone="success" size="xs" />;
@@ -528,33 +553,6 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
             return <StatusPill status="In Review" tone="warning" size="xs" />;
           return <StatusPill status="Awaiting Claim" tone="neutral" size="xs" />;
         },
-      },
-      {
-        id: "actions",
-        header: "Action",
-        width: "w-[100px]",
-        align: "right",
-        cell: (req) => (
-          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => handleOpenInspect(req)}
-              className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-bold transition shadow-2xs active:scale-95 ${
-                req.samplingFeasibilityResponse
-                  ? "border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-high)] text-[var(--on-surface)]"
-                  : req.counterDateDecision === "pending"
-                  ? "bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 hover:bg-amber-100"
-                  : "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white"
-              }`}
-            >
-              {req.counterDateDecision === "pending"
-                ? "View Date"
-                : req.samplingFeasibilityResponse
-                ? "Sign-Off"
-                : "Evaluate"}
-            </button>
-          </div>
-        ),
       },
     ],
     [todayKey, claimingId, notify, isAdmin]
@@ -693,8 +691,14 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
         <DataTable
           data={filteredRequests}
           columns={columns}
-          keyExtractor={(req) => req.id}
+          keyExtractor={(req) => String(req.id)}
           isLoading={isLoading}
+          enableSelection={true}
+          selectedIds={selectedIds}
+          onToggleSelectRow={toggleSelectRow}
+          onToggleSelectAll={toggleSelectAll}
+          tableClassName="w-full table-fixed min-w-0"
+          containerClassName="overflow-y-auto overflow-x-hidden"
           emptyMessage={
             feasibilityRequests.length === 0
               ? "No feasibility tasks found in the review queue."
@@ -714,6 +718,11 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
                 </span>{" "}
                 feasibility tasks
               </span>
+              {selectedIds.size > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary)] text-white shadow-2xs">
+                  {selectedIds.size} selected
+                </span>
+              )}
             </div>
           }
         />

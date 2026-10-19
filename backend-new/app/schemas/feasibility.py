@@ -46,6 +46,12 @@ class FeasibilitySampVerdictPayload(BaseModel):
     conditions: Optional[str] = None
     lead_time_note: Optional[str] = None
 
+    @model_validator(mode="after")
+    def require_remark_for_negative_or_conditional_verdict(self):
+        if self.response in {"No", "Maybe"} and not (self.remark or "").strip():
+            raise ValueError("A remark is required when the SAMP verdict is No or Maybe")
+        return self
+
 
 class FeasibilityMarketingDecisionPayload(BaseModel):
     """Payload for Marketing final decision."""

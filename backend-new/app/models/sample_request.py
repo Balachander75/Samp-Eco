@@ -236,6 +236,16 @@ class DesignRequest(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     request_code = Column(String(50), nullable=False, unique=True, index=True)
+    sample_request_id = Column(
+        Integer,
+        ForeignKey(
+            "create_sample_requests.id",
+            ondelete="SET NULL",
+            name="fk_design_requests_sample_request",
+        ),
+        nullable=True,
+        index=True,
+    )
     sr_number = Column(String(50), nullable=True, index=True)
     customer_name = Column(String(150), nullable=False, index=True)
     program_name = Column(String(150), nullable=True)

@@ -9,8 +9,6 @@ import {
   fetchProductCategoriesApi,
   updateSampleRequestApi,
   releaseSampleRequestIdsApi,
-  deleteSampleRequestApi,
-  batchDeleteSampleRequestsApi,
   fetchProductDetailsApi,
 } from "@/infrastructure/api";
 import { ProductSearchResult, BindingHierarchyResponse, SampleRequestItem } from "../types";
@@ -56,32 +54,45 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       sourceSrNumber?: string;
       designs: DesignFollowupArtwork[];
     };
+    customer?: string;
+    programName?: string;
+    programYear?: string;
+    year?: string;
+    targetPlant?: string;
+    feasibilityRequestId?: number | string;
+    feasibilityRequestType?: "sample" | "mockup";
+    feasibilityRequestTypes?: Array<"sample" | "mockup">;
+    feasibilityRequestCode?: string;
+    feasibilityDescription?: string;
+    feasibilityRequiredDate?: string;
+    feasibilityReferenceLinks?: string[];
+    parentRequestId?: string | number;
+    parentSrNumber?: string;
+    parentRequestTypes?: string[];
+    parentMockupWorkflowState?: SampleRequestItem["mockupWorkflowState"];
+    parentCreationMode?: string;
+    openedFromDraft?: boolean;
   } | null;
   const designMockupHandoff = routeState?.designMockupHandoff;
+  const feasibilityStorageId = routeState?.feasibilityRequestId
+    ? String(routeState.feasibilityRequestId).replace(/^feasibility-/, "")
+    : "";
   const stagedProductsStorageKey = designMockupHandoff
     ? "samp_design_mockup_handoff_products:" + designMockupHandoff.designRequestId
+    : feasibilityStorageId
+      ? `samp_feasibility_staged_products:${feasibilityStorageId}`
     : "samp_active_staged_products";
   const programContextStorageKey = designMockupHandoff
     ? "samp_design_mockup_handoff_program:" + designMockupHandoff.designRequestId
+    : feasibilityStorageId
+      ? `samp_feasibility_program:${feasibilityStorageId}`
     : "samp_active_program_form";
 
   // Load Program Setup from location state or cached session
   const [programContext, setProgramContext] = useState(() => {
-    const state = location.state as {
-      customer?: string;
-      programName?: string;
-      programYear?: string;
-      year?: string;
-      targetPlant?: string;
-      parentRequestId?: string | number;
-      parentSrNumber?: string;
-      parentRequestTypes?: string[];
-      parentMockupWorkflowState?: SampleRequestItem["mockupWorkflowState"];
-      parentCreationMode?: string;
-      openedFromDraft?: boolean;
-    } | null;
+    const state = routeState;
 
-    if (designMockupHandoff || state?.customer || state?.programName) {
+    if (designMockupHandoff || state?.customer || state?.programName || state?.feasibilityRequestId) {
       return {
         customer: state?.customer || "",
         programName: state?.programName || "",
@@ -94,6 +105,13 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         parentMockupWorkflowState: state?.parentMockupWorkflowState,
         parentCreationMode: state?.parentCreationMode,
         openedFromDraft: Boolean(state?.openedFromDraft),
+        feasibilityRequestId: state?.feasibilityRequestId,
+        feasibilityRequestType: state?.feasibilityRequestType,
+        feasibilityRequestTypes: state?.feasibilityRequestTypes,
+        feasibilityReferenceLinks: state?.feasibilityReferenceLinks || [],
+        feasibilityRequestCode: state?.feasibilityRequestCode || "",
+        feasibilityDescription: state?.feasibilityDescription || "",
+        feasibilityRequiredDate: state?.feasibilityRequiredDate || "",
       };
     }
 
@@ -113,6 +131,13 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           parentMockupWorkflowState: parsed.parentMockupWorkflowState,
           parentCreationMode: parsed.parentCreationMode,
           openedFromDraft: Boolean(parsed.openedFromDraft),
+          feasibilityRequestId: parsed.feasibilityRequestId,
+          feasibilityRequestType: parsed.feasibilityRequestType,
+          feasibilityRequestTypes: parsed.feasibilityRequestTypes,
+          feasibilityReferenceLinks: parsed.feasibilityReferenceLinks || [],
+          feasibilityRequestCode: parsed.feasibilityRequestCode || "",
+          feasibilityDescription: parsed.feasibilityDescription || "",
+          feasibilityRequiredDate: parsed.feasibilityRequiredDate || "",
         };
       }
     } catch {
@@ -131,8 +156,19 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       parentMockupWorkflowState: undefined,
       parentCreationMode: undefined,
       openedFromDraft: false,
+      feasibilityRequestId: undefined,
+      feasibilityRequestType: undefined,
+      feasibilityRequestTypes: undefined,
+      feasibilityReferenceLinks: [],
+      feasibilityRequestCode: "",
+      feasibilityDescription: "",
+      feasibilityRequiredDate: "",
     };
   });
+  const feasibilityHandoff = Boolean(
+    programContext.feasibilityRequestId &&
+    ((programContext.feasibilityRequestTypes && programContext.feasibilityRequestTypes.length > 0) || programContext.feasibilityRequestType)
+  );
 
   // Staged Products in current batch (persisted across page reloads)
   const [stagedProducts, setStagedProducts] = useState<StagedProductItem[]>(() => {
@@ -154,11 +190,19 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   }, [stagedProducts, stagedProductsStorageKey]);
 
   // Add Product Modal & Flow State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(Boolean(designMockupHandoff));
+  const [isAddModalOpen, setIsAddModalOpen] = useState(Boolean(designMockupHandoff || feasibilityHandoff));
   const [addModalStep, setAddModalStep] = useState<
     "scopes" | "design_brief" | "sampling_config" | "product_search"
-  >(designMockupHandoff ? "sampling_config" : "scopes");
-  const [selectedScopes, setSelectedScopes] = useState<DeliverableScopeId[]>(designMockupHandoff ? ["mockup"] : []);
+  >(designMockupHandoff || feasibilityHandoff ? "sampling_config" : "scopes");
+  const [selectedScopes, setSelectedScopes] = useState<DeliverableScopeId[]>(
+    designMockupHandoff
+      ? ["mockup"]
+      : feasibilityHandoff
+      ? ((programContext.feasibilityRequestTypes && programContext.feasibilityRequestTypes.length > 0
+          ? programContext.feasibilityRequestTypes
+          : [programContext.feasibilityRequestType!]) as DeliverableScopeId[])
+      : [],
+  );
   const [scopeTimestamps, setScopeTimestamps] = useState<Record<string, string>>({});
 
   // Design Fields
@@ -194,7 +238,9 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   // Sampling / Specification Configuration State
   const [sampleType, setSampleType] = useState<"full" | "partial">("full");
   const [partialRequirements, setPartialRequirements] = useState("");
-  const [samplingSearchMode, setSamplingSearchMode] = useState<"new" | "material_code" | "binding">(designMockupHandoff ? "material_code" : "new");
+  const [samplingSearchMode, setSamplingSearchMode] = useState<"new" | "material_code" | "binding">(
+    designMockupHandoff || (feasibilityHandoff && programContext.feasibilityRequestType === "mockup") ? "material_code" : "new",
+  );
   const [designNeeded, setDesignNeeded] = useState<boolean | null>(designMockupHandoff ? false : null);
   const [marketingShutterstockNo, setMarketingShutterstockNo] = useState("");
   const [marketingMockupRemark, setMarketingMockupRemark] = useState("");
@@ -227,13 +273,15 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   const bindingSearchSequenceRef = useRef(0);
 
   // Staged product description for sampling item
-  const [samplingDescription, setSamplingDescription] = useState("");
+  const [samplingDescription, setSamplingDescription] = useState(feasibilityHandoff ? programContext.feasibilityDescription || "" : "");
   const [newProductCustomDetails, setNewProductCustomDetails] = useState<NonNullable<StagedProductItem["customDetails"]>>([]);
   const [, setCatalogProductDescription] = useState("");
   const [qtyDesignCosting, setQtyDesignCosting] = useState("");
   const [qtyForSampling, setQtyForSampling] = useState("1");
   const [qtyForMockup, setQtyForMockup] = useState("1");
-  const [mockupRequiredDate, setMockupRequiredDate] = useState("");
+  const [mockupRequiredDate, setMockupRequiredDate] = useState(
+    feasibilityHandoff && programContext.feasibilityRequestType === "mockup" ? programContext.feasibilityRequiredDate || "" : "",
+  );
   const [customerProductCode, setCustomerProductCode] = useState("");
   const [costingBarcode, setCostingBarcode] = useState("");
   const [brandName, setBrandName] = useState("");
@@ -398,6 +446,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Ask which deliverable is needed before opening the product form.
   const handleOpenAddProduct = () => {
+    if (feasibilityHandoff) {
+      setIsAddModalOpen(true);
+      return;
+    }
     setEditingProduct(null);
     setAddModalStep("scopes");
     setSelectedScopes([]);
@@ -458,7 +510,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       );
       stagedProductsRef.current = nextProducts;
       setStagedProducts(nextProducts);
-      sessionStorage.setItem("samp_active_staged_products", JSON.stringify(nextProducts));
+      sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
       try {
         const result = await autoSaveStagedProductsToDraft(nextProducts, programContext, user);
         if (!result.success) throw new Error(result.error || "Could not save the staged request details.");
@@ -467,7 +519,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         );
         stagedProductsRef.current = savedProducts;
         setStagedProducts(savedProducts);
-        sessionStorage.setItem("samp_active_staged_products", JSON.stringify(savedProducts));
+        sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(savedProducts));
         showToast("Staged request details updated.");
         return true;
       } catch (error) {
@@ -578,7 +630,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
     setStagedProducts(nextProducts);
     stagedProductsRef.current = nextProducts;
-    sessionStorage.setItem("samp_active_staged_products", JSON.stringify(nextProducts));
+    sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
     setInspectingProduct(updatedItem);
     showToast("Product description and characteristics saved.");
   };
@@ -986,7 +1038,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     }
 
     setStagedProducts(nextProducts);
-    sessionStorage.setItem("samp_active_staged_products", JSON.stringify(nextProducts));
+    sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
     setIsAddModalOpen(false);
     resetDesignState();
 
@@ -1002,12 +1054,12 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
               parentRequestId: res.requestId,
               parentSrNumber: res.srNumber || prev.parentSrNumber,
             }));
-            const cached = sessionStorage.getItem("samp_active_program_form");
+            const cached = sessionStorage.getItem(programContextStorageKey);
             if (cached) {
               const parsed = JSON.parse(cached);
               parsed.parentRequestId = res.requestId;
               if (res.srNumber) parsed.parentSrNumber = res.srNumber;
-              sessionStorage.setItem("samp_active_program_form", JSON.stringify(parsed));
+              sessionStorage.setItem(programContextStorageKey, JSON.stringify(parsed));
             }
           }
           showToast(`✓ Staged product saved to Draft (${res.srNumber || programContext.parentSrNumber || "Draft queue"}).`);
@@ -1173,6 +1225,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         qtyPerPack: unitPcPack === "Pack" ? qtyPerPack.trim() : "1",
         ...(selectedScopes.includes("sample") && {
           qtyForSampling: qtyForSampling.trim() || "1",
+          sampleRequiredDate: programContext.feasibilityRequiredDate || editingProduct.sampleRequiredDate,
         }),
         ...(selectedScopes.includes("mockup") && {
           qtyForMockup: qtyForMockup.trim() || "1",
@@ -1268,6 +1321,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         qtyPerPack: unitPcPack === "Pack" ? qtyPerPack.trim() : "1",
         ...(selectedScopes.includes("sample") && {
           qtyForSampling: qtyForSampling.trim() || "1",
+          sampleRequiredDate: programContext.feasibilityRequiredDate || undefined,
         }),
         ...(selectedScopes.includes("mockup") && {
           qtyForMockup: qtyForMockup.trim() || "1",
@@ -1410,7 +1464,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     }
 
     setStagedProducts(nextProducts);
-    sessionStorage.setItem("samp_active_staged_products", JSON.stringify(nextProducts));
+    sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
     setIsAddModalOpen(false);
     resetSamplingState();
 
@@ -1418,6 +1472,27 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     autoSaveStagedProductsToDraft(nextProducts, programContext, user)
       .then((res) => {
         if (res.success) {
+          if (feasibilityHandoff) {
+            hasAutoSavedRef.current = true;
+            stagedProductsRef.current = [];
+            setStagedProducts([]);
+            sessionStorage.removeItem(stagedProductsStorageKey);
+            sessionStorage.removeItem(programContextStorageKey);
+            navigate("/sample-requests", { state: { refresh: Date.now(), stage: "draft" } });
+            window.dispatchEvent(new CustomEvent("app:show-toast", {
+              detail: {
+                message: `${
+                  (programContext.feasibilityRequestTypes && programContext.feasibilityRequestTypes.length === 2)
+                    ? "Sample & Mockup"
+                    : programContext.feasibilityRequestTypes?.includes("mockup") || programContext.feasibilityRequestType === "mockup"
+                    ? "Mockup"
+                    : "Sample"
+                } details staged and linked to ${programContext.feasibilityRequestCode || "the feasibility request"}.`,
+                tone: "success",
+              },
+            }));
+            return;
+          }
           nextItem.isDraftSaved = true;
           setStagedProducts([...nextProducts]);
           showToast(`✓ Staged product saved to Draft (${res.srNumber || programContext.parentSrNumber || "Draft queue"}).`);
@@ -1429,48 +1504,32 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       });
   };
 
-  const handleRemoveStagedItem = async (id: string) => {
+  const handleRemoveStagedItem = (id: string) => {
     const item = stagedProducts.find((staged) => staged.id === id);
     const nextProducts = stagedProducts.filter((staged) => staged.id !== id);
     setStagedProducts(nextProducts);
     stagedProductsRef.current = nextProducts;
     try {
-      sessionStorage.setItem("samp_active_staged_products", JSON.stringify(nextProducts));
+      sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
     } catch {
       // ignore
     }
-    showToast(`Removed "${item?.productDescription || "Product"}" from staging.`);
-
-    if (item?.savedRequestId) {
-      try {
-        await deleteSampleRequestApi(item.savedRequestId);
-      } catch (err) {
-        console.warn("Could not delete draft request from backend:", err);
-      }
-    }
+    showToast(
+      item?.savedRequestId
+        ? `Removed "${item.productDescription || "Product"}" from staging. Its saved request remains available in Drafts.`
+        : `Removed "${item?.productDescription || "Product"}" from staging.`
+    );
   };
 
-  const handleClearStaging = async () => {
-    const savedIds = stagedProducts
-      .map((item) => item.savedRequestId)
-      .filter((savedId): savedId is string | number => Boolean(savedId));
-
+  const handleClearStaging = () => {
     setStagedProducts([]);
     stagedProductsRef.current = [];
     try {
-      sessionStorage.removeItem("samp_active_staged_products");
+      sessionStorage.removeItem(stagedProductsStorageKey);
     } catch {
       // ignore
     }
-    showToast("Cleared all staged products.");
-
-    if (savedIds.length > 0) {
-      try {
-        await batchDeleteSampleRequestsApi(savedIds);
-      } catch (err) {
-        console.warn("Could not delete draft requests from backend:", err);
-      }
-    }
+    showToast("Cleared staging. Any saved request drafts remain available in Drafts.");
   };
 
   const handleDuplicateStagedItem = async (item: StagedProductItem) => {
@@ -1595,6 +1654,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       sessionStorage.removeItem(stagedProductsStorageKey);
       sessionStorage.removeItem(programContextStorageKey);
     }
+    if (feasibilityHandoff) {
+      sessionStorage.removeItem(stagedProductsStorageKey);
+      sessionStorage.removeItem(programContextStorageKey);
+    }
     navigate("/sample-requests");
   };
 
@@ -1607,8 +1670,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     try {
       const res = await autoSaveStagedProductsToDraft(stagedProducts, programContext, user);
       if (res.success) {
-        sessionStorage.removeItem("samp_active_program_form");
-        sessionStorage.removeItem("samp_active_staged_products");
+        sessionStorage.removeItem(programContextStorageKey);
+        sessionStorage.removeItem(stagedProductsStorageKey);
         showToast(`Successfully saved ${res.count} specification(s) to Draft queue!`);
         setTimeout(() => {
           navigate("/sample-requests", { state: { refresh: Date.now(), stage: "draft" } });
@@ -1638,8 +1701,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     try {
       const res = await autoSaveStagedProductsToDraft(stagedProducts, programContext, user);
       if (res.success) {
-        sessionStorage.removeItem("samp_active_program_form");
-        sessionStorage.removeItem("samp_active_staged_products");
+        sessionStorage.removeItem(programContextStorageKey);
+        sessionStorage.removeItem(stagedProductsStorageKey);
         sessionStorage.removeItem("samp_active_staged_items");
         setStagedProducts([]);
       showToast(`Successfully saved ${res.count} product(s) to ${programContext.parentSrNumber || "the request"}. Returning to desk...`);
@@ -1728,8 +1791,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       const newStatus = destinations.join(" and ") || "Creative";
 
       // 4. Clear staging session storage, in-memory list and refs
-      sessionStorage.removeItem("samp_active_program_form");
-      sessionStorage.removeItem("samp_active_staged_products");
+      sessionStorage.removeItem(programContextStorageKey);
+      sessionStorage.removeItem(stagedProductsStorageKey);
       sessionStorage.removeItem("samp_active_staged_items");
       stagedProductsRef.current = [];
       hasAutoSavedRef.current = true;
@@ -2030,6 +2093,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                 }}
                 onBackToScopes={() => {
                   if (isSubmittingAll) return;
+                  if (feasibilityHandoff) return;
                   setModalError(null);
                   if (designMockupHandoff) void handleReturnToDesk();
                   else setAddModalStep("scopes");

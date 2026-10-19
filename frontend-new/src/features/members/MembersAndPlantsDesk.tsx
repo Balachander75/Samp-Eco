@@ -12,7 +12,7 @@ import {
   updateUserApi,
 } from "@/infrastructure/api/masterApi";
 import { MembersTeamsPage } from "./MembersTeamsPage";
-import { Check, ShieldCheck, X } from "lucide-react";
+import { Building2, Check, Loader2, ShieldCheck, UserRoundPlus, X } from "lucide-react";
 
 interface MembersAndPlantsDeskProps {
   user: UserProfile;
@@ -27,10 +27,15 @@ const EMPTY_FORM: CreateUserPayload = {
   sub_role: "",
   team: "marketing",
   is_team_head: false,
+  is_costing_admin: false,
   plant_code: "",
   plant_codes: [],
   is_active: true,
 };
+
+const FIELD_CLASS =
+  "mt-1.5 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-sm text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)]";
+const LABEL_CLASS = "block text-xs font-medium text-[var(--on-surface-muted)]";
 
 function departmentKey(team?: string): string {
   const value = (team || "").trim().toLowerCase().replace(/[_-]+/g, " ");
@@ -52,6 +57,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [form, setForm] = useState<CreateUserPayload>(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const isAdmin = ["admin", "administrator"].includes(user.role.trim().toLowerCase());
 
@@ -98,6 +104,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
         sub_role: member.subRole || "",
         team,
         is_team_head: member.isTeamHead,
+        is_costing_admin: member.isCostingAdmin,
         plant_code: plantCode,
         plant_codes: plantCode ? [plantCode] : [],
         is_active: member.isActive,
@@ -140,13 +147,14 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
           sub_role: form.sub_role?.trim() || "",
           team: form.team,
           is_team_head: form.is_team_head,
+          is_costing_admin: form.team === "costing" && Boolean(form.is_costing_admin),
           plant_code: assignedPlant || "",
           plant_codes: assignedPlant ? [assignedPlant] : [],
           is_active: form.is_active,
         };
         if (password) payload.password = password;
         await updateUserApi(editingUser.id, payload);
-        showToast(`User ${name} updated`);
+        showToast("User " + name + " updated");
       } else {
         await createUserApi({
           ...form,
@@ -158,7 +166,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
           plant_code: assignedPlant,
           plant_codes: assignedPlant ? [assignedPlant] : [],
         });
-        showToast(`User ${name} created`);
+        showToast("User " + name + " created");
       }
       setIsModalOpen(false);
       await loadData();
@@ -170,67 +178,215 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
   };
 
   const removeUser = async (userId: number, name: string) => {
-    if (!window.confirm(`Remove member “${name}”? Their database request history will be kept and sign-in access will be disabled.`)) return;
+    if (deletingUserId !== null) return;
+    if (!window.confirm("Permanently delete " + name + "'s account? Their requests and audit history will remain, but this account cannot be restored.")) return;
+    setDeletingUserId(userId);
     try {
       await deleteUserApi(userId);
-      showToast(`Member ${name} deactivated; request history preserved`);
+      showToast("Member " + name + " deleted; request history preserved");
       await loadData();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Error deactivating member", "error");
+      showToast(error instanceof Error ? error.message : "Could not delete member", "error");
+    } finally {
+      setDeletingUserId(null);
     }
+  };
+
+  const closeModal = () => {
+    if (!isSubmitting) setIsModalOpen(false);
   };
 
   if (!isAdmin) {
     return (
-      <main className="min-h-[60vh] flex items-center justify-center p-6">
-        <div className="max-w-sm rounded-xl bg-white dark:bg-[#0e121a] border border-zinc-200 dark:border-zinc-800 p-6 text-center shadow-xs">
-          <ShieldCheck className="h-8 w-8 text-emerald-600 mx-auto mb-3" />
-          <h1 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Administrator Access Required</h1>
-          <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">This section is restricted to administrators.</p>
-        </div>
+      <main className="flex min-h-[60vh] items-center justify-center p-6">
+        <section className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-6 text-center shadow-sm">
+          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-primary-subtle)]">
+            <ShieldCheck className="h-5 w-5 text-[var(--accent-primary)]" />
+          </div>
+          <h1 className="text-sm font-semibold text-[var(--on-surface)]">Administrator access required</h1>
+          <p className="mt-1.5 text-sm text-[var(--on-surface-muted)]">This section is restricted to administrators.</p>
+        </section>
       </main>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 w-full bg-white dark:bg-[#080a10] text-zinc-900 dark:text-zinc-100 font-sans select-text overflow-hidden">
-      {feedback && <div className={`fixed bottom-5 right-5 z-[70] flex items-center gap-2 px-3.5 py-2.5 rounded-lg shadow-lg text-xs font-medium border animate-smooth-toast ${feedback.type === "success" ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-800 dark:border-zinc-200" : "bg-rose-600 text-white border-rose-700"}`}>
-        {feedback.type === "success" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <X className="w-3.5 h-3.5" />}<span>{feedback.text}</span>
-      </div>}
-      {loadError && !isLoading && <div role="alert" className="mx-5 mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">Database load failed: {loadError}</div>}
-      <MembersTeamsPage currentUser={user} users={users} plants={plants} isLoading={isLoading} onRefresh={() => void loadData()} onOpenUserModal={openUserModal} onDeleteUser={(id, name) => void removeUser(id, name)} />
-
-      {isModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-smooth-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !isSubmitting) setIsModalOpen(false); }}>
-        <div role="dialog" aria-modal="true" aria-labelledby="member-modal-title" className="w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto bg-white dark:bg-[#0e121a] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl animate-smooth-modal">
-          <div className="sticky top-0 z-10 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-white dark:bg-[#0e121a]">
-            <h2 id="member-modal-title" className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100 font-mono">{editingUser ? `Edit Member: ${editingUser.name}` : "New Team Member"}</h2>
-            <button type="button" disabled={isSubmitting} onClick={() => setIsModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 cursor-pointer transition-colors disabled:opacity-50"><X className="w-4 h-4" /></button>
-          </div>
-          <form onSubmit={(event) => void submitUser(event)} className="p-5 space-y-3.5 text-xs">
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">Full Name *<input required maxLength={255} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Parin Dedhia" className="mt-1 w-full px-2.5 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white transition" /></label>
-              <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">Username / ID *<input required maxLength={100} value={form.userid} onChange={(event) => setForm({ ...form, userid: event.target.value })} placeholder="Parin.d" className="mt-1 w-full px-2.5 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white transition" /></label>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">Email *<input type="email" required maxLength={255} value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="user@navneet.com" className="mt-1 w-full px-2.5 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white transition" /></label>
-              <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">{editingUser ? "Password (optional)" : "Password *"}<input type="password" required={!editingUser} autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={editingUser ? "Keep unchanged" : "Enter initial password"} className="mt-1 w-full px-2.5 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white transition" /></label>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">Department *<select value={form.team || "marketing"} onChange={(event) => { const team = event.target.value; const code = team === "plant" ? (form.plant_code || plants[0]?.code || "") : ""; setForm({ ...form, team, plant_code: code, plant_codes: code ? [code] : [] }); }} className="mt-1 w-full px-2.5 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white transition">
-                <option value="marketing">Marketing</option><option value="creative">Creative Studio</option><option value="studio">Structural CAD Studio</option><option value="samp">SAMP Sampling Lab</option><option value="costing">Commercial Costing</option><option value="plant">Plant Operations</option><option value="admin">Administration</option>
-              </select></label>
-              <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">Role Title<input maxLength={100} value={form.sub_role || ""} onChange={(event) => setForm({ ...form, sub_role: event.target.value })} placeholder="e.g. Sampling Specialist" className="mt-1 w-full px-2.5 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white transition" /></label>
-            </div>
-            {form.team === "plant" && <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">Assigned Facility *<select required value={form.plant_code || ""} onChange={(event) => { const code = event.target.value; setForm({ ...form, plant_code: code, plant_codes: code ? [code] : [] }); }} className="mt-1 w-full px-2.5 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white transition"><option value="">Select active facility</option>{plants.map((plant) => <option key={plant.id} value={plant.code}>{plant.code} - {plant.name.replace(new RegExp(`^${plant.code}\\s*-\\s*`, "i"), "")}</option>)}</select>{plants.length === 0 && <span className="mt-1 block text-rose-600">No active facilities are available in the database.</span>}</label>}
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400">System Access<select value={form.role || "user"} onChange={(event) => setForm({ ...form, role: event.target.value, is_team_head: event.target.value === "admin" ? false : form.is_team_head })} className="mt-1 w-full px-2.5 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white transition"><option value="user">Standard User</option><option value="admin">Global Administrator</option></select></label>
-              <div className="flex flex-col justify-end">{form.role !== "admin" && <label className="flex items-center gap-2 cursor-pointer pb-2 select-none"><input type="checkbox" checked={Boolean(form.is_team_head)} onChange={(event) => setForm({ ...form, is_team_head: event.target.checked })} className="rounded text-zinc-900 focus:ring-zinc-900 w-3.5 h-3.5 cursor-pointer" /><span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">Department Team Head</span></label>}</div>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer select-none"><input type="checkbox" checked={Boolean(form.is_active)} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} className="rounded text-zinc-900 focus:ring-zinc-900 w-3.5 h-3.5 cursor-pointer" /><span className="text-[11px] text-zinc-600 dark:text-zinc-400">Active Account Status</span></label>
-            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2"><button type="button" disabled={isSubmitting} onClick={() => setIsModalOpen(false)} className="h-8 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-medium cursor-pointer transition-colors">Cancel</button><button type="submit" disabled={isSubmitting || (form.team === "plant" && plants.length === 0)} className="h-8 px-3.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50">{isSubmitting ? "Saving..." : editingUser ? "Save Changes" : "Create Member"}</button></div>
-          </form>
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-[var(--surface-base)] font-sans text-[var(--on-surface)]">
+      {feedback && (
+        <div
+          role={feedback.type === "error" ? "alert" : "status"}
+          className={"fixed bottom-4 left-4 right-4 z-[70] flex items-center gap-2 rounded-xl border px-4 py-3 text-sm shadow-lg sm:left-auto sm:right-5 sm:w-auto sm:max-w-md " +
+            (feedback.type === "success"
+              ? "border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)]"
+              : "border-rose-500/30 bg-rose-50 text-rose-800 dark:bg-rose-950 dark:text-rose-200")}
+        >
+          {feedback.type === "success" ? <Check className="h-4 w-4 shrink-0 text-emerald-600" /> : <X className="h-4 w-4 shrink-0" />}
+          <span>{feedback.text}</span>
         </div>
-      </div>}
+      )}
+      {loadError && !isLoading && (
+        <div role="alert" className="mx-4 mt-3 rounded-lg border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-300 sm:mx-6">
+          Could not load team members: {loadError}
+        </div>
+      )}
+      <MembersTeamsPage
+        currentUser={user}
+        users={users}
+        plants={plants}
+        isLoading={isLoading}
+        deletingUserId={deletingUserId}
+        onRefresh={() => void loadData()}
+        onOpenUserModal={openUserModal}
+        onDeleteUser={(id: number, name: string) => void removeUser(id, name)}
+      />
+
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="member-modal-title"
+            className="flex max-h-[94dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] shadow-2xl sm:max-h-[min(90dvh,800px)] sm:rounded-2xl"
+          >
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-4 py-4 sm:px-6">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
+                  <UserRoundPlus className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h2 id="member-modal-title" className="truncate text-base font-semibold text-[var(--on-surface)]">
+                    {editingUser ? "Edit team member" : "Add team member"}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-[var(--on-surface-muted)]">
+                    {editingUser ? "Update access and profile details." : "Create an account and assign team access."}
+                  </p>
+                </div>
+              </div>
+              <button type="button" disabled={isSubmitting} onClick={closeModal} aria-label="Close dialog" className="rounded-lg p-2 text-[var(--on-surface-subtle)] transition-colors hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] disabled:opacity-50">
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+
+            <form onSubmit={(event) => void submitUser(event)} className="flex min-h-0 flex-1 flex-col">
+              <div className="grid flex-1 grid-cols-1 gap-x-4 gap-y-4 overflow-y-auto px-4 py-5 sm:grid-cols-2 sm:px-6">
+                <label className={LABEL_CLASS}>
+                  Full name <span className="text-rose-600">*</span>
+                  <input required maxLength={255} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Full name" className={FIELD_CLASS} />
+                </label>
+                <label className={LABEL_CLASS}>
+                  Username / ID <span className="text-rose-600">*</span>
+                  <input required maxLength={100} autoComplete="username" value={form.userid} onChange={(event) => setForm({ ...form, userid: event.target.value })} placeholder="Username" className={FIELD_CLASS} />
+                </label>
+                <label className={LABEL_CLASS}>
+                  Email <span className="text-rose-600">*</span>
+                  <input type="email" required maxLength={255} autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="name@company.com" className={FIELD_CLASS} />
+                </label>
+                <label className={LABEL_CLASS}>
+                  Password {editingUser ? <span className="font-normal text-[var(--on-surface-subtle)]">(optional)</span> : <span className="text-rose-600">*</span>}
+                  <input type="password" required={!editingUser} autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={editingUser ? "Leave blank to keep current" : "Initial password"} className={FIELD_CLASS} />
+                </label>
+                <label className={LABEL_CLASS}>
+                  Department <span className="text-rose-600">*</span>
+                  <select
+                    value={form.team || "marketing"}
+                    onChange={(event) => {
+                      const team = event.target.value;
+                      const code = team === "plant" ? (form.plant_code || plants[0]?.code || "") : "";
+                      setForm({ ...form, team, is_costing_admin: team === "costing" && Boolean(form.is_costing_admin), plant_code: code, plant_codes: code ? [code] : [] });
+                    }}
+                    className={FIELD_CLASS}
+                  >
+                    <option value="marketing">Marketing</option>
+                    <option value="creative">Creative Studio</option>
+                    <option value="studio">Structural CAD Studio</option>
+                    <option value="samp">SAMP Sampling Lab</option>
+                    <option value="costing">Commercial Costing</option>
+                    <option value="plant">Plant Operations</option>
+                    <option value="admin">Administration</option>
+                  </select>
+                </label>
+                <label className={LABEL_CLASS}>
+                  Role title
+                  <input maxLength={100} value={form.sub_role || ""} onChange={(event) => setForm({ ...form, sub_role: event.target.value })} placeholder="e.g. Sampling Specialist" className={FIELD_CLASS} />
+                </label>
+
+                {form.team === "plant" && (
+                  <label className={LABEL_CLASS + " sm:col-span-2"}>
+                    Assigned facility <span className="text-rose-600">*</span>
+                    <span className="relative mt-1.5 block">
+                      <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--on-surface-subtle)]" />
+                      <select
+                        required
+                        value={form.plant_code || ""}
+                        onChange={(event) => {
+                          const code = event.target.value;
+                          setForm({ ...form, plant_code: code, plant_codes: code ? [code] : [] });
+                        }}
+                        className={FIELD_CLASS + " mt-0 pl-9"}
+                      >
+                        <option value="">Select an active facility</option>
+                        {plants.map((plant) => {
+                          const prefix = plant.code + " -";
+                          const facilityName = plant.name.trim().toLowerCase().startsWith(prefix.toLowerCase())
+                            ? plant.name.trim()
+                            : plant.code + " - " + plant.name.trim();
+                          return <option key={plant.id} value={plant.code}>{facilityName}</option>;
+                        })}
+                      </select>
+                    </span>
+                    {plants.length === 0 && <span className="mt-1.5 block text-xs text-rose-600">No active facilities are available.</span>}
+                  </label>
+                )}
+
+                <label className={LABEL_CLASS}>
+                  System access
+                  <select value={form.role || "user"} onChange={(event) => setForm({ ...form, role: event.target.value, is_team_head: event.target.value === "admin" ? false : form.is_team_head })} className={FIELD_CLASS}>
+                    <option value="user">Standard member</option>
+                    <option value="admin">Global administrator</option>
+                  </select>
+                </label>
+
+                <div className="flex flex-col justify-end gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-low)]/60 p-3 sm:min-h-[72px]">
+                  {form.role !== "admin" ? (
+                    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-[var(--on-surface-muted)]">
+                      <input type="checkbox" checked={Boolean(form.is_team_head)} onChange={(event) => setForm({ ...form, is_team_head: event.target.checked })} className="h-4 w-4 rounded border-[var(--border-strong)] accent-[var(--accent-primary)] focus:ring-[var(--border-focus)]" />
+                      Department team head
+                    </label>
+                  ) : (
+                    <p className="text-xs text-[var(--on-surface-subtle)]">Administrators have workspace-wide access.</p>
+                  )}
+                  {form.team === "costing" && (
+                    <label className="flex cursor-pointer items-start gap-2.5 text-sm text-[var(--on-surface-muted)]">
+                      <input type="checkbox" checked={Boolean(form.is_costing_admin)} onChange={(event) => setForm({ ...form, is_costing_admin: event.target.checked })} className="mt-0.5 h-4 w-4 rounded border-[var(--border-strong)] accent-[var(--accent-primary)] focus:ring-[var(--border-focus)]" />
+                      <span>
+                        Costing administrator
+                        <span className="mt-0.5 block text-xs text-[var(--on-surface-subtle)]">Can view claimant names in the Costing queue.</span>
+                      </span>
+                    </label>
+                  )}
+                  <label className="flex cursor-pointer items-center gap-2.5 text-sm text-[var(--on-surface-muted)]">
+                    <input type="checkbox" checked={Boolean(form.is_active)} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} className="h-4 w-4 rounded border-[var(--border-strong)] accent-[var(--accent-primary)] focus:ring-[var(--border-focus)]" />
+                    Active account
+                  </label>
+                </div>
+              </div>
+
+              <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-4 py-3 sm:flex-row sm:justify-end sm:px-6">
+                <button type="button" disabled={isSubmitting} onClick={closeModal} className="h-10 rounded-lg border border-[var(--border-subtle)] px-4 text-sm font-medium text-[var(--on-surface-muted)] transition-colors hover:bg-[var(--surface-low)] disabled:opacity-50">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSubmitting || (form.team === "plant" && plants.length === 0)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--accent-primary)] px-4 text-sm font-semibold text-[var(--on-accent-primary)] transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60">
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? "Saving…" : editingUser ? "Save changes" : "Create member"}
+                </button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

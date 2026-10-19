@@ -215,7 +215,7 @@ Base URL in local dev: `http://localhost:8001` (configured via `VITE_API_URL`).
 - `GET    /api/v1/sample-requests/{id}` — Fetch request details with EAV product characteristics.
 - `PATCH  /api/v1/sample-requests/{id}` — Update request attributes.
 - `POST   /api/v1/sample-requests/batch-status` — Bulk transition status across multiple requests.
-- `DELETE /api/v1/sample-requests/{id}` — Soft delete or remove sample request.
+- Sample and workflow request records are retained; individual and batch request deletion is not available.
 - `GET    /api/v1/sample-requests/business-years` — Aggregated summary across business years.
 
 ### 6.3 Creative Design Requests (`/api/v1/design-requests`)

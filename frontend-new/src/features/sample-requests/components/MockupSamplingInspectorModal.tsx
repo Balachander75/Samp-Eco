@@ -9,10 +9,12 @@ import {
   CheckCircle2,
   Clock3,
   Copy,
+  Download,
   ExternalLink,
   Layers,
   Package,
   Palette,
+  Printer,
   Search,
   ShieldAlert,
   Sparkles,
@@ -20,6 +22,7 @@ import {
   UserCheck,
   X,
   ZoomIn,
+  FileSpreadsheet,
 } from "lucide-react";
 import type { UserProfile } from "@/features/auth";
 import { reviewRequestWorkflowApi, type RequestWorkflowRecord } from "@/infrastructure/api";
@@ -31,7 +34,13 @@ import {
 import { formatWorkflowAction } from "./workflowPresentation";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ScopeReferenceImagesGallery } from "@/features/sample-requests/components/staging/ScopeReferenceImagesGallery";
-import type { SampleRequestItem } from "../types";
+import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
+import {
+  downloadProductDocketPdf,
+  downloadProductDocketCsv,
+  printProductDocketView,
+} from "@/features/sample-requests/components/staging/productDocketPdf";
+import type { ProductSearchResult, SampleRequestItem } from "../types";
 
 interface MockupSamplingInspectorModalProps {
   record: RequestWorkflowRecord;
@@ -128,6 +137,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
   const [productSpecifications, setProductSpecifications] = useState<ProductDetailItem[]>([]);
   const [isLoadingSpecifications, setIsLoadingSpecifications] = useState(false);
   const [specSearchQuery, setSpecSearchQuery] = useState("");
+  const [specViewMode, setSpecViewMode] = useState<"all" | "configured" | "docket">("all");
   const [scopeReferenceImages, setScopeReferenceImages] = useState<NonNullable<SampleRequestItem["scopeReferenceImages"]>>({});
 
   const dialogRef = useRef<HTMLElement>(null);
@@ -249,17 +259,52 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
     }
   };
 
+  const isMissingSpecificationValue = (value: unknown): boolean => {
+    if (value === null || value === undefined) return true;
+    const str = String(value).trim().toUpperCase();
+    return str === "" || str === "NA" || str === "N/A" || str === "NULL" || str === "NONE" || str === "—" || str === "-";
+  };
+
+  const configuredSpecs = useMemo(() => {
+    return productSpecifications.filter((item) => !isMissingSpecificationValue(item.value));
+  }, [productSpecifications]);
+
+  const docketClassGroups = useMemo<[string, ProductDetailItem[]][]>(() => {
+    const map = new Map<string, ProductDetailItem[]>();
+    productSpecifications.forEach((item) => {
+      const current = map.get(item.className) || [];
+      current.push(item);
+      map.set(item.className, current);
+    });
+    return Array.from(map.entries());
+  }, [productSpecifications]);
+
+  const docketProduct = useMemo<ProductSearchResult & { brand?: string }>(() => {
+    const reqData = (record.request_data || {}) as Record<string, any>;
+    return {
+      id: Number(record.sample_request_id),
+      sr_number: record.sr_number,
+      material_code: record.material_code || "",
+      product_description: record.product_description || "",
+      customer: record.customer || "",
+      target_plant: (reqData.target_plant as string) || (reqData.plant as string) || "",
+      source_sample_code: [reqData.barcode, reqData.customer_product_code].filter(Boolean).join(" / ") || "NA",
+      brand: record.brand_name || "",
+    } as ProductSearchResult & { brand?: string };
+  }, [record]);
+
   // Group specs by class
   const filteredSpecs = useMemo(() => {
+    const list = specViewMode === "configured" ? configuredSpecs : productSpecifications;
     const q = specSearchQuery.trim().toLowerCase();
-    if (!q) return productSpecifications;
-    return productSpecifications.filter(
+    if (!q) return list;
+    return list.filter(
       (s) =>
         s.className.toLowerCase().includes(q) ||
         s.characteristicName.toLowerCase().includes(q) ||
         String(s.value || "").toLowerCase().includes(q)
     );
-  }, [productSpecifications, specSearchQuery]);
+  }, [productSpecifications, configuredSpecs, specViewMode, specSearchQuery]);
 
   const specificationGroups = useMemo(() => {
     const groups = new Map<string, ProductDetailItem[]>();
@@ -375,7 +420,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
 
         {/* ── 3. MAIN WORKSPACE VIEWPORT ── */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] p-4 md:p-6 space-y-4">
-          <div className="max-w-6xl mx-auto w-full rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
+          <div className={`mx-auto w-full rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-200 ${activeTab === "specs" && specViewMode === "docket" ? "max-w-[98%]" : "max-w-6xl"}`}>
             {/* Dossier Header & Ribbon */}
             <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-base)]">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-2.5 sm:px-8">
@@ -723,8 +768,8 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                     scopes={["mockup"]}
                     onPreview={setLightboxUrl}
                   />
-                  {/* Search Bar for Specs */}
-                  <div className="flex items-center justify-between gap-3">
+                  {/* Search Bar and View Mode Filters for Specs */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="relative flex-1 max-w-md">
                       <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[var(--on-surface-subtle)]" />
                       <input
@@ -735,14 +780,125 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                         className="w-full pl-9 pr-3 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] text-xs text-[var(--on-surface)] focus:ring-1 focus:ring-[var(--accent-primary)] outline-none"
                       />
                     </div>
-                    <span className="text-xs text-[var(--on-surface-muted)]">
-                      Showing {filteredSpecs.length} of {productSpecifications.length} parameters
-                    </span>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {specViewMode === "docket" && docketClassGroups.length > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => downloadProductDocketPdf(docketProduct, docketClassGroups)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[10px] font-semibold text-rose-800 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50 cursor-pointer"
+                            title="Download Complete Technical Docket PDF"
+                          >
+                            <Download className="h-3.5 w-3.5 text-rose-600" /> PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadProductDocketCsv(docketProduct, docketClassGroups)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 cursor-pointer"
+                            title="Export Structured Specifications to CSV (Excel Compatible)"
+                          >
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" /> CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => printProductDocketView(docketProduct, `mockup-docket-${record.sample_request_id}`)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
+                            title="Print or Save Complete Docket as PDF"
+                          >
+                            <Printer className="h-3.5 w-3.5" /> Print
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-1 bg-[var(--surface-lowest)] p-0.5 rounded-lg border border-[var(--border-subtle)] text-[10px] font-mono">
+                        <button
+                          type="button"
+                          onClick={() => setSpecViewMode("all")}
+                          className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
+                            specViewMode === "all"
+                              ? "bg-[var(--surface-low)] text-[var(--on-surface)] font-bold shadow-2xs"
+                              : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
+                          }`}
+                        >
+                          <span>All Specs</span>
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] font-normal border border-[var(--border-subtle)]">
+                            {productSpecifications.length}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSpecViewMode("configured")}
+                          className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
+                            specViewMode === "configured"
+                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shadow-2xs"
+                              : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
+                          }`}
+                        >
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>Configured</span>
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-300/40">
+                            {configuredSpecs.length}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSpecViewMode("docket")}
+                          className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
+                            specViewMode === "docket"
+                              ? "bg-[var(--surface-low)] text-[var(--on-surface)] font-bold shadow-2xs"
+                              : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
+                          }`}
+                        >
+                          <span>Official Docket</span>
+                        </button>
+                      </div>
+
+                      {specViewMode === "docket" && docketClassGroups.length > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => downloadProductDocketPdf(docketProduct, docketClassGroups)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-[10px] font-semibold text-[var(--on-surface)] transition hover:bg-[var(--surface-low)] cursor-pointer"
+                            title="Download Complete Technical Docket PDF"
+                          >
+                            <Download className="h-3.5 w-3.5" /> PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadProductDocketCsv(docketProduct, docketClassGroups)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-300/60 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer"
+                            title="Export Docket Specifications to CSV (Excel Ready)"
+                          >
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => printProductDocketView(docketProduct, `mockup-docket-${record.sample_request_id}`)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
+                            title="Print or Save Complete Docket as PDF"
+                          >
+                            <Printer className="h-3.5 w-3.5" /> Print / Save PDF
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {isLoadingSpecifications ? (
                     <div className="p-8 text-center text-xs text-[var(--on-surface-muted)]">
                       Loading product specifications…
+                    </div>
+                  ) : specViewMode === "docket" ? (
+                    <div className="overflow-x-auto rounded-xl border border-slate-300 bg-slate-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
+                      <div className="min-w-[960px]">
+                        <ProductDocketView
+                          product={docketProduct}
+                          classGroups={docketClassGroups}
+                          searchQuery={specSearchQuery}
+                          containerId={`mockup-docket-${record.sample_request_id}`}
+                        />
+                      </div>
                     </div>
                   ) : specificationGroups.length > 0 ? (
                     <div className="space-y-4">

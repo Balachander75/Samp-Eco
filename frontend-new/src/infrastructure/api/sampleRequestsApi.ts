@@ -10,9 +10,8 @@ import {
 import type { DesignFollowupScope } from "@/features/sample-requests/types";
 import { getBusinessYearForDate, normalizeToBusinessYear } from "@/lib/businessYear";
 import { readAuthUser } from "@/lib/session";
-import { getRequestTrackType } from "@/features/sample-requests/utils/trackTypes";
-import { fetchFeasibilityRequestsApi, deleteFeasibilityRequestApi } from "./feasibilityApi";
-import { fetchProgramRequestsApi, deleteProgramRequestApi } from "./programsApi";
+import { fetchFeasibilityRequestsApi } from "./feasibilityApi";
+import { fetchProgramRequestsApi } from "./programsApi";
 
 type ApiSampleRequest = Record<string, unknown>;
 
@@ -39,6 +38,7 @@ export function mapDesignRequest(item: Record<string, unknown>): DesignRequest {
       : {}) as Record<string, any>;
   return {
     id: Number(item.id),
+    sampleRequestId: item.sample_request_id == null ? null : Number(item.sample_request_id),
     srNumber: typeof item.sr_number === "string" ? item.sr_number : typeof item.srNumber === "string" ? item.srNumber : undefined,
     requestCode: typeof item.request_code === "string" ? item.request_code : typeof item.requestCode === "string" ? item.requestCode : undefined,
     customerName: designText(item.customer_name ?? item.customer, ["General Customer", "General Customer Account", "General Account"]),
@@ -72,6 +72,9 @@ export function mapDesignRequest(item: Record<string, unknown>): DesignRequest {
     remainingDesignCount: Number(item.remaining_design_count ?? item.remainingDesignCount ?? 0),
     releasedAt: workflow.releasedAt || workflow.released_at || null,
     claimedBy: workflow.claimedBy || workflow.claimed_by || null,
+    claimedByUserId: workflow.claimedByUserId == null && workflow.claimed_by_user_id == null
+      ? null
+      : Number(workflow.claimedByUserId ?? workflow.claimed_by_user_id),
     claimedAt: workflow.claimedAt || workflow.claimed_at || null,
     isCounterDateActive: Boolean(workflow.isCounterDateActive ?? workflow.is_counter_date_active ?? false),
     proposedTargetDate: workflow.proposedTargetDate || workflow.proposed_target_date || null,
@@ -113,6 +116,7 @@ export function mapDesignRequestToSampleRequest(item: DesignRequest): SampleRequ
     programName: item.programName,
     requestKind: "design",
     designRequestId: item.id,
+    sampleRequestId: item.sampleRequestId ?? null,
     numberOfDesigns: item.numberOfDesigns,
     trend: item.trend,
     targetAudience: item.targetAudience,
@@ -126,6 +130,7 @@ export function mapDesignRequestToSampleRequest(item: DesignRequest): SampleRequ
     releasedAt: item.releasedAt,
     designRequestCreatedAt: item.createdAt,
     claimedBy: item.claimedBy,
+    claimedByUserId: item.claimedByUserId ?? null,
     claimedAt: item.claimedAt,
     isCounterDateActive: item.isCounterDateActive,
     proposedTargetDate: item.proposedTargetDate,
@@ -227,19 +232,6 @@ export async function updateDesignRequestApi(id: number, form: Partial<DesignReq
   } catch (err) {
     console.error(`Error updating design request ${id}:`, err);
     return null;
-  }
-}
-
-export async function deleteDesignRequestApi(id: number): Promise<boolean> {
-  try {
-    await apiFetch(`/api/v1/design-requests/${id}`, { method: "DELETE" });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-    }
-    return true;
-  } catch (err) {
-    console.error(`Error deleting design request ${id}:`, err);
-    return false;
   }
 }
 
@@ -422,6 +414,14 @@ export async function claimDesignRequestApi(id: number, designerName: string): P
   const data = await apiFetch<Record<string, unknown>>(`/api/v1/design-requests/${id}/claim`, {
     method: "POST",
     jsonBody: { designer_name: designerName },
+  });
+  notifyDesignWorkflowUpdated(id);
+  return mapDesignRequest(data);
+}
+
+export async function releaseDesignRequestClaimApi(id: number): Promise<DesignRequest> {
+  const data = await apiFetch<Record<string, unknown>>(`/api/v1/design-requests/${id}/claim`, {
+    method: "DELETE",
   });
   notifyDesignWorkflowUpdated(id);
   return mapDesignRequest(data);
@@ -866,6 +866,7 @@ function mergeSampleAndDesignRequests(
         ? sample.status
         : design.status,
       designRequestId: design.designRequestId,
+      sampleRequestId: design.sampleRequestId ?? null,
       designRequestStatus: design.designRequestStatus,
       numberOfDesigns: design.numberOfDesigns || sample.numberOfDesigns,
       trend: design.trend || sample.trend,
@@ -880,6 +881,7 @@ function mergeSampleAndDesignRequests(
       releasedAt: design.releasedAt,
       designRequestCreatedAt: design.designRequestCreatedAt,
       claimedBy: design.claimedBy,
+      claimedByUserId: design.claimedByUserId ?? null,
       claimedAt: design.claimedAt,
       isCounterDateActive: design.isCounterDateActive,
       proposedTargetDate: design.proposedTargetDate,
@@ -1136,83 +1138,5 @@ export async function batchUpdateStatusApi(
   } catch (err) {
     console.error("Error batch updating status:", err);
     throw err;
-  }
-}
-
-export async function deleteSampleRequestApi(id: number | string): Promise<boolean> {
-  const cleanId = String(id).replace(/^sample-/, "");
-  try {
-    await apiFetch(`/api/v1/sample-requests/${cleanId}`, { method: "DELETE" });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-    }
-    return true;
-  } catch (err) {
-    console.error("Error deleting sample request:", err);
-    return false;
-  }
-}
-
-export async function deleteAnyRequestApi(
-  request: SampleRequestItem | { id: string | number; requestKind?: string; creationMode?: string; srNumber?: string }
-): Promise<boolean> {
-  const idStr = String(request.id || "");
-  const track = getRequestTrackType(request as any);
-  const srNumber = (request as any).srNumber;
-
-  let success = false;
-  if (idStr.startsWith("program-")) {
-    success = await deleteProgramRequestApi(idStr);
-  } else if (idStr.startsWith("feasibility-")) {
-    success = await deleteFeasibilityRequestApi(idStr);
-  } else if (isStandaloneDesignRequest(request as SampleRequestItem)) {
-    const numId = Number((request as any).designRequestId || idStr.replace(/^design-/, ""));
-    success = Number.isInteger(numId) && numId > 0 ? await deleteDesignRequestApi(numId) : false;
-  } else if (track === "feasibility_check") {
-    success = await deleteFeasibilityRequestApi(idStr);
-    if (!success) {
-      success = await deleteSampleRequestApi(request.id);
-    }
-    if (!success && srNumber) {
-      success = await deleteSampleRequestApi(srNumber);
-    }
-  } else if (track === "program_planning") {
-    success = await deleteProgramRequestApi(idStr);
-    if (!success) {
-      success = await deleteSampleRequestApi(request.id);
-    }
-    if (!success && srNumber) {
-      success = await deleteSampleRequestApi(srNumber);
-    }
-  } else {
-    success = await deleteSampleRequestApi(request.id);
-    if (!success && srNumber) {
-      success = await deleteSampleRequestApi(srNumber);
-    }
-  }
-
-  if (success && typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-  }
-  return success;
-}
-
-export async function batchDeleteSampleRequestsApi(ids: (number | string)[]): Promise<boolean> {
-  try {
-    const results = await Promise.all(ids.map((id) => deleteSampleRequestApi(id)));
-    return results.every(Boolean);
-  } catch (err) {
-    console.error("Error batch deleting sample requests:", err);
-    return false;
-  }
-}
-
-export async function batchDeleteAnyRequestsApi(requests: SampleRequestItem[]): Promise<boolean> {
-  try {
-    const results = await Promise.all(requests.map((req) => deleteAnyRequestApi(req)));
-    return results.every(Boolean);
-  } catch (err) {
-    console.error("Error batch deleting requests:", err);
-    return false;
   }
 }

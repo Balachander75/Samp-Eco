@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.repositories.base import BaseRepository
-from app.models.master import Customer, Plant, RefreshToken, User
+from app.models.master import Customer, LoginAuditLog, Plant, RefreshToken, User
 
 
 class MasterRepository:
@@ -69,6 +69,7 @@ class MasterRepository:
         sub_role: Optional[str] = None,
         team: Optional[str] = None,
         is_team_head: bool = False,
+        is_costing_admin: bool = False,
         plant_code: Optional[str] = None,
         is_active: bool = True,
     ) -> User:
@@ -81,6 +82,7 @@ class MasterRepository:
             sub_role=sub_role,
             team=team,
             is_team_head=is_team_head,
+            is_costing_admin=is_costing_admin,
             plant_code=plant_code,
             is_active=is_active,
         )
@@ -126,13 +128,93 @@ class MasterRepository:
         user = self.get_user_by_id(id)
         if not user:
             return False
-        user.is_active = False
-        self.db.query(RefreshToken).filter(RefreshToken.user_id == id).update(
-            {RefreshToken.is_revoked: True}, synchronize_session=False
+
+        # Keep operational and audit history, but detach it from the deleted
+        # account so the user row can be removed without cascading requests.
+        from app.models.feasibility import FeasibilityActivityLog, FeasibilityRequest
+        from app.models.program_request import ProgramActivityLog, ProgramRequest
+        from app.models.request_workflows import (
+            CostingWorkflow,
+            CostingWorkflowLog,
+            MockupWorkflow,
+            MockupWorkflowLog,
         )
-        self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
+        from app.models.sample_request import (
+            CreateSampleRequest,
+            DesignRequest,
+            SampleRequestActivityLog,
+        )
+
+        references = (
+            (FeasibilityRequest, FeasibilityRequest.created_by_user_id),
+            (FeasibilityRequest, FeasibilityRequest.samp_counter_date_proposed_by_user_id),
+            (FeasibilityRequest, FeasibilityRequest.counter_date_decision_by_user_id),
+            (FeasibilityActivityLog, FeasibilityActivityLog.actor_id),
+            (ProgramRequest, ProgramRequest.created_by_user_id),
+            (ProgramActivityLog, ProgramActivityLog.actor_id),
+            (CreateSampleRequest, CreateSampleRequest.created_by_user_id),
+            (DesignRequest, DesignRequest.created_by_user_id),
+            (SampleRequestActivityLog, SampleRequestActivityLog.actor_user_id),
+            (MockupWorkflow, MockupWorkflow.reviewer_user_id),
+            (MockupWorkflow, MockupWorkflow.created_by_user_id),
+            (MockupWorkflowLog, MockupWorkflowLog.actor_user_id),
+            (CostingWorkflow, CostingWorkflow.reviewer_user_id),
+            (CostingWorkflow, CostingWorkflow.created_by_user_id),
+            (CostingWorkflowLog, CostingWorkflowLog.actor_user_id),
+            (LoginAuditLog, LoginAuditLog.user_id),
+        )
+
+        try:
+            self.db.query(FeasibilityRequest).filter(
+                FeasibilityRequest.taken_by_samp_user_id == id
+            ).update(
+                {
+                    FeasibilityRequest.taken_by_samp_user_id: None,
+                    FeasibilityRequest.taken_by_samp: None,
+                    FeasibilityRequest.taken_at_samp: None,
+                },
+                synchronize_session=False,
+            )
+            self.db.query(ProgramRequest).filter(
+                ProgramRequest.sampling_claimed_by_user_id == id
+            ).update(
+                {
+                    ProgramRequest.sampling_claimed_by_user_id: None,
+                    ProgramRequest.sampling_claimed_by: None,
+                },
+                synchronize_session=False,
+            )
+            self.db.query(ProgramRequest).filter(
+                ProgramRequest.plant_claimed_by_user_id == id
+            ).update(
+                {
+                    ProgramRequest.plant_claimed_by_user_id: None,
+                    ProgramRequest.plant_claimed_by: None,
+                },
+                synchronize_session=False,
+            )
+            self.db.query(CostingWorkflow).filter(
+                CostingWorkflow.claimed_by_user_id == id
+            ).update(
+                {
+                    CostingWorkflow.claimed_by_user_id: None,
+                    CostingWorkflow.claimed_by: None,
+                    CostingWorkflow.claimed_at: None,
+                },
+                synchronize_session=False,
+            )
+            for model, user_id_column in references:
+                self.db.query(model).filter(user_id_column == id).update(
+                    {user_id_column: None}, synchronize_session=False
+                )
+            self.db.query(RefreshToken).filter(RefreshToken.user_id == id).delete(
+                synchronize_session=False
+            )
+            self.db.delete(user)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
         return True
 
     def count_active_admins(self, excluding_user_id: Optional[int] = None) -> int:

@@ -6,7 +6,6 @@ import { getStageIdForRequest } from "../utils/trackTypes";
 import { getBusinessYearForDate, normalizeToBusinessYear } from "@/lib/businessYear";
 import {
   Plus,
-  Trash2,
   Send,
   Package,
   Layers,
@@ -37,8 +36,6 @@ export interface SamplingRequestsPageProps {
   onInspectRequest: (req: SampleRequestItem) => void;
   onReleaseDraft: (req: SampleRequestItem) => Promise<void>;
   onBatchReleaseDraft: (selectedIds: Set<string | number>) => Promise<void>;
-  onDeleteRequest: (req: SampleRequestItem, e?: React.MouseEvent) => Promise<void>;
-  onBatchDelete: (selectedIds: Set<string | number>) => Promise<void>;
   onRefresh: () => Promise<void>;
   onExportCSV: () => void;
   onUpdateStatus?: (reqId: string | number, newStatus: string) => Promise<void>;
@@ -72,8 +69,6 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
   onInspectRequest,
   onReleaseDraft,
   onBatchReleaseDraft,
-  onDeleteRequest,
-  onBatchDelete,
   onRefresh,
   onExportCSV,
   onDraftModeChange,
@@ -791,7 +786,6 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
           onOpenDraftInStaging={handleOpenDraftInStaging}
           onInspectRequest={onInspectRequest}
           onReleaseDraft={onReleaseDraft}
-          onDeleteRequest={onDeleteRequest}
           onPageChange={(p) => setCurrentPage(p)}
           onOpenNewModal={onOpenNewModal}
           onResetFilters={handleResetFilters}
@@ -818,18 +812,6 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
             >
               <Send className="w-3.5 h-3.5" />
               <span>Release Drafts ({selectedDraftsCount})</span>
-            </button>
-          )}
-
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => onBatchDelete(selectedIds)}
-              className="h-8 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
-              title="Delete selected requests"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete ({selectedIds.size})</span>
             </button>
           )}
 

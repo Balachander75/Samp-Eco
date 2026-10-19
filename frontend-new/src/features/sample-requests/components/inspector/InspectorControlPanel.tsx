@@ -1,6 +1,6 @@
 import React from "react";
 import { SampleRequestItem } from "../../types";
-import { Copy, Check, Trash2, Send, X, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Copy, Check, Send, X, ChevronRight, CheckCircle2 } from "lucide-react";
 
 export interface InspectorControlPanelProps {
   request: SampleRequestItem;
@@ -13,7 +13,6 @@ export interface InspectorControlPanelProps {
   readOnly?: boolean;
   onClose: () => void;
   onCopyCode: () => void;
-  onDeleteRequest?: (request: SampleRequestItem) => void;
   onReleaseDraft?: (request: SampleRequestItem) => Promise<void> | void;
   onConvertToSampling: () => Promise<void>;
   onMarketingFinalApprove: (approved: boolean, remark?: string) => Promise<void>;
@@ -30,7 +29,6 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
   readOnly = false,
   onClose,
   onCopyCode,
-  onDeleteRequest,
   onReleaseDraft,
   onConvertToSampling,
   setIsReleasing,
@@ -208,17 +206,6 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
           <span>{copiedCode ? "Copied" : "Copy Code"}</span>
         </button>
 
-        {!readOnly && onDeleteRequest && (
-          <button
-            type="button"
-            onClick={() => onDeleteRequest(request)}
-            className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-medium px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition"
-            title="Delete this record"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete</span>
-          </button>
-        )}
       </div>
 
       {/* Right: Modern Luminous Workflow Stepper (Replacing Old Polygon Chevrons) */}

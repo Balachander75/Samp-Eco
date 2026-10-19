@@ -1,6 +1,7 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { SampleRequestItem } from "../../types";
-import { Package, Check, X, AlertTriangle, Copy } from "lucide-react";
+import { Package, Check, X, AlertTriangle, Copy, ArrowRight } from "lucide-react";
 
 export interface FeasibilityCommercialDecisionTabProps {
   activeRequest: SampleRequestItem;
@@ -9,10 +10,11 @@ export interface FeasibilityCommercialDecisionTabProps {
   decisionError: string | null;
   isSubmittingDecision: boolean;
   isConverting: boolean;
+  conversionError?: string | null;
   onDecisionRemarkChange: (val: string) => void;
   onMarketingFinalApprove: (approved: boolean) => void;
   onCounterDateDecision: (accepted: boolean) => void;
-  onConvertToSampling: (requestTypes: Array<"sample" | "costing">) => void;
+  onConvertToSampling: (requestTypes: Array<"sample" | "mockup">) => void;
 }
 
 export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDecisionTabProps> = ({
@@ -22,21 +24,25 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
   decisionError,
   isSubmittingDecision,
   isConverting,
+  conversionError,
   onDecisionRemarkChange,
   onMarketingFinalApprove,
   onCounterDateDecision,
   onConvertToSampling,
 }) => {
-  const [conversionTypes, setConversionTypes] = React.useState<Array<"sample" | "costing">>(["sample"]);
+  const navigate = useNavigate();
+  const [selectedTypes, setSelectedTypes] = React.useState<Array<"sample" | "mockup">>(["sample"]);
   const [copiedSr, setCopiedSr] = React.useState(false);
+  const canCreateNextRequest =
+    canMakeCommercialDecision && activeRequest.marketingDecision === "Accepted" && !isConverting;
 
-  const toggleConversionType = (type: "sample" | "costing") => {
-    setConversionTypes((current) => {
-      if (current.includes(type)) {
-        if (current.length === 1) return current;
-        return current.filter((item) => item !== type);
+  const toggleType = (type: "sample" | "mockup") => {
+    setSelectedTypes((prev) => {
+      if (prev.includes(type)) {
+        return prev.filter((t) => t !== type);
+      } else {
+        return [...prev, type];
       }
-      return [...current, type];
     });
   };
 
@@ -216,8 +222,8 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                 {activeRequest.samplingFeasibilityResponse === "No" && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
                     SAMP Lab evaluated this request as <strong>Not Feasible</strong>. Marketing may
-                    accept this as a business exception if client has agreed to custom terms. Add the
-                    business justification below.
+                    record an exception for audit purposes, but this will not allow a Sample or Mockup
+                    request to be created. Add the business justification below if accepting.
                   </div>
                 )}
 
@@ -253,7 +259,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                     className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-2xs cursor-pointer transition disabled:opacity-50 flex items-center gap-1.5"
                   >
                     <Check className="w-3.5 h-3.5" />
-                    <span>Accept Feasibility</span>
+                    <span>{activeRequest.samplingFeasibilityResponse === "No" ? "Record Marketing Exception" : "Accept Feasibility"}</span>
                   </button>
                   <button
                     type="button"
@@ -273,15 +279,32 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
             )}
           </div>
 
-          {/* Commercial Sampling Request Conversion Card */}
-          {activeRequest.marketingDecision === "Accepted" && (
-            <div className="p-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] space-y-3.5">
-              <div className="flex items-center gap-2 text-xs font-display font-bold text-[var(--accent-primary)]">
-                <Package className="w-4 h-4 text-[var(--accent-primary)]" />
-                <span>Commercial Request Conversion</span>
-              </div>
+          <section
+            aria-labelledby="feasibility-next-process-title"
+            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-5 space-y-3.5"
+          >
+            <div className="flex items-center gap-2 text-xs font-display font-bold text-[var(--accent-primary)]">
+              <Package className="w-4 h-4 text-[var(--accent-primary)]" />
+              <h3 id="feasibility-next-process-title">Next Process</h3>
+            </div>
 
-              {(activeRequest.convertedRequestCode || activeRequest.convertedSrNumber) ? (
+            {activeRequest.samplingFeasibilityResponse === "No" ? (
+              <div role="alert" className="rounded-xl bg-rose-50 p-4 text-xs leading-relaxed text-rose-900 dark:bg-rose-950/20 dark:text-rose-200">
+                <div className="font-display font-bold">Sample and Mockup requests are blocked</div>
+                <p className="mt-1">
+                  SAMP marked this feasibility check Not Feasible. A Marketing business exception records the decision only; it does not override the technical rejection.
+                </p>
+                {(activeRequest.convertedRequestCode || activeRequest.convertedSrNumber) && (
+                  <p className="mt-2 font-semibold">
+                    Existing linked request: {activeRequest.convertedRequestCode || activeRequest.convertedSrNumber}
+                  </p>
+                )}
+              </div>
+            ) : activeRequest.marketingDecision === "Rejected" ? (
+              <p className="text-xs leading-relaxed text-[var(--on-surface-muted)]">
+                Marketing rejected this feasibility check. No Sample or Mockup request can be created from it.
+              </p>
+            ) : (activeRequest.convertedRequestCode || activeRequest.convertedSrNumber) ? (
                 <div className="p-4 bg-[var(--surface-lowest)] rounded-xl border border-[var(--border-subtle)] flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <div className="flex items-center gap-2">
@@ -307,53 +330,113 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                     </div>
                     <p className="text-[11px] text-[var(--on-surface-muted)] mt-0.5">
                       Created for {(activeRequest.convertedRequestTypes || activeRequest.requestTypes || [])
-                        .map((type) => type === "sample" ? "Sampling" : "Costing")
+                        .map((type) => type === "sample" ? "Sample" : type === "mockup" ? "Mockup" : "Costing")
                         .join(" and ") || "commercial processing"} by {activeRequest.convertedBy || "Marketing"}.
                     </p>
-                  </div>
-                  <span className="px-3 py-1 bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-mono text-[11px] font-bold rounded-lg border border-[var(--border-subtle)]">
-                    Active Commercial Request
-                  </span>
-                </div>
-              ) : canMakeCommercialDecision ? (
-                <div className="space-y-3">
-                  <p className="text-xs text-[var(--on-surface-muted)] max-w-lg">
-                    Choose which linked commercial workflows to create from this accepted feasibility request.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    {(["sample", "costing"] as const).map((type) => (
-                      <label
-                        key={type}
-                        className="inline-flex cursor-pointer select-none items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2 text-xs font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-low)]"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={conversionTypes.includes(type)}
-                          onChange={() => toggleConversionType(type)}
-                          disabled={isConverting}
-                          className="h-3.5 w-3.5 accent-[var(--accent-primary)]"
-                        />
-                        {type === "sample" ? "Sampling request" : "Costing request"}
-                      </label>
-                    ))}
+                    <p className="mt-1 text-[11px] text-[var(--on-surface-subtle)]">
+                      Product details were staged before linking. Review the draft and release it from Draft Workspace.
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => onConvertToSampling(conversionTypes)}
-                    disabled={isConverting || conversionTypes.length === 0}
+                    onClick={() => navigate("/sample-requests/draft-workspace")}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-[var(--accent-primary-hover)]"
+                  >
+                    Open Draft Workspace <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-[var(--on-surface-muted)] max-w-lg">
+                    {activeRequest.marketingDecision === "Accepted"
+                      ? "Choose the request type (Sample, Mockup, or both together), then complete product details in Product Staging."
+                      : "Choose a request type to prepare. Product Staging unlocks after Marketing accepts this feasibility result."}
+                  </p>
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleType("sample")}
+                      disabled={!canCreateNextRequest}
+                      className={`inline-flex select-none items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition cursor-pointer ${
+                        selectedTypes.includes("sample")
+                          ? "bg-[var(--accent-primary)]/15 border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold shadow-2xs"
+                          : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)]"
+                      } ${!canCreateNextRequest ? "opacity-60 cursor-not-allowed" : ""}`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded-md border flex items-center justify-center transition ${
+                          selectedTypes.includes("sample")
+                            ? "bg-[var(--accent-primary)] border-[var(--accent-primary)] text-white"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-base)]"
+                        }`}
+                      >
+                        {selectedTypes.includes("sample") && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <span>Sample Request</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleType("mockup")}
+                      disabled={!canCreateNextRequest}
+                      className={`inline-flex select-none items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition cursor-pointer ${
+                        selectedTypes.includes("mockup")
+                          ? "bg-[var(--accent-primary)]/15 border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold shadow-2xs"
+                          : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)]"
+                      } ${!canCreateNextRequest ? "opacity-60 cursor-not-allowed" : ""}`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded-md border flex items-center justify-center transition ${
+                          selectedTypes.includes("mockup")
+                            ? "bg-[var(--accent-primary)] border-[var(--accent-primary)] text-white"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-base)]"
+                        }`}
+                      >
+                        {selectedTypes.includes("mockup") && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <span>Mockup Request</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[var(--on-surface-subtle)]">
+                    You can request Mockup, Sampling, or both together.
+                  </p>
+                  {conversionError && (
+                    <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                      {conversionError}
+                    </p>
+                  )}
+                  {activeRequest.marketingDecision !== "Accepted" && (
+                    <p className="rounded-xl bg-[var(--surface-lowest)] p-3 text-xs leading-relaxed text-[var(--on-surface-muted)]">
+                      Awaiting Marketing acceptance. Sample and Mockup are visible here but cannot be created yet.
+                    </p>
+                  )}
+                  {activeRequest.marketingDecision === "Accepted" && !canMakeCommercialDecision && (
+                    <p className="text-xs text-[var(--on-surface-subtle)]">
+                      A Marketing authority must create this request.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onConvertToSampling(selectedTypes)}
+                    disabled={!canCreateNextRequest || selectedTypes.length === 0}
                     className="inline-flex cursor-pointer select-none items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Package className={`h-3.5 w-3.5 ${isConverting ? "animate-spin" : ""}`} />
-                    <span>{isConverting ? "Creating request..." : "Create commercial request"}</span>
+                    <span>
+                      {isConverting
+                        ? "Opening Product Staging..."
+                        : selectedTypes.length === 0
+                        ? "Select at least one request type"
+                        : selectedTypes.includes("sample") && selectedTypes.includes("mockup")
+                        ? "Continue to Sample & Mockup staging"
+                        : selectedTypes.includes("sample")
+                        ? "Continue to Sample staging"
+                        : "Continue to Mockup staging"}
+                    </span>
                   </button>
                 </div>
-              ) : (
-                <div className="text-xs text-[var(--on-surface-subtle)]">
-                  Ready for commercial sampling conversion by Marketing authority.
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </section>
         </div>
       )}
     </div>

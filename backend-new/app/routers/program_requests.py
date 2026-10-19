@@ -9,6 +9,7 @@ from app.auth.security import get_current_user
 from app.database import get_db
 from app.schemas.program_request import (
     ProgramBatchSampRemarksUpdate,
+    ProgramBatchPlantRemarksUpdate,
     ProgramActivityPinSubmit,
     ProgramActivityReplySubmit,
     ProgramMaterialCreate,
@@ -22,6 +23,7 @@ from app.schemas.program_request import (
     ProgramRequestUpdate,
     ProgramSeenSubmit,
     SingleSampRemarkUpdate,
+    SinglePlantRemarkUpdate,
 )
 from app.services.program_request_service import ProgramRequestService
 
@@ -208,6 +210,53 @@ def update_single_material_samp_remark(
     return item
 
 
+@router.put(
+    "/{request_id}/plant-remarks",
+    response_model=ProgramRequestOut,
+    summary="Batch update Plant team remarks on material specification matrix rows",
+)
+def update_batch_plant_remarks(
+    request_id: int,
+    payload: ProgramBatchPlantRemarksUpdate,
+    service: ProgramRequestService = Depends(get_program_service),
+    current_user=Depends(get_current_user),
+):
+    """Batch update Plant remarks on multiple material specification matrix rows."""
+    require_team(current_user, "plant")
+    existing = service.get_by_id(request_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Program planning request was not found")
+    require_plant_access(current_user, existing.get("target_plant"), service.db)
+    item = service.update_batch_plant_remarks(request_id, payload, current_user=current_user)
+    if not item:
+        raise HTTPException(status_code=404, detail="Program planning request was not found")
+    return item
+
+
+@router.patch(
+    "/{request_id}/materials/{material_id}/plant-remark",
+    response_model=ProgramRequestOut,
+    summary="Update Plant team remark on a single material specification row",
+)
+def update_single_material_plant_remark(
+    request_id: int,
+    material_id: int,
+    payload: SinglePlantRemarkUpdate,
+    service: ProgramRequestService = Depends(get_program_service),
+    current_user=Depends(get_current_user),
+):
+    """Update Plant team remark on an individual material row."""
+    require_team(current_user, "plant")
+    existing = service.get_by_id(request_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Program request was not found")
+    require_plant_access(current_user, existing.get("target_plant"), service.db)
+    item = service.update_single_plant_remark(request_id, material_id, payload, current_user=current_user)
+    if not item:
+        raise HTTPException(status_code=404, detail="Program request or material row was not found")
+    return item
+
+
 @router.post(
     "/{request_id}/materials",
     response_model=ProgramRequestOut,
@@ -230,7 +279,6 @@ def add_program_material(
         raise HTTPException(status_code=404, detail="Program planning request was not found")
     return item
 
-
 @router.delete(
     "/{request_id}/materials/{material_id}",
     response_model=ProgramRequestOut,
@@ -248,26 +296,6 @@ def delete_program_material(
     if not item:
         raise HTTPException(status_code=404, detail="Program request or material row was not found")
     return item
-
-
-@router.post(
-    "/{request_id}/materials/{material_id}/promote-to-sampling",
-    response_model=Dict[str, Any],
-    summary="Promote a Program SKU into a commercial Sample Request",
-)
-def promote_program_material_to_sampling(
-    request_id: int,
-    material_id: int,
-    payload: Optional[ProgramPromoteSkuPayload] = None,
-    service: ProgramRequestService = Depends(get_program_service),
-    current_user=Depends(get_current_user),
-):
-    """Promote a specific matrix SKU row into an active commercial Sample Request."""
-    require_any_team(current_user, ("marketing", "admin"))
-    _require_marketing_request_owner(request_id, service, current_user)
-    types = payload.request_types if payload and payload.request_types else ["sample"]
-    return service.promote_sku_to_sampling(request_id, material_id, request_types=types, current_user=current_user)
-
 
 @router.post("/{request_id}/outputs", response_model=ProgramRequestOut)
 def submit_program_output(
@@ -392,20 +420,24 @@ def pause_program_request(
     return service.toggle_pause(request_id, paused=payload.paused, current_user=current_user)
 
 
-@router.delete(
-    "/{request_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a program planning request",
+@router.post(
+    "/{request_id}/materials/{material_id}/promote-to-sampling",
+    response_model=Dict[str, Any],
+    summary="Promote a matrix SKU into an active commercial Sample Request",
 )
-def delete_program_request(
+def promote_sku_to_sampling(
     request_id: int,
+    material_id: int,
+    payload: ProgramPromoteSkuPayload,
     service: ProgramRequestService = Depends(get_program_service),
     current_user=Depends(get_current_user),
 ):
-    """Permanently delete a seasonal program request and re-sequence remaining requests."""
-    require_admin(current_user)
-    deleted = service.delete(request_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Program planning request was not found")
-    return None
-
+    """Marketing creator or Admin promotes a specific matrix SKU into an active commercial Sample Request."""
+    require_team(current_user, "marketing")
+    _require_marketing_request_owner(request_id, service, current_user)
+    return service.promote_sku_to_sampling(
+        request_id,
+        material_id,
+        payload,
+        current_user=current_user,
+    )

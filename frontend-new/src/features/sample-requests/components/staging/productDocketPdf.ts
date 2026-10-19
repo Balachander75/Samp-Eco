@@ -34,6 +34,26 @@ function pdfText(value: unknown): string {
     .replace(/\)/g, "\\)");
 }
 
+export function isMissingSpec(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  const str = String(value).trim().toUpperCase();
+  return (
+    str === "" ||
+    str === "NA" ||
+    str === "N/A" ||
+    str === "NAN" ||
+    str === "NULL" ||
+    str === "NONE" ||
+    str === "—" ||
+    str === "-"
+  );
+}
+
+export function isClassPresent(specs: ProductDetailItem[] | undefined | null): boolean {
+  if (!specs || specs.length === 0) return false;
+  return specs.some((s) => !isMissingSpec(s.value));
+}
+
 function getCharValue(
   specs: ProductDetailItem[],
   charName: string,
@@ -43,14 +63,10 @@ function getCharValue(
   const spec = specs.find(
     (s) => s.characteristicName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() === target
   );
-  if (!spec || spec.value === null || spec.value === undefined || String(spec.value).trim() === "") {
+  if (!spec || isMissingSpec(spec.value)) {
     return { value: fallback, isNa: true };
   }
   const val = String(spec.value).trim();
-  const emptyKeywords = new Set(["NA", "N/A", "NAN", "NULL", "NONE", "—", "-"]);
-  if (emptyKeywords.has(val.toUpperCase())) {
-    return { value: "NA", isNa: true };
-  }
   return { value: val, isNa: false, uom: spec.uom || undefined };
 }
 
@@ -142,9 +158,9 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     rows: productRows,
   });
 
-  // 2. BINDING DETAILS (Only if NB_BINDING is present)
+  // 2. BINDING DETAILS (Only if NB_BINDING is present and has data)
   const bindingSpecs = groupsMap.get("NB_BINDING");
-  if (bindingSpecs && bindingSpecs.length > 0) {
+  if (bindingSpecs && isClassPresent(bindingSpecs)) {
     const bSide = getCharValue(bindingSpecs, "BINDINGSIDE").value;
     const bType1 = getCharValue(bindingSpecs, "BINDINGTYPE1").value;
     const bType2 = getCharValue(bindingSpecs, "BINDINGTYPE2").value;
@@ -196,13 +212,21 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     });
   }
 
-  // 3. COMPONENTS 1 TO 7 (Only if present)
+  // 3. COMPONENTS 1 TO 7 (Only if component class is present and has data)
   for (let cIdx = 1; cIdx <= 7; cIdx++) {
     const cKey = `NB_COMPONENT_${cIdx}`;
     const compSpecs = groupsMap.get(cKey);
-    if (!compSpecs || compSpecs.length === 0) continue;
+    if (!compSpecs || !isClassPresent(compSpecs)) continue;
 
     const cName = getCharValue(compSpecs, `COMPONENT${cIdx}NAME`);
+    const compTitle =
+      !cName.isNa && cName.value !== "NA"
+        ? cName.value.toUpperCase().includes("COVER")
+          ? "Cover Details"
+          : cName.value
+        : cIdx === 1
+        ? "Cover Details"
+        : `Component ${cIdx} Details`;
     const cLen = getCharValue(compSpecs, `C${cIdx}SIZELENGTH`);
     const cWid = getCharValue(compSpecs, `C${cIdx}SIZEWIDTH`);
     const sizeStr = !cLen.isNa && !cWid.isNa ? `${cLen.value} X ${cWid.value} CM` : !cLen.isNa ? `${cLen.value} CM` : "NA";
@@ -251,15 +275,15 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     }
 
     sections.push({
-      title: cIdx === 1 ? "Cover Details" : `Component ${cIdx} Details`,
+      title: compTitle,
       countBadge: `${compSpecs.length} SPECS`,
       rows: compRows,
     });
   }
 
-  // 4. INSIDE DETAILS (RULLING_DETAILS, Only if present)
+  // 4. INSIDE DETAILS (RULLING_DETAILS, Only if present and has data)
   const rulingSpecs = groupsMap.get("RULLING_DETAILS");
-  if (rulingSpecs && rulingSpecs.length > 0) {
+  if (rulingSpecs && isClassPresent(rulingSpecs)) {
     const rulingRows: CellDef[][] = [
       [
         { label: "Inside Paper GSM", value: getCharValue(rulingSpecs, "INSIDE_PAPER_GSM", "52").value },
@@ -298,9 +322,9 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     });
   }
 
-  // 5. INSIDE ACCESSORIES DETAILS (NB_DIVIDER_SPECS, Only if present)
+  // 5. INSIDE ACCESSORIES DETAILS (NB_DIVIDER_SPECS, Only if present and has data)
   const dividerSpecs = groupsMap.get("NB_DIVIDER_SPECS");
-  if (dividerSpecs && dividerSpecs.length > 0) {
+  if (dividerSpecs && isClassPresent(dividerSpecs)) {
     const dividerRows: CellDef[][] = [
       [
         {
@@ -339,21 +363,22 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     });
   }
 
-  // 6. PACKAGING DETAILS (Only if present)
+  // 6. PACKAGING DETAILS (Only if present and has data)
   const pkgSpecs1 = groupsMap.get("PACKAGING_SPECS_1");
   const pkgDetails = groupsMap.get("PACKING_DETAILS");
-  if ((pkgSpecs1 && pkgSpecs1.length > 0) || (pkgDetails && pkgDetails.length > 0)) {
-    const pkgRows: CellDef[][] = [
-      [
-        { label: "Packaging 1 Name", value: getCharValue(pkgSpecs1 || [], "PACKAGING1NAME").value },
-        { label: "Material", value: getCharValue(pkgSpecs1 || [], "PACKAGING1MATERIAL").value },
-        { label: "Printing - No & Name of Colors", value: getCharValue(pkgSpecs1 || [], "PACKAGING1PRINTING").value },
-        { label: "GSM", value: getCharValue(pkgSpecs1 || [], "PACKAGING1GSM").value },
-        { label: "Size (CM)", value: getCharValue(pkgSpecs1 || [], "PACKAGING1SIZE").value },
-        { label: "Finish Details", value: getCharValue(pkgSpecs1 || [], "PACKAGING1FINISH").value },
-      ],
-    ];
-    if (pkgDetails && pkgDetails.length > 0) {
+  if ((pkgSpecs1 && isClassPresent(pkgSpecs1)) || (pkgDetails && isClassPresent(pkgDetails))) {
+    const pkgRows: CellDef[][] = [];
+    if (pkgSpecs1 && isClassPresent(pkgSpecs1)) {
+      pkgRows.push([
+        { label: "Packaging 1 Name", value: getCharValue(pkgSpecs1, "PACKAGING1NAME").value },
+        { label: "Material", value: getCharValue(pkgSpecs1, "PACKAGING1MATERIAL").value },
+        { label: "Printing - No & Name of Colors", value: getCharValue(pkgSpecs1, "PACKAGING1PRINTING").value },
+        { label: "GSM", value: getCharValue(pkgSpecs1, "PACKAGING1GSM").value },
+        { label: "Size (CM)", value: getCharValue(pkgSpecs1, "PACKAGING1SIZE").value },
+        { label: "Finish Details", value: getCharValue(pkgSpecs1, "PACKAGING1FINISH").value },
+      ]);
+    }
+    if (pkgDetails && isClassPresent(pkgDetails)) {
       for (let i = 0; i < pkgDetails.length; i += NUM_COLS) {
         pkgRows.push(
           pkgDetails.slice(i, i + NUM_COLS).map((s) => ({
@@ -370,13 +395,15 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     });
   }
 
-  // 7. GENERIC / CUSTOM CLASSES (Only if present)
+  // 7. GENERIC / CUSTOM CLASSES (Only if present and has data)
   const handledKeys = new Set([
     "PRODUCT_CLASS", "NB_BINDING", "NB_COMPONENT_1", "NB_COMPONENT_2", "NB_COMPONENT_3",
     "NB_COMPONENT_4", "NB_COMPONENT_5", "NB_COMPONENT_6", "NB_COMPONENT_7",
     "RULLING_DETAILS", "NB_DIVIDER_SPECS", "PACKAGING_SPECS_1", "PACKING_DETAILS",
   ]);
-  const otherGroups = groups.filter(([name]) => !handledKeys.has(name.toUpperCase()));
+  const otherGroups = groups
+    .filter(([name]) => !handledKeys.has(name.toUpperCase()))
+    .filter(([, specs]) => isClassPresent(specs));
   for (const [name, specs] of otherGroups) {
     const rows: CellDef[][] = [];
     for (let i = 0; i < specs.length; i += NUM_COLS) {
@@ -555,12 +582,17 @@ export function printProductDocketView(product: ProductSearchResult, elementId: 
 
   const contentHtml = element ? element.outerHTML : "<div>No docket content available</div>";
 
+  const styles = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
+    .map((node) => node.outerHTML)
+    .join("\n");
+
   doc.open();
   doc.write(`
     <!DOCTYPE html>
     <html>
       <head>
         <title>${title}</title>
+        ${styles}
         <style>
           @page {
             size: A4 landscape;
@@ -574,12 +606,15 @@ export function printProductDocketView(product: ProductSearchResult, elementId: 
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             margin: 0;
-            padding: 0;
+            padding: 4mm;
             background: #ffffff;
             color: #0f172a;
           }
           .docket-print-root {
             width: 100%;
+          }
+          header input, header button, .no-print {
+            display: none !important;
           }
         </style>
       </head>
@@ -599,6 +634,74 @@ export function printProductDocketView(product: ProductSearchResult, elementId: 
       document.body.removeChild(iframe);
     }, 1000);
   }, 300);
+}
+
+/**
+ * Export product docket specifications to Excel-compatible CSV with UTF-8 BOM.
+ */
+export function downloadProductDocketCsv(
+  product: ProductSearchResult,
+  groups: DocketClass[]
+): void {
+  const d = new Date();
+  const formattedToday = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+  const filename = `${product.material_code || product.sr_number || "Product"}_Docket_Specifications_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.csv`;
+
+  const rows: (string | number | null | undefined)[][] = [
+    ["OFFICIAL TECHNICAL SPECIFICATION DOCKET (SAP BOM)"],
+    ["Generated Date", formattedToday],
+    ["Material Code", product.material_code || "—"],
+    ["Sample Request No", product.sr_number || "—"],
+    ["Product Description", product.product_description || "—"],
+    ["Customer", product.customer || "—"],
+    ["Target Plant", product.target_plant || "—"],
+    ["Barcode / VSN", product.source_sample_code || (product as any).barcode || "—"],
+    [],
+    ["Section", "Section Title", "Classification Class", "Characteristic Code", "Value", "UOM", "Status"],
+  ];
+
+  let secIdx = 1;
+  for (const [className, specs] of groups) {
+    if (!isClassPresent(specs)) continue;
+    const title = productDocketSectionTitle(className);
+    for (const spec of specs) {
+      const isConfigured = !isMissingSpec(spec.value);
+      rows.push([
+        `Section ${secIdx}`,
+        title,
+        className,
+        spec.characteristicName,
+        spec.value ? String(spec.value).trim() : "NA",
+        spec.uom || "",
+        isConfigured ? "Configured" : "Unconfigured",
+      ]);
+    }
+    secIdx++;
+  }
+
+  // Sanitize CSV cells according to RFC-4180
+  const csvContent = rows
+    .map((row) =>
+      row
+        .map((val) => {
+          if (val === null || val === undefined) return '""';
+          const str = String(val);
+          return `"${str.replace(/"/g, '""')}"`;
+        })
+        .join(",")
+    )
+    .join("\r\n");
+
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export default downloadProductDocketPdf;

@@ -8,6 +8,7 @@ import { apiRawFetch } from "@/infrastructure/api/client";
 import { UserProfile } from "@/features/auth";
 import { getBusinessYearForDate } from "@/lib/businessYear";
 import { getAutomaticSampleRoute } from "./sampleRouting";
+import { convertFeasibilityToSamplingApi } from "@/infrastructure/api/feasibilityApi";
 
 export interface ProgramContextData {
   customer?: string;
@@ -17,6 +18,13 @@ export interface ProgramContextData {
   targetPlant?: string;
   parentRequestId?: string | number;
   parentSrNumber?: string;
+  feasibilityRequestId?: number | string;
+  feasibilityRequestType?: "sample" | "mockup";
+  feasibilityRequestTypes?: Array<"sample" | "mockup">;
+  feasibilityRequestCode?: string;
+  feasibilityDescription?: string;
+  feasibilityRequiredDate?: string;
+  feasibilityReferenceLinks?: string[];
 }
 
 export interface AutoSaveResult {
@@ -33,6 +41,26 @@ export interface AutoSaveResult {
 function draftKeyFor(item: StagedProductItem, user?: UserProfile | null): string {
   const owner = String(user?.userid || user?.name || "marketing").trim().slice(0, 60);
   return `samp-draft:${owner}:${item.id}`.slice(0, 160);
+}
+
+async function linkStagedFeasibilityRequest(
+  items: StagedProductItem[],
+  context?: ProgramContextData | null,
+): Promise<void> {
+  if (!context?.feasibilityRequestId) return;
+  const types = (context.feasibilityRequestTypes && context.feasibilityRequestTypes.length > 0)
+    ? context.feasibilityRequestTypes
+    : context.feasibilityRequestType
+    ? [context.feasibilityRequestType]
+    : undefined;
+  if (!types || types.length === 0) return;
+  const stagedRequestId = items[0]?.savedRequestId;
+  if (!stagedRequestId) throw new Error("The staged product was saved, but its request ID was not returned for feasibility linking.");
+  await convertFeasibilityToSamplingApi(
+    context.feasibilityRequestId,
+    types,
+    stagedRequestId,
+  );
 }
 
 /**
@@ -168,7 +196,10 @@ export async function autoSaveStagedProductsToDraft(
           target_audience: prod.designMetadata?.targetAudience || null,
           product_image_path: prod.designMetadata?.referenceImage || null,
           reference_images: prod.designMetadata?.images?.map((img) => img.url) || [],
-          reference_links: prod.designMetadata?.webLinks || [],
+          reference_links: Array.from(new Set([
+            ...(prod.designMetadata?.webLinks || []),
+            ...(programContext?.feasibilityReferenceLinks || []),
+          ])),
           scope_reference_images: Object.fromEntries(
             Object.entries(prod.scopeReferenceImages || {}).map(([scope, images]) => [
               scope,
@@ -217,6 +248,20 @@ export async function autoSaveStagedProductsToDraft(
           // ignore
         }
         if (firstId !== undefined && savedIds.length === items.length && items.every((item) => item.savedRequestId !== undefined)) {
+          try {
+            await linkStagedFeasibilityRequest(items, programContext);
+          } catch (err) {
+            return {
+              success: false,
+              count: items.length,
+              customer,
+              programName,
+              requestId: firstId,
+              srNumber: firstSr,
+              savedIds,
+              error: `Draft saved, but it could not be linked to feasibility: ${err instanceof Error ? err.message : "Please retry."}`,
+            };
+          }
           return { success: true, count: items.length, customer, programName, requestId: firstId, srNumber: firstSr, savedIds };
         }
       } else if (res.status >= 400 && res.status < 500 && res.status !== 404 && res.status !== 405) {
@@ -264,7 +309,10 @@ export async function autoSaveStagedProductsToDraft(
       clientDraftKey: draftKeyFor(prod, user),
       productImagePath: prod.designMetadata?.referenceImage || undefined,
       referenceImages: prod.designMetadata?.images?.map((img) => img.url) || [],
-      referenceLinks: prod.designMetadata?.webLinks || [],
+      referenceLinks: Array.from(new Set([
+        ...(prod.designMetadata?.webLinks || []),
+        ...(programContext?.feasibilityReferenceLinks || []),
+      ])),
       scopeReferenceImages: Object.fromEntries(
         Object.entries(prod.scopeReferenceImages || {}).map(([scope, images]) => [
           scope,
@@ -375,6 +423,23 @@ export async function autoSaveStagedProductsToDraft(
   }
 
   const savedIds = items.map((i) => i.savedRequestId).filter((id): id is string | number => id !== undefined && id !== null);
+
+  if (savedCount === items.length) {
+    try {
+      await linkStagedFeasibilityRequest(items, programContext);
+    } catch (err) {
+      return {
+        success: false,
+        count: savedCount,
+        customer,
+        programName,
+        requestId: firstSavedId,
+        srNumber: firstSavedSr,
+        savedIds,
+        error: `Draft saved, but it could not be linked to feasibility: ${err instanceof Error ? err.message : "Please retry."}`,
+      };
+    }
+  }
 
   return {
     success: savedCount === items.length,

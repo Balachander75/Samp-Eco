@@ -635,7 +635,11 @@ class SampleRequestService:
             status=payload.get("status") or "Draft (Pre-SMT)",
             creation_mode=payload.get("creation_mode") or "material_code",
             request_types=request_types,
-            request_codes={},
+            request_codes=(
+                dict(payload.get("linked_request_codes"))
+                if isinstance(payload.get("linked_request_codes"), dict)
+                else {}
+            ),
             mockup_workflow_state=payload.get("mockup_workflow_state") or payload.get("mockupWorkflowState") or {},
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),

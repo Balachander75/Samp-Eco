@@ -4,7 +4,6 @@ import {
   Plus,
   Sparkles,
   Building2,
-  Trash2,
   Clock,
   AlertTriangle,
 } from "lucide-react";
@@ -49,7 +48,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
   briefs,
   designRequests,
   selectedYear,
-  isAdmin = false,
+  isAdmin: _isAdmin = false,
   onOpenNewBriefModal,
   onInspectBrief,
   onInspectRequest,
@@ -548,23 +547,13 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
 
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-1.5 ml-auto">
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedIds(new Set())}
-                  className="h-8 px-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition"
-                  title="Clear selected items"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Selected ({selectedIds.size})</span>
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
                 className="text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] text-[11px] underline px-1 cursor-pointer"
+                title="Clear selection"
               >
-                Clear ({selectedIds.size})
+                Clear selection ({selectedIds.size})
               </button>
             </div>
           )}

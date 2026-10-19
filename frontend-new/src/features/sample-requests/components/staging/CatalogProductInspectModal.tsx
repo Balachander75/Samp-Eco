@@ -2,11 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  Download,
   LoaderCircle,
   Search,
   X,
-  Printer,
 } from "lucide-react";
 import {
   fetchProductInspectionDetailsApi,
@@ -14,8 +12,6 @@ import {
   PRODUCT_CLASS_ORDER,
 } from "@/infrastructure/api/masterApi";
 import { ProductSearchResult } from "../../types";
-import { downloadProductDocketPdf, printProductDocketView } from "./productDocketPdf";
-import { ProductDocketView } from "./ProductDocketView";
 import { isListedCreativeCharacteristic, isMockupCreativeCharacteristic } from "./mockupCreativeFields";
 
 interface CatalogProductInspectModalProps {
@@ -43,7 +39,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
   const [details, setDetails] = useState<ProductDetailItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState("");
-  const [view, setView] = useState<"configured" | "all" | "docket">("configured");
+  const [view, setView] = useState<"configured" | "all">("configured");
   const [characteristicQuery, setCharacteristicQuery] = useState("");
   const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set());
 
@@ -53,7 +49,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
     setIsLoading(true);
     setDetails([]);
     setDetailsError("");
-    setView(embedded ? "docket" : "configured");
+    setView("configured");
     setCharacteristicQuery("");
     setExpandedClasses(new Set());
 
@@ -169,8 +165,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
         aria-modal={embedded ? undefined : "true"}
         aria-labelledby="catalog-inspect-title"
         className={embedded
-          ? "w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)]"
-          : `flex h-[88vh] max-h-[94vh] w-full ${view === "docket" ? "max-w-[1140px]" : "max-w-[960px]"} flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-[0_24px_80px_rgba(2,6,23,0.2)] transition-[max-width] duration-200`}
+          ? "w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)]"          : "flex h-[88vh] max-h-[94vh] w-full max-w-[960px] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-[0_24px_80px_rgba(2,6,23,0.2)]"}
       >
         <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-4 sm:px-6">
           <div className="flex items-start justify-between gap-4">
@@ -214,7 +209,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
               <div className="flex flex-wrap items-center justify-between gap-2.5">
                 <div>
                   <h3 className="text-xs font-bold text-slate-900 dark:text-zinc-100">{heading || "Product specifications"}</h3>
-                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-zinc-400">{view === "docket" ? "All characteristics in this product’s classes. — means no saved value; NA is shown as recorded." : intro || "Showing classes with saved values. Expand a class to view its specifications."}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-zinc-400">{intro || "Showing classes with saved values. Expand a class to view its specifications."}</p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   {!isLoading && !detailsError && (
@@ -222,29 +217,12 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                       {classGroups.length} classes · {configuredCount} saved
                     </span>
                   )}
-                  <button type="button" disabled={isLoading || !!detailsError || classGroups.length === 0} onClick={() => downloadProductDocketPdf(product, classGroups)} className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800" title="Download Complete Technical Docket PDF">
-                    <Download className="h-3.5 w-3.5" /> PDF
-                  </button>
-                  {view === "docket" && (
-                    <button
-                      type="button"
-                      disabled={isLoading || !!detailsError || classGroups.length === 0}
-                      onClick={() => printProductDocketView(product)}
-                      className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
-                      title="Print or Save Complete Docket as PDF via Browser"
-                    >
-                      <Printer className="h-3.5 w-3.5" /> Print / Save PDF
-                    </button>
-                  )}
                   <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-zinc-700 dark:bg-zinc-900" aria-label="Specification view">
                     <button type="button" onClick={() => { setView("configured"); setExpandedClasses(new Set()); }} aria-pressed={view === "configured"} className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition ${view === "configured" ? "bg-white text-[var(--accent-primary)] shadow-sm dark:bg-zinc-800 dark:text-emerald-300" : "text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"}`}>
                       Configured <span className="ml-1 opacity-70">{configuredCount}</span>
                     </button>
                     <button type="button" onClick={() => { setView("all"); setExpandedClasses(new Set()); }} aria-pressed={view === "all"} className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition ${view === "all" ? "bg-white text-[var(--accent-primary)] shadow-sm dark:bg-zinc-800 dark:text-emerald-300" : "text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"}`}>
                       All <span className="ml-1 opacity-70">{availableSpecCount}</span>
-                    </button>
-                    <button type="button" onClick={() => { setView("docket"); setExpandedClasses(new Set(classGroups.map(([name]) => name))); }} aria-pressed={view === "docket"} className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition ${view === "docket" ? "bg-white text-[var(--accent-primary)] shadow-sm dark:bg-zinc-800 dark:text-emerald-300" : "text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"}`}>
-                      Docket
                     </button>
                   </div>
                 </div>
@@ -272,92 +250,79 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                   {characteristicQuery.trim() ? "No specifications match this filter." : "No saved specifications are available for this product."}
                 </div>
               ) : (
-                view === "docket" ? (
-                  <div className="overflow-x-auto pb-4">
-                    <div className="min-w-[740px]">
-                      <ProductDocketView
-                        product={product}
-                        classGroups={filteredClassGroups}
-                        searchQuery={characteristicQuery}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredClassGroups.map(([className, specs]) => {
-                      const allSpecsInClass = classGroups.find(([name]) => name === className)?.[1] || specs;
-                      const configuredInClass = allSpecsInClass.filter((item) => hasConfiguredValue(item.value)).length;
-                      const expanded = expandedClasses.has(className);
-                      return (
-                      <section key={className} className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]">
-                          <button
-                            type="button"
-                            aria-expanded={expanded}
-                            onClick={() => toggleClass(className)}
-                            className="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-[var(--surface-low)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)] sm:px-3.5"
-                          >
-                            <span className="min-w-0">
-                              <span className="text-xs font-semibold text-slate-800 dark:text-zinc-100">
-                                {displayClassName(className)}
-                              </span>
-                              <span className="ml-2 text-[10px] text-slate-400 dark:text-zinc-500">
-                                {view === "configured"
-                                  ? `${configuredInClass} configured`
-                                  : `${configuredInClass}/${allSpecsInClass.length} configured`}
-                              </span>
+                <div className="space-y-2">
+                  {filteredClassGroups.map(([className, specs]) => {
+                    const allSpecsInClass = classGroups.find(([name]) => name === className)?.[1] || specs;
+                    const configuredInClass = allSpecsInClass.filter((item) => hasConfiguredValue(item.value)).length;
+                    const expanded = expandedClasses.has(className);
+                    return (
+                    <section key={className} className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]">
+                        <button
+                          type="button"
+                          aria-expanded={expanded}
+                          onClick={() => toggleClass(className)}
+                          className="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-[var(--surface-low)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)] sm:px-3.5"
+                        >
+                          <span className="min-w-0">
+                            <span className="text-xs font-semibold text-slate-800 dark:text-zinc-100">
+                              {displayClassName(className)}
                             </span>
-                            <span className="flex shrink-0 items-center gap-2">
-                              <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-zinc-800 sm:block">
-                                <span
-                                  className="block h-full rounded-full bg-[var(--accent-primary)]"
-                                  style={{
-                                    width: `${allSpecsInClass.length ? (configuredInClass / allSpecsInClass.length) * 100 : 0}%`,
-                                  }}
-                                />
-                              </span>
-                              {expanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                            <span className="ml-2 text-[10px] text-slate-400 dark:text-zinc-500">
+                              {view === "configured"
+                                ? `${configuredInClass} configured`
+                                : `${configuredInClass}/${allSpecsInClass.length} configured`}
                             </span>
-                          </button>
-                          {expanded && (
-                          <div className="border-t border-[var(--border-subtle)]">
-                              <div className="grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 bg-[var(--surface-low)] px-3 py-1.5 text-[9px] font-bold uppercase tracking-wide text-[var(--on-surface-subtle)] sm:px-3.5">
-                                <span>Characteristic</span>
-                                <span>Value</span>
-                                <span>UOM</span>
-                              </div>
-                              {specs.map((item) => (
-                                <div
-                                  key={`${item.className}-${item.characteristicName}`}
-                                  className={`grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 border-t border-slate-100 px-3 py-2 text-[11px] dark:border-zinc-800/80 sm:px-3.5 ${highlightCreativeFields && (isMockupCreativeCharacteristic(item.className, item.characteristicName) || isListedCreativeCharacteristic(item, creativeCharacteristicKeys)) ? "border border-rose-500 bg-rose-50/80 ring-1 ring-inset ring-rose-400 dark:border-rose-400 dark:bg-rose-950/25 dark:ring-rose-500" : ""}`}
-                                >
-                                  <div className="min-w-0 break-words">
-                                    <span className="font-medium text-slate-700 dark:text-zinc-200">
-                                      {item.characteristicName}
-                                    </span>
-                                    {highlightCreativeFields && (isMockupCreativeCharacteristic(item.className, item.characteristicName) || isListedCreativeCharacteristic(item, creativeCharacteristicKeys)) && (
-                                      <span className="ml-2 inline-flex rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-rose-800 dark:bg-rose-900/50 dark:text-rose-200">Creative input</span>
-                                    )}
-                                  </div>
-                                  <span
-                                    className={`min-w-0 break-words ${
-                                      hasConfiguredValue(item.value)
-                                        ? "font-semibold text-slate-900 dark:text-zinc-100"
-                                        : "text-slate-400 dark:text-zinc-500"
-                                    }`}
-                                  >
-                                    {hasConfiguredValue(item.value) ? item.value?.trim() : ""}
-                                  </span>
-                                  <span className="text-slate-500 dark:text-zinc-400">{item.uom || ""}</span>
-                                </div>
-                              ))}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-zinc-800 sm:block">
+                              <span
+                                className="block h-full rounded-full bg-[var(--accent-primary)]"
+                                style={{
+                                  width: `${allSpecsInClass.length ? (configuredInClass / allSpecsInClass.length) * 100 : 0}%`,
+                                }}
+                              />
+                            </span>
+                            {expanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                          </span>
+                        </button>
+                        {expanded && (
+                        <div className="border-t border-[var(--border-subtle)]">
+                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 bg-[var(--surface-low)] px-3 py-1.5 text-[9px] font-bold uppercase tracking-wide text-[var(--on-surface-subtle)] sm:px-3.5">
+                              <span>Characteristic</span>
+                              <span>Value</span>
+                              <span>UOM</span>
                             </div>
-                          )}
-                        </section>
-                      );
-                    })}
-                  </div>
-                )
-
+                            {specs.map((item) => (
+                              <div
+                                key={`${item.className}-${item.characteristicName}`}
+                                className={`grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 border-t border-slate-100 px-3 py-2 text-[11px] dark:border-zinc-800/80 sm:px-3.5 ${highlightCreativeFields && (isMockupCreativeCharacteristic(item.className, item.characteristicName) || isListedCreativeCharacteristic(item, creativeCharacteristicKeys)) ? "border border-rose-500 bg-rose-50/80 ring-1 ring-inset ring-rose-400 dark:border-rose-400 dark:bg-rose-950/25 dark:ring-rose-500" : ""}`}
+                              >
+                                <div className="min-w-0 break-words">
+                                  <span className="font-medium text-slate-700 dark:text-zinc-200">
+                                    {item.characteristicName}
+                                  </span>
+                                  {highlightCreativeFields && (isMockupCreativeCharacteristic(item.className, item.characteristicName) || isListedCreativeCharacteristic(item, creativeCharacteristicKeys)) && (
+                                    <span className="ml-2 inline-flex rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-rose-800 dark:bg-rose-900/50 dark:text-rose-200">Creative input</span>
+                                  )}
+                                </div>
+                                <span
+                                  className={`min-w-0 break-words ${
+                                    hasConfiguredValue(item.value)
+                                      ? "font-semibold text-slate-900 dark:text-zinc-100"
+                                      : "text-slate-400 dark:text-zinc-500"
+                                  }`}
+                                >
+                                  {hasConfiguredValue(item.value) ? item.value?.trim() : ""}
+                                </span>
+                                <span className="text-slate-500 dark:text-zinc-400">{item.uom || ""}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </main>

@@ -16,8 +16,6 @@ import {
   updateSampleRequestApi,
   updateAnyRequestStatusApi,
   releaseDraftRequestsApi,
-  deleteAnyRequestApi,
-  batchDeleteAnyRequestsApi,
 } from "@/infrastructure/api";
 import {
   getRequestTrackType,
@@ -356,65 +354,6 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
     );
   };
 
-  // Delete Request from Database
-  const handleDeleteRequest = async (req: SampleRequestItem, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const reqCode = req.requestCode || req.srNumber || req.materialCode || `SR-${String(req.id).padStart(3, "0")}`;
-    if (
-      !window.confirm(
-        `Permanently delete request ${reqCode} (${req.customer || "Unspecified"}) from database? (Testing mode)`
-      )
-    )
-      return;
-
-    try {
-      const ok = await deleteAnyRequestApi(req);
-      if (ok) {
-        setRequests((current) => current.filter((item) => String(item.id) !== String(req.id)));
-        if (selectedRequest?.id === req.id) {
-          setIsInspectorOpen(false);
-          setSelectedRequest(null);
-        }
-        await loadRequests();
-        showToast(`✓ Request ${reqCode} deleted.`);
-      } else {
-        showToast(`Failed to delete request ${reqCode} from database.`);
-      }
-    } catch (err) {
-      console.error("Failed to delete request:", err);
-      showToast(err instanceof Error ? err.message : `Error deleting request ${reqCode}.`);
-    }
-  };
-
-  // Batch Delete Selected Requests
-  const handleBatchDelete = async (selectedIds: Set<string | number>) => {
-    if (selectedIds.size === 0) return;
-    const selectedList = requests.filter((r) => selectedIds.has(r.id));
-    if (
-      !window.confirm(
-        `Permanently delete ${selectedList.length} selected request(s) from database? (Testing mode)`
-      )
-    )
-      return;
-
-    try {
-      const deleted = await batchDeleteAnyRequestsApi(selectedList);
-      if (!deleted) throw new Error("One or more selected requests could not be deleted.");
-      const selectedKeys = new Set(Array.from(selectedIds, String));
-      setRequests((current) => current.filter((item) => !selectedKeys.has(String(item.id))));
-      if (selectedRequest && selectedIds.has(selectedRequest.id)) {
-        setIsInspectorOpen(false);
-        setSelectedRequest(null);
-      }
-      await loadRequests();
-      showToast(`✓ ${selectedList.length} request(s) deleted and sample codes reset.`);
-    } catch (err) {
-      console.error("Failed to batch delete requests:", err);
-      await loadRequests();
-      showToast("Error deleting selected requests from database.");
-    }
-  };
-
   // Direct Status Update Handler (for quick status change)
   const handleUpdateStatus = async (reqId: string | number, newStatus: string) => {
     const requestItem = requests.find((r) => String(r.id) === String(reqId));
@@ -674,8 +613,6 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
           onInspectRequest={handleInspectRequest}
           onReleaseDraft={handleReleaseDraft}
           onBatchReleaseDraft={handleBatchReleaseDraft}
-          onDeleteRequest={handleDeleteRequest}
-          onBatchDelete={handleBatchDelete}
           onRefresh={loadRequests}
           onExportCSV={handleExportCSV}
           onUpdateStatus={handleUpdateStatus}
@@ -695,15 +632,12 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
           requests={visibleRequests}
           isLoading={isLoading}
           selectedYear={selectedYear}
-          selectedPlant={selectedPlant}
-          uniquePlants={uniquePlants}
           uniqueCustomers={uniqueCustomers}
           user={user}
           isAdmin={isAdmin}
           isReadOnly={isReadOnly}
           onOpenNewModal={() => handleOpenNewModal("program_planning")}
           onInspectRequest={handleInspectRequest}
-          onDeleteRequest={handleDeleteRequest}
           onRefresh={loadRequests}
         />
       )}
@@ -728,7 +662,6 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
             isOpen={isInspectorOpen}
             onClose={() => setIsInspectorOpen(false)}
             onRefresh={loadRequests}
-            onDeleteRequest={(req) => handleDeleteRequest(req)}
             user={user}
             isAdmin={isAdmin}
             sourceDesk="marketing"
@@ -743,7 +676,6 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
             currentUser={user}
             readOnly={isReadOnly}
             onRefresh={loadRequests}
-            onDeleteRequest={isAdmin ? (req) => handleDeleteRequest(req) : undefined}
           />
         ) : (
           <SampleRequestInspector
@@ -752,7 +684,6 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
             onClose={() => setIsInspectorOpen(false)}
             onMarketingApprove={handleMarketingApproveFeasibility}
             onMaterialsUpdated={handleMaterialsUpdated}
-            onDeleteRequest={(req) => handleDeleteRequest(req)}
             onReleaseDraft={handleReleaseDraft}
             isAdmin={isAdmin}
             readOnly={isReadOnly}

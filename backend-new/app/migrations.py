@@ -759,6 +759,65 @@ def _index_feasibility_workflow() -> None:
             connection.execute(text(statement))
 
 
+def _add_costing_claim_fields() -> None:
+    statements = (
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_costing_admin BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE costing_workflows ADD COLUMN IF NOT EXISTS claimed_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+        "ALTER TABLE costing_workflows ADD COLUMN IF NOT EXISTS claimed_by VARCHAR(255)",
+        "ALTER TABLE costing_workflows ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ",
+        "CREATE INDEX IF NOT EXISTS ix_costing_workflows_claimed_by_user_id ON costing_workflows (claimed_by_user_id)",
+    )
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
+def _link_design_requests_to_sample_requests() -> None:
+    """Give Design workflow rows a stable parent link to their intake request."""
+    with engine.begin() as connection:
+        connection.execute(text(
+            "ALTER TABLE design_requests ADD COLUMN IF NOT EXISTS sample_request_id INTEGER"
+        ))
+        connection.execute(text("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'fk_design_requests_sample_request'
+                      AND conrelid = 'design_requests'::regclass
+                ) THEN
+                    ALTER TABLE design_requests
+                    ADD CONSTRAINT fk_design_requests_sample_request
+                    FOREIGN KEY (sample_request_id)
+                    REFERENCES create_sample_requests(id) ON DELETE SET NULL;
+                END IF;
+            END $$
+        """))
+        connection.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_requests_sample_request_id "
+            "ON design_requests (sample_request_id)"
+        ))
+        connection.execute(text("""
+            UPDATE design_requests AS design
+            SET sample_request_id = (
+                SELECT sample.id
+                FROM create_sample_requests AS sample
+                WHERE sample.request_codes->>'design' = design.request_code
+                   OR (design.sr_number IS NOT NULL AND sample.sr_number = design.sr_number)
+                ORDER BY
+                    CASE WHEN sample.request_codes->>'design' = design.request_code THEN 0 ELSE 1 END,
+                    sample.id DESC
+                LIMIT 1
+            )
+            WHERE design.sample_request_id IS NULL
+              AND EXISTS (
+                  SELECT 1
+                  FROM create_sample_requests AS sample
+                  WHERE sample.request_codes->>'design' = design.request_code
+                     OR (design.sr_number IS NOT NULL AND sample.sr_number = design.sr_number)
+              )
+        """))
+
+
 MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0001_legacy_schema_bootstrap", "Record and run existing schema upgrades", _bootstrap_existing_schema),
     ("0002_feasibility_conversion_relations", "Connect Feasibility conversions to sample requests", _link_feasibility_conversions),
@@ -776,6 +835,8 @@ MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0014_backfill_scoped_request_codes", "Assign request codes to legacy scoped requests", _backfill_scoped_request_codes),
     ("0015_reconcile_released_costing_workflows", "Route released Costing requests out of Marketing", _reconcile_released_costing_workflows),
     ("0016_index_feasibility_workflow", "Index feasibility requests status and activity logs request_id", _index_feasibility_workflow),
+    ("0017_costing_claim_tracking", "Add Costing task ownership and Costing administrator access", _add_costing_claim_fields),
+    ("0018_design_sample_request_link", "Link Design workflow records to their Sample Request parent", _link_design_requests_to_sample_requests),
 ]
 
 

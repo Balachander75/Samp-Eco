@@ -24,6 +24,7 @@ class User(Base):
     sub_role = Column(String(100), nullable=True)
     team = Column(String(100), nullable=True, index=True)
     is_team_head = Column(Boolean, default=False, nullable=False)
+    is_costing_admin = Column(Boolean, default=False, server_default="false", nullable=False)
     plant_code = Column(String(50), nullable=True)
     theme_id = Column(String(20), nullable=False, default="emerald", server_default="emerald")
     is_active = Column(Boolean, default=True, nullable=False)

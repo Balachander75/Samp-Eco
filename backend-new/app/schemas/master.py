@@ -42,6 +42,7 @@ class UserCreate(BaseModel):
     sub_role: Optional[str] = None
     team: Optional[str] = None
     is_team_head: Optional[bool] = False
+    is_costing_admin: Optional[bool] = False
     plant_code: Optional[str] = None
     plant_codes: List[str] = Field(default_factory=list)
     is_active: Optional[bool] = True
@@ -72,6 +73,7 @@ class UserUpdate(BaseModel):
     sub_role: Optional[str] = None
     team: Optional[str] = None
     is_team_head: Optional[bool] = None
+    is_costing_admin: Optional[bool] = None
     plant_code: Optional[str] = None
     plant_codes: Optional[List[str]] = None
     is_active: Optional[bool] = None
@@ -106,6 +108,7 @@ class UserOut(BaseModel):
     sub_role: Optional[str] = None
     team: Optional[str] = None
     is_team_head: bool = False
+    is_costing_admin: bool = False
     plant_code: Optional[str] = None
     plant_codes: List[str] = Field(default_factory=list)
     is_active: bool

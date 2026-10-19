@@ -246,11 +246,11 @@ def claim_feasibility_task(
 @router.post(
     "/{request_id}/convert-to-sampling",
     response_model=Dict[str, Any],
-    summary="Convert Accepted Feasibility Request into Commercial Sample Request",
+    summary="Link a staged Sample or Mockup draft to an accepted Feasibility request",
 )
 def convert_feasibility_to_sampling(
     request_id: int,
-    body: Dict[str, Any] = Body(default_factory=dict),
+    body: Optional[Dict[str, Any]] = Body(default=None),
     service: FeasibilityService = Depends(get_feasibility_service),
     current_user=Depends(get_current_user),
 ):
@@ -259,8 +259,15 @@ def convert_feasibility_to_sampling(
     if not request:
         raise HTTPException(status_code=404, detail="Feasibility request was not found")
     _require_request_visibility(request, current_user)
-    request_types = body.get("request_types", body.get("requestTypes")) if isinstance(body, dict) else None
-    return service.convert_to_sampling(request_id, current_user=current_user, request_types=request_types)
+    payload = body if isinstance(body, dict) else {}
+    request_types = payload.get("request_types", payload.get("requestTypes"))
+    sample_request_id = payload.get("sample_request_id", payload.get("sampleRequestId"))
+    return service.convert_to_sampling(
+        request_id,
+        current_user=current_user,
+        request_types=request_types,
+        sample_request_id=sample_request_id,
+    )
 
 
 @router.post(
@@ -320,39 +327,3 @@ def update_feasibility_request(
         status_code=409,
         detail="Direct workflow edits are disabled. Use the SAMP verdict or Marketing decision endpoint so the change is audited.",
     )
-
-
-@router.delete(
-    "/{request_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete feasibility request from database (testing / cleanup)",
-)
-def delete_feasibility_request(
-    request_id: int,
-    service: FeasibilityService = Depends(get_feasibility_service),
-    current_user=Depends(get_current_user),
-):
-    require_admin(current_user)
-    request = service.repo.get_for_update(request_id)
-    if request:
-        service.repo.add_activity_log(
-            feasibility_request_id=request.id,
-            actor_id=getattr(current_user, "id", None),
-            actor_name=getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Admin",
-            actor_department="Admin",
-            action="DELETED",
-            payload={
-                "request_code": request.request_code,
-                "customer_id": request.customer_id,
-                "feasibility_type": request.feasibility_type,
-                "status": request.status,
-            },
-            commit=False,
-        )
-        service.db.flush()
-        deleted = service.delete(request_id)
-    else:
-        deleted = False
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Feasibility request was not found")
-    return None

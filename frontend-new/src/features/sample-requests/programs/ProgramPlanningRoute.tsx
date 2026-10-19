@@ -5,10 +5,7 @@ import { isAdmin, isReadOnlyTeamHead } from "@/features/auth/permissions";
 import { useBusinessYear } from "@/context/BusinessYearContext";
 import { usePlant } from "@/context/PlantContext";
 import { SampleRequestItem } from "@/features/sample-requests/types";
-import {
-  deleteProgramRequestApi,
-  fetchProgramRequestsApi,
-} from "@/infrastructure/api/programsApi";
+import { fetchProgramRequestsApi } from "@/infrastructure/api/programsApi";
 import { ProgramPlanningPage } from "./ProgramPlanningPage";
 import { ProgramPlanningInspectorModal } from "./components/ProgramPlanningInspectorModal";
 import { SamplingProgramPlanningView } from "@/features/samp-team/programs/SamplingProgramPlanningView";
@@ -23,7 +20,7 @@ interface ProgramPlanningRouteProps {
 
 export const ProgramPlanningRoute: React.FC<ProgramPlanningRouteProps> = ({ user, mode }) => {
   const { selectedYear } = useBusinessYear();
-  const { selectedPlant, plantOptions } = usePlant();
+  const { selectedPlant } = usePlant();
   const location = useLocation();
   const [requests, setRequests] = useState<SampleRequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,14 +29,6 @@ export const ProgramPlanningRoute: React.FC<ProgramPlanningRouteProps> = ({ user
   const [toast, setToast] = useState("");
   const admin = isAdmin(user);
   const readOnly = isReadOnlyTeamHead(user);
-  const selectedPlantLabel = useMemo(() => {
-    if (!selectedPlant || selectedPlant === "ALL") return "ALL";
-    const selected = selectedPlant.trim().toLowerCase();
-    return plantOptions.find((plant) =>
-      [plant.code, plant.name, plant.displayName].some((value) => value.trim().toLowerCase() === selected),
-    )?.name || selectedPlant;
-  }, [plantOptions, selectedPlant]);
-
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -74,27 +63,10 @@ export const ProgramPlanningRoute: React.FC<ProgramPlanningRouteProps> = ({ user
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const uniquePlants = useMemo(
-    () => Array.from(new Set(requests.map((request) => request.targetPlant?.trim()).filter((value): value is string => Boolean(value)))).sort(),
-    [requests],
-  );
   const uniqueCustomers = useMemo(
     () => Array.from(new Set(requests.map((request) => request.customer?.trim()).filter((value): value is string => Boolean(value)))).sort(),
     [requests],
   );
-
-  const handleDeleteRequest = useCallback(async (request: SampleRequestItem, event?: React.MouseEvent) => {
-    event?.stopPropagation();
-    if (!window.confirm(`Delete Program Planning request ${request.requestCode || request.materialCode || request.id}? This cannot be undone.`)) return;
-    const deleted = await deleteProgramRequestApi(request.id);
-    if (!deleted) {
-      setToast("Could not delete this Program Planning request.");
-      return;
-    }
-    if (selectedRequest?.id === request.id) setSelectedRequest(null);
-    setToast("Program Planning request deleted.");
-    await loadRequests();
-  }, [loadRequests, selectedRequest?.id]);
 
   const commonPageProps = {
     requests,
@@ -119,20 +91,15 @@ export const ProgramPlanningRoute: React.FC<ProgramPlanningRouteProps> = ({ user
         <ProgramPlanningPage
           {...commonPageProps}
           selectedYear={selectedYear}
-          selectedPlant={selectedPlantLabel}
-          uniquePlants={uniquePlants}
           uniqueCustomers={uniqueCustomers}
           user={user}
           isAdmin={admin}
           isReadOnly={readOnly}
           onOpenNewModal={() => undefined}
-          onDeleteRequest={handleDeleteRequest}
         />
       ) : mode === "sampling" ? (
         <SamplingProgramPlanningView
           {...commonPageProps}
-          selectedPlant={selectedPlantLabel}
-          uniquePlants={uniquePlants}
           user={user}
           isAdmin={admin}
         />
@@ -140,6 +107,7 @@ export const ProgramPlanningRoute: React.FC<ProgramPlanningRouteProps> = ({ user
         <PlantProgramPlanningView
           {...commonPageProps}
           selectedPlant={selectedPlant}
+          isAdmin={admin}
         />
       )}
 
@@ -152,7 +120,6 @@ export const ProgramPlanningRoute: React.FC<ProgramPlanningRouteProps> = ({ user
           userRole={admin ? "admin" : user?.role || mode}
           currentUser={user}
           readOnly={readOnly}
-          onDeleteRequest={mode === "marketing" && admin ? handleDeleteRequest : undefined}
           onRefresh={loadRequests}
         />
       )}

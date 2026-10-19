@@ -175,6 +175,17 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
       // Exclude unreleased drafts - only show once released to Creative
       if (s.includes("draft") || s.includes("smt") || s.includes("pending allocation")) return false;
 
+      // Keep a claimed task in the assignee's queue. Global admins and
+      // read-only team heads retain visibility for oversight and recovery.
+      if (r.claimedBy && !isAdmin && !isReadOnlyTeamHead(user)) {
+        const ownerMatches = r.claimedByUserId != null && user?.id != null
+          ? String(r.claimedByUserId) === String(user.id)
+          : [user?.name, user?.userid].some((value) =>
+              Boolean(value) && String(r.claimedBy).trim().toLowerCase() === String(value).trim().toLowerCase()
+            );
+        if (!ownerMatches) return false;
+      }
+
       const designState = String(r.designRequestStatus || r.status || "").toLowerCase();
       if (
         r.marketingDesignDecision === "awaiting_marketing_review" ||
@@ -185,7 +196,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
       }
       return true;
     });
-  }, [allRequests]);
+  }, [allRequests, isAdmin, user]);
 
   // Sampling & Mockup requests (come together)
   const samplingMockupRequests = useMemo(() => {

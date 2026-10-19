@@ -297,16 +297,21 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
                 </div>
               </div>
 
-              {/* Optional Remark */}
+              {/* Remark required for No and Maybe verdicts */}
               <div>
                 <label className="block text-[11px] font-medium text-[var(--on-surface-subtle)] mb-1">
-                  Remark <span className="text-[10px] text-[var(--on-surface-subtle)] font-normal">(Optional)</span>
+                  Remark {sampVerdictChoice === "Yes" ? (
+                    <span className="text-[10px] text-[var(--on-surface-subtle)] font-normal">(Optional)</span>
+                  ) : (
+                    <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">(Required)</span>
+                  )}
                 </label>
                 <input
                   type="text"
                   value={sampVerdictRemark}
                   onChange={(e) => onSampVerdictRemarkChange(e.target.value)}
-                  placeholder="Optional remark or notes..."
+                  required={sampVerdictChoice !== "Yes"}
+                  placeholder={sampVerdictChoice === "Yes" ? "Optional remark or notes..." : "Explain this verdict..."}
                   className="w-full px-3 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>

@@ -20,9 +20,12 @@ import {
   Search,
   Tag,
   X,
+  Download,
+  Printer,
 } from "lucide-react";
 import type { UserProfile } from "@/features/auth";
 import {
+  claimCostingWorkflowApi,
   completeCostingWorkflowApi,
   releaseCostingWorkflowApi,
   reviewRequestWorkflowApi,
@@ -36,6 +39,7 @@ import { isMockupCreativeCharacteristic } from "@/features/sample-requests/compo
 import { fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
 import { ScopeReferenceImagesGallery } from "@/features/sample-requests/components/staging/ScopeReferenceImagesGallery";
 import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
+import { downloadProductDocketPdf, downloadProductDocketCsv, printProductDocketView } from "@/features/sample-requests/components/staging/productDocketPdf";
 import type { ProductSearchResult, SampleRequestItem } from "@/features/sample-requests/types";
 import { formatWorkflowAction } from "./workflowPresentation";
 
@@ -118,6 +122,8 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   const [outputPath, setOutputPath] = useState(record.costing_output_path || "");
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [locallyClaimedRequestId, setLocallyClaimedRequestId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -140,7 +146,11 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   const isClosed = record.current_stage === "done";
   const isReturned = record.reviewer_status === "returned";
 
-  const canSubmitCosting = (mode === "costing" || isCostingWork) && !readOnly;
+  const isGlobalAdmin = ["admin", "administrator"].includes(String(user?.role || "").toLowerCase());
+  const isClaimedByMe = Boolean(record.is_claimed_by_me) || locallyClaimedRequestId === record.sample_request_id;
+  const isClaimed = Boolean(record.is_claimed || record.claimed_by || isClaimedByMe);
+  const canClaimCosting = mode === "costing" && isCostingWork && !readOnly;
+  const canSubmitCosting = mode === "costing" && isCostingWork && !readOnly && (isClaimedByMe || isGlobalAdmin);
   const canReview = (mode === "sampling" || isSamplingReview) && !readOnly;
   const canReleaseToCosting = (mode === "creative" || isCreativeReview) && !readOnly;
 
@@ -164,6 +174,17 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
     });
     return [...groups.entries()];
   }, [productSpecifications]);
+
+  const costingDocketProduct = useMemo<ProductSearchResult & { brand?: string }>(() => ({
+    id: Number(record.sample_request_id),
+    sr_number: record.sr_number,
+    material_code: record.material_code || "",
+    product_description: record.product_description || "",
+    customer: record.customer || "",
+    target_plant: (requestData.target_plant as string) || (requestData.plant as string) || "",
+    source_sample_code: [requestData.barcode, requestData.customer_product_code].filter(Boolean).join(" / "),
+    brand: record.brand_name || "",
+  } as ProductSearchResult & { brand?: string }), [record, requestData]);
 
   const configuredCount = useMemo(() => {
     return productSpecifications.filter((item) => !isMissingSpecificationValue(item.value)).length;
@@ -330,6 +351,21 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
+  const claimTask = async () => {
+    if (isClaiming) return;
+    setIsClaiming(true);
+    setError(null);
+    try {
+      await claimCostingWorkflowApi(record.sample_request_id);
+      setLocallyClaimedRequestId(record.sample_request_id);
+      await onSaved();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not claim this Costing task.");
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
   // Save / Submit workflow update
   const save = async (decision?: "approve" | "return") => {
     if (decision === "return" && !notes.trim()) {
@@ -401,7 +437,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
         {/* ── 1. TOP CONTROL PANEL WITH STEPPER ── */}
         <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
           {/* Left Action Buttons */}
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={isSaving}
@@ -427,6 +463,29 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
               )}
               <span className="font-mono">{copiedCode ? "Copied" : code}</span>
             </button>
+            {mode === "costing" && isCostingWork && (
+              <div role="status" aria-live="polite" className="ml-1 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-low)] px-2.5 py-1.5">
+                <span className="text-[11px] font-medium text-[var(--on-surface-muted)]">
+                  {isClaimedByMe
+                    ? "Claimed by you"
+                    : record.claimed_by
+                      ? `Claimed by ${record.claimed_by}`
+                      : isClaimed
+                        ? "Claimed by another Costing member"
+                        : "Available to claim"}
+                </span>
+                {canClaimCosting && (!isClaimed || isGlobalAdmin) && !isClaimedByMe && (
+                  <button
+                    type="button"
+                    disabled={isClaiming || isSaving}
+                    onClick={() => void claimTask()}
+                    className="inline-flex min-h-7 items-center rounded-md bg-[var(--accent-primary)] px-2.5 text-[10px] font-semibold text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isClaiming ? "Claiming..." : isClaimed ? "Reassign to me" : "Claim task"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right: Modern Workflow Stepper */}
@@ -487,7 +546,9 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
         <div className="flex-1 flex overflow-hidden">
           {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
-            <div className="max-w-5xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
+            <div className={`mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-300 ${
+              activeTab === "specs" && specViewMode === "docket" ? "max-w-[98%]" : "max-w-5xl"
+            }`}>
               {/* ── Dossier Header ── */}
               <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
                 {/* Reference, Account & Status Badges */}
@@ -765,7 +826,11 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                             <p className="text-xs text-[var(--on-surface-muted)]">
                               {canSubmitCosting
                                 ? "Paste the link to the completed costing spreadsheet or server file path."
-                                : "The costing sheet submitted by the Costing team."}
+                                : isCostingWork && isClaimed && !isClaimedByMe && !isGlobalAdmin
+                                  ? `This Costing task is claimed by ${record.claimed_by || "another Costing member"}.`
+                                  : isCostingWork && !isClaimedByMe && !isGlobalAdmin
+                                    ? "Claim this task to edit and submit the Costing sheet."
+                                    : "The costing sheet submitted by the Costing team."}
                             </p>
                           </div>
                         </div>
@@ -964,6 +1029,35 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                           <span>Official Docket</span>
                         </button>}
                       </div>
+
+                      {specViewMode === "docket" && mode !== "creative" && specificationGroups.length > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => downloadProductDocketPdf(costingDocketProduct, specificationGroups)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-[10px] font-semibold text-[var(--on-surface)] transition hover:bg-[var(--surface-low)] cursor-pointer"
+                            title="Download Complete Technical Docket PDF"
+                          >
+                            <Download className="h-3.5 w-3.5" /> PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadProductDocketCsv(costingDocketProduct, specificationGroups)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-300/60 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer"
+                            title="Export Docket Specifications to CSV (Excel Ready)"
+                          >
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => printProductDocketView(costingDocketProduct, `costing-docket-${record.sample_request_id}`)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
+                            title="Print or Save Complete Docket as PDF"
+                          >
+                            <Printer className="h-3.5 w-3.5" /> Print / Save PDF
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Creative Missing Fields Warning if Creative Mode */}
@@ -991,25 +1085,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                       </div>
                     ) : specViewMode === "docket" && mode !== "creative" ? (
                       /* Official Docket View */
-                      <div className="overflow-x-auto rounded-xl border border-sky-300 bg-white p-3 dark:border-sky-900 dark:bg-zinc-950">
-                        <div className="min-w-[720px]">
+                      <div className="overflow-x-auto rounded-xl border border-slate-300 bg-slate-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
+                        <div className="min-w-[960px]">
                           <ProductDocketView
-                            product={
-                              {
-                                id: Number(record.sample_request_id),
-                                sr_number: record.sr_number,
-                                material_code: record.material_code || "",
-                                product_description: record.product_description || "",
-                                customer: record.customer || "",
-                                source_sample_code: [
-                                  requestData.barcode,
-                                  requestData.customer_product_code,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" / "),
-                                brand: record.brand_name || "",
-                              } as ProductSearchResult & { brand?: string }
-                            }
+                            product={costingDocketProduct}
                             classGroups={specificationGroups}
                             containerId={`costing-docket-${record.sample_request_id}`}
                           />

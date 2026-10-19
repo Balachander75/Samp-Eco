@@ -15,6 +15,7 @@ class ProgramMaterialBase(BaseModel):
     unit: Optional[str] = None
     remark: Optional[str] = None
     samp_remark: Optional[str] = None
+    plant_remark: Optional[str] = None
     promoted_sample_request_id: Optional[int] = None
     promoted_sr_number: Optional[str] = None
 
@@ -92,6 +93,19 @@ class ProgramBatchSampRemarksUpdate(BaseModel):
 
 class SingleSampRemarkUpdate(BaseModel):
     samp_remark: Optional[str] = None
+
+
+class ProgramMaterialPlantRemarkUpdate(BaseModel):
+    material_id: int
+    plant_remark: Optional[str] = None
+
+
+class ProgramBatchPlantRemarksUpdate(BaseModel):
+    remarks: List[ProgramMaterialPlantRemarkUpdate]
+
+
+class SinglePlantRemarkUpdate(BaseModel):
+    plant_remark: Optional[str] = None
 
 
 class ProgramPauseSubmit(BaseModel):

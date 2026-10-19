@@ -8,7 +8,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import and_, func, or_, String
 from sqlalchemy.orm import Session
 
-from app.auth.permissions import is_team_head, require_any_team, require_team, user_has_team
+from app.auth.permissions import can_view_costing_claims, is_admin, is_team_head, require_any_team, require_team, user_has_team
 from app.auth.security import get_current_user
 from app.database import get_db
 from app.models.request_workflows import (
@@ -52,6 +52,16 @@ def _require_claim(state: Dict[str, Any], user, expected_stage: str) -> None:
 def _clear_claim(state: Dict[str, Any]) -> None:
     for key in ("claimedBy", "claimedByUserId", "claimedAt", "claimedStage"):
         state.pop(key, None)
+
+
+def _require_costing_claim(workflow: CostingWorkflow, user) -> None:
+    claimed_by_user_id = workflow.claimed_by_user_id
+    if claimed_by_user_id is None:
+        if not is_admin(user):
+            raise HTTPException(status_code=409, detail="Claim this Costing task before submitting it")
+        return
+    if str(claimed_by_user_id) != str(getattr(user, "id", None)) and not is_admin(user):
+        raise HTTPException(status_code=409, detail="This Costing task is claimed by another Costing teammate")
 
 
 def _snapshot(request: CreateSampleRequest) -> Dict[str, Any]:
@@ -192,9 +202,10 @@ def _get_workflow(db, model, sample_request_id: int):
     return db.query(model).filter(model.sample_request_id == sample_request_id).with_for_update().first()
 
 
-def _serialize_workflow(db, workflow, request, kind: str, log_model, logs=None):
+def _serialize_workflow(db, workflow, request, kind: str, log_model, logs=None, viewer=None):
     if logs is None:
         logs = db.query(log_model).filter(log_model.workflow_id == workflow.id).order_by(log_model.id.asc()).all()
+    can_view_claims = can_view_costing_claims(viewer)
     data = {
         "workflow_type": kind,
         "workflow_id": workflow.id,
@@ -215,14 +226,14 @@ def _serialize_workflow(db, workflow, request, kind: str, log_model, logs=None):
         "costing_creative_input_remark": request.costing_creative_input_remark,
         "logs": [{
             "id": log.id,
-            "actor_name": log.actor_name,
+            "actor_name": "Costing team" if kind == "costing" and log.action == "COSTING_TASK_CLAIMED" and not can_view_claims else log.actor_name,
             "actor_team": log.actor_team,
             "action": log.action,
             "from_stage": log.from_stage,
             "to_stage": log.to_stage,
             "from_status": log.from_status,
             "to_status": log.to_status,
-            "details": log.details or {},
+            "details": {} if kind == "costing" and log.action == "COSTING_TASK_CLAIMED" and not can_view_claims else log.details or {},
             "created_at": log.created_at.isoformat() if log.created_at else None,
         } for log in logs],
     }
@@ -244,6 +255,15 @@ def _serialize_workflow(db, workflow, request, kind: str, log_model, logs=None):
             "reviewer_name": workflow.reviewer_name,
             "reviewed_at": workflow.reviewed_at.isoformat() if workflow.reviewed_at else None,
         })
+        if viewer is not None and (is_admin(viewer) or user_has_team(viewer, "costing")):
+            data["is_claimed"] = workflow.claimed_by_user_id is not None
+            data["is_claimed_by_me"] = str(workflow.claimed_by_user_id) == str(getattr(viewer, "id", None))
+            if can_view_costing_claims(viewer):
+                data.update({
+                    "claimed_by": workflow.claimed_by,
+                    "claimed_by_user_id": workflow.claimed_by_user_id,
+                    "claimed_at": workflow.claimed_at.isoformat() if workflow.claimed_at else None,
+                })
     return data
 
 
@@ -295,7 +315,7 @@ def _create_costing_if_missing(db, request, user, stage="marketing"):
     return workflow
 
 
-def _list_workflows(db, model, log_model, kind, year, stage, limit):
+def _list_workflows(db, model, log_model, kind, year, stage, limit, viewer=None):
     query = db.query(model, CreateSampleRequest).join(
         CreateSampleRequest, CreateSampleRequest.id == model.sample_request_id
     )
@@ -332,7 +352,7 @@ def _list_workflows(db, model, log_model, kind, year, stage, limit):
         for log in logs:
             logs_by_workflow.setdefault(log.workflow_id, []).append(log)
     return [
-        _serialize_workflow(db, workflow, request, kind, log_model, logs_by_workflow.get(workflow.id, []))
+        _serialize_workflow(db, workflow, request, kind, log_model, logs_by_workflow.get(workflow.id, []), viewer)
         for workflow, request in rows
     ]
 
@@ -360,12 +380,15 @@ def submit_costing_request(sample_request_id: int, payload: Dict[str, Any] = Bod
 
     workflow = _get_workflow(db, CostingWorkflow, request.id)
     if workflow and workflow.current_stage != "marketing":
-        return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog)
+        return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog, viewer=current_user)
     if not workflow:
         workflow = _create_costing_if_missing(db, request, current_user, "marketing")
     old_stage, old_status = workflow.current_stage, workflow.status
     needs_creative = request.costing_creative_input_needed is True
     submitted_at = _now()
+    workflow.claimed_by_user_id = None
+    workflow.claimed_by = None
+    workflow.claimed_at = None
     workflow.request_data = _snapshot(request)
     workflow.current_stage = "creative" if needs_creative else "costing"
     workflow.status = "Creative Review" if needs_creative else "Costing Work"
@@ -379,7 +402,7 @@ def submit_costing_request(sample_request_id: int, payload: Dict[str, Any] = Bod
                {**workflow.request_data, "creative_due_at": workflow.creative_due_at.isoformat() if workflow.creative_due_at else None})
     db.commit()
     db.refresh(workflow)
-    return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog)
+    return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog, viewer=current_user)
 
 
 @router.post("/api/v1/workflows/costing/{sample_request_id}/release-to-costing", summary="Release a Creative-reviewed request to Costing")
@@ -395,7 +418,7 @@ def release_costing_request(sample_request_id: int, payload: Dict[str, Any] = Bo
     if not workflow:
         raise HTTPException(status_code=404, detail="Costing workflow not found")
     if workflow.current_stage == "costing":
-        return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog)
+        return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog, viewer=current_user)
     if workflow.current_stage != "creative":
         raise HTTPException(status_code=409, detail="This request is not waiting for Creative review")
 
@@ -439,6 +462,9 @@ def release_costing_request(sample_request_id: int, payload: Dict[str, Any] = Bo
 
     old_stage, old_status = workflow.current_stage, workflow.status
     workflow.request_data = _snapshot(request)
+    workflow.claimed_by_user_id = None
+    workflow.claimed_by = None
+    workflow.claimed_at = None
     workflow.current_stage = "costing"
     workflow.status = "Costing Work"
     workflow.updated_at = _now()
@@ -453,7 +479,7 @@ def release_costing_request(sample_request_id: int, payload: Dict[str, Any] = Bo
     )
     db.commit()
     db.refresh(workflow)
-    return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog)
+    return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog, viewer=current_user)
 
 
 @router.get("/api/v1/workflows/costing", summary="List costing workflow records")
@@ -461,26 +487,67 @@ def list_costing_workflows(year: Optional[str] = None, stage: Optional[str] = No
                            limit: int = Query(500, ge=1, le=2000), db: Session = Depends(get_db),
                            current_user=Depends(get_current_user)):
     require_any_team(current_user, ("marketing", "creative_studio", "costing", "samp"))
-    stage_filter = stage
-    if not stage_filter and user_has_team(current_user, "costing"):
+    all_stages = str(stage or "").strip().casefold() == "all"
+    stage_filter = None if all_stages else stage
+    if not all_stages and not stage_filter and user_has_team(current_user, "costing"):
         stage_filter = "costing"
-    elif not stage_filter and user_has_team(current_user, "creative_studio"):
+    elif not all_stages and not stage_filter and user_has_team(current_user, "creative_studio"):
         stage_filter = "creative"
-    elif not stage_filter and user_has_team(current_user, "samp"):
+    elif not all_stages and not stage_filter and user_has_team(current_user, "samp"):
         stage_filter = "sampling_review"
-    return _list_workflows(db, CostingWorkflow, CostingWorkflowLog, "costing", year, stage_filter, limit)
+    return _list_workflows(db, CostingWorkflow, CostingWorkflowLog, "costing", year, stage_filter, limit, viewer=current_user)
+
+
+@router.post("/api/v1/workflows/costing/{sample_request_id}/claim", summary="Claim an active Costing work item")
+def claim_costing_work(sample_request_id: int, db: Session = Depends(get_db),
+                       current_user=Depends(get_current_user)):
+    require_team(current_user, "costing")
+    if is_team_head(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
+    request = _get_request(db, sample_request_id)
+    workflow = _get_workflow(db, CostingWorkflow, sample_request_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Costing workflow not found")
+    if workflow.current_stage != "costing":
+        raise HTTPException(status_code=409, detail="Only active Costing work can be claimed")
+
+    previous_claim = workflow.claimed_by
+    previous_claim_user_id = workflow.claimed_by_user_id
+    if previous_claim_user_id is not None and str(previous_claim_user_id) == str(current_user.id):
+        return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog, viewer=current_user)
+    if previous_claim_user_id is not None and not is_admin(current_user):
+        raise HTTPException(status_code=409, detail="This Costing task is already claimed by another Costing teammate")
+
+    actor = _actor(current_user)
+    old_stage, old_status = workflow.current_stage, workflow.status
+    workflow.claimed_by_user_id = current_user.id
+    workflow.claimed_by = actor
+    workflow.claimed_at = _now()
+    workflow.updated_at = workflow.claimed_at
+    _write_log(
+        db, CostingWorkflowLog, workflow, request, current_user, "COSTING_TASK_CLAIMED",
+        old_stage, old_stage, old_status, old_status,
+        {"claimed_by": actor, "claimed_by_user_id": current_user.id,
+         "previous_claimed_by": previous_claim, "previous_claimed_by_user_id": previous_claim_user_id},
+    )
+    db.commit()
+    db.refresh(workflow)
+    return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog, viewer=current_user)
 
 
 @router.post("/api/v1/workflows/costing/{sample_request_id}/complete", summary="Submit costing output for Sampling review")
 def complete_costing_work(sample_request_id: int, payload: Dict[str, Any] = Body(...),
                           db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     require_team(current_user, "costing")
+    if is_team_head(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
     request = _get_request(db, sample_request_id)
     workflow = _get_workflow(db, CostingWorkflow, sample_request_id)
     if not workflow:
         raise HTTPException(status_code=409, detail="Marketing and Creative must send this request to the Costing queue first")
     if workflow.current_stage != "costing":
         raise HTTPException(status_code=409, detail="This request is not in the Costing work queue")
+    _require_costing_claim(workflow, current_user)
     if not db.query(ProductDetail.id).filter(ProductDetail.sample_request_id == request.id).first():
         raise HTTPException(status_code=422, detail="Product class specifications must be attached before completing Costing")
     output = str(payload.get("costing_output_path") or payload.get("output_path") or "").strip()
@@ -504,7 +571,7 @@ def complete_costing_work(sample_request_id: int, payload: Dict[str, Any] = Body
                {"output_path": output[:4000], "notes": note[:4000]})
     db.commit()
     db.refresh(workflow)
-    return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog)
+    return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog, viewer=current_user)
 
 
 def _list_sample_requests_for_sampling(db, year, limit):
@@ -710,6 +777,10 @@ def review_workflow(workflow_type: str, sample_request_id: int, payload: Dict[st
         if not ({"sample", "mockup"} & set(request.request_types or [])):
             request.status = workflow.status
         workflow.closed_at = None if returning else _now()
+        if returning:
+            workflow.claimed_by_user_id = None
+            workflow.claimed_by = None
+            workflow.claimed_at = None
         details = {"decision": "return" if returning else "approve", "remark": remark}
     else:
         raise HTTPException(status_code=404, detail="Unknown workflow type")

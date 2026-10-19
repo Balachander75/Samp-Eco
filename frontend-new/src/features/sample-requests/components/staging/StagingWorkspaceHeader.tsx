@@ -2,7 +2,7 @@ import React from "react";
 import {
   ArrowLeft,
   Plus,
-  Trash2,
+  X,
   Building2,
   Calendar,
   Package,
@@ -191,10 +191,10 @@ export const StagingWorkspaceHeader: React.FC<StagingWorkspaceHeaderProps> = ({
               type="button"
               onClick={onClearAll}
               disabled={isSubmittingAll}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 hover:bg-rose-100/80 dark:bg-rose-950/30 dark:hover:bg-rose-950/60 text-rose-700 dark:text-rose-400 px-2.5 text-xs font-semibold transition-colors cursor-pointer ml-1 disabled:opacity-50"
-              title="Clear all staged products"
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)] text-[var(--on-surface-muted)] px-2.5 text-xs font-semibold transition-colors cursor-pointer ml-1 disabled:opacity-50"
+              title="Clear staging; saved request drafts remain available in Drafts"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <X className="h-3.5 w-3.5" />
               <span>Clear</span>
             </button>
           )}

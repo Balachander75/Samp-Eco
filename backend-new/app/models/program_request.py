@@ -99,6 +99,9 @@ class ProgramMaterialSpecification(Base):
     # SAMP team evaluation remark (populated during view mode review)
     samp_remark = Column(Text, nullable=True)
 
+    # Plant team evaluation / capacity remark (populated during view mode review)
+    plant_remark = Column(Text, nullable=True)
+
     # Link to commercial Sample Request if promoted
     promoted_sample_request_id = Column(Integer, ForeignKey("create_sample_requests.id", ondelete="SET NULL"), nullable=True, index=True)
     promoted_sr_number = Column(String(50), nullable=True)

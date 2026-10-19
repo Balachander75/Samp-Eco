@@ -36,7 +36,7 @@ export interface DataTableProps<T> {
   sortField?: string | null;
   sortDirection?: "asc" | "desc";
   onSortChange?: (field: string) => void;
-  // Kept for API compatibility but unused — density is always normal
+  // Legacy API compatibility; use density to control the rendered spacing.
   defaultDensity?: "compact" | "comfortable";
   // Pagination
   currentPage?: number;
@@ -45,6 +45,8 @@ export interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   // Table custom styles
   tableClassName?: string;
+  containerClassName?: string;
+  density?: "compact" | "normal";
   // Toolbar slots
   toolbarLeft?: React.ReactNode;
   toolbarRight?: React.ReactNode;
@@ -70,6 +72,8 @@ export function DataTable<T>({
   totalCount,
   onPageChange,
   tableClassName,
+  containerClassName,
+  density = "normal",
   toolbarLeft,
   toolbarRight,
 }: DataTableProps<T>) {
@@ -125,8 +129,8 @@ export function DataTable<T>({
       </div>
 
       {/* Main Table Container */}
-      <div className="flex-1 overflow-auto min-h-0 relative">
-        <table className={`w-full text-left text-[13px] border-collapse ${tableClassName ?? "min-w-[1080px]"}`}>
+      <div className={`flex-1 min-h-0 relative ${containerClassName ?? "overflow-auto"}`}>
+        <table className={`w-full text-left ${density === "compact" ? "text-[12px]" : "text-[13px]"} border-collapse ${tableClassName ?? "min-w-[1080px]"}`}>
           {/* Sticky Header */}
           <thead className="sticky top-0 z-20 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] shadow-2xs">
             <tr>
@@ -161,7 +165,8 @@ export function DataTable<T>({
                     key={col.id}
                     onClick={() => col.sortable && onSortChange && onSortChange(col.id)}
                     className={[
-                      "px-3 py-2 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.045em] text-[var(--text-muted)]",
+                      density === "compact" ? "px-2 py-1.5" : "px-3 py-2",
+                      `whitespace-nowrap ${density === "compact" ? "text-[10px]" : "text-[11px]"} font-semibold uppercase tracking-[0.045em] text-[var(--text-muted)]`,
                       col.width ?? "",
                       col.sortable
                         ? "cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 group select-none transition-colors"
@@ -206,7 +211,7 @@ export function DataTable<T>({
                     </td>
                   )}
                   {columns.map((_col, cIdx) => (
-                    <td key={cIdx} className="px-4 py-2.5">
+                    <td key={cIdx} className={density === "compact" ? "px-2 py-1.5" : "px-4 py-2.5"}>
                       <div
                         className={`h-3.5 bg-[var(--surface-low)] rounded ${
                           cIdx === 0 ? "w-3/4" : cIdx % 3 === 0 ? "w-2/5" : "w-3/5"
@@ -292,7 +297,7 @@ export function DataTable<T>({
                         <td
                           key={col.id}
                           className={[
-                            "px-3 py-2",
+                            density === "compact" ? "px-2 py-1.5" : "px-3 py-2",
                             col.width ?? "",
                             col.align === "right"
                               ? "text-right"

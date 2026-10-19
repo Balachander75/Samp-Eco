@@ -20,12 +20,16 @@ import {
   recordMarketingDesignDecisionApi,
   requestPostDesignDeliverablesApi,
   claimDesignRequestApi,
+  releaseDesignRequestClaimApi,
   proposeDesignCounterDateApi,
   decideDesignCounterDateApi,
   addDesignWorkflowNoteApi,
   mapDesignRequestToSampleRequest,
 } from "@/infrastructure/api/sampleRequestsApi";
 import { StatusPill } from "@/components/ui/StatusPill";
+import type { UserProfile } from "@/features/auth/types";
+import { isAdmin as isAdminUser, isReadOnlyTeamHead } from "@/features/auth/permissions";
+import { readAuthUser } from "@/lib/session";
 import {
   mergeWithWorkflowState,
   checkCounterDateSla,
@@ -110,6 +114,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   showToast,
 }) => {
   const navigate = useNavigate();
+  const currentUser = useMemo(() => readAuthUser<UserProfile>(), []);
+  const isGlobalAdmin = isAdminUser(currentUser);
   // ── HOOKS DECLARED UNCONDITIONALLY AT THE TOP ──
   const [activeTab, setActiveTab] = useState<TabType>("specs");
   const [copiedCode, setCopiedCode] = useState(false);
@@ -177,6 +183,19 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     return mergeWithWorkflowState(request);
   }, [request, localOverride, workflowVersion]);
 
+  const hasVerifiedClaimOwnership = Boolean(
+    activeRequest?.claimedByUserId != null && currentUser?.id != null &&
+    String(activeRequest.claimedByUserId) === String(currentUser.id)
+  );
+  const isLegacyClaimForCurrentUser = Boolean(
+    activeRequest?.claimedBy && activeRequest.claimedByUserId == null &&
+    (activeRequest.claimedBy === currentUser?.name || activeRequest.claimedBy === currentUser?.userid)
+  );
+  const isClaimedByCurrentUser = hasVerifiedClaimOwnership || isLegacyClaimForCurrentUser;
+  const canReleaseClaim = Boolean(activeRequest?.claimedBy) &&
+    (isGlobalAdmin || hasVerifiedClaimOwnership) &&
+    !isReadOnlyTeamHead(currentUser);
+
   // SLA Calculation for 48h Counter-Date Negotiation
   const slaStatus = useMemo(() => {
     if (!activeRequest) return { isEligible: false, hoursRemaining: 0, label: "Expired", deadlineIso: "" };
@@ -221,6 +240,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const [mockupHandoffDialog, setMockupHandoffDialog] = useState<"missing_stock" | "product_required" | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [isReleasingClaim, setIsReleasingClaim] = useState(false);
   const [isPostingNote, setIsPostingNote] = useState(false);
 
   // Chatter State
@@ -620,7 +640,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
   const handleClaim = async () => {
     if (isClaiming || !activeRequest || !effectiveDesignId) return;
-    const name = "Creative Designer (Studio)";
+    const name = currentUser?.name || currentUser?.userid || "Creative Designer (Studio)";
     setIsClaiming(true);
     setWorkflowError(null);
     try {
@@ -630,13 +650,37 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       if (onRefresh) await onRefresh();
     } catch (err: any) {
       setWorkflowError(err?.message || "Could not claim this task.");
+      if (onRefresh) {
+        try {
+          await onRefresh();
+        } catch {
+          // Keep the claim conflict visible; the request list can be refreshed manually.
+        }
+      }
     } finally {
       setIsClaiming(false);
     }
   };
 
+  const handleReleaseClaim = async () => {
+    if (!activeRequest || !effectiveDesignId || !canReleaseClaim || isReleasingClaim) return;
+    setIsReleasingClaim(true);
+    setWorkflowError(null);
+    try {
+      const saved = await releaseDesignRequestClaimApi(effectiveDesignId);
+      applyWorkflowResponse(saved);
+      if (showToast) showToast("Creative claim released. The task is available to the team.");
+      if (onRefresh) await onRefresh();
+    } catch (error: any) {
+      setWorkflowError(error?.message || "Could not release this Creative claim.");
+    } finally {
+      setIsReleasingClaim(false);
+    }
+  };
+
   const handleProposeCounterDate = async (proposedDate: string, reason: string) => {
     if (!activeRequest || !effectiveDesignId) throw new Error("Design request reference ID could not be resolved.");
+    if (!hasVerifiedClaimOwnership) throw new Error("Confirm the assigned claim before proposing a counter date.");
     const saved = await proposeDesignCounterDateApi(effectiveDesignId, proposedDate, reason, activeRequest.claimedBy || undefined);
     applyWorkflowResponse(saved);
     if (showToast) showToast("Counter target date proposed to Marketing!");
@@ -691,8 +735,10 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       setSubmitError("This design request is missing its backend reference. Refresh the request and try again.");
       return;
     }
-    if (!activeRequest.claimedBy) {
-      setSubmitError("Claim this design task before submitting artwork.");
+    if (!hasVerifiedClaimOwnership) {
+      setSubmitError(activeRequest.claimedBy
+        ? `This task is assigned to ${activeRequest.claimedBy}. Only the assigned designer can submit artwork.`
+        : "Claim this design task before submitting artwork.");
       return;
     }
     if (!designFileUrl.trim()) {
@@ -717,7 +763,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
             remarks: row.remarks.trim(),
           })),
         },
-        activeRequest.claimedBy
+        activeRequest.claimedBy || undefined
       );
       applyWorkflowResponse(saved);
       setShowSubmitForm(false);
@@ -919,7 +965,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   );
   const requestStageLabel = String(activeRequest.designRequestStatus || activeRequest.status || "").toLowerCase();
   const isCreativeWorkStage = activeStage === 1 || requestStageLabel.includes("target date counter proposed");
-  const canSubmitCreativeOutput = mode === "creative" && isCreativeWorkStage && !isAwaitingReview && !isClosed && remainingCount > 0;
+  const canSubmitCreativeOutput = mode === "creative" && !isReadOnlyTeamHead(currentUser) && hasVerifiedClaimOwnership && isCreativeWorkStage && !isAwaitingReview && !isClosed && remainingCount > 0;
   const canCloseInspector = !isSubmittingOutput && !isDeciding && !isPostingNote && !isAddingFollowups;
 
   return createPortal(
@@ -1092,7 +1138,9 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                     requestedCount={requestedCount}
                     isCounterDatePending={isCounterDatePending}
                     slaStatus={slaStatus}
+                    canProposeCounterDate={!isReadOnlyTeamHead(currentUser) && hasVerifiedClaimOwnership && slaStatus.isEligible}
                     onOpenCounterDateModal={() => {
+                      if (isReadOnlyTeamHead(currentUser) || !hasVerifiedClaimOwnership || !slaStatus.isEligible) return;
                       setWorkflowError(null);
                       setIsCounterDateModalOpen(true);
                     }}
@@ -1118,12 +1166,19 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                   {/* Task Ownership & Claim Strip */}
                   <DesignClaimStrip
                     claimedBy={activeRequest.claimedBy}
+                    isClaimedByCurrentUser={isClaimedByCurrentUser}
                     claimedAt={activeRequest.claimedAt}
                     isCreativeMode={mode === "creative"}
+                    canReleaseClaim={canReleaseClaim}
+                    canRefreshLegacyClaim={mode === "creative" && !isReadOnlyTeamHead(currentUser) && isClaimedByCurrentUser && activeRequest.claimedByUserId == null}
+                    isReleasingClaim={isReleasingClaim}
+                    onReleaseClaim={handleReleaseClaim}
                     isClaiming={isClaiming}
-                    canClaim={isCreativeWorkStage && slaStatus.isEligible}
+                    canClaim={!isReadOnlyTeamHead(currentUser) && isCreativeWorkStage && slaStatus.isEligible}
                     claimDisabledReason={
-                      isCreativeWorkStage
+                      isReadOnlyTeamHead(currentUser)
+                        ? "Team head access is read-only."
+                        : isCreativeWorkStage
                         ? slaStatus.label
                         : "This design request must be released to Creative before it can be claimed."
                     }
