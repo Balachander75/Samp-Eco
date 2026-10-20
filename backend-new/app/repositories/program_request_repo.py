@@ -46,9 +46,10 @@ class ProgramRequestRepository(BaseRepository[ProgramRequest]):
                 start, end = date_range
                 start_dt = datetime.combine(start, time.min, tzinfo=timezone.utc)
                 end_dt = datetime.combine(end, time.min, tzinfo=timezone.utc)
-                _, second_yr = clean_year.split("-")
+                first_yr, second_yr = clean_year.split("-")
                 query = query.filter(or_(
                     ProgramRequest.program_year == clean_year,
+                    ProgramRequest.program_year == first_yr,
                     ProgramRequest.program_year == second_yr,
                     and_(
                         or_(

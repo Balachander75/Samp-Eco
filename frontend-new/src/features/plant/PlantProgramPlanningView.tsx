@@ -13,6 +13,7 @@ import {
   Calendar,
   User,
 } from "lucide-react";
+import { usePlant } from "@/context/PlantContext";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { Select } from "@/components/ui/Select";
 import { DataTable, type ColumnDef, DeskWorkspaceLayout } from "@/components/erp";
@@ -91,11 +92,13 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
     return requests.filter((r) => {
       const mode = String(r.creationMode || "").toLowerCase();
       const kind = String(r.requestKind || "").toLowerCase();
+      const code = String(r.requestCode || "").toLowerCase();
       const sr = String(r.srNumber || "").toLowerCase();
       const mat = String(r.materialCode || "").toLowerCase();
       return (
         kind === "program" ||
         mode === "program_planning" ||
+        code.startsWith("pp-") ||
         sr.includes("-pg-") ||
         mat.includes("pg-") ||
         getRequestTrackType(r) === "program_planning"
@@ -103,13 +106,13 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
     });
   }, [requests]);
 
+  const { matchesPlant } = usePlant();
+
   // Filter by selectedPlant if not "ALL"
   const plantScopedRequests = useMemo(() => {
     if (!selectedPlant || selectedPlant === "ALL") return programRequests;
-    return programRequests.filter(
-      (r) => (r.targetPlant || "").toLowerCase() === selectedPlant.toLowerCase()
-    );
-  }, [programRequests, selectedPlant]);
+    return programRequests.filter((r) => matchesPlant(r.targetPlant));
+  }, [programRequests, selectedPlant, matchesPlant]);
 
   // Unique customer list
   const customerList = useMemo(() => {

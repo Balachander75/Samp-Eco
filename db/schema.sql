@@ -808,7 +808,7 @@ ALTER SEQUENCE public.program_material_specifications_id_seq OWNED BY public.pro
 CREATE TABLE public.program_requests (
     id integer NOT NULL,
     request_code character varying(32) NOT NULL,
-    sr_number character varying(32) NOT NULL,
+    sr_number character varying(32),
     customer_name character varying(255) NOT NULL,
     target_plant character varying(255) NOT NULL,
     program_campaign_title character varying(255) NOT NULL,

@@ -39,7 +39,7 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
   onSubmit,
   customers: propCustomers,
   existingCustomers = [],
-  defaultPlant = "Navneet - Khaniwade",
+  defaultPlant = "1505 - Khaniwade",
 }) => {
   const requestCodeYear = String(getBusinessYearInfo().startYear).slice(-2);
   const { customers: dbCustomers } = useMasterData(isOpen);
@@ -178,7 +178,7 @@ export const NewFeasibilityModal: React.FC<NewFeasibilityModalProps> = ({
       referenceImages: uploadedImages.map((img) => img.url),
       referenceImageNames: uploadedImages.map((img) => img.name),
       referenceLinks: webLinks,
-      targetPlant: defaultPlant || "Navneet - Khaniwade",
+      targetPlant: defaultPlant || "1505 - Khaniwade",
     };
 
     setIsSubmitting(true);

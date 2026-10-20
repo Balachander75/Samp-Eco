@@ -104,6 +104,24 @@ export const InspectorSheetHeader: React.FC<InspectorSheetHeaderProps> = ({
               )}
             </p>
 
+            {/* Seasonal Program Reference Badge */}
+            {(activeRequest.programName || activeRequest.creationMode === "program_planning") && (
+              <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-800/40 text-indigo-950 dark:text-indigo-200 shadow-2xs text-xs">
+                <span className="text-[10px] font-mono uppercase font-bold text-indigo-600 dark:text-indigo-400 tracking-wider">
+                  Seasonal Reference
+                </span>
+                <span className="font-bold font-display">{activeRequest.programName || "Seasonal Program"}</span>
+                {activeRequest.programYear && (
+                  <span className="font-mono text-[11px] opacity-75">({activeRequest.programYear})</span>
+                )}
+                {activeRequest.sourceSampleCode && (
+                  <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-200 font-bold">
+                    Ref: {activeRequest.sourceSampleCode}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Merchandising Category Breadcrumb Bar (Commercial Taxonomy - Distinct from Technical SAP Specs) */}
             {!isMockup && (activeRequest.productCategory || activeRequest.productSubCategory || activeRequest.productThirdCategory) && (
               <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">

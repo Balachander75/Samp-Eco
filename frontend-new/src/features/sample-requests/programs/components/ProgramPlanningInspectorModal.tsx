@@ -1,3 +1,4 @@
+import { Ban, Loader2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { UserProfile } from "@/features/auth";
@@ -7,11 +8,11 @@ import {
   markProgramSeenApi,
   mapProgramRequestToSampleRequest,
   submitProgramOutputApi,
-  pinProgramActivityApi,
-  replyToProgramActivityApi,
   claimProgramTaskApi,
   addProgramMaterialApi,
+  deleteProgramMaterialApi,
   pauseProgramRequestApi,
+  dismantleProgramRequestApi,
 } from "@/infrastructure/api/programsApi";
 
 // Modular Sub-Components matching Feasibility Inspector
@@ -20,7 +21,6 @@ import { ProgramPlanningSheetHeader } from "./ProgramPlanningSheetHeader";
 import { ProgramPlanningMaterialMatrixTab } from "./ProgramPlanningMaterialMatrixTab";
 import { ProgramPlanningSampReviewTab } from "./ProgramPlanningSampReviewTab";
 import { ProgramPlanningPlantReviewTab } from "./ProgramPlanningPlantReviewTab";
-import { ProgramPlanningMarketingTab } from "./ProgramPlanningMarketingTab";
 import { ProgramPlanningChatterFeed } from "./ProgramPlanningChatterFeed";
 
 export interface ProgramPlanningInspectorModalProps {
@@ -35,7 +35,7 @@ export interface ProgramPlanningInspectorModalProps {
   onRefresh?: () => Promise<void>;
 }
 
-export type ProgramInspectorTab = "matrix" | "samp" | "plant" | "marketing";
+export type ProgramInspectorTab = "matrix" | "samp" | "plant";
 
 export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorModalProps> = ({
   request,
@@ -160,23 +160,6 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
     await onRefresh?.();
   };
 
-  // Pin output handler
-  const handlePinActivity = async (activityId: number, pinned: boolean) => {
-    if (!activeRequest?.id) return;
-    const updated = await pinProgramActivityApi(activeRequest.id, activityId, pinned);
-    setLocalOverride(mapProgramRequestToSampleRequest(updated));
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-    await onRefresh?.();
-  };
-
-  // Reply to output handler
-  const handleReplyActivity = async (activityId: number, remark: string) => {
-    if (!activeRequest?.id) return;
-    const updated = await replyToProgramActivityApi(activeRequest.id, activityId, { remark });
-    setLocalOverride(mapProgramRequestToSampleRequest(updated));
-    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
-    await onRefresh?.();
-  };
 
   // Add SKU Material specification row
   const handleAddMaterial = async (payload: AddProgramMaterialPayload) => {
@@ -199,10 +182,58 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
     }
   };
 
+
+
+  const [isDeletingMaterial, setIsDeletingMaterial] = useState<string | number | null>(null);
+
+  // Delete SKU Material specification row
+  const handleDeleteMaterial = async (materialId: number | string) => {
+    if (!activeRequest?.id || isDeletingMaterial) return;
+    setIsDeletingMaterial(materialId);
+    try {
+      const updated = await deleteProgramMaterialApi(activeRequest.id, materialId);
+      setLocalOverride(mapProgramRequestToSampleRequest(updated));
+      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
+    } catch (err) {
+      console.error("Failed to delete material line:", err);
+      throw err;
+    } finally {
+      setIsDeletingMaterial(null);
+    }
+  };
+
+
+  const [isDismantleModalOpen, setIsDismantleModalOpen] = useState(false);
+  const [dismantleReason, setDismantleReason] = useState("");
+  const [isDismantling, setIsDismantling] = useState(false);
+  const [dismantleError, setDismantleError] = useState<string | null>(null);
+
+  const handleConfirmDismantle = async () => {
+    if (!activeRequest?.id || isDismantling) return;
+    setIsDismantling(true);
+    setDismantleError(null);
+    try {
+      const updated = await dismantleProgramRequestApi(activeRequest.id, dismantleReason);
+      setLocalOverride(mapProgramRequestToSampleRequest(updated));
+      setIsDismantleModalOpen(false);
+      setDismantleReason("");
+      window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+      await onRefresh?.();
+    } catch (err: any) {
+      setDismantleError(err?.message || "Failed to dismantle program.");
+    } finally {
+      setIsDismantling(false);
+    }
+  };
+
   const [isTogglingPause, setIsTogglingPause] = useState(false);
   const userTeam = (effectiveUser?.team || user?.team || "").toLowerCase();
-  const isMarketing = userTeam === "marketing" || mode === "marketing";
-  const canPause = !readOnly && isMarketing;
+  const isAdmin = effectiveUser?.role?.toLowerCase() === "admin" || _userRole === "admin";
+  const isMarketing = userTeam === "marketing" || mode === "marketing" || isAdmin;
+  const isDismantled = activeRequest?.status === "Dismantled";
+  const canPause = isMarketing && !isDismantled;
+  const canDismantle = isMarketing && !isDismantled;
 
   const handleTogglePause = async () => {
     if (!activeRequest?.id || isTogglingPause) return;
@@ -225,13 +256,11 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
   const materials = activeRequest.programMaterials || [];
   const hasSampNote = Boolean(activeRequest.samplingRemark?.trim());
   const hasPlantNote = Boolean(activeRequest.plantRemark?.trim());
-  const pinnedCount = ((activeRequest.activities || []) as any[]).filter(
-    (act) => act.pinned_by_marketing || act.pinnedByMarketing
-  ).length;
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-3 bg-slate-950/75 backdrop-blur-sm select-text animate-in fade-in duration-150"
+    <>
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-3 bg-slate-950/75 backdrop-blur-sm select-text animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -246,180 +275,227 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
           copiedCode={copiedCode}
           onClose={onClose}
           onCopyCode={handleCopyCode}
-          readOnly={readOnly}
+          readOnly={readOnly || isDismantled}
           canPause={canPause}
           isTogglingPause={isTogglingPause}
           onTogglePause={handleTogglePause}
+          canDismantle={canDismantle}
+          isDismantling={isDismantling}
+          onDismantle={() => {
+            setDismantleReason("");
+            setDismantleError(null);
+            setIsDismantleModalOpen(true);
+          }}
           mode={mode}
         />
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG CHATTER) */}
         <div className="flex-1 flex overflow-hidden min-h-0">
           {/* LEFT: WORKSPACE CANVAS */}
-          <div className="flex-1 overflow-y-auto p-3 sm:p-3.5 space-y-2.5 bg-[var(--bg-app)] min-w-0">
-            {/* Dual Sign-Off Executive Snapshot */}
-            <ProgramPlanningSheetHeader
-              activeRequest={activeRequest}
-              mode={mode}
-              onNavigateToTab={(tab) => setActiveTab(tab)}
-              onClaimTask={handleClaimTask}
-              isClaiming={isClaiming}
-              currentUser={effectiveUser}
-              isAdmin={effectiveUser?.role?.toLowerCase() === "admin"}
-            />
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)] min-w-0">
+            <div className="max-w-6xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
+              {/* ── 1. PRIMARY SECTION TABS (TOP) ── */}
+              <div className="px-6 sm:px-8 pt-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
+                <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
+                  {/* Tab 1: Substrate Matrix */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("matrix")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "matrix"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <span>1. Substrate &amp; SKU Matrix</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--surface-base)] text-[var(--on-surface)] border border-[var(--border-subtle)]">
+                      {materials.length} {materials.length === 1 ? "SKU" : "SKUs"}
+                    </span>
+                  </button>
 
-            {/* Sleek Segmented Tab Strip */}
-            <div className="flex items-center gap-1 p-1 bg-[var(--surface-low)] rounded-xl border border-[var(--border-subtle)] overflow-x-auto shadow-2xs shrink-0">
-              {/* Tab 1: Substrate Matrix */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("matrix")}
-                className={`px-3 py-1.5 rounded-lg font-display text-xs transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                  activeTab === "matrix"
-                    ? "bg-[var(--surface-lowest)] text-[var(--accent-primary)] font-bold shadow-2xs border border-[var(--border-subtle)]"
-                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50 border border-transparent"
-                }`}
-              >
-                <span>1. Substrate Matrix</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
-                  activeTab === "matrix"
-                    ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]"
-                    : "bg-[var(--surface-base)] text-[var(--on-surface-muted)]"
-                }`}>
-                  {materials.length} SKUs
-                </span>
-              </button>
+                  {/* Tab 2: Sampling Team Review */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("samp")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "samp"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <span>2. Sampling Team Review</span>
+                    {hasSampNote ? (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        ✓ Reviewed
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-base)] text-[var(--on-surface-muted)]">
+                        {activeRequest.samplingClaimedBy ? "In Review" : "Pending Claim"}
+                      </span>
+                    )}
+                  </button>
 
-              {/* Tab 2: SAMP Technical Review */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("samp")}
-                className={`px-3 py-1.5 rounded-lg font-display text-xs transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                  activeTab === "samp"
-                    ? "bg-[var(--surface-lowest)] text-emerald-700 dark:text-emerald-400 font-bold shadow-2xs border border-[var(--border-subtle)]"
-                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50 border border-transparent"
-                }`}
-              >
-                <span>2. SAMP Review Details</span>
-                {hasSampNote ? (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                    ✓ Reviewed
-                  </span>
-                ) : (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-[var(--surface-base)] text-[var(--on-surface-subtle)]">
-                    {activeRequest.samplingSeenAt ? "In Review" : "Pending"}
-                  </span>
-                )}
-              </button>
+                  {/* Tab 3: Plant Production Review */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("plant")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "plant"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <span>3. Plant Production Review</span>
+                    {hasPlantNote ? (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                        ✓ Confirmed
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-base)] text-[var(--on-surface-muted)]">
+                        {activeRequest.plantClaimedBy ? "In Review" : "Pending Claim"}
+                      </span>
+                    )}
+                  </button>
 
-              {/* Tab 3: Plant Feasibility */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("plant")}
-                className={`px-3 py-1.5 rounded-lg font-display text-xs transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                  activeTab === "plant"
-                    ? "bg-[var(--surface-lowest)] text-teal-700 dark:text-teal-400 font-bold shadow-2xs border border-[var(--border-subtle)]"
-                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50 border border-transparent"
-                }`}
-              >
-                <span>3. Plant Capacity</span>
-                {hasPlantNote ? (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20">
-                    ✓ Confirmed
-                  </span>
-                ) : (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-[var(--surface-base)] text-[var(--on-surface-subtle)]">
-                    {activeRequest.plantSeenAt ? "In Review" : "Pending"}
-                  </span>
-                )}
-              </button>
+                </div>
+              </div>
 
-              {/* Tab 4: Marketing Directives */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("marketing")}
-                className={`px-3 py-1.5 rounded-lg font-display text-xs transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                  activeTab === "marketing"
-                    ? "bg-[var(--surface-lowest)] text-[var(--accent-primary)] font-bold shadow-2xs border border-[var(--border-subtle)]"
-                    : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-lowest)]/50 border border-transparent"
-                }`}
-              >
-                <span>4. Directives</span>
-                {pinnedCount > 0 ? (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/20">
-                    {pinnedCount} Pinned
-                  </span>
-                ) : (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-[var(--surface-base)] text-[var(--on-surface-subtle)]">
-                    {hasSampNote || hasPlantNote ? "Ready" : "Overview"}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* Tab 1 Content: Material Allocation Matrix */}
-            {activeTab === "matrix" && (
-              <ProgramPlanningMaterialMatrixTab
+              {/* ── 2. COMPACT HERO HEADER ── */}
+              <ProgramPlanningSheetHeader
                 activeRequest={activeRequest}
                 mode={mode}
-                readOnly={readOnly}
                 onNavigateToTab={(tab) => setActiveTab(tab)}
-                onAddMaterial={handleAddMaterial}
-                onRefreshData={handleRefreshData}
                 onClaimTask={handleClaimTask}
                 isClaiming={isClaiming}
                 currentUser={effectiveUser}
+                isAdmin={effectiveUser?.role?.toLowerCase() === "admin"}
               />
-            )}
 
-            {/* Tab 2 Content: SAMP Technical Review */}
-            {activeTab === "samp" && (
-              <ProgramPlanningSampReviewTab
-                activeRequest={activeRequest}
-                mode={mode}
-                readOnly={readOnly}
-                onSaveOutput={handleSaveOutput}
-                onRefreshData={handleRefreshData}
-                onClaimTask={handleClaimTask}
-                isClaiming={isClaiming}
-                currentUser={effectiveUser}
-              />
-            )}
+              {/* ── 3. ACTIVE TAB CONTENT ── */}
+              <div className="px-6 sm:px-8 pb-6 pt-3">
+                {activeTab === "matrix" && (
+                  <ProgramPlanningMaterialMatrixTab
+                    activeRequest={activeRequest}
+                    mode={mode}
+                    readOnly={readOnly}
+                    onNavigateToTab={(tab) => setActiveTab(tab)}
+                    onAddMaterial={handleAddMaterial}
+                    onDeleteMaterial={handleDeleteMaterial}
+                    onRefreshData={handleRefreshData}
+                    onClaimTask={handleClaimTask}
+                    isClaiming={isClaiming}
+                    currentUser={effectiveUser}
+                  />
+                )}
 
-            {/* Tab 3 Content: Plant Feasibility & Capacity */}
-            {activeTab === "plant" && (
-              <ProgramPlanningPlantReviewTab
-                activeRequest={activeRequest}
-                mode={mode}
-                readOnly={readOnly}
-                onSaveOutput={handleSaveOutput}
-                onRefreshData={handleRefreshData}
-                onClaimTask={handleClaimTask}
-                isClaiming={isClaiming}
-                currentUser={effectiveUser}
-              />
-            )}
+                {activeTab === "samp" && (
+                  <ProgramPlanningSampReviewTab
+                    activeRequest={activeRequest}
+                    mode={mode}
+                    readOnly={readOnly}
+                    onSaveOutput={handleSaveOutput}
+                    onRefreshData={handleRefreshData}
+                    onClaimTask={handleClaimTask}
+                    isClaiming={isClaiming}
+                    currentUser={effectiveUser}
+                  />
+                )}
 
-            {/* Tab 4 Content: Marketing Review & Directives */}
-            {activeTab === "marketing" && (
-              <ProgramPlanningMarketingTab
-                activeRequest={activeRequest}
-                mode={mode}
-                readOnly={readOnly}
-                onPinActivity={handlePinActivity}
-                onReplyActivity={handleReplyActivity}
-              />
-            )}
+                {activeTab === "plant" && (
+                  <ProgramPlanningPlantReviewTab
+                    activeRequest={activeRequest}
+                    mode={mode}
+                    readOnly={readOnly}
+                    onSaveOutput={handleSaveOutput}
+                    onRefreshData={handleRefreshData}
+                    onClaimTask={handleClaimTask}
+                    isClaiming={isClaiming}
+                    currentUser={effectiveUser}
+                  />
+                )}
+
+              </div>
+            </div>
           </div>
 
           {/* RIGHT: TIME LOG CHATTER FEED PANEL */}
           <ProgramPlanningChatterFeed
             activeRequest={activeRequest}
             onNoteAdded={handleRefreshData}
+            currentUser={effectiveUser}
           />
         </div>
       </div>
-    </div>,
+    </div>
+
+      {/* ── Confirm Dismantle Program Modal ── */}
+      {isDismantleModalOpen && (
+        <div
+          className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs select-text animate-in fade-in duration-150"
+          onClick={() => !isDismantling && setIsDismantleModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md bg-[var(--surface-base)] border border-rose-300 dark:border-rose-800 rounded-2xl shadow-[0_24px_70px_-12px_rgba(225,29,72,0.25)] overflow-hidden p-5 space-y-4"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-600 flex items-center justify-center shrink-0">
+                <Ban className="w-5 h-5 stroke-[2.5]" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
+                  Dismantle Program Plan?
+                </h3>
+                <p className="text-xs text-[var(--on-surface-muted)] mt-0.5">
+                  This action is permanent and cannot be undone. Once dismantled, the program is completely terminated and CANNOT be resumed.
+                </p>
+              </div>
+            </div>
+
+            {dismantleError && (
+              <div className="p-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 text-xs">
+                {dismantleError}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                Dismantle Reason (Optional)
+              </label>
+              <textarea
+                rows={2}
+                value={dismantleReason}
+                onChange={(e) => setDismantleReason(e.target.value)}
+                placeholder="e.g. Seasonal campaign cancelled by customer / budget constraints"
+                className="w-full p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[var(--border-subtle)]">
+              <button
+                type="button"
+                onClick={() => setIsDismantleModalOpen(false)}
+                disabled={isDismantling}
+                className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] transition cursor-pointer"
+              >
+                Keep Active
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDismantle}
+                disabled={isDismantling}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+              >
+                {isDismantling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                <span>{isDismantling ? "Dismantling..." : "Confirm & Dismantle"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>,
     document.body
   );
 };

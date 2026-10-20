@@ -14,7 +14,7 @@ export interface FeasibilityCommercialDecisionTabProps {
   onDecisionRemarkChange: (val: string) => void;
   onMarketingFinalApprove: (approved: boolean) => void;
   onCounterDateDecision: (accepted: boolean) => void;
-  onConvertToSampling: (requestTypes: Array<"sample" | "mockup">) => void;
+  onConvertToSampling: (requestTypes: Array<"sample" | "mockup" | "costing">) => void;
 }
 
 export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDecisionTabProps> = ({
@@ -31,12 +31,12 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
   onConvertToSampling,
 }) => {
   const navigate = useNavigate();
-  const [selectedTypes, setSelectedTypes] = React.useState<Array<"sample" | "mockup">>(["sample"]);
+  const [selectedTypes, setSelectedTypes] = React.useState<Array<"sample" | "mockup" | "costing">>(["sample"]);
   const [copiedSr, setCopiedSr] = React.useState(false);
   const canCreateNextRequest =
     canMakeCommercialDecision && activeRequest.marketingDecision === "Accepted" && !isConverting;
 
-  const toggleType = (type: "sample" | "mockup") => {
+  const toggleType = (type: "sample" | "mockup" | "costing") => {
     setSelectedTypes((prev) => {
       if (prev.includes(type)) {
         return prev.filter((t) => t !== type);
@@ -62,7 +62,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                 className="text-sm font-display font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5"
               >
                 <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                <span>Marketing Action Needed: SAMP Lab Proposed a Revised Date</span>
+                <span>Marketing Action Needed: Sampling Team Proposed a Revised Date</span>
               </h3>
               <p className="mt-1 text-xs text-[var(--on-surface-muted)]">
                 The technical review is paused while this date proposal is pending. Decide within 4
@@ -159,7 +159,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
               Technical Review Must Be Completed First
             </h3>
             <p className="text-xs text-[var(--on-surface-muted)] max-w-md mx-auto mt-1 leading-relaxed">
-              Commercial sign-off unlocks as soon as the SAMP Lab records their technical verdict
+              Commercial sign-off unlocks as soon as the Sampling Team records their technical verdict
               (Feasible / Conditional / Not Feasible).
             </p>
           </div>
@@ -221,7 +221,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
 
                 {activeRequest.samplingFeasibilityResponse === "No" && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
-                    SAMP Lab evaluated this request as <strong>Not Feasible</strong>. Marketing may
+                    Sampling Team evaluated this request as <strong>Not Feasible</strong>. Marketing may
                     record an exception for audit purposes, but this will not allow a Sample or Mockup
                     request to be created. Add the business justification below if accepting.
                   </div>
@@ -396,9 +396,31 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                       </div>
                       <span>Mockup Request</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleType("costing")}
+                      disabled={!canCreateNextRequest}
+                      className={`inline-flex select-none items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition cursor-pointer ${
+                        selectedTypes.includes("costing")
+                          ? "bg-[var(--accent-primary)]/15 border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold shadow-2xs"
+                          : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)]"
+                      } ${!canCreateNextRequest ? "opacity-60 cursor-not-allowed" : ""}`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded-md border flex items-center justify-center transition ${
+                          selectedTypes.includes("costing")
+                            ? "bg-[var(--accent-primary)] border-[var(--accent-primary)] text-white"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-base)]"
+                        }`}
+                      >
+                        {selectedTypes.includes("costing") && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <span>Costing Request</span>
+                    </button>
                   </div>
                   <p className="text-[11px] text-[var(--on-surface-subtle)]">
-                    You can request Mockup, Sampling, or both together.
+                    You can request Sample, Mockup, Costing, or any combination together.
                   </p>
                   {conversionError && (
                     <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
@@ -427,11 +449,9 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                         ? "Opening Product Staging..."
                         : selectedTypes.length === 0
                         ? "Select at least one request type"
-                        : selectedTypes.includes("sample") && selectedTypes.includes("mockup")
-                        ? "Continue to Sample & Mockup staging"
-                        : selectedTypes.includes("sample")
-                        ? "Continue to Sample staging"
-                        : "Continue to Mockup staging"}
+                        : `Continue to ${selectedTypes
+                            .map((t) => (t === "sample" ? "Sample" : t === "mockup" ? "Mockup" : "Costing"))
+                            .join(" & ")} staging`}
                     </span>
                   </button>
                 </div>

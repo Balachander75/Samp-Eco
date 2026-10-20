@@ -86,11 +86,13 @@ export const SamplingProgramPlanningView: React.FC<SamplingProgramPlanningViewPr
     return requests.filter((r) => {
       const mode = String(r.creationMode || "").toLowerCase();
       const kind = String(r.requestKind || "").toLowerCase();
+      const code = String(r.requestCode || "").toLowerCase();
       const sr = String(r.srNumber || "").toLowerCase();
       const mat = String(r.materialCode || "").toLowerCase();
       return (
         kind === "program" ||
         mode === "program_planning" ||
+        code.startsWith("pp-") ||
         sr.includes("-pg-") ||
         mat.includes("pg-") ||
         getRequestTrackType(r) === "program_planning"

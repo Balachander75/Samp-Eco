@@ -39,7 +39,7 @@ class FeasibilityRequest(Base):
     request_raised_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
-    # Sampling Lab response fields
+    # Sampling Team response fields
     taken_by_samp = Column(String(255), nullable=True)
     taken_by_samp_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     taken_at_samp = Column(DateTime(timezone=True), nullable=True)

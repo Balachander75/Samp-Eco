@@ -280,7 +280,7 @@ export const MARKETING_REQUEST_TYPES: MarketingDeliverableType[] = [
     id: "sample",
     code: "03",
     label: "Sampling",
-    department: "SAMP Tech Lab",
+    department: "Sampling Team",
     tag: "Physical Finished Prototype",
     desc: "Finished physical prototype with actual binding, ruling, paper stock & cover finishes",
     icon: Sparkles,

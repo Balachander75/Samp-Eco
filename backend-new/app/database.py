@@ -53,6 +53,7 @@ def ensure_program_schema():
         model.__table__.create(bind=engine, checkfirst=True)
 
     statements = (
+        "ALTER TABLE program_requests ALTER COLUMN sr_number DROP NOT NULL",
         "ALTER TABLE program_requests ADD COLUMN IF NOT EXISTS sampling_seen_at TIMESTAMPTZ",
         "ALTER TABLE program_requests ADD COLUMN IF NOT EXISTS sampling_seen_by VARCHAR(255)",
         "ALTER TABLE program_requests ADD COLUMN IF NOT EXISTS sampling_verdict VARCHAR(64)",
@@ -81,6 +82,10 @@ def ensure_program_schema():
         "ALTER TABLE program_material_specifications ADD COLUMN IF NOT EXISTS promoted_sr_number VARCHAR(50)",
         "CREATE INDEX IF NOT EXISTS ix_pms_promoted_sample_request_id ON program_material_specifications (promoted_sample_request_id)",
         "ALTER TABLE program_material_specifications ADD COLUMN IF NOT EXISTS plant_remark TEXT",
+        "CREATE INDEX IF NOT EXISTS ix_program_requests_year_id ON program_requests (program_year, id DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_program_requests_status_id ON program_requests (status, id DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_program_materials_request_id_id ON program_material_specifications (program_request_id, id)",
+        "CREATE INDEX IF NOT EXISTS ix_program_activity_request_id_id ON program_activity_logs (program_request_id, id)",
     )
     with engine.begin() as connection:
         for statement in statements:
@@ -296,7 +301,7 @@ def ensure_feasibility_workflow_columns():
             """UPDATE feasibility_requests
                SET target_plant = COALESCE(
                    (SELECT name FROM plants WHERE code = '1505' ORDER BY id LIMIT 1),
-                   '1505- Khaniwade'
+                   '1505 - Khaniwade'
                )
                WHERE target_plant IS NULL OR trim(target_plant) = ''"""
         ))

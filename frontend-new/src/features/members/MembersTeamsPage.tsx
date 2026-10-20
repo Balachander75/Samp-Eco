@@ -37,7 +37,7 @@ const DEPARTMENTS = [
   { id: "marketing", label: "Marketing", icon: Layers, color: "text-blue-600 dark:text-blue-400", badge: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200/60 dark:border-blue-800/60" },
   { id: "creative", label: "Creative", icon: Palette, color: "text-purple-600 dark:text-purple-400", badge: "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200/60 dark:border-purple-800/60" },
   { id: "studio", label: "Studio CAD", icon: Box, color: "text-indigo-600 dark:text-indigo-400", badge: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200/60 dark:border-indigo-800/60" },
-  { id: "samp", label: "Sampling Lab", icon: FlaskConical, color: "text-teal-600 dark:text-teal-400", badge: "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border-teal-200/60 dark:border-teal-800/60" },
+  { id: "samp", label: "Sampling Team", icon: FlaskConical, color: "text-teal-600 dark:text-teal-400", badge: "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border-teal-200/60 dark:border-teal-800/60" },
   { id: "costing", label: "Costing", icon: Calculator, color: "text-emerald-600 dark:text-emerald-400", badge: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60" },
   { id: "plant", label: "Plant Operations", icon: Factory, color: "text-amber-600 dark:text-amber-400", badge: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/60" },
   { id: "admin", label: "Administration", icon: ShieldCheck, color: "text-zinc-600 dark:text-zinc-400", badge: "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700" },
@@ -46,7 +46,7 @@ const DEPARTMENTS = [
 function departmentKey(team?: string): string {
   const value = (team || "").trim().toLowerCase().replace(/[_-]+/g, " ");
   if (["admin", "administration", "management"].includes(value)) return "admin";
-  if (["samp", "sampling", "sampling lab"].includes(value)) return "samp";
+  if (["samp", "sampling", "sampling team"].includes(value)) return "samp";
   if (["plant", "plant operations"].includes(value)) return "plant";
   if (["studio", "studio cad", "structural cad studio"].includes(value)) return "studio";
   if (["costing", "commercial costing"].includes(value)) return "costing";

@@ -19,8 +19,8 @@ export interface ProgramContextData {
   parentRequestId?: string | number;
   parentSrNumber?: string;
   feasibilityRequestId?: number | string;
-  feasibilityRequestType?: "sample" | "mockup";
-  feasibilityRequestTypes?: Array<"sample" | "mockup">;
+  feasibilityRequestType?: "sample" | "mockup" | "costing";
+  feasibilityRequestTypes?: Array<"sample" | "mockup" | "costing">;
   feasibilityRequestCode?: string;
   feasibilityDescription?: string;
   feasibilityRequiredDate?: string;

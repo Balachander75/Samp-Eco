@@ -118,7 +118,7 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
           : ("pending" as const),
       },
       {
-        label: "3. Costing & Lab",
+        label: "3. Costing & Sampling",
         status: stage3Done
           ? ("done" as const)
           : stage3Active

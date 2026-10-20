@@ -85,7 +85,7 @@ export function getFeasibilityTypeDisplay(request: SampleRequestItem): string {
   };
   if (ft && typeMap[ft.toLowerCase()]) return typeMap[ft.toLowerCase()];
   if (ft) return ft.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  return "New Category";
+  return "";
 }
 
 export function getFeasibilityTypeId(request: SampleRequestItem): string {

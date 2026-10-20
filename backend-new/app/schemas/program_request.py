@@ -63,6 +63,7 @@ class ProgramRequestUpdate(BaseModel):
 class ProgramOutputSubmit(BaseModel):
     department: Literal["sampling", "plant"]
     remark: str = Field(min_length=1, max_length=4000)
+    verdict: Optional[str] = None
 
 
 class ProgramClaimSubmit(BaseModel):
@@ -112,6 +113,12 @@ class ProgramPauseSubmit(BaseModel):
     """Payload to pause or resume a seasonal program plan."""
 
     paused: bool = True
+
+
+class ProgramDismantleSubmit(BaseModel):
+    """Payload to permanently dismantle a seasonal program plan."""
+
+    reason: Optional[str] = Field(default=None, max_length=1000)
 
 
 class ProgramPromoteSkuPayload(BaseModel):

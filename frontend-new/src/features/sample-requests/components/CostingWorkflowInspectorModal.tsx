@@ -1,3 +1,4 @@
+import { UniversalChatterFeed, UniversalChatterEvent } from "./common/UniversalChatterFeed";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -9,7 +10,6 @@ import {
   Check,
   CheckCircle2,
   Clock,
-  Clock3,
   Copy,
   ExternalLink,
   FileSpreadsheet,
@@ -419,6 +419,27 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   };
 
   const code = record.request_code || record.sr_number || `CR-${record.sample_request_id}`;
+
+  const costingChatterEvents = useMemo<UniversalChatterEvent[]>(() => {
+    return (record.logs || []).map((log) => {
+      const hasRemark = Boolean(log.details?.remark) || Boolean(log.details?.note);
+      const remarkText = String(log.details?.remark || log.details?.note || "").trim();
+      const isSystem = !hasRemark;
+
+      return {
+        id: log.id,
+        kind: isSystem ? "system_announcement" : "bubble",
+        actorName: log.actor_name || "Team Member",
+        actorDepartment: log.actor_team || "Costing",
+        summary: hasRemark ? remarkText : `${log.actor_name || "User"} - ${formatWorkflowAction(log.action)}`,
+        timestamp: log.created_at,
+        badge: log.from_stage && log.to_stage && log.from_stage !== log.to_stage ? {
+          text: `${stageLabels[log.from_stage] || log.from_stage} → ${stageLabels[log.to_stage] || log.to_stage}`,
+          variant: "info",
+        } : undefined,
+      };
+    });
+  }, [record.logs]);
 
   return createPortal(
     <div
@@ -1471,75 +1492,13 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
             </div>
           </div>
 
-          {/* ── RIGHT PANEL: TIME LOG & ACTIVITY CHATTER FEED ── */}
-          <aside className="w-80 lg:w-96 border-l border-[var(--border-subtle)] bg-[var(--surface-lowest)] flex flex-col shrink-0 select-text">
-            <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock3 className="w-4 h-4 text-[var(--accent-primary)]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
-                  Activity &amp; Audit History
-                </h3>
-              </div>
-              <span className="rounded-full bg-[var(--surface-low)] px-2 py-0.5 text-[10px] font-mono text-[var(--on-surface-muted)]">
-                {record.logs.length} events
-              </span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <ol className="relative border-l border-[var(--border-subtle)] ml-3 space-y-5">
-                {record.logs.map((log) => {
-                  const hasRemark =
-                    Boolean(log.details?.remark) || Boolean(log.details?.note);
-                  const remarkText = String(log.details?.remark || log.details?.note || "");
-
-                  return (
-                    <li key={log.id} className="ml-4 relative">
-                      <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-[var(--accent-primary)] ring-4 ring-[var(--surface-lowest)]" />
-
-                      <div className="flex items-center justify-between gap-1">
-                        <p className="text-xs font-semibold text-[var(--on-surface)]">
-                          {formatWorkflowAction(log.action)}
-                        </p>
-                        <span className="text-[9px] font-mono text-[var(--on-surface-subtle)]">
-                          {log.actor_team}
-                        </span>
-                      </div>
-
-                      {log.from_stage && log.to_stage && log.from_stage !== log.to_stage && (
-                        <p className="mt-0.5 flex items-center gap-1 text-[10px] text-[var(--on-surface-muted)]">
-                          <span>{stageLabels[log.from_stage] || log.from_stage}</span>
-                          <ArrowRight className="h-2.5 w-2.5 opacity-60" />
-                          <span className="font-semibold">
-                            {stageLabels[log.to_stage] || log.to_stage}
-                          </span>
-                        </p>
-                      )}
-
-                      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-[var(--on-surface-subtle)]">
-                        <span className="font-medium text-[var(--on-surface-muted)]">
-                          {log.actor_name}
-                        </span>
-                        <span>·</span>
-                        <span>{formatDateTime(log.created_at)}</span>
-                      </div>
-
-                      {hasRemark && (
-                        <div className="mt-1.5 p-2 rounded-lg bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[11px] text-[var(--on-surface-muted)] leading-relaxed whitespace-pre-wrap break-words">
-                          "{remarkText}"
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-
-                {record.logs.length === 0 && (
-                  <li className="text-xs text-[var(--on-surface-muted)] ml-4">
-                    No activity recorded yet.
-                  </li>
-                )}
-              </ol>
-            </div>
-          </aside>
+          {/* ── RIGHT PANEL: UNIVERSAL ACTIVITY CHATTER FEED ── */}
+          <UniversalChatterFeed
+            title="Audit & Activity Log"
+            events={costingChatterEvents}
+            currentUser={user}
+            className="w-80 lg:w-96"
+          />
         </div>
       </section>
     </div>,

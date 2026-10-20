@@ -1,4 +1,4 @@
-"""Pydantic schemas for feasibility-check requests, lab verdicts, marketing decisions, and activity logs."""
+"""Pydantic schemas for feasibility-check requests, technical verdicts, marketing decisions, and activity logs."""
 from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator

@@ -946,7 +946,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
               {isLoading ? "—" : telemetry.totalInProduction}
             </div>
             <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
-              Active in lab/studio
+              Active in sampling/studio
             </div>
           </div>
 
@@ -1013,7 +1013,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-[var(--on-surface-muted)] mb-3">
-                  Client sample intake, PMT laboratory verification, and physical dispatch tracking.
+                  Client sample intake, PMT technical verification, and physical dispatch tracking.
                 </p>
               </div>
 

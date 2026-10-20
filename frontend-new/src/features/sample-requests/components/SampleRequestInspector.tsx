@@ -1,3 +1,6 @@
+import { readAuthUser } from "@/lib/session";
+import type { UserProfile } from "@/features/auth";
+import { UniversalChatterFeed, UniversalChatterEvent } from "./common/UniversalChatterFeed";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -19,7 +22,6 @@ import {
   Search,
   FileText,
   Box,
-  MessageSquare,
   Truck,
   UserCheck,
   ShieldAlert,
@@ -144,6 +146,21 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   const activeRequest = localOverride || request;
 
   // Active Tab: defaulted intelligently based on user role
+  const currentUser = useMemo(() => {
+    const sessionUser = readAuthUser<UserProfile>();
+    if (sessionUser) return sessionUser;
+    if (actorName) {
+      return {
+        id: actorUserId || 0,
+        name: actorName,
+        userid: actorName.toLowerCase().replace(/\s+/g, "."),
+        team: role,
+        role: role,
+      } as UserProfile;
+    }
+    return null;
+  }, [actorName, actorUserId, role]);
+
   const initialTab = useMemo<InspectorTab>(() => {
     if (role === "creative") return "creative";
     if (role === "studio") return "studio";
@@ -192,11 +209,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   const [samplingFeedbackMessage, setSamplingFeedbackMessage] = useState<string | null>(null);
 
   // Chatter State
-  const [noteInput, setNoteInput] = useState("");
-  const [chatterFilter, setChatterFilter] = useState<"all" | "audit" | "notes">("all");
   const [internalNotes, setInternalNotes] = useState<ChatterMessage[]>([]);
-  const [isPostingNote, setIsPostingNote] = useState(false);
-  const chatterEndRef = useRef<HTMLDivElement | null>(null);
 
   // Lightbox Preview Image state
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
@@ -602,40 +615,19 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     return combined.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [activeRequest, internalNotes, isReleasedToPlant, ws]);
 
-  const filteredChatter = useMemo(() => {
-    if (chatterFilter === "all") return chatterEvents;
-    if (chatterFilter === "notes") return chatterEvents.filter((e) => e.isNote);
-    if (chatterFilter === "audit") return chatterEvents.filter((e) => !e.isNote);
-    return chatterEvents;
-  }, [chatterEvents, chatterFilter]);
-
-  // Post internal note handler
-  const handlePostNote = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!noteInput.trim() || !activeRequest?.id) return;
-    setIsPostingNote(true);
-
-    const newNote: ChatterMessage = {
-      id: `note-${Date.now()}`,
-      actorName: actorName || (role === "sampling" ? "Sampling Reviewer" : role === "creative" ? "Creative Lead" : role === "studio" ? "Studio Prepress" : "Commercial Team"),
-      actorDepartment: role === "sampling" ? "Sampling Review" : role === "creative" ? "Creative" : role === "studio" ? "Studio" : "Commercial",
-      action: "NOTE_POSTED",
-      title: "Team Note",
-      body: noteInput.trim(),
-      timestamp: new Date().toISOString(),
-      isNote: true,
-    };
-
-    const updatedNotes = [...internalNotes, newNote];
-    setInternalNotes(updatedNotes);
-    try {
-      localStorage.setItem(`samp_notes_${activeRequest.id}`, JSON.stringify(updatedNotes));
-    } catch (err) {
-      console.warn("Could not save note to local storage:", err);
-    }
-    setNoteInput("");
-    setIsPostingNote(false);
-  };
+  const universalChatterEvents = useMemo<UniversalChatterEvent[]>(() => {
+    return chatterEvents.map((evt) => {
+      const isSystem = !evt.isNote && ["REQUEST_CREATED", "ROUTED_CREATIVE", "RELEASED_TO_PLANT", "STATUS_CHANGED"].includes(evt.action);
+      return {
+        id: evt.id,
+        kind: isSystem ? "system_announcement" : "bubble",
+        actorName: evt.actorName || "Desk",
+        actorDepartment: evt.actorDepartment || "Marketing",
+        summary: evt.body || evt.title,
+        timestamp: evt.timestamp,
+      };
+    });
+  }, [chatterEvents]);
 
   // ── ACTION HANDLERS ──
 
@@ -2081,134 +2073,13 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
             </div>
           </div>
 
-          {/* ── RIGHT: LIVE CHATTER & ACTIVITY STREAM (LIKE DESIGN REQUEST) ── */}
-          <aside className="w-full lg:w-80 xl:w-96 shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border-subtle)] bg-[var(--surface-lowest)] flex flex-col min-h-0">
-            {/* Chatter Header */}
-            <div className="p-3.5 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-3.5 h-3.5 text-teal-600" />
-                <span className="text-xs font-bold text-[var(--on-surface)] uppercase tracking-wider font-mono">Activity Stream</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[var(--surface-container)] text-[var(--on-surface-muted)] font-bold">
-                  {chatterEvents.length}
-                </span>
-              </div>
-
-              {/* Filter Pills */}
-              <div className="flex items-center gap-1 bg-[var(--surface-lowest)] p-0.5 rounded-lg text-[10px] font-mono border border-[var(--border-subtle)]">
-                <button
-                  type="button"
-                  onClick={() => setChatterFilter("all")}
-                  className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                    chatterFilter === "all" ? "bg-[var(--accent-primary)] text-white font-bold" : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChatterFilter("audit")}
-                  className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                    chatterFilter === "audit" ? "bg-[var(--accent-primary)] text-white font-bold" : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
-                  }`}
-                >
-                  Audit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChatterFilter("notes")}
-                  className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                    chatterFilter === "notes" ? "bg-[var(--accent-primary)] text-white font-bold" : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
-                  }`}
-                >
-                  Notes
-                </button>
-              </div>
-            </div>
-
-            {/* Note Composer */}
-            <form onSubmit={handlePostNote} className="p-3 border-b border-[var(--border-subtle)] bg-[var(--surface-base)]">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={noteInput}
-                  onChange={(e) => setNoteInput(e.target.value)}
-                  placeholder="Post an operational note..."
-                  maxLength={1000}
-                  disabled={isPostingNote}
-                  className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] py-2 pl-3 pr-9 text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
-                />
-                <button
-                  type="submit"
-                  disabled={!noteInput.trim() || isPostingNote}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--on-surface-subtle)] hover:text-[var(--accent-primary)] disabled:opacity-30 cursor-pointer"
-                  title="Post note"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <div className="mt-1 px-1 text-[10px] text-[var(--on-surface-subtle)]">
-                Visible to Commercial, Creative, Studio &amp; Plant
-              </div>
-            </form>
-
-            {/* Chronological Message Stream */}
-            <div className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-[var(--surface-lowest)]">
-              {filteredChatter.length === 0 ? (
-                <div className="py-12 text-center text-[var(--on-surface-subtle)] font-mono text-[11px]">
-                  No chatter entries found.
-                </div>
-              ) : (
-                filteredChatter.map((evt) => {
-                  const isNote = evt.isNote;
-                  const isSystem = ["REQUEST_CREATED", "ROUTED_CREATIVE", "RELEASED_TO_PLANT"].includes(evt.action);
-                  const initials = (evt.actorName || "OP")
-                    .split(/\s+/)
-                    .filter(Boolean)
-                    .map((n) => n[0])
-                    .join("")
-                    .substring(0, 2)
-                    .toUpperCase();
-
-                  if (isSystem) {
-                    return (
-                      <div key={evt.id} className="flex justify-center py-1">
-                        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-teal-500/20 bg-teal-50/50 dark:bg-teal-950/30 px-3 py-1 text-[11px] text-teal-900 dark:text-teal-200">
-                          <span className="font-semibold">{evt.title}</span>
-                          <span className="text-[10px] opacity-75">· {formatOdooLogDate(evt.timestamp)}</span>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div
-                      key={evt.id}
-                      className={`p-3 rounded-xl border text-xs space-y-1.5 ${
-                        isNote
-                          ? "border-amber-200/80 bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-950/20"
-                          : "border-[var(--border-subtle)] bg-[var(--surface-base)]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-[11px]">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] text-[10px] font-mono font-bold flex items-center justify-center">
-                            {initials}
-                          </span>
-                          <span className="font-bold text-[var(--on-surface)]">{evt.actorName}</span>
-                          <span className="text-[10px] text-[var(--on-surface-subtle)]">({evt.actorDepartment})</span>
-                        </div>
-                        <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
-                          {formatOdooLogDate(evt.timestamp)}
-                        </span>
-                      </div>
-                      <p className="text-[11.5px] text-[var(--on-surface)] leading-relaxed">{evt.body}</p>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={chatterEndRef} />
-            </div>
-          </aside>
+          {/* ── RIGHT: AUDIT & ACTIVITY LOG ── */}
+          <UniversalChatterFeed
+            title="Audit & Activity Log"
+            events={universalChatterEvents}
+            currentUser={currentUser}
+            className="w-full lg:w-80 xl:w-96"
+          />
 
         </div>
       </div>

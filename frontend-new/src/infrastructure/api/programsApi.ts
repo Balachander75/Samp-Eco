@@ -428,3 +428,24 @@ export async function promoteProgramSkuApi(
   };
 }
 
+
+
+export async function dismantleProgramRequestApi(
+  requestId: number | string,
+  reason?: string
+): Promise<ProgramRequestRecord> {
+  const cleanId = String(requestId).replace(/^program-/, "");
+  const data = await apiFetch<Record<string, unknown>>(
+    `/api/v1/program-requests/${cleanId}/dismantle`,
+    {
+      method: "POST",
+      jsonBody: { reason: reason?.trim() || null },
+    }
+  );
+  const record = mapProgramResponse(data);
+  dispatchProgramRequestChanged(record);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("samp:requests-changed"));
+  }
+  return record;
+}

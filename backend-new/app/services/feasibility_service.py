@@ -285,12 +285,18 @@ class FeasibilityService:
 
     def create(self, payload: FeasibilityRequestCreate, current_user=None) -> Dict[str, Any]:
         """Create new feasibility check and assign codes."""
+        today_local = datetime.now(timezone.utc).astimezone(INDIA_TZ).date()
+        if payload.required_date < today_local:
+            raise HTTPException(
+                status_code=422,
+                detail="Required date cannot be in the past.",
+            )
         if not _is_operational_workday(payload.required_date):
             raise HTTPException(
                 status_code=422,
                 detail="Required date must be a working day. Sundays and 2nd/4th Saturdays are off.",
             )
-        target_plant_name = "1505- Khaniwade"
+        target_plant_name = "1505 - Khaniwade"
         if payload.target_plant and payload.target_plant.strip():
             target_plant_name = payload.target_plant.strip()
         else:
@@ -505,6 +511,9 @@ class FeasibilityService:
             raise HTTPException(status_code=409, detail="A counter-date can only be proposed while technical review is open")
         if req.samp_counter_date is not None:
             raise HTTPException(status_code=409, detail="A counter-date proposal has already been used for this request")
+        today_local = datetime.now(timezone.utc).astimezone(INDIA_TZ).date()
+        if payload.proposed_date <= today_local:
+            raise HTTPException(status_code=422, detail="The proposed date must be later than today")
         if payload.proposed_date <= req.required_date:
             raise HTTPException(status_code=422, detail="The proposed date must be later than the requested date")
         if not _is_operational_workday(payload.proposed_date):
@@ -667,6 +676,8 @@ class FeasibilityService:
             )
             if not is_admin and not same_claimant:
                 raise HTTPException(status_code=409, detail="This feasibility review is already claimed by another SAMP member")
+            if same_claimant:
+                return self.serialize_request(self.repo.get_with_details(req.id))
 
         actor_name = current_user.name if current_user else "Sampling Engineer"
         actor_id = current_user.id if current_user else None
@@ -764,18 +775,29 @@ class FeasibilityService:
         if sample_request_id is None:
             from app.utils.business_year import get_current_business_year
             # Create a commercial sample request draft directly from the feasibility request
-            yr_suffix = datetime.now(timezone.utc).year % 100
-            customer_name = self.db.query(Customer.name).filter(Customer.id == req.customer_id).scalar() or req.customer or ""
-            generated_sr_num = f"SR-MK-{yr_suffix:02d}-{req.id:04d}"
+            created_today = datetime.now(timezone.utc).date()
+            customer_name = self.db.query(Customer.name).filter(Customer.id == req.customer_id).scalar() or ""
+            generated_sr_num = (
+                next_request_code(self.db, REQUEST_CODE_PREFIX_BY_SCOPE["sample"], created_today)
+                if "sample" in selected_types
+                else None
+            )
+            codes = {}
+            for scope_key in ("design", "mockup", "costing"):
+                if scope_key in selected_types:
+                    codes[scope_key] = next_request_code(
+                        self.db, REQUEST_CODE_PREFIX_BY_SCOPE[scope_key], created_today
+                    )
 
             staged = CreateSampleRequest(
                 customer=customer_name,
                 year=getattr(req, "year", None) or get_current_business_year(),
-                date_request_created=getattr(req, "date_request_created", None) or datetime.now(timezone.utc).date(),
+                date_request_created=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 material_code=getattr(req, "material_code", None) or f"FS-{req.id:04d}",
                 creation_mode="new",
-                product_description=req.description_notes or req.product_description or "Commercial request from Feasibility",
+                product_description=req.description_notes or getattr(req, "product_description", None) or "Commercial request from Feasibility",
                 request_types=selected_types,
+                request_codes=codes,
                 sr_number=generated_sr_num,
                 status="Draft (Pre-SMT)",
                 created_by=actor_name,
@@ -875,18 +897,36 @@ class FeasibilityService:
                 used_orders.add(next_order)
                 next_order += 1
 
+        sample_request_code = (
+            staged.sr_number
+            if "sample" in staged_types
+            else next(
+                (
+                    (staged.request_codes or {}).get(key)
+                    for key in ("mockup", "costing", "design")
+                    if (staged.request_codes or {}).get(key)
+                ),
+                None,
+            )
+        )
         req.converted_sample_request_id = staged.id
-        req.converted_sr_number = staged.sr_number
+        req.converted_sr_number = staged.sr_number or sample_request_code
         req.converted_at = datetime.now(timezone.utc)
         req.converted_by = actor_name
-        if "sample" in selected_types and "mockup" in selected_types:
+        if "sample" in selected_types and "mockup" in selected_types and "costing" in selected_types:
+            req.status = "Converted to Sample, Mockup & Costing"
+        elif "sample" in selected_types and "mockup" in selected_types:
             req.status = "Converted to Sample & Mockup"
         elif "sample" in selected_types and "costing" in selected_types:
             req.status = "Converted to Sampling and Costing"
+        elif "mockup" in selected_types and "costing" in selected_types:
+            req.status = "Converted to Mockup & Costing"
         elif "sample" in selected_types:
             req.status = "Converted to Sample"
         elif "mockup" in selected_types:
             req.status = "Converted to Mockup"
+        elif "costing" in selected_types:
+            req.status = "Converted to Costing"
         else:
             req.status = "Converted to Commercial"
         self.repo.add_activity_log(
@@ -898,14 +938,13 @@ class FeasibilityService:
             payload={
                 "sample_request_id": staged.id,
                 "sample_sr_number": staged.sr_number,
-                "sample_request_code": staged.sr_number if "sample" in staged_types else (staged.request_codes or {}).get("mockup"),
+                "sample_request_code": sample_request_code,
                 "request_types": selected_types,
                 "staged_before_link": True,
             },
             commit=False,
         )
         self.db.commit()
-        sample_request_code = staged.sr_number if "sample" in staged_types else (staged.request_codes or {}).get("mockup")
         return {
             "feasibility": self.serialize_request(self.repo.get_with_details(req.id)),
             "sample_request_id": staged.id,

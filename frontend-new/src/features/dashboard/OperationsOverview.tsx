@@ -466,7 +466,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
     const stOnTime = Math.max(0, stTotal - stDelayed);
     const stSla = stTotal > 0 ? Math.round((stOnTime / stTotal) * 100) : 100;
 
-    // 4. SAMP Lab
+    // 4. Sampling Team
     const smTotal = marketingDecomposition.sampling.count;
     const smDelayed = slaMetrics.classified.filter(
       (r) => r._departmentKey === "samp" && r._isDelayed
@@ -544,7 +544,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
       },
       {
         id: "samp",
-        name: "SAMP Lab",
+        name: "Sampling Team",
         scope: "Physical Fabrication & QC",
         icon: FlaskConical,
         route: "/samp-team-work",
@@ -1410,7 +1410,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
             <div
               style={{ width: `${slaMetrics.total ? (lifecycleFunnel.samp.count / slaMetrics.total) * 100 : 0}%` }}
               className="bg-teal-500 transition-all duration-300"
-              title={`SAMP Lab: ${lifecycleFunnel.samp.count} (${lifecycleFunnel.samp.pct}%)`}
+              title={`Sampling Team: ${lifecycleFunnel.samp.count} (${lifecycleFunnel.samp.pct}%)`}
             />
             <div
               style={{ width: `${slaMetrics.total ? (lifecycleFunnel.costing.count / slaMetrics.total) * 100 : 0}%` }}
@@ -1453,7 +1453,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
             <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors shadow-2xs">
               <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase font-semibold">SAMP Lab</span>
+                <span className="text-[10px] text-[var(--on-surface-subtle)] block uppercase font-semibold">Sampling Team</span>
                 <span className="font-bold text-[var(--on-surface)] tabular-nums">{lifecycleFunnel.samp.count} ({lifecycleFunnel.samp.pct}%)</span>
               </div>
             </div>
@@ -1865,7 +1865,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       <FlaskConical className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)]">Sampling Lab</h4>
+                      <h4 className="text-xs font-bold text-[var(--on-surface)]">Sampling Team</h4>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Physical Prototypes</span>
                     </div>
                   </div>
@@ -1882,7 +1882,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                     {marketingDecomposition.sampling.count}
                   </span>
                   <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                    SAMP Lab <ChevronRight className="w-3 h-3" />
+                    Sampling Team <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
               </div>

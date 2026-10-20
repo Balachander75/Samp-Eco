@@ -57,7 +57,7 @@ export const FeasibilityClaimStrip: React.FC<FeasibilityClaimStripProps> = ({
         </div>
 
         <span className="text-[11px] font-mono font-semibold text-emerald-800/80 dark:text-emerald-300/80 bg-emerald-100/60 dark:bg-emerald-900/40 px-2.5 py-1 rounded-lg border border-emerald-300/40 dark:border-emerald-700/40">
-          Sampling Lab Review
+          Sampling Team Review
         </span>
       </div>
     );

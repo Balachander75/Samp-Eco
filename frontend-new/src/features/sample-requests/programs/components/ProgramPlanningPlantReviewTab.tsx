@@ -3,15 +3,13 @@ import { SampleRequestItem } from "../../types";
 import { formatOdooDate } from "../../utils/dateUtils";
 import {
   Factory,
+  Boxes,
   CheckCircle2,
-  Clock,
   Save,
   Loader2,
   AlertCircle,
   Check,
-  ShieldAlert,
   UserCheck,
-  Lock,
   FileCheck2,
 } from "lucide-react";
 import { updateBatchProgramPlantRemarksApi } from "@/infrastructure/api/programsApi";
@@ -50,7 +48,6 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
   const isClaimed = Boolean(claimUserId);
   const isClaimedByMe = Boolean(claimUserId && currentUserId && claimUserId === currentUserId);
-  const isAdmin = currentUser?.role?.toLowerCase() === "admin" || currentUser?.role?.toLowerCase() === "administrator";
 
   // Every Plant response must be submitted by the reviewer who owns the claim.
   const canSubmitReview = isPlantDesk && !readOnly && isClaimedByMe;
@@ -120,141 +117,91 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
 
   return (
     <div className="py-2 space-y-3 select-text text-xs">
-      {/* ── Claim Banner Strip ── */}
-      {isPlantDesk && !readOnly ? (
-        !isClaimed ? (
-          <div className="p-2.5 rounded-xl border border-amber-300 bg-amber-50/90 dark:border-amber-900/50 dark:bg-amber-950/30 flex flex-wrap items-center justify-between gap-2.5 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-700 dark:text-amber-300 shrink-0">
-                <ShieldAlert className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="font-display font-bold text-xs text-amber-950 dark:text-amber-200">
-                  Plant Feasibility Task Unclaimed (Plant {activeRequest.targetPlant || "1505"})
-                </h4>
-                <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80">
-                  Claim this program request first to verify machine tooling availability and submit formal plant feasibility sign-off.
-                </p>
-              </div>
+      {/* ── 1. Compact Plant Operations Parameters & Ownership Strip ── */}
+      <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Target Plant */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+              <Factory className="w-4 h-4" />
             </div>
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
+                Target Facility
+              </span>
+              <span className="font-mono font-bold text-xs text-[var(--on-surface)]">
+                {activeRequest.targetPlant?.toLowerCase().startsWith("plant") ? activeRequest.targetPlant : `Plant ${activeRequest.targetPlant || "1505"}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="h-6 w-px bg-[var(--border-subtle)] hidden sm:block" />
+
+          {/* Plant Material Scope */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <Boxes className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
+                Manufacturing Scope
+              </span>
+              <span className="font-sans font-bold text-xs text-[var(--on-surface)]">
+                {materials.length} Material {materials.length === 1 ? "Line" : "Lines"}
+              </span>
+            </div>
+          </div>
+
+          <div className="h-6 w-px bg-[var(--border-subtle)] hidden sm:block" />
+
+          {/* Assigned Plant Reviewer */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] flex items-center justify-center shrink-0">
+              <UserCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
+                Plant Engineer
+              </span>
+              <span className="font-sans font-bold text-xs text-[var(--on-surface)]">
+                {activeRequest.plantClaimedBy || (
+                  <span className="text-amber-600 dark:text-amber-400 italic">Unclaimed</span>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Claim / Status Action Button on Right */}
+        <div className="flex items-center gap-2">
+          {hasPlantNote ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900/50 text-teal-800 dark:text-teal-300 text-xs font-bold shadow-2xs">
+              <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+              <span>Plant Confirmed</span>
+            </span>
+          ) : isPlantDesk && !readOnly && !isClaimed ? (
             <button
               type="button"
               onClick={() => onClaimTask?.("plant")}
               disabled={isClaiming}
-              className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50"
+              className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50"
             >
               {isClaiming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
-              <span>{isClaiming ? "Claiming Plant Task..." : "Claim Plant Task"}</span>
+              <span>{isClaiming ? "Claiming..." : "Claim Plant Task"}</span>
             </button>
-          </div>
-        ) : !isClaimedByMe ? (
-          <div className="p-2.5 rounded-xl border border-sky-200 bg-sky-50/70 dark:border-sky-900/50 dark:bg-sky-950/30 flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center text-sky-700 dark:text-sky-300 shrink-0">
-              <Lock className="w-4 h-4" />
-            </div>
-            <div>
-              <h4 className="font-display font-bold text-xs text-sky-950 dark:text-sky-200">
-                Assigned to {activeRequest.plantClaimedBy || "Another Plant Reviewer"}
-              </h4>
-              <p className="text-[11px] text-sky-900/80 dark:text-sky-300/80">
-                This factory review is currently claimed and being handled by {activeRequest.plantClaimedBy}.
-              </p>
-            </div>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => onClaimTask?.("plant")}
-                disabled={isClaiming}
-                className="ml-auto shrink-0 px-2.5 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-800 text-white text-[11px] font-semibold disabled:opacity-50"
-              >
-                {isClaiming ? "Claiming..." : "Take Over Review"}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="p-2.5 rounded-xl border border-teal-300 bg-teal-50/80 dark:border-teal-900/50 dark:bg-teal-950/30 flex items-center justify-between gap-2.5 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center text-teal-700 dark:text-teal-300 shrink-0">
-                <UserCheck className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <h4 className="font-display font-bold text-xs text-teal-950 dark:text-teal-200">
-                  Claimed by You ({activeRequest.plantClaimedBy || currentUser?.name})
-                </h4>
-                <p className="text-[11px] text-teal-900/80 dark:text-teal-300/80">
-                  You have active plant ownership. Review target hub capacity and enter formal sign-off below.
-                </p>
-              </div>
-            </div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-300 border border-teal-300/50">
-              Active Plant Owner
+          ) : isClaimedByMe ? (
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+              ✓ Active Plant Owner
             </span>
-          </div>
-        )
-      ) : (
-        /* Marketing / ReadOnly Perspective: Informational Intake Status */
-        !isClaimed ? (
-          <div className="p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] flex items-center gap-2.5 shadow-2xs">
-            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <div>
-              <h4 className="font-display font-bold text-xs text-[var(--on-surface)]">
-                Awaiting Plant Review Claim
-              </h4>
-              <p className="text-[11px] text-[var(--on-surface-muted)]">
-                This program plan has been dispatched to Plant {activeRequest.targetPlant || "1505"}. Awaiting claim and capacity verification by plant operations.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="p-2.5 rounded-xl border border-teal-200 bg-teal-50/50 dark:border-teal-900/40 dark:bg-teal-950/20 flex items-center gap-2.5 shadow-2xs">
-            <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-            <div>
-              <h4 className="font-display font-bold text-xs text-[var(--on-surface)]">
-                Under Plant Feasibility Evaluation by {activeRequest.plantClaimedBy}
-              </h4>
-              <p className="text-[11px] text-[var(--on-surface-muted)]">
-                Plant engineer has claimed this request and is conducting manufacturing feasibility review.
-              </p>
-            </div>
-          </div>
-        )
-      )}
-
-      {/* ── Editorial Header Banner ── */}
-      <div className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)]">
-        <div className="flex items-start justify-between gap-2.5 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold uppercase tracking-wider bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/40">
-                Plant Desk Stage
-              </span>
-              <h2 className="text-xs sm:text-sm font-bold font-display text-[var(--on-surface)]">
-                Plant Feasibility &amp; Converting Machine Capacity
-              </h2>
-            </div>
-            <p className="mt-0.5 text-[11px] text-[var(--on-surface-muted)] max-w-2xl leading-normal">
-              Factory operations review target manufacturing lines, machine die-cutting schedules, warehousing space, and production shift capacity at Plant {activeRequest.targetPlant || "1505"}.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {hasPlantNote ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-display font-bold text-[11px] bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-950/50 dark:text-teal-300">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Confirmed by {activeRequest.plantSignedBy || activeRequest.plantClaimedBy || "Plant Authority"}</span>
-              </span>
-            ) : isClaimed ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-display font-semibold text-[11px] bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/50 dark:text-sky-300">
-                <Clock className="w-3 h-3" />
-                <span>Claimed by {activeRequest.plantClaimedBy}</span>
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-display font-semibold text-[11px] bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300">
-                <Clock className="w-3 h-3" />
-                <span>Pending Claim</span>
-              </span>
-            )}
-          </div>
+          ) : isClaimed ? (
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border border-sky-200">
+              Claimed by {activeRequest.plantClaimedBy}
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200">
+              Pending Claim
+            </span>
+          )}
         </div>
       </div>
 
@@ -303,7 +250,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
             />
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-[10.5px] font-mono text-[var(--on-surface-subtle)]">
-                {draftRemark.length} / 4000 characters · Recorded for Plant {activeRequest.targetPlant || "1505"}
+                {draftRemark.length} / 4000 characters · Recorded for {activeRequest.targetPlant?.toLowerCase().startsWith("plant") ? activeRequest.targetPlant : `Plant ${activeRequest.targetPlant || "1505"}`}
               </span>
               <button
                 type="submit"
@@ -325,7 +272,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
           </div>
         ) : (
           <div className="p-4 rounded-lg border border-dashed border-[var(--border-subtle)] text-center text-[11.5px] text-[var(--on-surface-subtle)]">
-            No plant operational review has been recorded yet. Factory desk at Plant {activeRequest.targetPlant || "1505"} can add observations here.
+            No plant operational review has been recorded yet. Factory desk at {activeRequest.targetPlant?.toLowerCase().startsWith("plant") ? activeRequest.targetPlant : `Plant ${activeRequest.targetPlant || "1505"}`} can add observations here.
           </div>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { UniversalChatterFeed, UniversalChatterEvent } from "./common/UniversalChatterFeed";
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +24,6 @@ import {
   releaseDesignRequestClaimApi,
   proposeDesignCounterDateApi,
   decideDesignCounterDateApi,
-  addDesignWorkflowNoteApi,
   mapDesignRequestToSampleRequest,
 } from "@/infrastructure/api/sampleRequestsApi";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -40,12 +40,25 @@ import {
   MarketingCounterDateBanner,
   DesignBriefTab,
   DesignDeliverablesTab,
-  DesignChatterStream,
   DesignNextWorkTab,
   DesignMetadataStrip,
-  ChatterMessage,
   DesignReferenceAsset,
 } from "./inspector";
+
+interface ChatterMessage {
+  id: string;
+  actorName: string;
+  actorDepartment: string;
+  action: string;
+  title: string;
+  body: string;
+  timestamp: string;
+  badge?: {
+    text: string;
+    variant: "purple" | "teal" | "amber" | "emerald" | "rose" | "neutral";
+  };
+  isNote?: boolean;
+}
 
 export interface DesignRequestInspectorModalProps {
   request: SampleRequestItem | null;
@@ -241,13 +254,9 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const [isReleasingClaim, setIsReleasingClaim] = useState(false);
-  const [isPostingNote, setIsPostingNote] = useState(false);
 
   // Chatter State
-  const [noteInput, setNoteInput] = useState("");
-  const [chatterFilter, setChatterFilter] = useState<"all" | "audit" | "notes">("all");
   const [internalNotes, setInternalNotes] = useState<ChatterMessage[]>([]);
-  const chatterEndRef = useRef<HTMLDivElement | null>(null);
 
   // Creative deliverable matrix state lives in this inspector workspace
   const [showSubmitForm, setShowSubmitForm] = useState(false);
@@ -264,11 +273,11 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       if (event.key !== "Escape") return;
       event.preventDefault();
       if (isCounterDateModalOpen) return;
-      if (!isSubmittingOutput && !isDeciding && !isPostingNote && !isAddingFollowups) onClose();
+      if (!isSubmittingOutput && !isDeciding && !isAddingFollowups) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, isCounterDateModalOpen, isSubmittingOutput, isDeciding, isPostingNote, isAddingFollowups, onClose]);
+  }, [isOpen, isCounterDateModalOpen, isSubmittingOutput, isDeciding, isAddingFollowups, onClose]);
 
   // Computed Values
   const effectiveDesignId = useMemo(() => {
@@ -587,15 +596,43 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     return events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [activeRequest, requestedCount, submissions, activeStage, remainingCount, internalNotes]);
 
-  const filteredChatter = useMemo(() => {
-    if (chatterFilter === "audit") return chatterEvents.filter((e) => !e.isNote);
-    if (chatterFilter === "notes") return chatterEvents.filter((e) => e.isNote);
-    return chatterEvents;
-  }, [chatterEvents, chatterFilter]);
+  const universalChatterEvents = useMemo<UniversalChatterEvent[]>(() => {
+    return chatterEvents.map((msg) => {
+      const isNote = Boolean(msg.isNote);
+      const isSystem = !isNote && (
+        msg.action.includes("CREATE") ||
+        msg.action.includes("CLAIM") ||
+        msg.action.includes("ASSIGN") ||
+        msg.action.includes("RELEASE") ||
+        msg.action.includes("STATUS") ||
+        msg.action.includes("DATE") ||
+        msg.action.includes("START") ||
+        msg.action.includes("CLOSE")
+      );
 
-  useEffect(() => {
-    chatterEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [filteredChatter.length, isOpen, request?.id]);
+      return {
+        id: msg.id,
+        kind: isSystem ? "system_announcement" : "bubble",
+        actorName: msg.actorName || "Designer",
+        actorDepartment: msg.actorDepartment || "Studio",
+        summary: msg.body || msg.title,
+        timestamp: msg.timestamp,
+        badge: msg.badge
+          ? {
+              text: msg.badge.text,
+              variant:
+                msg.badge.variant === "emerald"
+                  ? "success"
+                  : msg.badge.variant === "rose"
+                  ? "danger"
+                  : msg.badge.variant === "amber"
+                  ? "warning"
+                  : "info",
+            }
+          : undefined,
+      };
+    });
+  }, [chatterEvents]);
 
   const handleCopyCode = async () => {
     try {
@@ -617,26 +654,6 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     }
   };
 
-  const handlePostNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isPostingNote || !noteInput.trim() || !effectiveDesignId) return;
-    setIsPostingNote(true);
-    setWorkflowError(null);
-    try {
-      const saved = await addDesignWorkflowNoteApi(
-        effectiveDesignId,
-        noteInput.trim(),
-        mode === "creative" ? "Creative Studio" : "Marketing"
-      );
-      applyWorkflowResponse(saved);
-      setNoteInput("");
-      if (onRefresh) await onRefresh();
-    } catch (err: any) {
-      setWorkflowError(err?.message || "Could not save the note. Please retry.");
-    } finally {
-      setIsPostingNote(false);
-    }
-  };
 
   const handleClaim = async () => {
     if (isClaiming || !activeRequest || !effectiveDesignId) return;
@@ -966,7 +983,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const requestStageLabel = String(activeRequest.designRequestStatus || activeRequest.status || "").toLowerCase();
   const isCreativeWorkStage = activeStage === 1 || requestStageLabel.includes("target date counter proposed");
   const canSubmitCreativeOutput = mode === "creative" && !isReadOnlyTeamHead(currentUser) && hasVerifiedClaimOwnership && isCreativeWorkStage && !isAwaitingReview && !isClosed && remainingCount > 0;
-  const canCloseInspector = !isSubmittingOutput && !isDeciding && !isPostingNote && !isAddingFollowups;
+  const canCloseInspector = !isSubmittingOutput && !isDeciding && !isAddingFollowups;
 
   return createPortal(
     <div
@@ -1360,16 +1377,10 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
           </div>
 
           {/* ── RIGHT: AUDIT TRAIL & CHATTER ── */}
-          <DesignChatterStream
-            filteredChatter={filteredChatter}
-            totalEventsCount={chatterEvents.length}
-            noteInput={noteInput}
-            onChangeNoteInput={setNoteInput}
-            isPostingNote={isPostingNote}
-            onPostNote={handlePostNote}
-            chatterFilter={chatterFilter}
-            onChangeChatterFilter={setChatterFilter}
-            chatterEndRef={chatterEndRef}
+          <UniversalChatterFeed
+            title="Audit & Activity Log"
+            events={universalChatterEvents}
+            currentUser={currentUser}
           />
         </div>
       </div>

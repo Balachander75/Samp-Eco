@@ -26,7 +26,7 @@ class ProgramRequest(Base):
     program_year = Column(String(50), nullable=False, default="2026-2027", server_default="2026-2027", index=True)
 
     status = Column(String(64), nullable=False, default="Pending SAMP Review", server_default="Pending SAMP Review")
-    is_active = Column(Boolean, nullable=False, default=True, server_default="1")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
     created_by = Column(String(255), nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 

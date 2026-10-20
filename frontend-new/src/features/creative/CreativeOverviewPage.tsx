@@ -828,7 +828,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               {isLoading ? "—" : telemetry.totalInProduction.toLocaleString()}
             </div>
             <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
-              <span>Active in design lab</span>
+              <span>Active in design studio</span>
               <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>

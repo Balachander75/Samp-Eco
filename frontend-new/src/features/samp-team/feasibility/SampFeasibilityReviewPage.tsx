@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { UserProfile } from "@/features/auth";
 import { isAdmin as checkIsAdmin } from "@/features/auth/permissions";
 import { useBusinessYear } from "@/context/BusinessYearContext";
+import { usePlant } from "@/context/PlantContext";
 import { SampleRequestItem } from "@/features/sample-requests/types";
 import {
   claimFeasibilityTaskApi,
@@ -78,6 +79,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
   showToast,
 }) => {
   const { currentBusinessYear } = useBusinessYear();
+  const { matchesPlant } = usePlant();
   const isAdmin = checkIsAdmin(user);
 
   const [internalRequests, setInternalRequests] = useState<SampleRequestItem[]>([]);
@@ -277,13 +279,16 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       completed,
       slaPercent,
     };
-  }, [feasibilityRequests, user?.name]);
+  }, [feasibilityRequests, user?.name, user?.id]);
 
   // Filtered dataset
   const filteredRequests = useMemo(() => {
     const currentUserName = (user?.name || "").toLowerCase();
 
     return feasibilityRequests.filter((r) => {
+      // Plant filter
+      if (!matchesPlant(r.targetPlant)) return false;
+
       // Tab filter
       if (filterTab === "awaiting_marketing" && r.counterDateDecision !== "pending") return false;
       if (filterTab === "awaiting_claim" && (r.takenBySamp || r.samplingFeasibilityResponse)) {
@@ -743,6 +748,7 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
               onRefresh={handleRefresh}
               onClose={() => {
                 setIsInspectorOpen(false);
+                setSelectedRequest(null);
                 void handleRefresh();
               }}
               user={user}

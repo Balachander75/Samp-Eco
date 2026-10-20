@@ -168,6 +168,7 @@ class MasterService:
             "management": "admin",
             "administration": "admin",
             "sampling": "samp",
+            "sampling team": "samp",
             "sampling lab": "samp",
             "plant operations": "plant",
             "structural cad studio": "studio",

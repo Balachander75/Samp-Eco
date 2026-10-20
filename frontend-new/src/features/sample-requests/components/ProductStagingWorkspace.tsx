@@ -68,7 +68,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     targetPlant?: string;
     feasibilityRequestId?: number | string;
     feasibilityRequestType?: "sample" | "mockup";
-    feasibilityRequestTypes?: Array<"sample" | "mockup">;
+    feasibilityRequestTypes?: Array<"sample" | "mockup" | "costing">;
     feasibilityRequestCode?: string;
     feasibilityDescription?: string;
     feasibilityRequiredDate?: string;
@@ -1489,10 +1489,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
             window.dispatchEvent(new CustomEvent("app:show-toast", {
               detail: {
                 message: `${
-                  (programContext.feasibilityRequestTypes && programContext.feasibilityRequestTypes.length === 2)
-                    ? "Sample & Mockup"
-                    : programContext.feasibilityRequestTypes?.includes("mockup") || programContext.feasibilityRequestType === "mockup"
-                    ? "Mockup"
+                  (programContext.feasibilityRequestTypes && programContext.feasibilityRequestTypes.length > 0)
+                    ? programContext.feasibilityRequestTypes
+                        .map((t: string) => t.charAt(0).toUpperCase() + t.slice(1))
+                        .join(" & ")
                     : "Sample"
                 } details staged and linked to ${programContext.feasibilityRequestCode || "the feasibility request"}.`,
                 tone: "success",

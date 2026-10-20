@@ -17,6 +17,7 @@ from app.schemas.program_request import (
     ProgramOutputSubmit,
     ProgramClaimSubmit,
     ProgramPauseSubmit,
+    ProgramDismantleSubmit,
     ProgramPromoteSkuPayload,
     ProgramRequestCreate,
     ProgramRequestOut,
@@ -291,7 +292,9 @@ def delete_program_material(
     current_user=Depends(get_current_user),
 ):
     """Removes a material specification row."""
-    require_admin(current_user)
+    if not is_admin(current_user):
+        require_team(current_user, "marketing")
+        _require_marketing_request_owner(request_id, service, current_user)
     item = service.delete_material(request_id, material_id, current_user=current_user)
     if not item:
         raise HTTPException(status_code=404, detail="Program request or material row was not found")
@@ -314,7 +317,13 @@ def submit_program_output(
         if not existing:
             raise HTTPException(status_code=404, detail="Program planning request was not found")
         require_plant_access(current_user, existing.get("target_plant"), service.db)
-    return service.submit_output(request_id, department, payload.remark, current_user=current_user)
+    return service.submit_output(
+        request_id,
+        department,
+        payload.remark,
+        current_user=current_user,
+        verdict=payload.verdict,
+    )
 
 
 @router.post("/{request_id}/activities/{activity_id}/pin", response_model=ProgramRequestOut)
@@ -421,6 +430,23 @@ def pause_program_request(
 
 
 @router.post(
+    "/{request_id}/dismantle",
+    response_model=ProgramRequestOut,
+    summary="Permanently dismantle and terminate a program planning request",
+)
+def dismantle_program_request(
+    request_id: int,
+    payload: ProgramDismantleSubmit = ProgramDismantleSubmit(),
+    service: ProgramRequestService = Depends(get_program_service),
+    current_user=Depends(get_current_user),
+):
+    """Marketing creator or Admin permanently dismantles a seasonal program."""
+    require_team(current_user, "marketing")
+    _require_marketing_request_owner(request_id, service, current_user)
+    return service.dismantle_program(request_id, reason=payload.reason, current_user=current_user)
+
+
+@router.post(
     "/{request_id}/materials/{material_id}/promote-to-sampling",
     response_model=Dict[str, Any],
     summary="Promote a matrix SKU into an active commercial Sample Request",
@@ -438,6 +464,6 @@ def promote_sku_to_sampling(
     return service.promote_sku_to_sampling(
         request_id,
         material_id,
-        payload,
+        payload.request_types,
         current_user=current_user,
     )

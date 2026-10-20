@@ -85,7 +85,7 @@ export const ProgramPlanningMarketingTab: React.FC<ProgramPlanningMarketingTabPr
               </h2>
             </div>
             <p className="mt-0.5 text-[11px] text-[var(--on-surface-muted)] max-w-2xl leading-normal">
-              Review feedback from SAMP Lab and Plant Desk, pin key technical observations, and record Marketing directives.
+              Review feedback from Sampling Team and Plant Desk, pin key technical observations, and record Marketing directives.
             </p>
           </div>
 
@@ -118,7 +118,7 @@ export const ProgramPlanningMarketingTab: React.FC<ProgramPlanningMarketingTabPr
 
         {outputs.length === 0 ? (
           <div className="p-6 rounded-xl border border-dashed border-[var(--border-subtle)] text-center text-[11.5px] text-[var(--on-surface-subtle)]">
-            No technical or plant observations recorded yet. Observations added by SAMP Lab or Plant Desk will appear here.
+            No technical or plant observations recorded yet. Observations added by Sampling Team or Plant Desk will appear here.
           </div>
         ) : (
           outputs.map((entry) => {

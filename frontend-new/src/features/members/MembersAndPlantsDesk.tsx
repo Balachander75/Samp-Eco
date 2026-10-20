@@ -40,7 +40,7 @@ const LABEL_CLASS = "block text-xs font-medium text-[var(--on-surface-muted)]";
 function departmentKey(team?: string): string {
   const value = (team || "").trim().toLowerCase().replace(/[_-]+/g, " ");
   if (["admin", "administration", "management"].includes(value)) return "admin";
-  if (["samp", "sampling", "sampling lab"].includes(value)) return "samp";
+  if (["samp", "sampling", "sampling team"].includes(value)) return "samp";
   if (["plant", "plant operations"].includes(value)) return "plant";
   if (["studio", "studio cad", "structural cad studio"].includes(value)) return "studio";
   if (["costing", "commercial costing"].includes(value)) return "costing";
@@ -302,7 +302,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
                     <option value="marketing">Marketing</option>
                     <option value="creative">Creative Studio</option>
                     <option value="studio">Structural CAD Studio</option>
-                    <option value="samp">SAMP Sampling Lab</option>
+                    <option value="samp">Sampling Team</option>
                     <option value="costing">Commercial Costing</option>
                     <option value="plant">Plant Operations</option>
                     <option value="admin">Administration</option>

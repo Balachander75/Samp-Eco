@@ -1,17 +1,7 @@
 import React, { useMemo } from "react";
 import { SampleRequestItem } from "../../types";
 import { formatOdooDate } from "../../utils/dateUtils";
-import {
-  Calendar,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  ShieldCheck,
-  Eye,
-} from "lucide-react";
-import { MarketingCounterDateBanner } from "../inspector/MarketingCounterDateBanner";
-import { FeasibilityClaimStrip } from "./FeasibilityClaimStrip";
+import { Eye, UserCheck, Clock, ShieldAlert, ArrowRight } from "lucide-react";
 import { indiaDateKey, operationalWorkdaysBetween } from "@/lib/operationalWorkdays";
 
 const formatRelativeTime = (timestamp?: string): string => {
@@ -28,7 +18,7 @@ const formatRelativeTime = (timestamp?: string): string => {
 
 export interface FeasibilitySheetHeaderProps {
   activeRequest: SampleRequestItem;
-  classificationLabel: string;
+  classificationLabel?: string;
   sourceDesk?: "marketing" | "samp";
   canEvaluateTechnical?: boolean;
   canMakeCommercialDecision?: boolean;
@@ -36,25 +26,21 @@ export interface FeasibilitySheetHeaderProps {
   onClaimTask?: () => void;
   onOpenCounterDateModal?: () => void;
   onCounterDateDecision?: (accepted: boolean, notes?: string) => Promise<void> | void;
+  onSelectTab?: (tab: "specs" | "review" | "decision") => void;
   currentUserName?: string;
   currentUserId?: number;
 }
 
 export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
   activeRequest,
-  classificationLabel,
   sourceDesk = "marketing",
   canEvaluateTechnical = false,
   isClaiming = false,
   onClaimTask,
-  onOpenCounterDateModal,
-  onCounterDateDecision,
+  onSelectTab,
   currentUserName,
   currentUserId,
 }) => {
-  const code = activeRequest.materialCode || `FC-${String(activeRequest.id).padStart(4, "0")}`;
-  const isEvaluated = Boolean(activeRequest.samplingFeasibilityResponse);
-
   const lastViewer = useMemo(() => {
     const activities = activeRequest.activities || [];
     const myName = (currentUserName || "").trim().toLowerCase();
@@ -84,250 +70,93 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
     return operationalWorkdaysBetween(origKey, propKey);
   }, [activeRequest.sampleRequiredDate, activeRequest.sampCounterDate]);
 
+  const isClaimed = Boolean(activeRequest.takenBySamp);
+  const canClaim = Boolean(canEvaluateTechnical && !activeRequest.takenBySamp && !activeRequest.samplingFeasibilityResponse);
+
   return (
-    <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
-      {/* ── Top Bar: Reference Code & Flow Progression ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 sm:px-8 py-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
-        <div className="flex items-center gap-2.5">
-          <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg bg-[var(--surface-lowest)] text-[var(--accent-primary)] border border-[var(--border-subtle)] shadow-2xs">
-            {code}
-          </span>
-          <span className="text-[var(--border-strong)]">/</span>
-          <span className="text-xs font-display font-semibold text-[var(--on-surface-muted)] flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-            <span>NPD Technical Feasibility Dossier</span>
-          </span>
-        </div>
-
-        {/* Status Badges Group */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Feasibility Scope Badge */}
-          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono font-semibold bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)]">
-            {classificationLabel}
-          </span>
-
-          {/* Technical Verdict Badge */}
-          {activeRequest.samplingFeasibilityResponse === "Yes" ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Feasible (Approved)</span>
+    <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] px-6 sm:px-8 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* ── Left: Customer Account & Metadata ── */}
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-display font-bold tracking-tight text-[var(--on-surface)] truncate">
+            {activeRequest.customer || "Unassigned Customer Account"}
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--on-surface-muted)] mt-0.5 font-mono">
+            <span>
+              Raised by <strong className="font-semibold text-[var(--on-surface)]">{activeRequest.createdBy || "Marketing"}</strong>
             </span>
-          ) : activeRequest.samplingFeasibilityResponse === "Maybe" ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Conditional Feasibility</span>
+            <span className="text-[var(--border-strong)]">·</span>
+            <span>
+              on{" "}
+              {activeRequest.dateRequestCreated
+                ? formatOdooDate(activeRequest.dateRequestCreated)
+                : activeRequest.createdAt
+                ? formatOdooDate(activeRequest.createdAt)
+                : "—"}
             </span>
-          ) : activeRequest.samplingFeasibilityResponse === "No" ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300">
-              <XCircle className="w-3.5 h-3.5" />
-              <span>Not Feasible</span>
-            </span>
-          ) : activeRequest.takenBySamp ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-semibold bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-950/40 dark:text-sky-300">
-              <Clock className="w-3.5 h-3.5" />
-              <span>In Trial ({activeRequest.takenBySamp})</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-semibold bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
-              <span>Awaiting SAMP Claim</span>
-            </span>
-          )}
-
-          {/* Converted Sampling Badge */}
-          {(activeRequest.convertedRequestCode || activeRequest.convertedSrNumber) && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-display font-bold bg-[var(--accent-primary)] text-white shadow-2xs">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Request: {activeRequest.convertedRequestCode || activeRequest.convertedSrNumber}</span>
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Document Hero Section ── */}
-      <div className="px-6 sm:px-8 py-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-[var(--on-surface)]">
-              {activeRequest.customer || "Unassigned Customer Account"}
-            </h1>
-            <p className="text-xs text-[var(--on-surface-muted)] mt-1 flex items-center gap-1.5 font-mono">
-              <span>Raised by</span>
-              <span className="font-semibold text-[var(--on-surface)]">
-                {activeRequest.createdBy || "Marketing"}
-              </span>
-              <span className="text-[var(--border-strong)]">·</span>
-              <span>
-                on{" "}
-                {activeRequest.dateRequestCreated
-                  ? formatOdooDate(activeRequest.dateRequestCreated)
-                  : activeRequest.createdAt
-                  ? formatOdooDate(activeRequest.createdAt)
-                  : "—"}
-              </span>
-            </p>
             {lastViewer && (
-              <p className="text-[11px] text-[var(--on-surface-subtle)] mt-1 flex items-center gap-1.5 font-mono">
-                <Eye className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>
-                  Last reviewed by <strong className="text-[var(--on-surface-muted)] font-semibold">{lastViewer.actorName}</strong> ({lastViewer.actorDepartment}) {lastViewer.timeAgo}
+              <>
+                <span className="text-[var(--border-strong)] hidden sm:inline">·</span>
+                <span className="inline-flex items-center gap-1 text-[11px] text-[var(--on-surface-subtle)]">
+                  <Eye className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>
+                    Reviewed by {lastViewer.actorName} {lastViewer.timeAgo}
+                  </span>
                 </span>
-              </p>
+              </>
             )}
           </div>
         </div>
 
-        {/* ── 4-Card Executive Metrics Strip ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-          {/* Card 1: Feasibility Type Scope */}
-          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-0.5">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
-              Feasibility Type
-            </span>
-            <div
-              className="font-display font-bold text-xs text-[var(--on-surface)] truncate"
-              title={classificationLabel}
-            >
-              {classificationLabel}
-            </div>
-          </div>
-
-          {/* Card 2: Target Required Date & Counter-Date Controls */}
-          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-0.5">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
-              Required Target Date
-            </span>
-            <div className="font-mono font-bold text-xs text-[var(--on-surface)] flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-              <span>
-                {activeRequest.sampleRequiredDate
-                  ? formatOdooDate(activeRequest.sampleRequiredDate)
-                  : "Flexible"}
+        {/* ── Right: Sleek Badges & Compact Actions ── */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {/* Pending Counter-Date Compact Micro-Pill */}
+          {activeRequest.counterDateDecision === "pending" && activeRequest.sampCounterDate && (
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 text-xs shadow-2xs">
+              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="font-semibold">
+                Revised Date: <span className="font-mono font-bold">{formatOdooDate(activeRequest.sampCounterDate)}</span>
+                {extensionDays > 0 && <span className="ml-1 opacity-80">(+{extensionDays}d)</span>}
               </span>
-            </div>
-
-            {/* Counter-Date Status & Triggers */}
-            {activeRequest.counterDateDecision === "pending" ? (
-              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                <span
-                  role="status"
-                  className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
-                >
-                  <Clock className="h-3 w-3" /> Awaiting Marketing
-                </span>
-                {activeRequest.sampCounterDate && (
-                  <span className="text-[10px] font-mono font-bold text-amber-800 dark:text-amber-300">
-                    Proposed: {formatOdooDate(activeRequest.sampCounterDate)}
-                  </span>
-                )}
-              </div>
-            ) : canEvaluateTechnical && !activeRequest.samplingFeasibilityResponse ? (
-              <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                Waiting Decision
+              </span>
+              {sourceDesk === "marketing" && onSelectTab && (
                 <button
                   type="button"
-                  disabled={!activeRequest.takenBySamp || Boolean(activeRequest.sampCounterDate)}
-                  onClick={onOpenCounterDateModal}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] dark:text-emerald-300 hover:underline disabled:opacity-40 disabled:no-underline cursor-pointer"
-                  title={
-                    !activeRequest.takenBySamp
-                      ? "Claim task first to propose a counter date"
-                      : activeRequest.sampCounterDate
-                      ? "Only one counter-date proposal is allowed for this request"
-                      : "Propose a revised required target date to Marketing"
-                  }
+                  onClick={() => onSelectTab("decision")}
+                  className="text-[11px] text-[var(--accent-primary)] hover:underline font-bold ml-0.5 cursor-pointer flex items-center gap-0.5"
                 >
-                  <Clock className="w-3 h-3" />
-                  <span>Propose Date</span>
+                  <span>Review</span>
+                  <ArrowRight className="w-3 h-3" />
                 </button>
-                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">
-                  {!activeRequest.takenBySamp
-                    ? "Claim task to propose"
-                    : activeRequest.sampCounterDate
-                    ? "Proposal used"
-                    : "Within 2-day policy"}
-                </span>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Card 3: SAMP Team Assignee */}
-          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-0.5">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
-              SAMP Lab Reviewer
-            </span>
-            <div className="font-sans font-bold text-xs">
-              {activeRequest.takenBySamp ? (
-                <span className="text-[var(--on-surface)] truncate">
-                  {activeRequest.takenBySamp}
-                </span>
-              ) : (
-                <span className="text-amber-600 dark:text-amber-400 font-medium italic">
-                  Unclaimed
-                </span>
               )}
             </div>
-          </div>
-
-          {/* Card 4: Commercial Status */}
-          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-0.5">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
-              Commercial Sign-Off
-            </span>
-            <div className="font-sans font-bold text-xs">
-              {(activeRequest.convertedRequestCode || activeRequest.convertedSrNumber) ? (
-                <span className="text-emerald-600 dark:text-emerald-400">Commercial Request Created</span>
-              ) : activeRequest.marketingDecision ? (
-                <span
-                  className={
-                    activeRequest.marketingDecision === "Accepted"
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-rose-600 dark:text-rose-400"
-                  }
-                >
-                  {activeRequest.marketingDecision}
-                </span>
-              ) : isEvaluated ? (
-                <span className="text-purple-600 dark:text-purple-400">Ready for Marketing</span>
-              ) : (
-                <span className="text-[var(--on-surface-subtle)] font-medium">Pending Lab Trial</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Workflow Negotiation & Task Claim Strips ── */}
-        <div className="mt-3.5 space-y-2.5">
-          {/* Counter Date Negotiation Banner */}
-          {activeRequest.counterDateDecision === "pending" && (
-            <MarketingCounterDateBanner
-              originalDate={formatOdooDate(activeRequest.sampleRequiredDate)}
-              proposedDate={formatOdooDate(activeRequest.sampCounterDate)}
-              reason={activeRequest.sampCounterDateReason}
-              claimedBy={activeRequest.sampCounterDateProposedBy || activeRequest.takenBySamp}
-              requestedAt={activeRequest.sampCounterDateProposedAt}
-              isMarketingMode={sourceDesk === "marketing"}
-              proposerTitle="Sampling Team"
-              extensionDays={extensionDays}
-              onAccept={() => onCounterDateDecision?.(true)}
-              onReject={(notes) => onCounterDateDecision?.(false, notes)}
-            />
           )}
 
-          {/* Task Ownership & Claim Strip */}
-          <FeasibilityClaimStrip
-            claimedBy={activeRequest.takenBySamp}
-            claimedAt={activeRequest.takenAtSamp}
-            isSamplingMode={canEvaluateTechnical}
-            isClaiming={isClaiming}
-            canClaim={Boolean(canEvaluateTechnical && !activeRequest.takenBySamp && !activeRequest.samplingFeasibilityResponse)}
-            claimDisabledReason={
-              activeRequest.samplingFeasibilityResponse
-                ? "Technical review has already been completed."
-                : !canEvaluateTechnical
-                ? "Only the Sampling Team can claim this task."
-                : undefined
-            }
-            onClaim={() => onClaimTask?.()}
-          />
+          {/* Reviewer / Claim Pill */}
+          {isClaimed ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface)] shadow-2xs">
+              <UserCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">Assigned:</span>
+              <span className="font-bold text-xs truncate max-w-[150px]">{activeRequest.takenBySamp}</span>
+            </div>
+          ) : canClaim ? (
+            <button
+              type="button"
+              onClick={onClaimTask}
+              disabled={isClaiming}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold transition cursor-pointer shadow-2xs disabled:opacity-50"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>{isClaiming ? "Claiming..." : "Claim Task"}</span>
+            </button>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-xs shadow-2xs">
+              <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+              <span className="font-medium text-[11px]">Unclaimed Feasibility</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

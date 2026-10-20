@@ -20,7 +20,19 @@ import {
   XCircle,
   ArrowRight,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  ExternalLink,
+  FileText,
+  User,
+  FolderGit2,
+  Layers,
+  MessageSquareQuote,
+  Maximize2,
 } from "lucide-react";
+import { CopyBadge } from "@/components/ui/CopyBadge";
+import { formatOdooDate } from "../utils/dateUtils";
 
 // Modular Sub-Components
 import {
@@ -108,9 +120,11 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   const [isSubmittingCounterDate, setIsSubmittingCounterDate] = useState(false);
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"specs" | "review" | "decision">("specs");
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isCounterDateModalOpen, setIsCounterDateModalOpen] = useState(false);
 
   useEffect(() => {
+    setActiveImageIndex(0);
     setSampVerdictChoice("Yes");
     setSampVerdictRemark("");
     setSampConditions("");
@@ -232,7 +246,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   );
 
   const classificationLabel = useMemo(() => {
-    if (!activeRequest) return "New Category";
+    if (!activeRequest) return "";
     if (activeRequest.customFeasibilityType && activeRequest.customFeasibilityType.trim()) {
       return activeRequest.customFeasibilityType.trim();
     }
@@ -245,7 +259,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     return (
       activeRequest.productTypeNavneet ||
       activeRequest.productType ||
-      "New Category"
+      ""
     );
   }, [activeRequest, feasibilityDetails.category]);
 
@@ -407,10 +421,10 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
   // Open Product Staging. The commercial request is created only after Marketing
   // completes and stages the actual product details there.
-  const handleConvertToSampling = async (requestTypes: Array<"sample" | "mockup">) => {
+  const handleConvertToSampling = async (requestTypes: Array<"sample" | "mockup" | "costing">) => {
     if (!activeRequest?.id || isConverting || !canMakeCommercialDecision) return;
     if (!requestTypes || requestTypes.length === 0) {
-      setConversionError("Select at least one request type (Sample, Mockup, or both).");
+      setConversionError("Select at least one request type (Sample, Mockup, or Costing).");
       return;
     }
     if (activeRequest.samplingFeasibilityResponse === "No") {
@@ -465,6 +479,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     if (previewableImages.length < 2 || currentIndex < 0) return;
     const nextIndex = (currentIndex + direction + previewableImages.length) % previewableImages.length;
     setSelectedPreviewImage(previewableImages[nextIndex].url || null);
+    setActiveImageIndex(nextIndex);
   };
 
   if (!isOpen || !activeRequest) return null;
@@ -487,6 +502,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
           onClose={onClose}
           onCopyCode={handleCopyCode}
           mode={sourceDesk === "samp" ? "samp" : "marketing"}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
         />
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG) */}
@@ -494,23 +511,9 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
           {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
             <div className="max-w-4xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
-              <FeasibilitySheetHeader
-                activeRequest={activeRequest}
-                classificationLabel={classificationLabel}
-                sourceDesk={sourceDesk}
-                canEvaluateTechnical={canEvaluateTechnical}
-                canMakeCommercialDecision={canMakeCommercialDecision}
-                isClaiming={isClaiming}
-                onClaimTask={handleClaimTask}
-                onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
-                onCounterDateDecision={handleCounterDateDecision}
-                currentUserName={user?.name}
-                currentUserId={user?.id}
-              />
-
-              {/* Notebook Tab Strip */}
-              <div className="px-6 sm:px-8 pb-6 pt-3">
-                <div className="border-b border-[var(--border-subtle)] flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
+              {/* ── 1. PRIMARY SECTION TABS (TOP) ── */}
+              <div className="px-6 sm:px-8 pt-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
+                <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => setActiveTab("specs")}
@@ -522,7 +525,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                   >
                     <span>1. Scope &amp; Specifications</span>
                     {(previewableImages.length > 0 || feasibilityDetails.referenceLinks.length > 0) && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-base)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
                         {previewableImages.length + feasibilityDetails.referenceLinks.length}
                       </span>
                     )}
@@ -537,7 +540,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
-                    <span>2. SAMP Technical Review</span>
+                    <span>2. Sampling Team Review</span>
                     {activeRequest.samplingFeasibilityResponse ? (
                       <span
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
@@ -551,7 +554,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         {activeRequest.samplingFeasibilityResponse}
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)]">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-base)] text-[var(--on-surface-muted)]">
                         {activeRequest.takenBySamp ? "In Review" : "Pending Claim"}
                       </span>
                     )}
@@ -566,7 +569,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
-                    <span>3. Commercial Decision &amp; Request</span>
+                    <span>3. Commercial Decision</span>
                     {activeRequest.convertedRequestCode || activeRequest.convertedSrNumber ? (
                       <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--border-subtle)]">
                         ✓ {activeRequest.convertedRequestCode || activeRequest.convertedSrNumber}
@@ -592,184 +595,328 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     ) : null}
                   </button>
                 </div>
+              </div>
+
+              {/* ── 2. DOCUMENT HERO & 4-CARD EXECUTIVE STRIP ── */}
+              <FeasibilitySheetHeader
+                activeRequest={activeRequest}
+                classificationLabel={classificationLabel}
+                sourceDesk={sourceDesk}
+                canEvaluateTechnical={canEvaluateTechnical}
+                canMakeCommercialDecision={canMakeCommercialDecision}
+                isClaiming={isClaiming}
+                onClaimTask={handleClaimTask}
+                onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
+                onCounterDateDecision={handleCounterDateDecision}
+                onSelectTab={setActiveTab}
+                currentUserName={user?.name}
+                currentUserId={user?.id}
+              />
+
+              {/* ── 3. ACTIVE TAB CONTENT ── */}
+              <div className="px-6 sm:px-8 pb-6 pt-2">
 
                 {/* Tab 1: Scope & Specifications */}
                 {activeTab === "specs" && (
-                  <div className="py-5 space-y-5">
-                    {canMakeCommercialDecision && activeRequest.counterDateDecision === "pending" && (
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-4">
-                        <div>
-                          <p className="text-xs font-bold text-amber-900 dark:text-amber-200">SAMP proposed revised date: {activeRequest.sampCounterDate}</p>
-                          <p className="mt-1 text-[11px] text-amber-800/80 dark:text-amber-300/80">Marketing response is due within 4 working days.</p>
-                        </div>
-                        <button type="button" onClick={() => setActiveTab("decision")} className="rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] px-3.5 py-2 text-xs font-bold text-white transition-colors cursor-pointer shadow-2xs">Review Date</button>
-                      </div>
-                    )}
-                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-3">
-                      <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Feasibility Required Date</div>
-                      <div className="mt-1 text-sm font-semibold font-mono text-[var(--on-surface)]">{activeRequest.sampleRequiredDate || "—"}</div>
-                    </div>
-                    {/* Primary Technical Description & Product Scope */}
-                    <div>
-                      <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-2">
-                        Technical Description &amp; Product Scope
-                      </div>
-                      <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-[13px] text-[var(--on-surface)] leading-relaxed font-sans shadow-2xs whitespace-pre-wrap">
-                        {displayDescription || "No technical description specified."}
-                      </div>
-                    </div>
-
-                    {/* Marketing Directives & Commercial Notes */}
-                    {displayRemark && (
-                      <div>
-                        <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--accent-primary)] mb-2">
-                          Marketing Directives &amp; Commercial Notes
-                        </div>
-                        <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs">
-                          {displayRemark}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Benchmark URLs & Links */}
-                    {feasibilityDetails.referenceLinks.length > 0 && (
-                      <div>
-                        <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-2">
-                          Client Reference URLs &amp; Benchmark Links ({feasibilityDetails.referenceLinks.length})
-                        </div>
-                        <div className="flex flex-wrap gap-2.5">
-                          {feasibilityDetails.referenceLinks.map((url, i) => (
-                            <a
-                              key={i}
-                              href={url.startsWith("http") ? url : `https://${url}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] text-xs font-mono text-[var(--on-surface)] transition shadow-2xs group"
-                            >
-                              <span className="truncate max-w-xs">{url.replace(/^https?:\/\//, "")}</span>
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Attached Reference Images */}
-                    {previewableImages.length > 0 && (
-                      <div>
-                        <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-2.5">
-                          Attached Reference Images ({previewableImages.length})
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-                          {previewableImages.map((img, idx) => (
-                            <button
-                              key={img.id}
-                              type="button"
-                              onClick={() => img.url && imageStatusFor(img.url) === "ready" && setSelectedPreviewImage(img.url)}
-                              disabled={imageStatusFor(img.url) !== "ready"}
-                              aria-label={`Open full-size preview of ${img.name}`}
-                              className="group relative rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] overflow-hidden text-left enabled:cursor-zoom-in enabled:hover:border-[var(--accent-primary)] transition shadow-xs disabled:cursor-wait"
-                            >
-                              <div className="aspect-[4/3] w-full bg-[var(--surface-low)] overflow-hidden relative">
-                                {imageSourceFor(img.url) ? (
-                                  <img
-                                    src={imageSourceFor(img.url)}
-                                    alt={img.name}
-                                    className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-300"
-                                  />
-                                ) : imageStatusFor(img.url) === "error" ? (
-                                  <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center text-[11px] text-rose-600 dark:text-rose-300">
-                                    <AlertTriangle className="h-5 w-5" />
-                                    <span>Couldn’t load this image</span>
-                                  </div>
-                                ) : (
-                                  <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[11px] text-[var(--on-surface-subtle)]">
-                                    <Loader2 className="h-5 w-5 animate-spin" />
-                                    <span>Loading image…</span>
-                                  </div>
-                                )}
-                                {imageStatusFor(img.url) === "ready" && (
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                                    <span className="text-[11px] font-sans font-semibold text-white bg-black/75 px-2.5 py-1 rounded-lg">
-                                      View full size
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="p-2 flex items-center justify-between text-[10.5px] text-[var(--on-surface-muted)] font-sans">
-                                <span className="truncate">{img.name}</span>
-                                <span className="font-mono text-[var(--on-surface-subtle)]">#{idx + 1}</span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ── In-Context SAMP Team Technical Verdict Spotlight ── */}
-                    {activeRequest.samplingFeasibilityResponse && (
-                      <div className="p-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] space-y-3 mt-3">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono font-bold text-[var(--on-surface)]">
-                              SAMP Team Response:
+                  <div className="py-4">
+                    {/* 2-Column Split View: Left (Specs, 4 Boxes, Directives, Links) + Right (Direct Large Image View) */}
+                    <div className={previewableImages.length > 0 ? "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start" : "w-full"}>
+                      {/* ── LEFT COLUMN ── */}
+                      <div className={previewableImages.length > 0 ? "lg:col-span-6 space-y-4" : "w-full space-y-4"}>
+                        {/* 1. Technical Description & Product Scope (Prominent on Top) */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                              <span>Technical Description &amp; Scope</span>
                             </span>
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-display font-bold border ${
-                                activeRequest.samplingFeasibilityResponse === "Yes"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                  : activeRequest.samplingFeasibilityResponse === "No"
-                                  ? "bg-rose-50 text-rose-700 border-rose-200/70 dark:bg-rose-950/50 dark:text-rose-300"
-                                  : "bg-amber-50 text-amber-800 border-amber-200/70 dark:bg-amber-950/50 dark:text-amber-300"
-                              }`}
-                            >
-                              {activeRequest.samplingFeasibilityResponse === "Yes" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
-                              {activeRequest.samplingFeasibilityResponse === "No" && <XCircle className="w-3.5 h-3.5 text-rose-600" />}
-                              {activeRequest.samplingFeasibilityResponse === "Maybe" && <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
-                              <span>
-                                {activeRequest.samplingFeasibilityResponse === "Yes" && "Feasible (Full Scope)"}
-                                {activeRequest.samplingFeasibilityResponse === "No" && "Not Feasible"}
-                                {activeRequest.samplingFeasibilityResponse === "Maybe" && "Conditional"}
-                              </span>
-                            </span>
+                            {displayDescription && (
+                              <CopyBadge text={displayDescription} label="Copy Scope" className="text-[10px] py-0.5 px-2" />
+                            )}
                           </div>
-                          <span className="text-[11px] font-mono text-[var(--on-surface-muted)]">
-                            Evaluated by: <span className="font-bold text-[var(--on-surface)]">{activeRequest.samplingFeasibilityApprovedBy || "SAMP Team"}</span>
-                          </span>
+                          <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-[13px] text-[var(--on-surface)] leading-relaxed font-sans shadow-2xs whitespace-pre-wrap min-h-[96px]">
+                            {displayDescription || (
+                              <span className="text-[var(--on-surface-subtle)] italic font-normal">
+                                No technical description specified by Marketing.
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        {activeRequest.samplingFeasibilityRemark && (
-                          <p className="text-xs text-[var(--on-surface)] bg-[var(--surface-lowest)] p-3 rounded-xl border border-[var(--border-subtle)] leading-relaxed font-sans shadow-2xs">
-                            {activeRequest.samplingFeasibilityRemark}
-                          </p>
+                        {/* 2. Four Informational Metric Cards */}
+                        <div className={`grid gap-2.5 ${previewableImages.length > 0 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
+                          {/* Box 1: Assigned Reviewer */}
+                          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex flex-col justify-between gap-1 shadow-2xs">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] flex items-center gap-1 font-semibold">
+                              <User className="w-3 h-3 text-[var(--accent-primary)] shrink-0" />
+                              <span>Reviewer</span>
+                            </span>
+                            <div className="font-sans font-bold text-xs truncate">
+                              {activeRequest.takenBySamp ? (
+                                <span className="text-[var(--on-surface)]">{activeRequest.takenBySamp}</span>
+                              ) : (
+                                <span className="text-amber-600 dark:text-amber-400 font-semibold italic">
+                                  Pending Claim
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Box 2: Feasibility Required Date */}
+                          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex flex-col justify-between gap-1 shadow-2xs">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] flex items-center gap-1 font-semibold">
+                              <Calendar className="w-3 h-3 text-teal-600 dark:text-teal-400 shrink-0" />
+                              <span>Required Date</span>
+                            </span>
+                            <div className="font-mono font-bold text-xs text-[var(--on-surface)] flex items-center justify-between gap-1">
+                              <span className="truncate">
+                                {activeRequest.sampleRequiredDate ? formatOdooDate(activeRequest.sampleRequiredDate) : "—"}
+                              </span>
+                              {canEvaluateTechnical && !activeRequest.samplingFeasibilityResponse && !activeRequest.sampCounterDate && activeRequest.takenBySamp && (
+                                <button
+                                  type="button"
+                                  onClick={() => setIsCounterDateModalOpen(true)}
+                                  className="text-[10px] text-[var(--accent-primary)] hover:underline font-sans font-semibold cursor-pointer shrink-0"
+                                >
+                                  Propose
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Box 3: NPD Technical Feasibility Dossier */}
+                          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex flex-col justify-between gap-1 shadow-2xs">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] flex items-center gap-1 font-semibold">
+                              <FolderGit2 className="w-3 h-3 text-sky-600 dark:text-sky-400 shrink-0" />
+                              <span>NPD Dossier</span>
+                            </span>
+                            <div className="font-mono font-bold text-xs text-[var(--on-surface)] truncate">
+                              {activeRequest.materialCode || activeRequest.requestCode || "—"}
+                            </div>
+                          </div>
+
+                          {/* Box 4: Feasibility Scope / Category */}
+                          <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex flex-col justify-between gap-1 shadow-2xs">
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] flex items-center gap-1 font-semibold">
+                              <Layers className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                              <span>Feasibility Scope</span>
+                            </span>
+                            <div className="font-display font-bold text-xs text-[var(--on-surface)] truncate">
+                              {classificationLabel || "—"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. Marketing Directives & Commercial Notes */}
+                        {displayRemark && (
+                          <div className="space-y-1.5">
+                            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                              <MessageSquareQuote className="w-3.5 h-3.5" />
+                              <span>Marketing Directives &amp; Commercial Notes</span>
+                            </div>
+                            <div className="p-3.5 rounded-xl border border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20 text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs whitespace-pre-wrap">
+                              {displayRemark}
+                            </div>
+                          </div>
                         )}
 
-                        <div className="flex items-center justify-between pt-1 text-xs">
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab("review")}
-                            className="text-[var(--accent-primary)] hover:underline font-semibold text-xs flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <span>View Full Technical Sign-Off</span>
-                            <ArrowRight className="w-3 h-3" />
-                          </button>
+                        {/* 4. Reference URLs & Benchmark Links */}
+                        {feasibilityDetails.referenceLinks.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] flex items-center gap-1.5">
+                              <ExternalLink className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                              <span>Reference URLs &amp; Benchmark Links ({feasibilityDetails.referenceLinks.length})</span>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              {feasibilityDetails.referenceLinks.map((url, i) => (
+                                <a
+                                  key={i}
+                                  href={url.startsWith("http") ? url : `https://${url}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="group flex items-center justify-between gap-3 p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/5 transition shadow-2xs"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="w-5 h-5 rounded-md bg-[var(--surface-low)] flex items-center justify-center shrink-0 text-[10px] font-mono font-bold text-[var(--accent-primary)]">
+                                      #{i + 1}
+                                    </span>
+                                    <span className="font-mono text-xs text-[var(--on-surface)] truncate group-hover:text-[var(--accent-primary)] transition">
+                                      {url.replace(/^https?:\/\//, "")}
+                                    </span>
+                                  </div>
+                                  <ExternalLink className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] group-hover:text-[var(--accent-primary)] shrink-0 transition" />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
-                          {canMakeCommercialDecision && !activeRequest.marketingDecision && (
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab("decision")}
-                              className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
-                            >
-                              <span>Take Commercial Decision</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
+                        {/* 5. In-Context SAMP Team Technical Verdict Spotlight */}
+                        {activeRequest.samplingFeasibilityResponse && (
+                          <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] space-y-2.5 shadow-2xs">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono font-bold text-[var(--on-surface)]">
+                                  Sampling Team Sign-Off:
+                                </span>
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-display font-bold border ${
+                                    activeRequest.samplingFeasibilityResponse === "Yes"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                      : activeRequest.samplingFeasibilityResponse === "No"
+                                      ? "bg-rose-50 text-rose-700 border-rose-200/70 dark:bg-rose-950/50 dark:text-rose-300"
+                                      : "bg-amber-50 text-amber-800 border-amber-200/70 dark:bg-amber-950/50 dark:text-amber-300"
+                                  }`}
+                                >
+                                  {activeRequest.samplingFeasibilityResponse === "Yes" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
+                                  {activeRequest.samplingFeasibilityResponse === "No" && <XCircle className="w-3.5 h-3.5 text-rose-600" />}
+                                  {activeRequest.samplingFeasibilityResponse === "Maybe" && <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
+                                  <span>
+                                    {activeRequest.samplingFeasibilityResponse === "Yes" && "Feasible (Full Scope)"}
+                                    {activeRequest.samplingFeasibilityResponse === "No" && "Not Feasible"}
+                                    {activeRequest.samplingFeasibilityResponse === "Maybe" && "Conditional"}
+                                  </span>
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-mono text-[var(--on-surface-muted)]">
+                                Evaluated by: <span className="font-bold text-[var(--on-surface)]">{activeRequest.samplingFeasibilityApprovedBy || "Sampling Team"}</span>
+                              </span>
+                            </div>
+
+                            {activeRequest.samplingFeasibilityRemark && (
+                              <p className="text-xs text-[var(--on-surface)] bg-[var(--surface-lowest)] p-3 rounded-xl border border-[var(--border-subtle)] leading-relaxed font-sans shadow-2xs">
+                                {activeRequest.samplingFeasibilityRemark}
+                              </p>
+                            )}
+
+                            <div className="flex items-center justify-between pt-1 text-xs">
+                              <button
+                                type="button"
+                                onClick={() => setActiveTab("review")}
+                                className="text-[var(--accent-primary)] hover:underline font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>View Full Technical Sign-Off</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+
+                              {canMakeCommercialDecision && !activeRequest.marketingDecision && (
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTab("decision")}
+                                  className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+                                >
+                                  <span>Take Commercial Decision</span>
+                                  <ArrowRight className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      {/* ── RIGHT COLUMN: PURE IMMERSIVE DIRECT IMAGE VIEWER ── */}
+                      {previewableImages.length > 0 && (() => {
+                        const safeIdx = activeImageIndex >= previewableImages.length ? 0 : activeImageIndex;
+                        const currentImg = previewableImages[safeIdx] || previewableImages[0];
+                        return (
+                          <div className="lg:col-span-6 sticky top-4">
+                            <div className="relative w-full h-[480px] sm:h-[520px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] overflow-hidden shadow-sm flex items-center justify-center p-3 select-none group">
+                              {/* Direct Full Image */}
+                              {imageSourceFor(currentImg.url) ? (
+                                <img
+                                  src={imageSourceFor(currentImg.url)}
+                                  alt={currentImg.name || "Reference image"}
+                                  onClick={() => setSelectedPreviewImage(currentImg.url)}
+                                  className="w-full h-full object-contain rounded-xl transition duration-300 group-hover:scale-[1.01] cursor-zoom-in"
+                                />
+                              ) : imageStatusFor(currentImg.url) === "error" ? (
+                                <div className="flex flex-col items-center justify-center gap-2 text-rose-500 text-xs">
+                                  <AlertTriangle className="w-8 h-8 opacity-60" />
+                                  <span>Could not load image</span>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center gap-2 text-[var(--on-surface-subtle)] text-xs">
+                                  <Loader2 className="w-7 h-7 animate-spin text-[var(--accent-primary)]" />
+                                  <span>Loading image…</span>
+                                </div>
+                              )}
+
+                              {/* Hover Floating Top Bar (Counter + Enlarge Hint) */}
+                              <div
+                                onClick={() => setSelectedPreviewImage(currentImg.url)}
+                                className="absolute top-3 inset-x-3 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition duration-200 z-10"
+                              >
+                                {previewableImages.length > 1 ? (
+                                  <span className="px-2.5 py-1 rounded-full bg-slate-950/75 backdrop-blur-md text-white font-mono text-[11px] font-bold shadow-md">
+                                    {safeIdx + 1} / {previewableImages.length}
+                                  </span>
+                                ) : <div />}
+                                <span className="px-3 py-1 rounded-full bg-slate-950/75 backdrop-blur-md text-white font-sans text-[11px] font-semibold flex items-center gap-1.5 shadow-md">
+                                  <Maximize2 className="w-3 h-3 text-slate-300" />
+                                  <span>Click to inspect &amp; zoom</span>
+                                </span>
+                              </div>
+
+                              {/* Direct Navigation Arrows (< and >) */}
+                              {previewableImages.length > 1 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : previewableImages.length - 1));
+                                    }}
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-md transition shadow-xl cursor-pointer active:scale-95 z-10 border border-white/10"
+                                    title="Previous Image"
+                                    aria-label="Previous image"
+                                  >
+                                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveImageIndex((prev) => (prev < previewableImages.length - 1 ? prev + 1 : 0));
+                                    }}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-md transition shadow-xl cursor-pointer active:scale-95 z-10 border border-white/10"
+                                    title="Next Image"
+                                    aria-label="Next image"
+                                  >
+                                    <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                                  </button>
+                                </>
+                              )}
+
+                              {/* Minimal Bottom Indicator Dots */}
+                              {previewableImages.length > 1 && (
+                                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 flex items-center gap-1.5 z-10 shadow-lg">
+                                  {previewableImages.map((_, dotIdx) => (
+                                    <button
+                                      key={dotIdx}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveImageIndex(dotIdx);
+                                      }}
+                                      className={`transition-all rounded-full cursor-pointer ${
+                                        safeIdx === dotIdx
+                                          ? "w-4 h-1.5 bg-emerald-400"
+                                          : "w-1.5 h-1.5 bg-white/40 hover:bg-white/80"
+                                      }`}
+                                      title={`Go to image ${dotIdx + 1}`}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 )}
 
-                {/* Tab 2: SAMP Technical Review */}
+                {/* Tab 2: Sampling Team Review */}
                 {activeTab === "review" && (
                   <FeasibilityTechnicalReviewTab
                     activeRequest={activeRequest}
@@ -801,6 +948,9 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     onCounterDateChange={setCounterDate}
                     onCounterDateReasonChange={setCounterDateReason}
                     onProposeCounterDate={handleProposeCounterDate}
+                    onProposeCounterDateDirect={handleProposeCounterDateSubmit}
+                    onNavigateToDecision={() => setActiveTab("decision")}
+                    onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
                     currentUserId={user?.id}
                     currentUserName={user?.name}
                     isAdmin={isAdmin}
@@ -863,6 +1013,11 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
         onNavigate={movePreview}
         imageSourceFor={imageSourceFor}
         imageStatusFor={imageStatusFor}
+        onSelectImage={(url) => {
+          setSelectedPreviewImage(url);
+          const idx = previewableImages.findIndex((img) => img.url === url);
+          if (idx >= 0) setActiveImageIndex(idx);
+        }}
       />
     </div>,
     document.body

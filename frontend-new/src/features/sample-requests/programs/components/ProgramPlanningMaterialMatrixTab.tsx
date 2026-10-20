@@ -9,16 +9,16 @@ import {
   Check,
   X,
   Loader2,
-  Clock,
+  Trash2,
 } from "lucide-react";
 
 export interface ProgramPlanningMaterialMatrixTabProps {
   activeRequest: SampleRequestItem;
   mode?: "marketing" | "sampling" | "plant";
   readOnly?: boolean;
-  onNavigateToTab?: (tab: "samp" | "plant" | "marketing" | "matrix") => void;
+  onNavigateToTab?: (tab: "samp" | "plant" | "matrix") => void;
   onAddMaterial?: (payload: AddProgramMaterialPayload) => Promise<void>;
-  onPromoteSku?: (materialId: number | string) => Promise<void>;
+  onDeleteMaterial?: (materialId: number | string) => Promise<any>;
   onRefreshData?: () => Promise<void>;
   onClaimTask?: (department: "sampling" | "plant") => Promise<void>;
   isClaiming?: boolean;
@@ -36,15 +36,20 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
   mode = "marketing",
   readOnly = false,
   onAddMaterial,
+  onDeleteMaterial,
+  onRefreshData,
 }) => {
   const materials = activeRequest.programMaterials || [];
   const skuCount = materials.length;
 
-  const canAddSku = mode === "marketing" && !readOnly && Boolean(onAddMaterial);
+  const canManageSku = mode === "marketing" && !readOnly;
+  const canAddSku = canManageSku && Boolean(onAddMaterial);
   const [isAddingSku, setIsAddingSku] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
-  const [addSuccess, setAddSuccess] = useState(false);
+  const [addSuccess, setAddSuccess] = useState(false);  // Row Action States
+  const [deletingId, setDeletingId] = useState<number | string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Summary statistics
   const summaryStats = useMemo(() => {
@@ -118,8 +123,33 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
     }
   };
 
+
+  const handleDeleteRow = async (matId: number | string) => {
+    if (!onDeleteMaterial || deletingId) return;
+    if (!window.confirm("Remove this SKU line from the material matrix?")) return;
+    setDeletingId(matId);
+    setActionError(null);
+    try {
+      await onDeleteMaterial(matId);
+      await onRefreshData?.();
+    } catch (err: any) {
+      setActionError(err?.message || "Failed to remove SKU line.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-2 select-text">
+      {actionError && (
+        <div className="p-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 text-xs flex items-center justify-between">
+          <span>{actionError}</span>
+          <button type="button" onClick={() => setActionError(null)} className="cursor-pointer text-rose-600 hover:text-rose-900 font-bold text-xs">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* ── Substrate Matrix Table ── */}
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-2xs">
         {/* Table Top Bar */}
@@ -163,9 +193,11 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
               <thead>
                 <tr className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] select-none">
                   <th className="px-2.5 py-1.5 w-10 text-center border-r border-[var(--border-subtle)]">#</th>
-                  <th className="px-3 py-1.5 min-w-[240px] border-r border-[var(--border-subtle)]">Substrate &amp; Specifications</th>
-                  <th className="px-3 py-1.5 min-w-[120px] text-right border-r border-[var(--border-subtle)]">Planned Volume</th>
-                  <th className="px-3 py-1.5 min-w-[280px]">Marketing Directive &amp; Application</th>
+                  <th className="px-3 py-1.5 min-w-[200px] border-r border-[var(--border-subtle)]">Substrate &amp; Specifications</th>
+                  <th className="px-3 py-1.5 min-w-[100px] text-right border-r border-[var(--border-subtle)]">Planned Volume</th>
+                  <th className="px-3 py-1.5 min-w-[180px] border-r border-[var(--border-subtle)]">SAMP &amp; Plant Feedback</th>
+                  <th className="px-3 py-1.5 min-w-[180px] border-r border-[var(--border-subtle)]">Marketing Directive</th>
+                  {canManageSku && onDeleteMaterial && <th className="px-3 py-1.5 w-16 text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -210,18 +242,58 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                         </span>
                       </td>
 
+                      {/* SAMP & Plant Feedback */}
+                      <td className="px-3 py-1.5 border-r border-[var(--border-subtle)]">
+                        <div className="space-y-1">
+                          {mat.sampRemark && (
+                            <div className="flex items-start gap-1 text-[10.5px] text-emerald-800 dark:text-emerald-300">
+                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-emerald-100 dark:bg-emerald-950/60 shrink-0">SAMP</span>
+                              <span className="line-clamp-2">{mat.sampRemark}</span>
+                            </div>
+                          )}
+                          {mat.plantRemark && (
+                            <div className="flex items-start gap-1 text-[10.5px] text-teal-800 dark:text-teal-300">
+                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-teal-100 dark:bg-teal-950/60 shrink-0">PLANT</span>
+                              <span className="line-clamp-2">{mat.plantRemark}</span>
+                            </div>
+                          )}
+                          {!mat.sampRemark && !mat.plantRemark && (
+                            <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">Awaiting team notes</span>
+                          )}
+                        </div>
+                      </td>
+
                       {/* Marketing Directive & Application */}
-                      <td className="px-3 py-1.5 text-xs text-[var(--on-surface)]">
+                      <td className="px-3 py-1.5 text-xs text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
                         {mat.remark ? (
                           <div className="text-[11px] leading-snug line-clamp-2">
                             {mat.remark}
                           </div>
                         ) : (
                           <span className="text-[var(--on-surface-subtle)] font-mono text-[10.5px]">
-                            — No special directive specified —
+                            — Standard production —
                           </span>
                         )}
                       </td>
+
+                      {/* Actions */}
+                      {canManageSku && onDeleteMaterial && (
+                        <td className="px-3 py-1.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRow(mat.id!)}
+                            disabled={deletingId === mat.id}
+                            className="h-6 w-6 mx-auto rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 flex items-center justify-center transition cursor-pointer disabled:opacity-50"
+                            title="Remove SKU line"
+                          >
+                            {deletingId === mat.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin text-rose-600" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -275,6 +347,8 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
         )}
       </div>
 
+      
+
       {/* ── Add SKU Specification Popup Modal ── */}
       {isAddingSku &&
         createPortal(
@@ -298,195 +372,183 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                     <h3 className="font-display font-bold text-base text-[var(--on-surface)]">
                       Add SKU Material Specification
                     </h3>
-                    <p className="text-xs text-[var(--on-surface-muted)] mt-0.5">
-                      Configure substrate properties, volume allocation, and directives.
+                    <p className="text-xs text-[var(--on-surface-muted)]">
+                      Configure substrate characteristics for seasonal planning
                     </p>
                   </div>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => setIsAddingSku(false)}
                   disabled={isSubmitting}
-                  className="p-1.5 rounded-xl text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] cursor-pointer transition disabled:opacity-50"
-                  title="Close popup (Esc)"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition cursor-pointer"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Form */}
-              <form onSubmit={handleAddSkuSubmit} className="space-y-4">
-                {/* Feedback Banners */}
+              {/* Form Body */}
+              <form onSubmit={handleAddSkuSubmit} className="space-y-4 text-xs">
                 {addError && (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 font-semibold flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{addError}</span>
                   </div>
                 )}
-
                 {addSuccess && (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                    <Check className="w-4 h-4 shrink-0 text-emerald-600" />
-                    <span>✓ SKU line successfully added to matrix!</span>
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-2">
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span>SKU specification added successfully!</span>
                   </div>
                 )}
 
-                {/* Section 1: Core Specifications & Volume */}
-                <div className="space-y-2">
-                  <div className="text-[10.5px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-                    01. Material &amp; Volume Target
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Material Type */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                      Material Type <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Folding Box Board, Kraft Paper, Greyboard"
+                      value={draftMaterial.material_type || ""}
+                      onChange={(e) =>
+                        setDraftMaterial((prev) => ({ ...prev, material_type: e.target.value }))
+                      }
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                    />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
-                    {/* Material Type */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1">
-                        Material Type <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={draftMaterial.material_type || ""}
-                        onChange={(e) =>
-                          setDraftMaterial((prev) => ({ ...prev, material_type: e.target.value }))
-                        }
-                        placeholder="e.g. FBB Board, Greyboard"
-                        className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-sm text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)]/70 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
-                      />
-                    </div>
 
-                    {/* Planned Quantity */}
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1">
-                        Volume <span className="text-rose-500">*</span>
-                      </label>
+                  {/* Supplier Info */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                      Supplier / Mill
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. ITC Ltd, Century Pulp, Bilt"
+                      value={draftMaterial.supplier_name || ""}
+                      onChange={(e) =>
+                        setDraftMaterial((prev) => ({ ...prev, supplier_name: e.target.value }))
+                      }
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                    />
+                  </div>
+
+                  {/* Grade */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                      Grade
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Cyber XL Pac, Super Kraft"
+                      value={draftMaterial.grade || ""}
+                      onChange={(e) =>
+                        setDraftMaterial((prev) => ({ ...prev, grade: e.target.value }))
+                      }
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                    />
+                  </div>
+
+                  {/* Color / Variant */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                      Color / Variant
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Natural White, Golden Brown, Bleached"
+                      value={draftMaterial.color_variant || ""}
+                      onChange={(e) =>
+                        setDraftMaterial((prev) => ({ ...prev, color_variant: e.target.value }))
+                      }
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                    />
+                  </div>
+
+                  {/* Caliper / Weight */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                      Caliper / Weight (GSM/Microns)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 300 GSM, 450 Microns, 1.8mm"
+                      value={draftMaterial.caliper_wt || ""}
+                      onChange={(e) =>
+                        setDraftMaterial((prev) => ({ ...prev, caliper_wt: e.target.value }))
+                      }
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                    />
+                  </div>
+
+                  {/* Planned Quantity & Unit */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                      Planned Volume &amp; Unit <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
                       <input
                         type="number"
-                        required
                         min="1"
+                        required
+                        placeholder="e.g. 50000"
                         value={draftMaterial.quantity || ""}
                         onChange={(e) =>
                           setDraftMaterial((prev) => ({ ...prev, quantity: e.target.value }))
                         }
-                        placeholder="e.g. 25000"
-                        className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-sm text-[var(--on-surface)] font-mono placeholder:text-[var(--on-surface-subtle)]/70 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                        className="flex-1 h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] font-mono text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
                       />
-                    </div>
-
-                    {/* Measurement Unit */}
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1">
-                        Unit
-                      </label>
                       <input
                         type="text"
-                        value={draftMaterial.unit ?? ""}
+                        placeholder="pcs"
+                        value={draftMaterial.unit || "pcs"}
                         onChange={(e) =>
                           setDraftMaterial((prev) => ({ ...prev, unit: e.target.value }))
                         }
-                        placeholder="pcs, sheets"
-                        className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-sm text-[var(--on-surface)] font-mono placeholder:text-[var(--on-surface-subtle)]/70 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                        className="w-20 h-9 px-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] font-mono text-xs text-[var(--on-surface)] text-center focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Section 2: Mill Sourcing & Finish */}
-                <div className="space-y-2">
-                  <div className="text-[10.5px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-                    02. Sourcing &amp; Surface Properties
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1">
-                        Caliper / Weight
-                      </label>
-                      <input
-                        type="text"
-                        value={draftMaterial.caliper_wt || ""}
-                        onChange={(e) =>
-                          setDraftMaterial((prev) => ({ ...prev, caliper_wt: e.target.value }))
-                        }
-                        placeholder="e.g. 300 GSM"
-                        className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-sm text-[var(--on-surface)] font-mono placeholder:text-[var(--on-surface-subtle)]/70 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1">
-                        Supplier / Mill
-                      </label>
-                      <input
-                        type="text"
-                        value={draftMaterial.supplier_name || ""}
-                        onChange={(e) =>
-                          setDraftMaterial((prev) => ({ ...prev, supplier_name: e.target.value }))
-                        }
-                        placeholder="e.g. ITC, Century"
-                        className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-sm text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)]/70 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1">
-                        Grade / Brand
-                      </label>
-                      <input
-                        type="text"
-                        value={draftMaterial.grade || ""}
-                        onChange={(e) =>
-                          setDraftMaterial((prev) => ({ ...prev, grade: e.target.value }))
-                        }
-                        placeholder="e.g. Cyber Premium"
-                        className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-sm text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)]/70 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 3: Marketing Directives */}
-                <div className="space-y-1.5">
+                {/* Directive & Application Remark */}
+                <div className="space-y-1">
                   <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
-                    03. Marketing Directives &amp; Application Scope
+                    Marketing Directive / Application Notes
                   </label>
                   <textarea
                     rows={2}
+                    placeholder="e.g. Outer lid wrap with soft touch lamination; grain parallel to spine"
                     value={draftMaterial.remark || ""}
                     onChange={(e) =>
                       setDraftMaterial((prev) => ({ ...prev, remark: e.target.value }))
                     }
-                    placeholder="Specific substrate requirements, intended use (e.g. Outer Cover, Inner Leaves), grain orientation, lamination notes..."
-                    className="w-full p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs sm:text-sm text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)]/70 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition resize-none"
+                    className="w-full p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition resize-none"
                   />
                 </div>
 
-                {/* Modal Footer Actions - Sized comfortably */}
-                <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
-                  <span className="text-[11px] font-mono text-[var(--on-surface-subtle)] flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-[var(--on-surface-subtle)]" />
-                    <span>Auto-records into audit log</span>
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingSku(false)}
-                      disabled={isSubmitting}
-                      className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] text-xs sm:text-sm font-semibold cursor-pointer transition disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="h-10 px-5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs sm:text-sm font-semibold flex items-center gap-2 transition shadow-xs cursor-pointer disabled:opacity-50 active:scale-95"
-                    >
-                      {isSubmitting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Plus className="w-4 h-4" />
-                      )}
-                      <span>Add SKU Line</span>
-                    </button>
-                  </div>
+                {/* Modal Footer */}
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--border-subtle)]">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingSku(false)}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-medium text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-5 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+                  >
+                    {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    <span>{isSubmitting ? "Adding..." : "Add to Material Matrix"}</span>
+                  </button>
                 </div>
               </form>
             </div>

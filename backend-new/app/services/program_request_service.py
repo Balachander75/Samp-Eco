@@ -286,6 +286,8 @@ class ProgramRequestService:
         item = self.repo.get_for_update(request_id)
         if not item:
             return None
+        if getattr(item, "status", None) == "Dismantled":
+            raise HTTPException(status_code=400, detail="Cannot modify materials in a dismantled program plan.")
 
         self._claim_team_task(item, "sampling", current_user)
         actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
@@ -322,6 +324,8 @@ class ProgramRequestService:
         item = self.repo.get_for_update(request_id)
         if not item:
             return None
+        if getattr(item, "status", None) == "Dismantled":
+            raise HTTPException(status_code=400, detail="Cannot modify materials in a dismantled program plan.")
         self._claim_team_task(item, "sampling", current_user)
         mat = next((m for m in item.materials if m.id == material_id), None)
         if not mat:
@@ -360,6 +364,8 @@ class ProgramRequestService:
         item = self.repo.get_for_update(request_id)
         if not item:
             return None
+        if getattr(item, "status", None) == "Dismantled":
+            raise HTTPException(status_code=400, detail="Cannot modify materials in a dismantled program plan.")
 
         self._claim_team_task(item, "plant", current_user)
         actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
@@ -396,6 +402,8 @@ class ProgramRequestService:
         item = self.repo.get_for_update(request_id)
         if not item:
             return None
+        if getattr(item, "status", None) == "Dismantled":
+            raise HTTPException(status_code=400, detail="Cannot modify materials in a dismantled program plan.")
         self._claim_team_task(item, "plant", current_user)
         mat = next((m for m in item.materials if m.id == material_id), None)
         if not mat:
@@ -489,6 +497,12 @@ class ProgramRequestService:
         if not mat:
             return None
 
+        if getattr(mat, "promoted_sample_request_id", None):
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot delete a material SKU that has already been promoted to an active Sample Request.",
+            )
+
         actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
         mat_type = mat.material_type
 
@@ -551,6 +565,7 @@ class ProgramRequestService:
         department: str,
         remark: str,
         current_user: Optional[Any] = None,
+        verdict: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Save a SAMP or Plant planning observation as an auditable output."""
         item = self.repo.get_for_update(request_id)
@@ -572,8 +587,7 @@ class ProgramRequestService:
             item.sampling_signed_by = actor_name
             item.sampling_seen_at = item.sampling_seen_at or now
             item.sampling_seen_by = item.sampling_seen_by or actor_name
-            if not item.sampling_verdict:
-                item.sampling_verdict = "Feasible"
+            item.sampling_verdict = verdict or item.sampling_verdict or "Feasible"
             action = "SAMP_OUTPUT"
             actor_department = "SAMP Team"
         else:
@@ -583,8 +597,7 @@ class ProgramRequestService:
             item.plant_signed_by = actor_name
             item.plant_seen_at = item.plant_seen_at or now
             item.plant_seen_by = item.plant_seen_by or actor_name
-            if not item.plant_verdict:
-                item.plant_verdict = "Capacity Confirmed"
+            item.plant_verdict = verdict or item.plant_verdict or "Capacity Confirmed"
             action = "PLANT_OUTPUT"
             actor_department = f"Plant ({item.target_plant})"
 
@@ -687,6 +700,8 @@ class ProgramRequestService:
         """Ensure the user has claimed the SAMP/Plant review lane before submitting remarks."""
         if not current_user:
             raise HTTPException(status_code=401, detail="Sign in and claim this review before submitting remarks.")
+        if is_admin(current_user):
+            return
         field_prefix = "sampling" if department == "sampling" else "plant"
         id_field = f"{field_prefix}_claimed_by_user_id"
         name_field = f"{field_prefix}_claimed_by"
@@ -819,6 +834,9 @@ class ProgramRequestService:
         if not item:
             raise HTTPException(status_code=404, detail="Program planning request was not found")
 
+        if getattr(item, "status", None) == "Dismantled":
+            raise HTTPException(status_code=400, detail="A dismantled program plan cannot be resumed or modified.")
+
         actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
         item.is_active = not paused
 
@@ -833,6 +851,48 @@ class ProgramRequestService:
             payload={
                 "is_active": item.is_active,
                 "paused": paused,
+                "note": note,
+            },
+            actor_id=actor_id,
+        )
+        self.db.commit()
+        self.db.refresh(item)
+        return self.serialize(item)
+
+    def dismantle_program(
+        self,
+        request_id: int,
+        reason: Optional[str] = None,
+        current_user: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Marketing creator or Admin permanently dismantles a seasonal program."""
+        item = self.repo.get_for_update(request_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Program planning request was not found")
+
+        if getattr(item, "status", None) == "Dismantled":
+            raise HTTPException(status_code=400, detail="This program plan is already dismantled.")
+
+        actor_id, actor_name, actor_dept = self._get_actor_info(current_user)
+        item.status = "Dismantled"
+        item.is_active = False
+
+        cleaned_reason = (reason or "").strip() or None
+        note = (
+            f"Seasonal Program was permanently dismantled by Marketing: {cleaned_reason}"
+            if cleaned_reason
+            else "Seasonal Program was permanently dismantled by Marketing"
+        )
+
+        self.repo.add_activity_log(
+            program_request_id=item.id,
+            actor_name=actor_name,
+            actor_department=actor_dept if current_user else "Marketing",
+            action="PROGRAM_DISMANTLED",
+            payload={
+                "status": "Dismantled",
+                "is_active": False,
+                "reason": cleaned_reason,
                 "note": note,
             },
             actor_id=actor_id,
@@ -908,7 +968,7 @@ class ProgramRequestService:
         if mat.remark:
             sku_details.append(f"Marketing Directive: {mat.remark}")
         if mat.samp_remark:
-            sku_details.append(f"SAMP Lab Review: {mat.samp_remark}")
+            sku_details.append(f"Sampling Team Review: {mat.samp_remark}")
         if item.plant_remark:
             sku_details.append(f"Plant Review: {item.plant_remark}")
 

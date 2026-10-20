@@ -524,7 +524,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       },
     },
     {
-      label: "Sampling Lab & Plant",
+      label: "Sampling Team & Plant",
       value: stageCounts.samp + stageCounts.plant + stageCounts.costing,
       detail: "Floor, BOM & costing",
       color: "bg-teal-500",

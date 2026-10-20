@@ -3,16 +3,14 @@ import { SampleRequestItem } from "../../types";
 import { formatOdooDate } from "../../utils/dateUtils";
 import {
   CheckCircle2,
-  Clock,
+  Factory,
   Loader2,
   ShieldCheck,
   Check,
   Save,
   FileCheck2,
   AlertCircle,
-  ShieldAlert,
   UserCheck,
-  Lock,
 } from "lucide-react";
 import { updateBatchProgramSampRemarksApi } from "@/infrastructure/api/programsApi";
 
@@ -50,7 +48,6 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
   const isClaimed = Boolean(claimUserId);
   const isClaimedByMe = Boolean(claimUserId && currentUserId && claimUserId === currentUserId);
-  const isAdmin = currentUser?.role?.toLowerCase() === "admin" || currentUser?.role?.toLowerCase() === "administrator";
 
   // Every SAMP response must be submitted by the reviewer who owns the claim.
   const canSubmitReview = isSamplingDesk && !readOnly && isClaimedByMe;
@@ -120,141 +117,91 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
 
   return (
     <div className="py-2 space-y-3 select-text text-xs">
-      {/* ── Claim Banner Strip ── */}
-      {isSamplingDesk && !readOnly ? (
-        !isClaimed ? (
-          <div className="p-2.5 rounded-xl border border-amber-300 bg-amber-50/90 dark:border-amber-900/50 dark:bg-amber-950/30 flex flex-wrap items-center justify-between gap-2.5 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-700 dark:text-amber-300 shrink-0">
-                <ShieldAlert className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="font-display font-bold text-xs text-amber-950 dark:text-amber-200">
-                  Sampling Technical Review Unclaimed
-                </h4>
-                <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80">
-                  Claim this program request first to unlock material specifications and submit formal SAMP technical evaluation.
-                </p>
-              </div>
+      {/* ── 1. Compact Sampling Review Parameters & Ownership Strip ── */}
+      <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Target Plant */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+              <Factory className="w-4 h-4" />
             </div>
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
+                Destination
+              </span>
+              <span className="font-mono font-bold text-xs text-[var(--on-surface)]">
+                {activeRequest.targetPlant?.toLowerCase().startsWith("plant") ? activeRequest.targetPlant : `Plant ${activeRequest.targetPlant || "1505"}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="h-6 w-px bg-[var(--border-subtle)] hidden sm:block" />
+
+          {/* Substrate SKUs */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <FileCheck2 className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
+                Substrate Scope
+              </span>
+              <span className="font-sans font-bold text-xs text-[var(--on-surface)]">
+                {materials.length} Material {materials.length === 1 ? "Line" : "Lines"}
+              </span>
+            </div>
+          </div>
+
+          <div className="h-6 w-px bg-[var(--border-subtle)] hidden sm:block" />
+
+          {/* Assigned Reviewer */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] flex items-center justify-center shrink-0">
+              <UserCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block font-semibold">
+                Sampling Reviewer
+              </span>
+              <span className="font-sans font-bold text-xs text-[var(--on-surface)]">
+                {activeRequest.samplingClaimedBy || (
+                  <span className="text-amber-600 dark:text-amber-400 italic">Unclaimed</span>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Claim / Status Action Button on Right */}
+        <div className="flex items-center gap-2">
+          {hasSampNote ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-xs font-bold shadow-2xs">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>Review Completed</span>
+            </span>
+          ) : isSamplingDesk && !readOnly && !isClaimed ? (
             <button
               type="button"
               onClick={() => onClaimTask?.("sampling")}
               disabled={isClaiming}
-              className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50"
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50"
             >
               {isClaiming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
-              <span>{isClaiming ? "Claiming Review..." : "Claim Technical Review"}</span>
+              <span>{isClaiming ? "Claiming..." : "Claim Sampling Task"}</span>
             </button>
-          </div>
-        ) : !isClaimedByMe ? (
-          <div className="p-2.5 rounded-xl border border-sky-200 bg-sky-50/70 dark:border-sky-900/50 dark:bg-sky-950/30 flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center text-sky-700 dark:text-sky-300 shrink-0">
-              <Lock className="w-4 h-4" />
-            </div>
-            <div>
-              <h4 className="font-display font-bold text-xs text-sky-950 dark:text-sky-200">
-                Assigned to {activeRequest.samplingClaimedBy || "Another SAMP Reviewer"}
-              </h4>
-              <p className="text-[11px] text-sky-900/80 dark:text-sky-300/80">
-                This technical review is currently claimed and being handled by {activeRequest.samplingClaimedBy}.
-              </p>
-            </div>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => onClaimTask?.("sampling")}
-                disabled={isClaiming}
-                className="ml-auto shrink-0 px-2.5 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-800 text-white text-[11px] font-semibold disabled:opacity-50"
-              >
-                {isClaiming ? "Claiming..." : "Take Over Review"}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="p-2.5 rounded-xl border border-emerald-300 bg-emerald-50/80 dark:border-emerald-900/50 dark:bg-emerald-950/30 flex items-center justify-between gap-2.5 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-700 dark:text-emerald-300 shrink-0">
-                <UserCheck className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <h4 className="font-display font-bold text-xs text-emerald-950 dark:text-emerald-200">
-                  Claimed by You ({activeRequest.samplingClaimedBy || currentUser?.name})
-                </h4>
-                <p className="text-[11px] text-emerald-900/80 dark:text-emerald-300/80">
-                  You have active technical ownership. Complete line remarks and submit formal observation below.
-                </p>
-              </div>
-            </div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300/50">
-              Active Owner
+          ) : isClaimedByMe ? (
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              ✓ Active Owner
             </span>
-          </div>
-        )
-      ) : (
-        /* Marketing / ReadOnly Perspective: Informational Intake Status */
-        !isClaimed ? (
-          <div className="p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] flex items-center gap-2.5 shadow-2xs">
-            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <div>
-              <h4 className="font-display font-bold text-xs text-[var(--on-surface)]">
-                Awaiting Sampling Review Claim
-              </h4>
-              <p className="text-[11px] text-[var(--on-surface-muted)]">
-                This program plan has been released to Sampling Team. Awaiting claim and substrate evaluation by SAMP lab.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20 flex items-center gap-2.5 shadow-2xs">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <div>
-              <h4 className="font-display font-bold text-xs text-[var(--on-surface)]">
-                Under Technical Evaluation by {activeRequest.samplingClaimedBy}
-              </h4>
-              <p className="text-[11px] text-[var(--on-surface-muted)]">
-                Sampling reviewer has claimed this request and is conducting technical evaluation.
-              </p>
-            </div>
-          </div>
-        )
-      )}
-
-      {/* ── Editorial Header Banner ── */}
-      <div className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)]">
-        <div className="flex items-start justify-between gap-2.5 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/40">
-                SAMP Lab Stage
-              </span>
-              <h2 className="text-xs sm:text-sm font-bold font-display text-[var(--on-surface)]">
-                Technical Feasibility &amp; Substrate Specifications
-              </h2>
-            </div>
-            <p className="mt-0.5 text-[11px] text-[var(--on-surface-muted)] max-w-2xl leading-normal">
-              SAMP Lab evaluates substrate characteristics, machine tooling compatibility, paper grain orientation, and trial runs for all SKUs in this program plan.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {hasSampNote ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-display font-bold text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Reviewed by {activeRequest.samplingSignedBy || activeRequest.samplingClaimedBy || "SAMP Team"}</span>
-              </span>
-            ) : isClaimed ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-display font-semibold text-[11px] bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/50 dark:text-sky-300">
-                <Clock className="w-3 h-3" />
-                <span>Claimed by {activeRequest.samplingClaimedBy}</span>
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-display font-semibold text-[11px] bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300">
-                <Clock className="w-3 h-3" />
-                <span>Pending Claim</span>
-              </span>
-            )}
-          </div>
+          ) : isClaimed ? (
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border border-sky-200">
+              Claimed by {activeRequest.samplingClaimedBy}
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200">
+              Pending Claim
+            </span>
+          )}
         </div>
       </div>
 

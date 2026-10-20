@@ -32,7 +32,7 @@ The application orchestrates requests through seven interconnected enterprise wo
                      ┌───────────────────┴───────────────────┐
                      ▼                                       ▼
 ┌────────────────────────────────────────┐ ┌────────────────────────────────────────┐
-│         2. CREATIVE STUDIO DESK        │ │       3. FEASIBILITY (SAMP LAB)        │
+│         2. CREATIVE STUDIO DESK        │ │       3. FEASIBILITY (SAMP TEAM)        │
 │  Route: /creative-work/design          │ │  Route: /sample-requests/feasibility   │
 │  - Artwork Briefs & Variant Generation │ │  - Tech verdict (Feasible/Revision/No) │
 │  - Reference moodboards & Shutterstock │ │  - Counter-date proposal (2-day SLA)   │
@@ -60,7 +60,7 @@ The application orchestrates requests through seven interconnected enterprise wo
                      │ Quote Approved
                      ▼
 ┌────────────────────────────────────────┐
-│       6. SAMPLING LAB (SAMP TEAM)      │
+│       6. SAMPLING TEAM (SAMP TEAM)      │
 │  Route: /samp-team-work                │
 │  - Prototype physical fabrication      │
 │  - Sample review & dispatch readiness  │
@@ -127,7 +127,7 @@ d:/Projects/samp/
 │   │   │   ├── dashboard/             # OperationsOverview (executive telemetry, KPI ribbon)
 │   │   │   ├── sample-requests/       # Marketing intake, drafts, Sampling, Costing, feasibility, programs
 │   │   │   ├── creative/              # Creative briefs, artwork, and Studio CAD/dielines
-│   │   │   ├── samp-team/             # Sampling Lab desk, feasibility technical review
+│   │   │   ├── samp-team/             # Sampling Team desk, feasibility technical review
 │   │   │   ├── plant/                 # Program review; floor/QC/dispatch remain placeholders
 │   │   │   ├── members/               # Teams, enterprise users, plant assignments, governance
 │   │   │   └── settings/              # SettingsPage (13 selectable enterprise theme palettes)
@@ -185,7 +185,7 @@ User access is strictly partitioned across two dimensions: **System Privilege** 
 | `feasibility_requests` | Technical feasibility checks | `id`, `request_code`, `customer_id` (FK), `target_plant`, `feasibility_type`, `description_notes`, `status`, `samp_counter_date`, `counter_date_decision`, `converted_sr_number` |
 | `feasibility_activity_logs` | Feasibility audit & chatter | `feasibility_request_id` (FK), `actor_name`, `actor_department`, `action`, `payload` |
 | `feasibility_reference_images` | Binary stored reference images | `feasibility_request_id` (FK), `original_name`, `content_type`, `image_data` (bytea) |
-| `feasibility_technical_attachments` | SAMP Lab technical evidence | `feasibility_request_id` (FK), `uploaded_by`, `original_name`, `file_data` (bytea) |
+| `feasibility_technical_attachments` | Sampling Team technical evidence | `feasibility_request_id` (FK), `uploaded_by`, `original_name`, `file_data` (bytea) |
 | `program_requests` | Seasonal Program Planning | `id`, `request_code`, `sr_number`, `customer_name`, `target_plant`, `program_campaign_title`, `program_year`, `sampling_verdict`, `plant_verdict` |
 | `program_material_specifications` | Program material matrix rows | `program_request_id` (FK), `material_type`, `supplier_name`, `grade`, `color_variant`, `caliper_wt`, `quantity`, `unit`, `samp_remark` |
 | `program_activity_logs` | Program chatter & pinned notes | `program_request_id` (FK), `actor_name`, `action`, `pinned_by_marketing`, `payload` |

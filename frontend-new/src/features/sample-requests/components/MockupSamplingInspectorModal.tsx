@@ -1,3 +1,4 @@
+import { UniversalChatterFeed, UniversalChatterEvent } from "./common/UniversalChatterFeed";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -313,6 +314,27 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
       items,
     }));
   }, [filteredSpecs]);
+
+  const mockupChatterEvents = useMemo<UniversalChatterEvent[]>(() => {
+    return (record.logs || []).map((log) => {
+      const hasRemark = Boolean(log.details?.remark) || Boolean(log.details?.note);
+      const remarkText = String(log.details?.remark || log.details?.note || "").trim();
+      const isSystem = !hasRemark;
+
+      return {
+        id: log.id,
+        kind: isSystem ? "system_announcement" : "bubble",
+        actorName: log.actor_name || "Team Member",
+        actorDepartment: log.actor_team || "Mockup",
+        summary: hasRemark ? remarkText : `${log.actor_name || "User"} - ${formatWorkflowAction(log.action)}`,
+        timestamp: log.created_at,
+        badge: log.from_stage && log.to_stage && log.from_stage !== log.to_stage ? {
+          text: `${stageLabels[log.from_stage] || log.from_stage} → ${stageLabels[log.to_stage] || log.to_stage}`,
+          variant: "info",
+        } : undefined,
+      };
+    });
+  }, [record.logs]);
 
   return createPortal(
     <div
@@ -1098,62 +1120,13 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
 
               {/* ═════════ TAB 4: AUDIT TRAIL & ACTIVITY LOG ═════════ */}
               {activeTab === "history" && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--on-surface-subtle)] font-mono">
-                      Append-Only Workflow Activity Timeline
-                    </h3>
-                    <span className="text-xs text-[var(--on-surface-muted)]">
-                      {record.logs.length} transition records
-                    </span>
-                  </div>
-
-                  <ol className="space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5">
-                    {record.logs.map((log) => (
-                      <li
-                        key={log.id}
-                        className="relative border-l-2 border-[var(--border-subtle)] pb-2 pl-4 last:border-transparent"
-                      >
-                        <span className="absolute -left-[5px] top-1.5 h-2 w-2 rounded-full bg-[var(--accent-primary)] ring-4 ring-[var(--surface-lowest)]" />
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-xs font-bold text-[var(--on-surface)]">
-                            {formatWorkflowAction(log.action)}
-                          </p>
-                          <span className="flex items-center gap-1 text-[10px] text-[var(--on-surface-subtle)]">
-                            <Clock3 className="h-3 w-3" />
-                            {formatDateTime(log.created_at)}
-                          </span>
-                        </div>
-
-                        {log.from_stage && log.to_stage && log.from_stage !== log.to_stage && (
-                          <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-[var(--on-surface-muted)]">
-                            <span className="rounded bg-[var(--surface-low)] px-1.5 py-0.5">
-                              {stageLabels[log.from_stage] || log.from_stage}
-                            </span>
-                            <ArrowRight className="h-3 w-3 text-[var(--border-strong)]" />
-                            <span className="rounded bg-[var(--surface-low)] px-1.5 py-0.5 font-bold text-[var(--on-surface)]">
-                              {stageLabels[log.to_stage] || log.to_stage}
-                            </span>
-                          </p>
-                        )}
-
-                        <p className="mt-1 text-[10px] text-[var(--on-surface-muted)]">
-                          Actor: <strong className="text-[var(--on-surface)]">{log.actor_name}</strong> · Team: {log.actor_team}
-                        </p>
-
-                        {typeof log.details.remark === "string" && log.details.remark && (
-                          <div className="mt-2 rounded-lg bg-[var(--surface-low)] p-2.5 text-xs text-[var(--on-surface)] border border-[var(--border-subtle)] italic">
-                            "{log.details.remark}"
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                    {!record.logs.length && (
-                      <li className="py-4 text-center text-xs text-[var(--on-surface-muted)]">
-                        No activity records logged yet.
-                      </li>
-                    )}
-                  </ol>
+                <div className="h-[480px] rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--surface-lowest)]">
+                  <UniversalChatterFeed
+                    title="Audit & Activity Log"
+                    events={mockupChatterEvents}
+                    currentUser={user}
+                    className="w-full h-full"
+                  />
                 </div>
               )}
             </div>

@@ -61,7 +61,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
   sourceDesk = "marketing",
   isReadOnly = false,
 }) => {
-  const { selectedPlant } = usePlant();
+  const { selectedPlant, matchesPlant, activePlantOption } = usePlant();
   const { currentBusinessYear } = useBusinessYear();
   const isAdmin = checkIsAdmin(user);
   // RBAC: Only marketing desk members or admins on Marketing desk can raise new feasibility requests
@@ -231,12 +231,8 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
   // Filtered requests
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
-      // Plant filter (if plant context is set and not "All")
-      if (selectedPlant && selectedPlant !== "All Plants" && r.targetPlant) {
-        if (r.targetPlant !== selectedPlant && !r.targetPlant.includes(selectedPlant)) {
-          // Keep showing if user plant is flexible
-        }
-      }
+      // Plant filter
+      if (!matchesPlant(r.targetPlant)) return false;
 
       if (filterTab === "awaiting_counter_date") {
         if (r.counterDateDecision !== "pending") return false;
@@ -627,7 +623,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
     {
       label: "Needs Claim",
       value: metrics.awaitingClaim,
-      detail: "Waiting for SAMP Lab",
+      detail: "Waiting for Sampling Team",
       color: "bg-amber-500",
       isActive: filterTab === "awaiting_claim",
       onClick: () => setFilterTab("awaiting_claim"),
@@ -838,7 +834,7 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
             customers={masterCustomers}
             existingCustomers={customerList}
             requestCreatedBy={user?.name || user?.userid}
-            defaultPlant={selectedPlant && selectedPlant !== "All Plants" ? selectedPlant : "Navneet - Khaniwade"}
+            defaultPlant={activePlantOption?.name || (selectedPlant && selectedPlant !== "ALL" ? selectedPlant : "1505 - Khaniwade")}
           />
         )}
       </React.Suspense>
