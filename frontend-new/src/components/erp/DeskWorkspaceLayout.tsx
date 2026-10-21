@@ -130,7 +130,7 @@ export const DeskWorkspaceLayout: React.FC<DeskWorkspaceLayoutProps> = ({
                 type="button"
                 onClick={primaryAction.onClick}
                 disabled={primaryAction.disabled}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] shadow-2xs cursor-pointer active:scale-98 disabled:opacity-50"
+                className="theme-primary-cta inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-98 disabled:opacity-50"
                 title={primaryAction.title || primaryAction.label}
               >
                 {primaryAction.icon ? (

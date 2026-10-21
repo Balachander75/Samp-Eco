@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Copy, Eye, Layers, Plus, X } from "lucide-react";
+import { Copy, Eye, Layers, Plus, Send, X } from "lucide-react";
 import { OperationalDatePicker } from "@/components/erp";
 import { StagedProductItem, DELIVERABLES } from "../../types/staging";
 
@@ -240,20 +240,26 @@ const EditableUnit: React.FC<EditableUnitProps> = ({ unit, qtyPerPack, editable,
 
 export interface StagingProductListProps {
   stagedProducts: StagedProductItem[];
+  isFeasibilityHandoff?: boolean;
   onOpenAddModal?: () => void;
   onInspectProduct: (item: StagedProductItem) => void;
   onUpdateProduct?: (item: StagedProductItem, updates: Partial<StagedProductItem>) => Promise<boolean | void> | boolean | void;
   onDuplicateProduct: (item: StagedProductItem) => void;
   onRemoveProduct: (id: string) => void;
+  onReleaseRequest?: () => void;
+  isReleasing?: boolean;
 }
 
 export const StagingProductList: React.FC<StagingProductListProps> = ({
   stagedProducts,
+  isFeasibilityHandoff = false,
   onOpenAddModal,
   onInspectProduct,
   onUpdateProduct,
   onDuplicateProduct,
   onRemoveProduct,
+  onReleaseRequest,
+  isReleasing = false,
 }) => {
   const editable = Boolean(onUpdateProduct);
   const updateField = async (item: StagedProductItem, field: EditableField, value: string) => {
@@ -319,28 +325,51 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
 
   if (stagedProducts.length === 0) {
     return (
-      <div className="flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-white dark:bg-[#0c0d12] px-6 py-14 text-center shadow-2xs">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-zinc-600 dark:text-zinc-300 shadow-2xs">
+      <div className="flex min-h-[380px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-6 py-14 text-center shadow-2xs">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[var(--accent-primary)] shadow-2xs">
           <Layers className="h-7 w-7 stroke-[1.8]" />
         </div>
-        <h3 className="font-display text-base font-bold tracking-tight text-zinc-900 dark:text-white">
+        <h3 className="font-display text-base font-bold tracking-tight text-[var(--on-surface)]">
           No Products Staged Yet
         </h3>
-        <p className="mt-1.5 max-w-md text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-          This sample request currently has no staged items. Add product specifications, configure artwork briefs or prototype samples, and assign deliverables.
+        <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--on-surface-muted)]">
+          {isFeasibilityHandoff
+            ? "Add the product covered by this feasibility request. Its selected Sample, Mockup, and Costing processes will start when you release from here."
+            : "This sample request currently has no staged items. Add product specifications, configure artwork briefs or prototype samples, and assign deliverables."}
         </p>
+
+        {/* 3-Step Lifecycle Guidance Indicator */}
+        <div className="my-5 flex flex-wrap items-center justify-center gap-2 text-[11px] font-sans">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-semibold border border-[var(--accent-primary)]/20">
+            <span className="w-4 h-4 rounded-full bg-[var(--accent-primary)] text-white text-[10px] flex items-center justify-center font-bold">1</span>
+            <span>Add Product</span>
+          </div>
+          <span className="text-[var(--on-surface-subtle)]">→</span>
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)] font-medium">
+            <span className="w-4 h-4 rounded-full bg-[var(--surface-container)] text-[var(--on-surface)] text-[10px] flex items-center justify-center font-bold border border-[var(--border-subtle)]">2</span>
+            <span>Set Scopes &amp; Dates</span>
+          </div>
+          <span className="text-[var(--on-surface-subtle)]">→</span>
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-semibold">
+            <span className="w-4 h-4 rounded-full bg-emerald-600 text-white text-[10px] flex items-center justify-center font-bold">3</span>
+            <span>Click Release</span>
+          </div>
+        </div>
+
         {onOpenAddModal && (
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="mt-5 inline-flex h-9 items-center gap-2 rounded-lg px-4 text-xs font-semibold text-white bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] shadow-2xs transition-all cursor-pointer active:scale-98"
+            className="inline-flex h-9 items-center gap-2 rounded-xl px-5 text-xs font-bold text-white bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] shadow-xs transition-all cursor-pointer active:scale-98"
           >
-            <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-            <span>Add First Product</span>
+            <Plus className="h-4 w-4 stroke-[2.5]" />
+            <span>Add First Product to Staging</span>
           </button>
         )}
-        <span className="mt-3 text-[11px] font-mono text-zinc-400 dark:text-zinc-500">
-          Specs are automatically preserved in Drafts
+        <span className="mt-3 text-[11px] font-mono text-[var(--on-surface-subtle)]">
+          {isFeasibilityHandoff
+            ? "One product per feasibility request · release selected workflows here"
+            : "Specs are automatically preserved in Drafts"}
         </span>
       </div>
     );
@@ -363,8 +392,24 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
         </div>
         <div className="flex items-center gap-3">
           <span className="hidden font-mono text-[10px] text-[var(--on-surface-subtle)] sm:inline">
-            Direct Material &amp; Scope Allocation · Auto-Persisted
+            {isFeasibilityHandoff
+              ? "Release starts the selected workflows for this feasibility"
+              : "Direct Material & Scope Allocation · Auto-Persisted"}
           </span>
+          {onReleaseRequest && (
+            <button
+              type="button"
+              onClick={onReleaseRequest}
+              disabled={isReleasing || stagedProducts.length === 0}
+              data-action="release"
+              data-keep-color="true"
+              className="release-cta-button inline-flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold text-white shadow-xs cursor-pointer active:scale-95 disabled:cursor-not-allowed"
+              title="Release staged products to operational team queues"
+            >
+              <Send className="h-3.5 w-3.5 stroke-[2.5]" />
+              <span>{isReleasing ? "Releasing…" : `Release (${stagedProducts.length})`}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -592,7 +637,7 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                     >
                       <Eye className="h-3.5 w-3.5" />
                     </button>
-                    {!prod.scopes.includes("mockup") && (
+                    {!isFeasibilityHandoff && !prod.scopes.includes("mockup") && (
                       <button
                         type="button"
                         onClick={() => onDuplicateProduct(prod)}

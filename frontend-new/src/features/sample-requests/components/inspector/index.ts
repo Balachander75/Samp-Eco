@@ -14,3 +14,5 @@ export * from "./DesignBriefTab";
 export * from "./DesignDeliverablesTab";
 export * from "./DesignNextWorkTab";
 export * from "./DesignMetadataStrip";
+export * from "./DesignControlPanel";
+export * from "./DesignSheetHeader";

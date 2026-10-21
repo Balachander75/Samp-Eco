@@ -644,6 +644,49 @@ export interface UserItem {
   createdAt?: string;
 }
 
+export interface TeamRosterMember {
+  id: number;
+  name: string;
+  role: string;
+  subRole?: string;
+  isTeamHead: boolean;
+  isTeamAdmin: boolean;
+}
+
+export interface TeamRoster {
+  team: string;
+  memberCount: number;
+  members: TeamRosterMember[];
+}
+
+export async function fetchMyTeamRosterApi(): Promise<TeamRoster> {
+  const data = await apiFetch<{
+    team: string;
+    member_count: number;
+    members: Array<{
+      id: number;
+      name: string;
+      role: string;
+      sub_role?: string | null;
+      is_team_head: boolean;
+      is_team_admin: boolean;
+    }>;
+  }>("/api/v1/teams/me/members");
+
+  return {
+    team: data.team,
+    memberCount: data.member_count,
+    members: (data.members || []).map((member) => ({
+      id: member.id,
+      name: member.name,
+      role: member.role,
+      subRole: member.sub_role || undefined,
+      isTeamHead: Boolean(member.is_team_head),
+      isTeamAdmin: Boolean(member.is_team_admin),
+    })),
+  };
+}
+
 export interface CreateUserPayload {
   name: string;
   userid: string;

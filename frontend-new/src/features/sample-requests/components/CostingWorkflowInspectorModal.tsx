@@ -24,6 +24,7 @@ import {
   Printer,
 } from "lucide-react";
 import type { UserProfile } from "@/features/auth";
+import { hasWorkflowTeam } from "@/features/auth/permissions";
 import {
   claimCostingWorkflowApi,
   completeCostingWorkflowApi,
@@ -41,6 +42,7 @@ import { ScopeReferenceImagesGallery } from "@/features/sample-requests/componen
 import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
 import type { ProductSearchResult, SampleRequestItem } from "@/features/sample-requests/types";
 import { formatWorkflowAction } from "./workflowPresentation";
+import { RequestClosureControl } from "./common/RequestClosureControl";
 
 export type InspectorMode = "creative" | "costing" | "sampling";
 export type CostingTab = "output" | "specs" | "commercial" | "review";
@@ -152,6 +154,16 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   const canSubmitCosting = mode === "costing" && isCostingWork && !readOnly && (isClaimedByMe || isGlobalAdmin);
   const canReview = (mode === "sampling" || isSamplingReview) && !readOnly;
   const canReleaseToCosting = (mode === "creative" || isCreativeReview) && !readOnly;
+  const closureRequestId = record.workflow_type === "design" ? record.workflow_id : record.sample_request_id;
+  const canCloseWorkflowRequest = Boolean(
+    !readOnly && (
+      isGlobalAdmin ||
+      hasWorkflowTeam(user, "marketing") ||
+      (record.workflow_type === "costing" && (hasWorkflowTeam(user, "costing") || hasWorkflowTeam(user, "creative_studio") || hasWorkflowTeam(user, "samp"))) ||
+      (record.workflow_type === "sample" && hasWorkflowTeam(user, "samp")) ||
+      (record.workflow_type === "mockup" && (hasWorkflowTeam(user, "samp") || hasWorkflowTeam(user, "creative_studio")))
+    )
+  );
 
   const creativeDeadline = record.creative_due_at ? new Date(record.creative_due_at) : null;
   const creativeDeadlineLabel =
@@ -483,6 +495,13 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
               )}
               <span className="font-mono">{copiedCode ? "Copied" : code}</span>
             </button>
+            {closureRequestId > 0 && ["design", "mockup", "sample", "costing"].includes(record.workflow_type) && (
+              <RequestClosureControl
+                requests={[{ type: record.workflow_type, id: closureRequestId }]}
+                canClose={canCloseWorkflowRequest}
+                onClosed={onSaved}
+              />
+            )}
             {mode === "costing" && isCostingWork && (
               <div role="status" aria-live="polite" className="ml-1 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-low)] px-2.5 py-1.5">
                 <span className="text-[11px] font-medium text-[var(--on-surface-muted)]">

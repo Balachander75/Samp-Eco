@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { UserProfile } from "@/features/auth";
-import { isAdmin } from "@/features/auth/permissions";
+import { getAssignedWorkspaceTeam, isAdmin, isRootAdmin } from "@/features/auth/permissions";
 import { Sidebar } from "./Sidebar";
 import { getNavigationTitle } from "./navigation";
 import { useBusinessYear } from "@/context/BusinessYearContext";
@@ -100,12 +100,19 @@ export const AppShell: React.FC<AppShellProps> = ({
     .join("")
     .toUpperCase();
 
-  const activeTitle = getNavigationTitle(currentPath);
-  const userRoleDisplay = isAdmin(user)
-    ? "System Admin"
-    : user?.team
-    ? `${user.team.charAt(0).toUpperCase() + user.team.slice(1)} ${user?.is_team_head ? "Head" : "Member"}`
-    : user?.sub_role || "Member";
+  const activeTitle = getNavigationTitle(currentPath, user);
+  const canManageBusinessYear = isAdmin(user);
+  const assignedTeam = getAssignedWorkspaceTeam(user);
+  const assignedTeamLabel = assignedTeam
+    ? assignedTeam.charAt(0).toUpperCase() + assignedTeam.slice(1)
+      : user?.team;
+  const userRoleDisplay = isRootAdmin(user)
+    ? "Root Admin"
+    : isAdmin(user)
+      ? `${assignedTeamLabel || "Team"} Admin`
+      : user?.team
+        ? `${user.team.charAt(0).toUpperCase() + user.team.slice(1)} ${user?.is_team_head ? "Head" : "Member"}`
+        : user?.sub_role || "Member";
 
   return (
     <div className="app-shell flex h-screen w-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] font-sans transition-colors duration-150">
@@ -166,31 +173,46 @@ export const AppShell: React.FC<AppShellProps> = ({
 
             {/* Business Year (BY) Selector */}
             <div className="relative" ref={yearDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setIsYearDropdownOpen((prev) => !prev)}
-                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-mono font-semibold cursor-pointer select-none transition-all duration-150 shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] active:scale-[0.98] ${
-                  isYearDropdownOpen
-                    ? "bg-[var(--sidebar-surface-raised)] border-[var(--sidebar-accent)]/30 text-[var(--sidebar-text)] ring-2 ring-[var(--sidebar-accent)]/10"
-                    : "bg-[var(--sidebar-surface-raised)]/80 hover:bg-[var(--sidebar-surface-raised)] border-[var(--border-subtle)]/75 text-[var(--sidebar-text)]"
-                }`}
-                title="Business Year (October to September)"
-                aria-label="Select Business Year"
-              >
-                <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-[var(--sidebar-accent)]/15 text-[var(--sidebar-accent)] font-sans">
-                  BY
-                </span>
-                <span className="tabular-nums tracking-tight text-[11.5px]">
-                  {selectedYear === "ALL" ? "All Years" : selectedYear}
-                </span>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 text-[var(--sidebar-text-muted)] transition-transform duration-200 ${
-                    isYearDropdownOpen ? "rotate-180 text-[var(--sidebar-text)]" : ""
+              {canManageBusinessYear ? (
+                <button
+                  type="button"
+                  onClick={() => setIsYearDropdownOpen((prev) => !prev)}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-mono font-semibold cursor-pointer select-none transition-all duration-150 shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] active:scale-[0.98] ${
+                    isYearDropdownOpen
+                      ? "bg-[var(--sidebar-surface-raised)] border-[var(--sidebar-accent)]/30 text-[var(--sidebar-text)] ring-2 ring-[var(--sidebar-accent)]/10"
+                      : "bg-[var(--sidebar-surface-raised)]/80 hover:bg-[var(--sidebar-surface-raised)] border-[var(--border-subtle)]/75 text-[var(--sidebar-text)]"
                   }`}
-                />
-              </button>
+                  title="Business Year (October to September)"
+                  aria-label="Select Business Year"
+                  aria-expanded={isYearDropdownOpen}
+                >
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-[var(--sidebar-accent)]/15 text-[var(--sidebar-accent)] font-sans">
+                    BY
+                  </span>
+                  <span className="tabular-nums tracking-tight text-[11.5px]">
+                    {selectedYear === "ALL" ? "All Years" : selectedYear}
+                  </span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-[var(--sidebar-text-muted)] transition-transform duration-200 ${
+                      isYearDropdownOpen ? "rotate-180 text-[var(--sidebar-text)]" : ""
+                    }`}
+                  />
+                </button>
+              ) : (
+                <div
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-[var(--border-subtle)]/75 bg-[var(--sidebar-surface-raised)]/80 text-xs font-mono font-semibold select-none"
+                  title="Selected Business Year (view only)"
+                >
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-[var(--sidebar-accent)]/15 text-[var(--sidebar-accent)] font-sans">
+                    BY
+                  </span>
+                  <span className="tabular-nums tracking-tight text-[11.5px]">
+                    {selectedYear === "ALL" ? "All Years" : selectedYear}
+                  </span>
+                </div>
+              )}
 
-              {isYearDropdownOpen && (
+              {canManageBusinessYear && isYearDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-60 rounded-2xl bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-2xl z-50 p-1.5 text-xs select-none header-dropdown-menu backdrop-blur-xl">
                   <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-subtle)]/60 mb-1">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-muted)] font-bold">

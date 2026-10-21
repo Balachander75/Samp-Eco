@@ -6,4 +6,5 @@ export * from "./programsApi";
 export * from "./sampleRequestsApi";
 export * from "./downstreamApi";
 export * from "./workflowApi";
+export * from "./requestClosuresApi";
 

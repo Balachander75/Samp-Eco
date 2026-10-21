@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Palette,
   Plus,
-  Sparkles,
   Building2,
   Clock,
   AlertTriangle,
@@ -423,8 +422,8 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
               <span>Studio Brief</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-              <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+              <Palette className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400 shrink-0" />
               <span>Design</span>
             </span>
           ),

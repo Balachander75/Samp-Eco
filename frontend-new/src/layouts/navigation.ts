@@ -1,5 +1,10 @@
 import type { UserProfile } from "@/features/auth";
-import { hasWorkflowTeam, isAdmin } from "@/features/auth/permissions";
+import {
+  getAssignedWorkspaceTeam,
+  getAssignedWorkflowTeam,
+  getWorkspaceHome,
+  isRootAdmin,
+} from "@/features/auth/permissions";
 
 export interface NavigationSubItem {
   id: string;
@@ -15,6 +20,7 @@ export interface NavigationItem {
   path: string;
   aliases?: string[];
   badge?: string;
+  badgeKey?: string;
   departmentKey: string;
   subItems?: NavigationSubItem[];
   subTeams?: string[];
@@ -212,43 +218,168 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
 export const ALL_NAVIGATION_ITEMS = NAVIGATION_GROUPS.flatMap((group) => group.items);
 
 export function getNavigationGroupsForUser(user: UserProfile): NavigationGroup[] {
-  const admin = isAdmin(user);
-  const allowedDepartments = new Set<string>(["settings", "help"]);
-  if (admin) {
-    NAVIGATION_GROUPS.forEach((group) => group.items.forEach((item) => allowedDepartments.add(item.departmentKey)));
-  } else {
-    if (hasWorkflowTeam(user, "marketing")) allowedDepartments.add("marketing");
-    if (hasWorkflowTeam(user, "samp")) allowedDepartments.add("samp");
-    if (hasWorkflowTeam(user, "creative_studio")) {
-      allowedDepartments.add("creative");
-      allowedDepartments.add("studio");
-    }
-    if (hasWorkflowTeam(user, "plant")) allowedDepartments.add("plant");
-    if (hasWorkflowTeam(user, "costing")) allowedDepartments.add("costing");
+  const rootAdmin = isRootAdmin(user);
+  if (rootAdmin) {
+    return NAVIGATION_GROUPS;
   }
 
-  return NAVIGATION_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => allowedDepartments.has(item.departmentKey)),
-  })).filter((group) => group.items.length > 0);
+  const team = getAssignedWorkspaceTeam(user);
+  if (!team) return NAVIGATION_GROUPS.filter((group) => group.groupTitle === "Preferences & Support");
+
+  const supportGroup = NAVIGATION_GROUPS.find((group) => group.groupTitle === "Preferences & Support");
+  const teamMembersItem: NavigationItem = {
+    id: "team-members",
+    title: "Members",
+    shortCode: "TM",
+    path: "/team/members",
+    departmentKey: "members",
+  };
+
+  if (team === "marketing") {
+    const marketingItems: NavigationItem[] = [
+      {
+        id: "marketing-overview",
+        title: "Overview",
+        shortCode: "OV",
+        path: "/sample-requests",
+        departmentKey: "marketing",
+      },
+      {
+        id: "marketing-sampling",
+        title: "Sample Requests",
+        shortCode: "SR",
+        path: "/sample-requests/sampling",
+        badgeKey: "sampling",
+        departmentKey: "marketing",
+      },
+      {
+        id: "marketing-feasibility",
+        title: "Feasibility Checks",
+        shortCode: "FC",
+        path: "/sample-requests/feasibility",
+        badgeKey: "pendingFeas",
+        departmentKey: "marketing",
+      },
+      {
+        id: "marketing-programs",
+        title: "Program Planning",
+        shortCode: "PP",
+        path: "/sample-requests/programs",
+        badgeKey: "programs",
+        departmentKey: "marketing",
+      },
+    ];
+    return [
+      { groupTitle: "Workspace", items: marketingItems },
+      { groupTitle: "Team", items: [teamMembersItem] },
+      ...(supportGroup ? [{ ...supportGroup }] : []),
+    ];
+  }
+
+  const sampleRoutes = {
+    samp: {
+      path: "/samp-team-work/sampling",
+      badgeKey: "sampSampling",
+    },
+    plant: {
+      path: "/plant/sampling",
+      badgeKey: "plantSampling",
+    },
+    creative: {
+      path: "/creative-work/sampling",
+      aliases: ["/creative-work/design", "/creative-work/costing"],
+      badgeKey: "creativeSampling",
+      subItems: [
+        { id: "team-design", title: "Design", path: "/creative-work/design", badgeKey: "creativeDesign" },
+        { id: "team-costing", title: "Costing Requests", path: "/creative-work/costing", badgeKey: "creativeCosting" },
+      ],
+    },
+    studio: {
+      path: "/studio-work/sampling",
+      aliases: ["/studio-work/mockup"],
+      badgeKey: "studioSampling",
+      subItems: [
+        { id: "team-mockup", title: "Mockup", path: "/studio-work/mockup", badgeKey: "studioMockup" },
+      ],
+    },
+    costing: {
+      path: "/costing-team/costing",
+      badgeKey: "costingQueue",
+    },
+  } as const;
+
+  const sampleRoute = sampleRoutes[team];
+  const workflowTeam = getAssignedWorkflowTeam(user);
+  const feasibilityPath = workflowTeam === "samp" ? "/samp-team-work/feasibility" : "/team-work/feasibility";
+  const programPath = team === "plant"
+    ? "/plant/programs"
+    : workflowTeam === "samp"
+      ? "/samp-team-work/programs"
+      : "/team-work/programs";
+  const items: NavigationItem[] = [
+    {
+      id: "team-overview",
+      title: "Overview",
+      shortCode: "OV",
+      path: getWorkspaceHome(user),
+      departmentKey: "operations",
+    },
+    {
+      id: "team-sample-requests",
+      title: "Sample Requests",
+      shortCode: "SR",
+      path: sampleRoute.path,
+      aliases: "aliases" in sampleRoute ? [...sampleRoute.aliases] : undefined,
+      badgeKey: sampleRoute.badgeKey,
+      departmentKey: "samp",
+      subItems: "subItems" in sampleRoute ? [...sampleRoute.subItems] : undefined,
+    },
+    {
+      id: "team-feasibility",
+      title: "Feasibility Checks",
+      shortCode: "FC",
+      path: feasibilityPath,
+      badgeKey: workflowTeam === "samp" ? "sampFeasibility" : undefined,
+      departmentKey: "samp",
+    },
+    {
+      id: "team-program-planning",
+      title: "Program Planning",
+      shortCode: "PP",
+      path: programPath,
+      badgeKey: team === "plant" ? "plantPrograms" : workflowTeam === "samp" ? "sampPrograms" : undefined,
+      departmentKey: "samp",
+    },
+  ];
+
+  return [
+    { groupTitle: "Workspace", items },
+    { groupTitle: "Team", items: [teamMembersItem] },
+    ...(supportGroup ? [{ ...supportGroup }] : []),
+  ];
 }
 
-export function getNavigationTitle(pathname: string): string {
-  const normalizedPath = pathname.toLowerCase();
-  for (const item of ALL_NAVIGATION_ITEMS) {
-    if (item.subItems) {
-      const subMatch = item.subItems.find((sub) => {
-        const p = sub.path.toLowerCase();
-        return normalizedPath === p || (p !== item.path.toLowerCase() && normalizedPath.startsWith(`${p}/`));
+export function getNavigationTitle(pathname: string, user?: UserProfile | null): string {
+  const normalizedPath = pathname.toLowerCase().split(/[?#]/, 1)[0].replace(/\/$/, "") || "/";
+  const items = (user ? getNavigationGroupsForUser(user) : NAVIGATION_GROUPS).flatMap((group) => group.items);
+  const matches = items.flatMap((item) => {
+    const itemPaths = [item.path, ...(item.aliases ?? [])].map((path) => path.toLowerCase().replace(/\/$/, "") || "/");
+    const itemMatches = itemPaths
+      .filter((path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`))
+      .map((path) => ({ length: path.length, title: item.title }));
+    const subMatches = (item.subItems ?? [])
+      .map((sub) => sub.path.toLowerCase().replace(/\/$/, "") || "/")
+      .filter((path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`))
+      .map((path) => {
+        const sub = item.subItems!.find((candidate) => candidate.path.toLowerCase().replace(/\/$/, "") === path);
+        return { length: path.length, title: sub ? `${item.title} / ${sub.title}` : item.title };
       });
-      if (subMatch && subMatch.path.toLowerCase() !== item.path.toLowerCase()) {
-        return `${item.title} / ${subMatch.title}`;
-      }
-    }
-    const isMatch = [item.path, ...(item.aliases ?? [])].some(
-      (path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`)
-    );
-    if (isMatch) return item.title;
+    return [...itemMatches, ...subMatches];
+  });
+
+  if (matches.length) {
+    return matches.reduce((best, current) => current.length >= best.length ? current : best).title;
   }
+
   return "Operations Overview";
 }

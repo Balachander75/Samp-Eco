@@ -366,8 +366,10 @@ export const ThemeProvider: React.FC<{ userId?: number | string; initialTheme?: 
   const scrollRestoreVersion = useRef(0);
 
   useLayoutEffect(() => {
+    const isDark = APP_THEMES.find((option) => option.id === theme)?.mode === "dark";
     document.documentElement.dataset.theme = theme;
-    document.documentElement.classList.toggle("dark", APP_THEMES.find((option) => option.id === theme)?.mode === "dark");
+    document.documentElement.classList.toggle("dark", isDark);
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
     storeThemeHint(theme);
     if (typeof window !== "undefined" && (window.scrollY !== 0 || window.scrollX !== 0)) {
       window.scrollTo(0, 0);
@@ -393,6 +395,15 @@ export const ThemeProvider: React.FC<{ userId?: number | string; initialTheme?: 
   const setTheme = useCallback((nextTheme: ThemeId): Promise<void> => {
     const scrollVersion = ++scrollRestoreVersion.current;
     const scrollPositions = captureWorkspaceScroll();
+
+    // Trigger smooth micro-transition on deliberate theme switch
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.add("theme-transitioning");
+      window.setTimeout(() => {
+        document.documentElement.classList.remove("theme-transitioning");
+      }, 220);
+    }
+
     setThemeState(nextTheme);
     storeThemeHint(nextTheme);
     if (typeof window !== "undefined" && (window.scrollY !== 0 || window.scrollX !== 0)) {

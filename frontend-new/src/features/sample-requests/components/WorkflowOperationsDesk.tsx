@@ -486,7 +486,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
           if (record.workflow_type === "design") {
             return (
               <div>
-                <span className="text-[11px] font-semibold text-[var(--on-surface)]">Design brief &amp; moodboard</span>
+                <span className="text-[11px] font-semibold text-[var(--on-surface)]">Design brief &amp; reference images</span>
                 <span className="mt-0.5 block text-[10px] text-[var(--on-surface-subtle)]">Creative specifications</span>
               </div>
             );
@@ -595,7 +595,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
       {
         label: "Design Briefs",
         value: designCount,
-        detail: "Design specs & moodboards",
+        detail: "Design specs & references",
         color: "bg-purple-600",
         isActive: deliverableFilter === "design",
         onClick: () => setDeliverableFilter((c) => c === "design" ? "all" : "design"),

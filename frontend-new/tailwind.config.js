@@ -8,15 +8,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Luminous Engine Surface Hierarchy (The "No-Line" Rule Foundation)
+        // Core Semantic Surfaces (Luminous Hierarchy)
         surface: {
           DEFAULT: "var(--surface-base)",
+          base: "var(--surface-base)",
           lowest: "var(--surface-lowest)",
           low: "var(--surface-low)",
           container: "var(--surface-container)",
           high: "var(--surface-high)",
           highest: "var(--surface-highest)",
         },
+        // Typography & On-Surface Contrast
         onSurface: {
           DEFAULT: "var(--on-surface)",
           muted: "var(--on-surface-muted)",
@@ -26,6 +28,43 @@ export default {
           DEFAULT: "var(--on-surface)",
           muted: "var(--on-surface-muted)",
           subtle: "var(--on-surface-subtle)",
+        },
+        // Semantic Theme Borders
+        border: {
+          DEFAULT: "var(--border-subtle)",
+          subtle: "var(--border-subtle)",
+          strong: "var(--border-strong)",
+          focus: "var(--border-focus)",
+        },
+        // Dynamic Theme Accents (Adapts across all 13 Themes)
+        accent: {
+          DEFAULT: "var(--accent-primary)",
+          primary: "var(--accent-primary)",
+          hover: "var(--accent-primary-hover)",
+          strong: "var(--accent-primary-strong)",
+          subtle: "var(--accent-primary-subtle)",
+          fillEnd: "var(--accent-primary-fill-end)",
+          secondary: "var(--accent-teal)",
+          secondaryHover: "var(--accent-teal-hover)",
+          secondarySubtle: "var(--accent-teal-subtle)",
+        },
+        // Navigation & Sidebar Semantic Surfaces
+        sidebar: {
+          surface: "var(--sidebar-surface)",
+          raised: "var(--sidebar-surface-raised)",
+          accent: "var(--sidebar-accent)",
+          accentSubtle: "var(--sidebar-accent-subtle)",
+          text: "var(--sidebar-text)",
+          textMuted: "var(--sidebar-text-muted)",
+          textSubtle: "var(--sidebar-text-subtle)",
+        },
+        // App Canvas & Sheet Level
+        app: {
+          DEFAULT: "var(--bg-app)",
+          bg: "var(--bg-app)",
+          panel: "var(--bg-panel)",
+          subtle: "var(--bg-subtle)",
+          muted: "var(--bg-muted)",
         },
         // High-Performance Flow Accents: Energy & Water
         luminous: {

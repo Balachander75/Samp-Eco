@@ -666,7 +666,7 @@ export async function sendMockupRequestToStudioApi(
 
 export async function decideMockupMarketingAcceptanceApi(
   sampleRequestId: string | number,
-  decision: "accept" | "request_revision" | "request_new_mockup" | "close",
+  decision: "accept" | "request_revision" | "request_new_mockup",
   remark?: string,
   actorName?: string,
 ): Promise<SampleRequestItem> {

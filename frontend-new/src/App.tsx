@@ -6,7 +6,7 @@ import { BusinessYearProvider } from "@/context/BusinessYearContext";
 import { PlantProvider } from "@/context/PlantContext";
 import { SignInPage } from "@/features/auth/SignInPage";
 import type { UserProfile, AuthResponse } from "@/features/auth/types";
-import { getWorkspaceHome, isAdmin } from "@/features/auth/permissions";
+import { canAccessWorkspacePath, getAssignedWorkspaceTeam, getWorkspaceHome, isRootAdmin } from "@/features/auth/permissions";
 import { AUTH_EXPIRED_EVENT, readAuthToken, readAuthUser, clearAuthStorage } from "@/lib/session";
 import { AppShell, getNavigationTitle } from "@/layouts";
 
@@ -41,6 +41,8 @@ const WorkflowOperationsDesk = lazy(() =>
 const MembersAndPlantsDesk = lazy(() => import("@/features/members/MembersAndPlantsDesk"));
 const OperationsOverview = lazy(() => import("@/features/dashboard/OperationsOverview"));
 const OperationsLandingPage = lazy(() => import("@/features/operations/OperationsLandingPage"));
+const TeamModuleStatusPage = lazy(() => import("@/features/operations/TeamModuleStatusPage"));
+const TeamMembersPage = lazy(() => import("@/features/operations/TeamMembersPage"));
 const PlantSamplingQueue = lazy(() => import("@/features/plant/PlantSamplingQueue").then((module) => ({ default: module.PlantSamplingQueue })));
 const StudioWorkDesk = lazy(() => import("@/features/creative/StudioWorkDesk"));
 const HelpSupportPage = lazy(() => import("@/features/help/HelpSupportPage"));
@@ -99,7 +101,11 @@ function AuthenticatedWorkspace({
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname === "/" ? getWorkspaceHome(user) : location.pathname;
-  const activeTitle = getNavigationTitle(currentPath);
+  const activeTitle = getNavigationTitle(currentPath, user);
+
+  if (!canAccessWorkspacePath(user, currentPath)) {
+    return <Navigate to={getWorkspaceHome(user)} replace state={{ from: currentPath }} />;
+  }
 
   return (
     <BusinessYearProvider>
@@ -114,10 +120,16 @@ function AuthenticatedWorkspace({
             <Suspense fallback={<RouteLoadingFallback />}>
               {currentPath === "/members" || currentPath.startsWith("/members/") ? (
             <MembersAndPlantsDesk user={user} />
+          ) : currentPath === "/team/members" ? (
+            <TeamMembersPage user={user} />
           ) : currentPath === "/dashboard" ? (
-            isAdmin(user) ? <OperationsOverview user={user} /> : <Navigate to={getWorkspaceHome(user)} replace />
+            isRootAdmin(user) ? <OperationsOverview user={user} /> : <Navigate to={getWorkspaceHome(user)} replace />
           ) : currentPath === "/help" || currentPath.startsWith("/help/") ? (
             <HelpSupportPage user={user} />
+          ) : currentPath === "/team-work/feasibility" ? (
+            <TeamModuleStatusPage module="feasibility" team={getAssignedWorkspaceTeam(user)} user={user} />
+          ) : currentPath === "/team-work/programs" ? (
+            <TeamModuleStatusPage module="programs" team={getAssignedWorkspaceTeam(user)} user={user} />
           ) : currentPath === "/settings" ? (
             <SettingsPage currentUser={user} />
           ) : currentPath === "/sample-requests/product-staging" || currentPath === "/sample-requests/add-product" ? (

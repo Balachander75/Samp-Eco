@@ -4,6 +4,33 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        try {
+          var darkThemes = ['midnight', 'forest-night', 'nocturne', 'tokyo-neon', 'titanium'];
+          var validThemes = [
+            'emerald', 'ocean', 'violet', 'amber', 'rose', 'neo-brutalism',
+            'nordic-frost', 'terracotta', 'midnight', 'forest-night',
+            'nocturne', 'tokyo-neon', 'titanium'
+          ];
+          var saved = localStorage.getItem('erp_theme_id');
+          if (!saved) {
+            try {
+              var sessionUser = localStorage.getItem('samp_auth_user');
+              if (sessionUser) {
+                var parsed = JSON.parse(sessionUser);
+                if (parsed && parsed.theme_id) saved = parsed.theme_id;
+              }
+            } catch (e) {}
+          }
+          var themeId = (saved && validThemes.indexOf(saved) !== -1) ? saved : 'emerald';
+          var isDark = darkThemes.indexOf(themeId) !== -1;
+          document.documentElement.dataset.theme = themeId;
+          document.documentElement.classList.toggle('dark', isDark);
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
     <title>Navneet SAMP Operations | Enterprise ERP</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

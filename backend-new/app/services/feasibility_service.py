@@ -5,6 +5,7 @@ status transitions, and activity audit logging.
 """
 import base64
 import binascii
+import hashlib
 import io
 import re
 from sqlalchemy import func
@@ -21,7 +22,7 @@ except ImportError:  # pragma: no cover
     Image = None
     ImageOps = None
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 from app.auth.permissions import user_has_team
 from app.repositories.feasibility_repo import FeasibilityRepository
 from app.models.feasibility import (
@@ -167,7 +168,10 @@ class FeasibilityService:
         }
 
     def serialize_request(
-        self, request: FeasibilityRequest, include_activities: bool = True
+        self,
+        request: FeasibilityRequest,
+        include_activities: bool = True,
+        converted_requests_by_id: Optional[Dict[int, CreateSampleRequest]] = None,
     ) -> Dict[str, Any]:
         """Serialize FeasibilityRequest model instance."""
         is_on_time = request.is_responded_on_time
@@ -176,9 +180,12 @@ class FeasibilityService:
             closed_date = (closed_at.replace(tzinfo=timezone.utc) if closed_at.tzinfo is None else closed_at).astimezone(INDIA_TZ).date()
             is_on_time = closed_date <= _shift_workdays(request.required_date, request.samp_sla_paused_workdays or 0)
 
-        converted_request = self.db.query(CreateSampleRequest).filter(
-            CreateSampleRequest.id == request.converted_sample_request_id,
-        ).first() if request.converted_sample_request_id else None
+        if converted_requests_by_id is None:
+            converted_request = self.db.query(CreateSampleRequest).filter(
+                CreateSampleRequest.id == request.converted_sample_request_id,
+            ).first() if request.converted_sample_request_id else None
+        else:
+            converted_request = converted_requests_by_id.get(request.converted_sample_request_id)
         converted_codes = converted_request.request_codes if converted_request and isinstance(converted_request.request_codes, dict) else {}
         converted_request_code = (
             converted_request.sr_number
@@ -271,7 +278,33 @@ class FeasibilityService:
             limit=limit,
             before_id=before_id,
         )
-        return [self.serialize_request(r, include_activities=False) for r in requests]
+        converted_ids = {
+            request.converted_sample_request_id
+            for request in requests
+            if request.converted_sample_request_id is not None
+        }
+        converted_requests_by_id = {}
+        if converted_ids:
+            converted_requests_by_id = {
+                request.id: request
+                for request in self.db.query(CreateSampleRequest)
+                .options(load_only(
+                    CreateSampleRequest.id,
+                    CreateSampleRequest.sr_number,
+                    CreateSampleRequest.request_types,
+                    CreateSampleRequest.request_codes,
+                ))
+                .filter(CreateSampleRequest.id.in_(converted_ids))
+                .all()
+            }
+        return [
+            self.serialize_request(
+                request,
+                include_activities=False,
+                converted_requests_by_id=converted_requests_by_id,
+            )
+            for request in requests
+        ]
 
     def get_by_id(self, request_id: int) -> Optional[Dict[str, Any]]:
         """Fetch request by ID with relations."""
@@ -310,7 +343,11 @@ class FeasibilityService:
             self.db.add(customer)
             self.db.flush()
 
-        creator_name = getattr(payload, "created_by", None) or (current_user.name if current_user else "Marketing Specialist")
+        creator_name = (
+            str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "").strip()
+            if current_user
+            else ""
+        ) or "Marketing Specialist"
         creator_user_id = current_user.id if current_user else None
 
         req = FeasibilityRequest(
@@ -722,23 +759,23 @@ class FeasibilityService:
         }
         selected_types = [value for value in ("sample", "mockup", "costing") if value in selected]
         if not selected_types or not selected.issubset({"sample", "mockup", "costing"}):
-            raise HTTPException(status_code=422, detail="Choose Sample, Mockup, or both request types.")
+            raise HTTPException(status_code=422, detail="Choose Sample, Mockup, Costing, or a combination of these processes.")
 
         if req.sampling_feasibility_response == "No":
             raise HTTPException(
                 status_code=409,
-                detail="SAMP marked this request Not Feasible. Sample and Mockup requests cannot be created from it.",
+                detail="SAMP marked this request Not Feasible. Commercial requests cannot be created from it.",
             )
         if req.sampling_feasibility_response not in {"Yes", "Maybe"}:
             raise HTTPException(
                 status_code=409,
-                detail="A completed Feasible or Conditional SAMP verdict is required before creating a Sample or Mockup request.",
+                detail="A completed Feasible or Conditional SAMP verdict is required before creating a commercial request.",
             )
 
         if req.marketing_decision != "Accepted":
             raise HTTPException(
                 status_code=400,
-                detail="Only accepted feasibility requests can be converted to a Sample or Mockup request.",
+                detail="Only accepted feasibility requests can be linked to a commercial request.",
             )
 
         if req.converted_sample_request_id:
@@ -773,97 +810,86 @@ class FeasibilityService:
         actor_id = current_user.id if current_user else None
 
         if sample_request_id is None:
-            from app.utils.business_year import get_current_business_year
-            # Create a commercial sample request draft directly from the feasibility request
-            created_today = datetime.now(timezone.utc).date()
-            customer_name = self.db.query(Customer.name).filter(Customer.id == req.customer_id).scalar() or ""
-            generated_sr_num = (
-                next_request_code(self.db, REQUEST_CODE_PREFIX_BY_SCOPE["sample"], created_today)
-                if "sample" in selected_types
-                else None
+            raise HTTPException(
+                status_code=422,
+                detail="Save and complete the commercial request in Product Staging before linking it to feasibility.",
             )
-            codes = {}
-            for scope_key in ("design", "mockup", "costing"):
-                if scope_key in selected_types:
-                    codes[scope_key] = next_request_code(
-                        self.db, REQUEST_CODE_PREFIX_BY_SCOPE[scope_key], created_today
-                    )
 
-            staged = CreateSampleRequest(
-                customer=customer_name,
-                year=getattr(req, "year", None) or get_current_business_year(),
-                date_request_created=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                material_code=getattr(req, "material_code", None) or f"FS-{req.id:04d}",
-                creation_mode="new",
-                product_description=req.description_notes or getattr(req, "product_description", None) or "Commercial request from Feasibility",
-                request_types=selected_types,
-                request_codes=codes,
-                sr_number=generated_sr_num,
-                status="Draft (Pre-SMT)",
-                created_by=actor_name,
-                created_by_user_id=actor_id,
-                qty_for_sampling=1 if "sample" in selected_types else None,
-                sample_required_date=req.required_date if "sample" in selected_types else None,
-                target_plant=req.target_plant,
-                reference_links=req.reference_links or [],
-                mockup_required="Yes" if "mockup" in selected_types else "No",
-                mockup_workflow_state={
-                    "qtyForMockup": 1,
-                    "requiredDate": str(req.required_date or ""),
-                    "designNeeded": False,
-                    "marketingRemark": req.marketing_remarks or "Converted from Feasibility",
-                } if "mockup" in selected_types else None,
+        staged = self.db.query(CreateSampleRequest).filter(
+            CreateSampleRequest.id == sample_request_id
+        ).with_for_update().first()
+        if not staged:
+            raise HTTPException(status_code=404, detail="The staged commercial request was not found.")
+        if not str(staged.status or "").strip().casefold().startswith("draft"):
+            raise HTTPException(status_code=409, detail="Only a staged draft can be linked to feasibility.")
+        staged_types = [
+            value for value in (staged.request_types or [])
+            if value in {"sample", "mockup", "costing"}
+        ]
+        if set(staged_types) != set(selected_types):
+            raise HTTPException(status_code=409, detail="The staged draft request type does not match the selected feasibility next process.")
+        customer_name = self.db.query(Customer.name).filter(Customer.id == req.customer_id).scalar() or ""
+        if str(staged.customer or "").strip().casefold() != customer_name.strip().casefold():
+            raise HTTPException(status_code=409, detail="The staged draft customer does not match the feasibility request.")
+        if not str(staged.product_description or "").strip():
+            raise HTTPException(status_code=409, detail="Add a product description in Product Staging before linking this request.")
+        if "sample" in selected_types:
+            try:
+                sampling_quantity = int(str(staged.qty_for_sampling or "").strip())
+            except (TypeError, ValueError):
+                sampling_quantity = 0
+            if sampling_quantity < 1 or not staged.sample_required_date:
+                raise HTTPException(status_code=409, detail="Complete the Sample quantity and required date in Product Staging first.")
+        if "sample" in selected_types or "costing" in selected_types:
+            unit = str(staged.unit_pc_pack or "").strip()
+            if unit not in {"PC", "Pack"}:
+                raise HTTPException(status_code=409, detail="Choose PC or Pack as the unit in Product Staging first.")
+            if unit == "Pack":
+                try:
+                    pieces_per_pack = int(str(staged.qty_per_pack or "").strip())
+                except (TypeError, ValueError):
+                    pieces_per_pack = 0
+                if pieces_per_pack < 1:
+                    raise HTTPException(status_code=409, detail="Enter the number of pieces per pack in Product Staging first.")
+        if "costing" in selected_types:
+            try:
+                costing_quantity = int(str(staged.qty_design_costing or "").strip())
+                date.fromisoformat(str(staged.costing_required_date or "").split("T")[0])
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=409, detail="Complete the Costing quantity and required date in Product Staging first.")
+            if costing_quantity < 1:
+                raise HTTPException(status_code=409, detail="Enter a whole-number Costing quantity in Product Staging first.")
+            if staged.costing_creative_input_needed and not str(staged.costing_creative_input_remark or "").strip():
+                raise HTTPException(status_code=409, detail="Add the Creative input remark in Product Staging before linking this Costing request.")
+        if "mockup" in selected_types:
+            mockup_state = staged.mockup_workflow_state if isinstance(staged.mockup_workflow_state, dict) else {}
+            try:
+                mockup_quantity = int(str(mockup_state.get("qtyForMockup") or "").strip())
+            except (TypeError, ValueError):
+                mockup_quantity = 0
+            has_mockup_detail = bool(
+                str(mockup_state.get("marketingShutterstockNo") or "").strip()
+                or str(mockup_state.get("marketingRemark") or "").strip()
             )
-            self.db.add(staged)
-            self.db.flush()
-        else:
-            staged = self.db.query(CreateSampleRequest).filter(CreateSampleRequest.id == sample_request_id).first()
-            if not staged:
-                raise HTTPException(status_code=404, detail="The staged commercial request was not found.")
-            if not str(staged.status or "").strip().casefold().startswith("draft"):
-                raise HTTPException(status_code=409, detail="Only a staged draft can be linked to feasibility.")
-            staged_types = [
-                value for value in (staged.request_types or [])
-                if value in {"sample", "mockup", "costing"}
-            ]
-            if set(staged_types) != set(selected_types):
-                raise HTTPException(status_code=409, detail="The staged draft request type does not match the selected feasibility next process.")
-            customer_name = self.db.query(Customer.name).filter(Customer.id == req.customer_id).scalar() or ""
-            if str(staged.customer or "").strip().casefold() != customer_name.strip().casefold():
-                raise HTTPException(status_code=409, detail="The staged draft customer does not match the feasibility request.")
-            if not str(staged.product_description or "").strip():
-                raise HTTPException(status_code=409, detail="Add a product description in Product Staging before linking this request.")
-            if "sample" in selected_types:
-                try:
-                    sampling_quantity = int(str(staged.qty_for_sampling or "").strip())
-                except (TypeError, ValueError):
-                    sampling_quantity = 0
-                if sampling_quantity < 1 or not staged.sample_required_date:
-                    raise HTTPException(status_code=409, detail="Complete the Sample quantity and required date in Product Staging first.")
-            if "mockup" in selected_types:
-                mockup_state = staged.mockup_workflow_state if isinstance(staged.mockup_workflow_state, dict) else {}
-                try:
-                    mockup_quantity = int(str(mockup_state.get("qtyForMockup") or "").strip())
-                except (TypeError, ValueError):
-                    mockup_quantity = 0
-                has_mockup_detail = bool(
-                    str(mockup_state.get("marketingShutterstockNo") or "").strip()
-                    or str(mockup_state.get("marketingRemark") or "").strip()
-                )
-                if (
-                    str(staged.mockup_required or "").strip().casefold() not in {"yes", "true", "y"}
-                    or mockup_quantity < 1
-                    or not str(mockup_state.get("requiredDate") or "").strip()
-                    or not isinstance(mockup_state.get("designNeeded"), bool)
-                    or not has_mockup_detail
-                ):
-                    raise HTTPException(status_code=409, detail="Complete the Mockup product, quantity, required date, and design details in Product Staging first.")
-            already_linked = self.db.query(FeasibilityRequest).filter(
-                FeasibilityRequest.converted_sample_request_id == staged.id,
-                FeasibilityRequest.id != req.id,
-            ).first()
-            if already_linked:
-                raise HTTPException(status_code=409, detail="This staged draft is already linked to another feasibility request.")
+            try:
+                date.fromisoformat(str(mockup_state.get("requiredDate") or "").split("T")[0])
+                valid_mockup_date = True
+            except (TypeError, ValueError):
+                valid_mockup_date = False
+            if (
+                str(staged.mockup_required or "").strip().casefold() not in {"yes", "true", "y"}
+                or mockup_quantity < 1
+                or not valid_mockup_date
+                or not isinstance(mockup_state.get("designNeeded"), bool)
+                or not has_mockup_detail
+            ):
+                raise HTTPException(status_code=409, detail="Complete the Mockup product, quantity, required date, and design details in Product Staging first.")
+        already_linked = self.db.query(FeasibilityRequest).filter(
+            FeasibilityRequest.converted_sample_request_id == staged.id,
+            FeasibilityRequest.id != req.id,
+        ).first()
+        if already_linked:
+            raise HTTPException(status_code=409, detail="This staged draft is already linked to another feasibility request.")
 
         staged_types = [
             value for value in (staged.request_types or [])
@@ -873,29 +899,62 @@ class FeasibilityService:
         if req.reference_image_records:
             from app.models.sample_request import SampleRequestReferenceImage
 
-            scope = selected_types[0]
             existing_images = self.db.query(SampleRequestReferenceImage).filter(
                 SampleRequestReferenceImage.sample_request_id == staged.id,
-                SampleRequestReferenceImage.scope == scope,
+                SampleRequestReferenceImage.scope.in_(selected_types),
             ).all()
-            used_orders = {image.sort_order for image in existing_images}
-            next_order = 0
-            for image in req.reference_image_records:
-                while next_order in used_orders and next_order < 2:
-                    next_order += 1
-                if next_order >= 2:
-                    break
-                self.db.add(SampleRequestReferenceImage(
-                    sample_request_id=staged.id,
-                    scope=scope,
-                    original_name=image.original_name,
-                    content_type=image.content_type,
-                    original_size_bytes=len(image.image_data) if image.image_data else None,
-                    image_data=image.image_data,
-                    sort_order=next_order,
-                ))
-                used_orders.add(next_order)
-                next_order += 1
+            images_by_scope = {
+                scope: [image for image in existing_images if image.scope == scope]
+                for scope in selected_types
+            }
+            copies_by_scope = {}
+            for scope, scoped_images in images_by_scope.items():
+                existing_signatures = {
+                    hashlib.sha256(bytes(image.image_data or b"")).digest()
+                    for image in scoped_images
+                }
+                copies = []
+                for image in req.reference_image_records:
+                    data = bytes(image.image_data or b"")
+                    signature = hashlib.sha256(data).digest()
+                    if signature in existing_signatures:
+                        continue
+                    copies.append((image, data))
+                    existing_signatures.add(signature)
+                if len(scoped_images) + len(copies) > 2:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"The {scope.title()} process already has two reference images in Product Staging. "
+                            "Remove one before linking so the Feasibility references can be included."
+                        ),
+                    )
+                copies_by_scope[scope] = copies
+
+            for scope, copies in copies_by_scope.items():
+                used_orders = {image.sort_order for image in images_by_scope[scope]}
+                for image, data in copies:
+                    next_order = next(order for order in range(2) if order not in used_orders)
+                    self.db.add(SampleRequestReferenceImage(
+                        sample_request_id=staged.id,
+                        scope=scope,
+                        original_name=image.original_name,
+                        content_type=image.content_type,
+                        original_size_bytes=len(data),
+                        image_data=data,
+                        sort_order=next_order,
+                    ))
+                    used_orders.add(next_order)
+
+        staged_links = staged.reference_links if isinstance(staged.reference_links, list) else []
+        feasibility_links = req.reference_links if isinstance(req.reference_links, list) else []
+        merged_links = list(dict.fromkeys(
+            str(link).strip()
+            for link in [*staged_links, *feasibility_links]
+            if link is not None and str(link).strip()
+        ))
+        if merged_links != staged_links:
+            staged.reference_links = merged_links
 
         sample_request_code = (
             staged.sr_number

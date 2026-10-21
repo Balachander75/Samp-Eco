@@ -1,15 +1,16 @@
 """Customer, manufacturing plant, and enterprise user master-data endpoints."""
 from typing import Optional, List, Any
 from sqlalchemy import Integer, case, cast, func
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.auth.permissions import filter_plant_values, require_admin, require_smps_member
+from app.auth.permissions import filter_plant_values, is_admin, require_admin, require_smps_member
 from app.auth.security import get_current_user, get_optional_current_user
 from app.database import get_db
 from app.models.feasibility import FeasibilityRequest
 from app.models.program_request import ProgramRequest
 from app.models.sample_request import CreateSampleRequest
+from app.models.master import User
 from app.schemas.master import (
     CustomerCreate,
     CustomerOut,
@@ -17,6 +18,8 @@ from app.schemas.master import (
     UserCreate,
     UserOut,
     UserUpdate,
+    TeamMemberSummary,
+    TeamRosterOut,
 )
 from app.services.master_service import MasterService
 
@@ -191,6 +194,46 @@ def list_business_years(
 # ---------------------------------------------------------------------------
 # Users & Team Hierarchy
 # ---------------------------------------------------------------------------
+@router.get(
+    "/api/v1/teams/me/members",
+    response_model=TeamRosterOut,
+    summary="List active members of the current user's team",
+)
+def list_my_team_members(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    team = str(getattr(current_user, "team", None) or "").strip()
+    if not team:
+        raise HTTPException(status_code=403, detail="A team assignment is required to view this roster")
+
+    members = (
+        db.query(User)
+        .filter(
+            func.lower(func.trim(User.team)) == team.casefold(),
+            User.is_active.is_(True),
+        )
+        .all()
+    )
+    members.sort(key=lambda member: (
+        not is_admin(member),
+        not bool(member.is_team_head),
+        (member.name or "").casefold(),
+    ))
+    summaries = [
+        TeamMemberSummary(
+            id=member.id,
+            name=member.name,
+            role=member.role,
+            sub_role=member.sub_role,
+            is_team_head=bool(member.is_team_head),
+            is_team_admin=is_admin(member),
+        )
+        for member in members
+    ]
+    return TeamRosterOut(team=team, member_count=len(summaries), members=summaries)
+
+
 @router.get("/api/v1/users", response_model=List[UserOut], summary="List enterprise users", dependencies=[Depends(require_admin)])
 def list_users(
     team: Optional[str] = Query(default=None, description="Filter by team department"),

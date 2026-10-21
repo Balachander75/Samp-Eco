@@ -153,8 +153,8 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
       {/* ── Substrate Matrix Table ── */}
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-2xs">
         {/* Table Top Bar */}
-        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3.5 py-2 bg-[var(--surface-low)] flex-wrap gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2.5 bg-[var(--surface-low)] flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
             <div className="w-6 h-6 rounded-md bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] flex items-center justify-center shrink-0">
               <Clipboard className="h-3.5 w-3.5" />
             </div>
@@ -162,7 +162,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
               <h2 className="text-xs font-bold font-display text-[var(--on-surface)]">
                 Material Specification Matrix
               </h2>
-              <span className="px-1.5 py-0.2 rounded font-mono text-[9.5px] font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
+              <span className="px-2 py-0.5 rounded-full font-mono text-[10px] font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/20">
                 {skuCount} {skuCount === 1 ? "SKU" : "SKUs"}
               </span>
             </div>
@@ -177,7 +177,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                   setAddSuccess(false);
                   setIsAddingSku(true);
                 }}
-                className="h-8 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                className="h-8 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add SKU Line</span>
@@ -192,12 +192,12 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
             <table className="w-full border-collapse text-left text-xs">
               <thead>
                 <tr className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] select-none">
-                  <th className="px-2.5 py-1.5 w-10 text-center border-r border-[var(--border-subtle)]">#</th>
-                  <th className="px-3 py-1.5 min-w-[200px] border-r border-[var(--border-subtle)]">Substrate &amp; Specifications</th>
-                  <th className="px-3 py-1.5 min-w-[100px] text-right border-r border-[var(--border-subtle)]">Planned Volume</th>
-                  <th className="px-3 py-1.5 min-w-[180px] border-r border-[var(--border-subtle)]">SAMP &amp; Plant Feedback</th>
-                  <th className="px-3 py-1.5 min-w-[180px] border-r border-[var(--border-subtle)]">Marketing Directive</th>
-                  {canManageSku && onDeleteMaterial && <th className="px-3 py-1.5 w-16 text-center">Actions</th>}
+                  <th className="px-3 py-2 w-12 text-center border-r border-[var(--border-subtle)]">#</th>
+                  <th className="px-3.5 py-2 min-w-[220px] border-r border-[var(--border-subtle)]">Substrate &amp; Specifications</th>
+                  <th className="px-3.5 py-2 min-w-[120px] text-right border-r border-[var(--border-subtle)]">Planned Volume</th>
+                  <th className="px-3.5 py-2 min-w-[220px] border-r border-[var(--border-subtle)]">SAMP &amp; Plant Feedback</th>
+                  <th className="px-3.5 py-2 min-w-[180px] border-r border-[var(--border-subtle)]">Marketing Directive</th>
+                  {canManageSku && onDeleteMaterial && <th className="px-3 py-2 w-14 text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -213,58 +213,65 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                   return (
                     <tr
                       key={rowId}
-                      className="hover:bg-[var(--surface-low)]/80 transition-colors align-middle"
+                      className="hover:bg-[var(--surface-low)]/70 transition-colors align-top"
                     >
                       {/* Index */}
-                      <td className="px-2.5 py-1.5 text-center font-mono font-bold text-[10.5px] text-[var(--on-surface-subtle)] border-r border-[var(--border-subtle)]">
+                      <td className="px-3 py-2.5 text-center font-mono font-bold text-[10.5px] text-[var(--on-surface-subtle)] border-r border-[var(--border-subtle)] pt-3">
                         {String(idx + 1).padStart(2, "0")}
                       </td>
 
                       {/* Substrate & Specs */}
-                      <td className="px-3 py-1.5 border-r border-[var(--border-subtle)]">
+                      <td className="px-3.5 py-2.5 border-r border-[var(--border-subtle)]">
                         <div className="font-semibold text-xs text-[var(--on-surface)] leading-tight">
                           {mat.materialType || "—"}
                         </div>
                         {specsParts.length > 0 && (
-                          <div className="text-[10px] font-mono text-[var(--on-surface-muted)] truncate mt-0.5">
-                            {specsParts.join(" · ")}
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                            {specsParts.map((spec, sIdx) => (
+                              <span
+                                key={sIdx}
+                                className="inline-block px-1.5 py-0.5 rounded text-[9.5px] font-mono bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]"
+                              >
+                                {spec}
+                              </span>
+                            ))}
                           </div>
                         )}
                       </td>
 
                       {/* Planned Volume */}
-                      <td className="px-3 py-1.5 text-right font-mono text-xs border-r border-[var(--border-subtle)] whitespace-nowrap">
+                      <td className="px-3.5 py-2.5 text-right font-mono text-xs border-r border-[var(--border-subtle)] whitespace-nowrap pt-3">
                         <span className="font-bold text-[var(--on-surface)]">
                           {mat.quantity ? Number(mat.quantity).toLocaleString() : "—"}
                         </span>{" "}
-                        <span className="text-[10px] text-[var(--on-surface-muted)] font-normal">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
                           {mat.unit || "pcs"}
                         </span>
                       </td>
 
                       {/* SAMP & Plant Feedback */}
-                      <td className="px-3 py-1.5 border-r border-[var(--border-subtle)]">
-                        <div className="space-y-1">
+                      <td className="px-3.5 py-2.5 border-r border-[var(--border-subtle)]">
+                        <div className="space-y-1.5">
                           {mat.sampRemark && (
-                            <div className="flex items-start gap-1 text-[10.5px] text-emerald-800 dark:text-emerald-300">
-                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-emerald-100 dark:bg-emerald-950/60 shrink-0">SAMP</span>
-                              <span className="line-clamp-2">{mat.sampRemark}</span>
+                            <div className="flex items-start gap-1.5 text-[10.5px] text-emerald-800 dark:text-emerald-300">
+                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 border border-emerald-500/25 shrink-0 mt-0.5">SAMP</span>
+                              <span className="line-clamp-2 leading-tight">{mat.sampRemark}</span>
                             </div>
                           )}
                           {mat.plantRemark && (
-                            <div className="flex items-start gap-1 text-[10.5px] text-teal-800 dark:text-teal-300">
-                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-teal-100 dark:bg-teal-950/60 shrink-0">PLANT</span>
-                              <span className="line-clamp-2">{mat.plantRemark}</span>
+                            <div className="flex items-start gap-1.5 text-[10.5px] text-teal-800 dark:text-teal-300">
+                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-teal-500/15 text-teal-900 dark:text-teal-200 border border-teal-500/25 shrink-0 mt-0.5">PLANT</span>
+                              <span className="line-clamp-2 leading-tight">{mat.plantRemark}</span>
                             </div>
                           )}
                           {!mat.sampRemark && !mat.plantRemark && (
-                            <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">Awaiting team notes</span>
+                            <span className="text-[10.5px] font-mono text-[var(--on-surface-subtle)]">—</span>
                           )}
                         </div>
                       </td>
 
                       {/* Marketing Directive & Application */}
-                      <td className="px-3 py-1.5 text-xs text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
+                      <td className="px-3.5 py-2.5 text-xs text-[var(--on-surface)] border-r border-[var(--border-subtle)] pt-3">
                         {mat.remark ? (
                           <div className="text-[11px] leading-snug line-clamp-2">
                             {mat.remark}
@@ -278,12 +285,12 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
 
                       {/* Actions */}
                       {canManageSku && onDeleteMaterial && (
-                        <td className="px-3 py-1.5 text-center">
+                        <td className="px-3 py-2.5 text-center pt-3">
                           <button
                             type="button"
                             onClick={() => handleDeleteRow(mat.id!)}
                             disabled={deletingId === mat.id}
-                            className="h-6 w-6 mx-auto rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 flex items-center justify-center transition cursor-pointer disabled:opacity-50"
+                            className="h-6 w-6 mx-auto rounded-md hover:bg-rose-500/10 text-[var(--on-surface-subtle)] hover:text-rose-600 flex items-center justify-center transition-all cursor-pointer disabled:opacity-50"
                             title="Remove SKU line"
                           >
                             {deletingId === mat.id ? (
@@ -301,7 +308,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
             </table>
 
             {/* High-Density Footer Summary Strip */}
-            <div className="px-3.5 py-1.5 bg-[var(--surface-lowest)] border-t border-[var(--border-subtle)] flex items-center justify-between text-[10.5px] font-mono text-[var(--on-surface-muted)] flex-wrap gap-2 select-none">
+            <div className="px-4 py-2 bg-[var(--surface-lowest)] border-t border-[var(--border-subtle)] flex items-center justify-between text-[10.5px] font-mono text-[var(--on-surface-muted)] flex-wrap gap-2 select-none">
               <div className="flex items-center gap-3">
                 <span>
                   Total SKUs: <strong className="text-[var(--on-surface)]">{materials.length}</strong>
@@ -417,7 +424,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                       onChange={(e) =>
                         setDraftMaterial((prev) => ({ ...prev, material_type: e.target.value }))
                       }
-                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 transition-all font-sans shadow-2xs"
                     />
                   </div>
 
@@ -433,7 +440,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                       onChange={(e) =>
                         setDraftMaterial((prev) => ({ ...prev, supplier_name: e.target.value }))
                       }
-                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 transition-all font-sans shadow-2xs"
                     />
                   </div>
 
@@ -449,7 +456,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                       onChange={(e) =>
                         setDraftMaterial((prev) => ({ ...prev, grade: e.target.value }))
                       }
-                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 transition-all font-sans shadow-2xs"
                     />
                   </div>
 
@@ -465,7 +472,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                       onChange={(e) =>
                         setDraftMaterial((prev) => ({ ...prev, color_variant: e.target.value }))
                       }
-                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 transition-all font-sans shadow-2xs"
                     />
                   </div>
 
@@ -481,7 +488,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                       onChange={(e) =>
                         setDraftMaterial((prev) => ({ ...prev, caliper_wt: e.target.value }))
                       }
-                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                      className="w-full h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 transition-all font-sans shadow-2xs"
                     />
                   </div>
 
@@ -500,7 +507,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                         onChange={(e) =>
                           setDraftMaterial((prev) => ({ ...prev, quantity: e.target.value }))
                         }
-                        className="flex-1 h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] font-mono text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                        className="flex-1 h-9 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] font-mono text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 transition-all shadow-2xs"
                       />
                       <input
                         type="text"
@@ -509,7 +516,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                         onChange={(e) =>
                           setDraftMaterial((prev) => ({ ...prev, unit: e.target.value }))
                         }
-                        className="w-20 h-9 px-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] font-mono text-xs text-[var(--on-surface)] text-center focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                        className="w-20 h-9 px-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] font-mono text-xs text-[var(--on-surface)] text-center focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 transition-all shadow-2xs"
                       />
                     </div>
                   </div>
@@ -527,7 +534,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                     onChange={(e) =>
                       setDraftMaterial((prev) => ({ ...prev, remark: e.target.value }))
                     }
-                    className="w-full p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition resize-none"
+                    className="w-full p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 transition-all resize-none shadow-2xs font-sans"
                   />
                 </div>
 
@@ -537,14 +544,14 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                     type="button"
                     onClick={() => setIsAddingSku(false)}
                     disabled={isSubmitting}
-                    className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-medium text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] transition cursor-pointer"
+                    className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] transition-all cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-5 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+                    className="px-5 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
                   >
                     {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                     <span>{isSubmitting ? "Adding..." : "Add to Material Matrix"}</span>

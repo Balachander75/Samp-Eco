@@ -70,7 +70,7 @@ def run_tests():
         "target_audience": "Executive Professionals",
         "program_name": "Premium Diary Collection",
         "program_year": "2025-2026",
-        "reference_images": ["https://example.com/moodboard1.jpg"],
+        "reference_images": ["https://example.com/reference-image1.jpg"],
         "reference_links": ["https://example.com/trend-brief"],
         "design_remarks": "Ensure CMYK separation ready for gold metallic foil stamping.",
     }

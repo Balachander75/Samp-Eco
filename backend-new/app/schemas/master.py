@@ -115,3 +115,18 @@ class UserOut(BaseModel):
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TeamMemberSummary(BaseModel):
+    id: int
+    name: str
+    role: str
+    sub_role: Optional[str] = None
+    is_team_head: bool = False
+    is_team_admin: bool = False
+
+
+class TeamRosterOut(BaseModel):
+    team: str
+    member_count: int
+    members: List[TeamMemberSummary]

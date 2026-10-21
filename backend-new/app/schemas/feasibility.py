@@ -19,7 +19,6 @@ class FeasibilityRequestCreate(BaseModel):
     required_date: date
     target_plant: Optional[str] = Field(default=None, max_length=255)
     marketing_remarks: Optional[str] = Field(default=None, max_length=100)
-    created_by: Optional[str] = None
     reference_images: list[str] = Field(default_factory=list, max_length=2)
     reference_image_names: list[str] = Field(default_factory=list, max_length=2)
     reference_links: list[str] = Field(default_factory=list, max_length=2)

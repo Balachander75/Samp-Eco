@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { SampleRequestItem } from "../../types";
 import { formatOdooDate } from "../../utils/dateUtils";
-import { Eye, UserCheck, Clock, ShieldAlert, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { indiaDateKey, operationalWorkdaysBetween } from "@/lib/operationalWorkdays";
 
 const formatRelativeTime = (timestamp?: string): string => {
@@ -97,11 +97,8 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
             {lastViewer && (
               <>
                 <span className="text-[var(--border-strong)] hidden sm:inline">·</span>
-                <span className="inline-flex items-center gap-1 text-[11px] text-[var(--on-surface-subtle)]">
-                  <Eye className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>
-                    Reviewed by {lastViewer.actorName} {lastViewer.timeAgo}
-                  </span>
+                <span className="text-[11px] text-[var(--on-surface-subtle)]">
+                  Reviewed by {lastViewer.actorName} {lastViewer.timeAgo}
                 </span>
               </>
             )}
@@ -113,7 +110,6 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
           {/* Pending Counter-Date Compact Micro-Pill */}
           {activeRequest.counterDateDecision === "pending" && activeRequest.sampCounterDate && (
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 text-xs shadow-2xs">
-              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
               <span className="font-semibold">
                 Revised Date: <span className="font-mono font-bold">{formatOdooDate(activeRequest.sampCounterDate)}</span>
                 {extensionDays > 0 && <span className="ml-1 opacity-80">(+{extensionDays}d)</span>}
@@ -137,7 +133,6 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
           {/* Reviewer / Claim Pill */}
           {isClaimed ? (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface)] shadow-2xs">
-              <UserCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">Assigned:</span>
               <span className="font-bold text-xs truncate max-w-[150px]">{activeRequest.takenBySamp}</span>
             </div>
@@ -148,12 +143,10 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
               disabled={isClaiming}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold transition cursor-pointer shadow-2xs disabled:opacity-50"
             >
-              <UserCheck className="w-3.5 h-3.5" />
               <span>{isClaiming ? "Claiming..." : "Claim Task"}</span>
             </button>
           ) : (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-xs shadow-2xs">
-              <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
               <span className="font-medium text-[11px]">Unclaimed Feasibility</span>
             </div>
           )}

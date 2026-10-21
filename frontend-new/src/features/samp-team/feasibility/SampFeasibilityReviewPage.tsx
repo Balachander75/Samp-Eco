@@ -28,7 +28,7 @@ import {
   addOperationalWorkdays,
   operationalWorkdaysBetween,
 } from "@/lib/operationalWorkdays";
-import { Search, X } from "lucide-react";
+import { AlertTriangle, Search, X } from "lucide-react";
 import { getFeasibilityTypeDisplay } from "@/features/sample-requests/utils/feasibilityParsers";
 
 export interface SampFeasibilityReviewPageProps {
@@ -84,6 +84,8 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
 
   const [internalRequests, setInternalRequests] = useState<SampleRequestItem[]>([]);
   const [internalLoading, setInternalLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadSequenceRef = useRef(0);
 
   const [filterTab, setFilterTab] = useState<FeasibilityFilterTab>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -151,18 +153,27 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
   }, []);
 
   const loadRequests = useCallback(async () => {
+    const loadSequence = ++loadSequenceRef.current;
     setInternalLoading(true);
+    setLoadError(null);
     try {
       const data = await fetchFeasibilityRequestsApi({
         year: currentBusinessYear || undefined,
       });
-      setInternalRequests(data);
+      if (loadSequence === loadSequenceRef.current) setInternalRequests(data);
     } catch (err) {
       console.error("Failed to load feasibility tasks for SAMP Review:", err);
+      if (loadSequence === loadSequenceRef.current) {
+        setLoadError(err instanceof Error ? err.message : "Check your connection and retry.");
+      }
     } finally {
-      setInternalLoading(false);
+      if (loadSequence === loadSequenceRef.current) setInternalLoading(false);
     }
   }, [currentBusinessYear]);
+
+  useEffect(() => () => {
+    loadSequenceRef.current += 1;
+  }, []);
 
   useEffect(() => {
     if (!initialRequests) {
@@ -187,7 +198,13 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
 
   const handleRefresh = useCallback(async () => {
     if (parentRefresh) {
-      await parentRefresh();
+      setLoadError(null);
+      try {
+        await parentRefresh();
+      } catch (err) {
+        console.error("Failed to refresh feasibility tasks for SAMP Review:", err);
+        setLoadError(err instanceof Error ? err.message : "Check your connection and retry.");
+      }
     } else {
       await loadRequests();
     }
@@ -698,6 +715,28 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
         onResetFilters={clearFilters}
         resetFiltersLabel="Clear Filters"
       >
+        {loadError && (
+          <div
+            role="alert"
+            className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200"
+          >
+            <div className="flex min-w-0 items-start gap-2 text-xs">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+              <div className="min-w-0">
+                <p className="font-semibold">{feasibilityRequests.length ? "Refresh failed. Showing the last loaded tasks." : "Feasibility tasks could not be loaded."}</p>
+                <p className="mt-0.5 break-words text-rose-700 dark:text-rose-300">{loadError}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleRefresh()}
+              disabled={isLoading}
+              className="min-h-8 shrink-0 rounded-md border border-rose-300 px-3 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-950/70"
+            >
+              {isLoading ? "Retrying…" : "Try again"}
+            </button>
+          </div>
+        )}
         <DataTable
           data={filteredRequests}
           columns={columns}
@@ -710,7 +749,9 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
           tableClassName="w-full table-fixed min-w-0"
           containerClassName="overflow-y-auto overflow-x-hidden"
           emptyMessage={
-            feasibilityRequests.length === 0
+            loadError && feasibilityRequests.length === 0
+              ? "The review queue is unavailable. Use Try again to reload it."
+              : feasibilityRequests.length === 0
               ? "No feasibility tasks found in the review queue."
               : "No tasks match the selected filters."
           }

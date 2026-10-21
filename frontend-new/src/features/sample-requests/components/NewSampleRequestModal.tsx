@@ -164,7 +164,7 @@ const ProgramPicker: React.FC<ProgramPickerProps> = ({ programs, value, onChange
               selectProgram(filteredPrograms[activeIndex]);
             }
           }}
-          className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 pr-9 text-xs font-semibold text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700/80 dark:bg-zinc-900/80 dark:text-zinc-100"
+          className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] pl-8 pr-9 text-xs font-semibold text-[var(--on-surface)] outline-none transition-colors placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15"
         />
         <button
           type="button"
@@ -178,7 +178,7 @@ const ProgramPicker: React.FC<ProgramPickerProps> = ({ programs, value, onChange
               inputRef.current?.focus();
             }
           }}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer p-1 text-zinc-400 transition-colors hover:text-zinc-700 dark:hover:text-zinc-200"
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer p-1 text-[var(--on-surface-subtle)] transition-colors hover:text-[var(--on-surface)]"
         >
           <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${isOpen ? "rotate-180 text-[var(--accent-primary)]" : ""}`} />
         </button>
@@ -190,7 +190,7 @@ const ProgramPicker: React.FC<ProgramPickerProps> = ({ programs, value, onChange
           id="marketing-program-options"
           role="listbox"
           style={{ position: "fixed", top: position.top, left: position.left, width: position.width, maxHeight: position.maxHeight }}
-          className="z-[99999] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1.5 shadow-[0_12px_36px_rgba(15,23,42,0.2)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)]"
+          className="z-[99999] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.25)]"
         >
           {filteredPrograms.length ? filteredPrograms.map((program, index) => {
             const title = program.programName || program.programCampaignTitle || "Untitled program";
@@ -206,16 +206,16 @@ const ProgramPicker: React.FC<ProgramPickerProps> = ({ programs, value, onChange
                 onClick={() => selectProgram(program)}
                 className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left transition-colors cursor-pointer ${
                   index === activeIndex || isSelected
-                    ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950/50 dark:text-emerald-200 font-semibold"
-                    : "text-zinc-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-zinc-800/60"
+                    ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-semibold"
+                    : "text-[var(--on-surface)] hover:bg-[var(--surface-low)]"
                 }`}
               >
                 <span className="min-w-0 truncate text-xs font-semibold">{title}</span>
-                <span className="shrink-0 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">Season {program.programYear || "2026"}</span>
+                <span className="shrink-0 text-[10px] font-mono text-[var(--on-surface-subtle)]">Season {program.programYear || "2026"}</span>
               </button>
             );
           }) : (
-            <div className="px-2.5 py-3 text-center text-[11px] text-zinc-500 dark:text-zinc-400">
+            <div className="px-2.5 py-3 text-center text-[11px] text-[var(--on-surface-subtle)]">
               {query.trim() ? "No matching program. You can keep the name you entered." : "Select a customer to see its programs."}
             </div>
           )}
@@ -705,23 +705,23 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
       />
 
       <div className="flex min-h-full items-center justify-center p-3 sm:p-5">
-        <div className={`relative w-full ${selectedTrack === "feasibility_check" ? "max-w-4xl" : "max-w-3xl"} bg-[var(--surface-low)] dark:bg-zinc-950 border border-slate-200/80 dark:border-white/[0.08] rounded-2xl shadow-2xl select-text overflow-hidden transition-all duration-200 animate-smooth-modal`}>
+        <div className={`relative w-full ${selectedTrack === "feasibility_check" ? "max-w-4xl" : "max-w-3xl"} bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl select-text overflow-hidden transition-all duration-200 animate-smooth-modal`}>
           
           {/* Luminous Engine Header Bar */}
-          <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-zinc-900 shrink-0 border-b border-slate-200/70 dark:border-white/[0.06] shadow-[0_1px_4px_rgba(11,28,48,0.02)]">
+          <div className="flex items-center justify-between px-6 py-4 bg-[var(--surface-lowest)] shrink-0 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight font-display">
+                  <h3 className="text-base font-bold text-[var(--on-surface)] tracking-tight font-display">
                     {selectedTrack === "feasibility_check" && "Technical Feasibility Check"}
                     {selectedTrack === "marketing_request" && "Commercial Sample Request"}
                     {selectedTrack === "program_planning" && "Seasonal Program Planning"}
                   </h3>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/20 tracking-wider uppercase">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/20 tracking-wider uppercase">
                     {selectedTrack === "feasibility_check" ? `FC-${requestCodeYear}-001` : selectedTrack === "program_planning" ? `PP-${requestCodeYear}-001` : `SR-${requestCodeYear}-001`}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-normal">
+                <p className="text-xs text-[var(--on-surface-muted)] mt-0.5 font-normal">
                   {selectedTrack === "feasibility_check" &&
                     "Sampling feasibility assessment, paper GSM & prototype specification evaluation"}
                   {selectedTrack === "marketing_request" &&
@@ -735,7 +735,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] transition-colors cursor-pointer"
               aria-label="Close modal"
             >
               <X className="w-4 h-4" />
@@ -744,7 +744,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
 
           {/* Track Switcher Tabs (Only shown when not locked to a specific track) */}
           {!lockTrack && (
-            <div className="flex items-center gap-1 px-6 bg-slate-50/80 dark:bg-zinc-900 border-b border-slate-200/60 dark:border-white/[0.08]">
+            <div className="flex items-center gap-1 px-6 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
               <button
                 type="button"
                 onClick={() => {
@@ -753,8 +753,8 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                 }}
                 className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all cursor-pointer select-none ${
                   selectedTrack === "feasibility_check"
-                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-400 bg-white dark:bg-zinc-800 font-bold shadow-2xs"
-                    : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-black/[0.02]"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--surface-lowest)] font-bold shadow-2xs"
+                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-black/[0.02]"
                 }`}
               >
                 <ClipboardCheck className="w-3.5 h-3.5" />
@@ -768,8 +768,8 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                 }}
                 className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all cursor-pointer select-none ${
                   selectedTrack === "marketing_request"
-                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-400 bg-white dark:bg-zinc-800 font-bold shadow-2xs"
-                    : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-black/[0.02]"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--surface-lowest)] font-bold shadow-2xs"
+                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-black/[0.02]"
                 }`}
               >
                 <Package className="w-3.5 h-3.5" />
@@ -783,8 +783,8 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                 }}
                 className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all cursor-pointer select-none ${
                   selectedTrack === "program_planning"
-                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-400 bg-white dark:bg-zinc-800 font-bold shadow-2xs"
-                    : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-black/[0.02]"
+                    ? "border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--surface-lowest)] font-bold shadow-2xs"
+                    : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-black/[0.02]"
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
@@ -804,14 +804,14 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
             {/* TAB 1: FEASIBILITY CHECK FORM */}
             {selectedTrack === "feasibility_check" && (
               <form onSubmit={handleSubmitFeasibility} className="space-y-4">
-                <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-white/[0.08] rounded-2xl p-5 shadow-[0_2px_12px_rgba(11,28,48,0.03)] space-y-4">
+                <div className="bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)] space-y-4">
                   {/* Two-Column Grid */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                     {/* Left Column (7 cols) */}
                     <div className="lg:col-span-7 space-y-3.5">
                       {/* Customer Account */}
                       <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1.5 font-sans">
                           Customer Account <span className="text-rose-500">*</span>
                         </label>
                         <CustomerCombobox
@@ -824,7 +824,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
 
                       {/* Feasibility Type Selection Cards */}
                       <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1.5 font-sans">
                           Feasibility Classification <span className="text-rose-500">*</span>
                         </label>
 
@@ -836,7 +836,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               return (
                                 <div
                                   key={type.id}
-                                  className="sm:col-span-2 flex min-h-12 items-center justify-between rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-primary)]/[0.035] px-3 ring-2 ring-[var(--accent-primary)]/20 shadow-2xs"
+                                  className="sm:col-span-2 flex min-h-12 items-center justify-between rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-primary-subtle)] px-3 ring-2 ring-[var(--accent-primary)]/20 shadow-2xs"
                                 >
                                   <input
                                     type="text"
@@ -847,9 +847,9 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                     placeholder="Custom requirement (max 25 chars)..."
                                     value={customTypeOther}
                                     onChange={(e) => setCustomTypeOther(e.target.value.slice(0, 25))}
-                                    className="w-full bg-transparent text-xs font-medium text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+                                    className="w-full bg-transparent text-xs font-medium text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-subtle)]"
                                   />
-                                  <span className={`text-[10px] font-mono shrink-0 ml-2 ${customTypeOther.length >= 25 ? "text-amber-500 font-bold" : "text-zinc-400"}`}>
+                                  <span className={`text-[10px] font-mono shrink-0 ml-2 ${customTypeOther.length >= 25 ? "text-amber-500 font-bold" : "text-[var(--on-surface-subtle)]"}`}>
                                     {customTypeOther.length}/25
                                   </span>
                                 </div>
@@ -864,16 +864,16 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                   isOther ? "sm:col-span-2" : ""
                                 } ${
                                   isSelected
-                                    ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/[0.035] ring-2 ring-[var(--accent-primary)]/20 shadow-2xs"
-                                    : "border-slate-200/90 dark:border-white/[0.08] hover:border-slate-300 bg-slate-50/60 dark:bg-zinc-900/40 hover:bg-white dark:hover:bg-zinc-850 text-slate-700 dark:text-zinc-300"
+                                    ? "border-[var(--accent-primary)] bg-[var(--accent-primary-subtle)] ring-2 ring-[var(--accent-primary)]/20 shadow-2xs"
+                                    : "border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] text-[var(--on-surface)]"
                                 }`}
                               >
                                 <div className="flex min-w-0 items-center justify-between w-full gap-3">
                                   <span
                                     className={`text-xs tracking-tight ${
                                       isSelected
-                                        ? "text-[var(--accent-primary)] dark:text-emerald-400 font-bold"
-                                        : "font-semibold text-slate-900 dark:text-zinc-100"
+                                        ? "text-[var(--accent-primary)] font-bold"
+                                        : "font-semibold text-[var(--on-surface)]"
                                     }`}
                                   >
                                     {type.label}
@@ -882,7 +882,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                     className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors ${
                                       isSelected
                                         ? "bg-[var(--accent-primary)] text-white"
-                                        : "border border-slate-300 dark:border-zinc-600"
+                                        : "border border-[var(--border-strong)]"
                                     }`}
                                   >
                                     {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
@@ -898,10 +898,10 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                       {/* Technical Description & Notes */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
-                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans">
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] font-sans">
                             Technical Description &amp; Specifications <span className="text-rose-500">*</span>
                           </label>
-                          <span className={`text-[10px] font-mono ${feasibilityDescription.length >= 75 ? "text-amber-500 font-bold" : "text-zinc-400"}`}>
+                          <span className={`text-[10px] font-mono ${feasibilityDescription.length >= 75 ? "text-amber-500 font-bold" : "text-[var(--on-surface-subtle)]"}`}>
                             {feasibilityDescription.length}/75
                           </span>
                         </div>
@@ -912,7 +912,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                           placeholder="Brief technical context, material GSM, binding specs... (max 75 characters)"
                           value={feasibilityDescription}
                           onChange={(e) => setFeasibilityDescription(e.target.value.slice(0, 75))}
-                          className="w-full p-3 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
+                          className="w-full p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
                         />
                       </div>
                     </div>
@@ -937,13 +937,13 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                       {/* Marketing Remarks / Notes */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] font-sans">
                             Marketing Remarks / Notes
                           </label>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-zinc-400 font-medium">Optional</span>
-                            <span className="text-zinc-300 dark:text-zinc-600">·</span>
-                            <span className={`text-[10px] font-mono ${releaseRemarks.length >= 100 ? "text-amber-500 font-bold" : "text-zinc-400"}`}>
+                            <span className="text-[10px] text-[var(--on-surface-subtle)] font-medium">Optional</span>
+                            <span className="text-[var(--border-strong)]">·</span>
+                            <span className={`text-[10px] font-mono ${releaseRemarks.length >= 100 ? "text-amber-500 font-bold" : "text-[var(--on-surface-subtle)]"}`}>
                               {releaseRemarks.length}/100
                             </span>
                           </div>
@@ -954,14 +954,14 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                           placeholder="Marketing remarks, client constraints... (max 100 characters)"
                           value={releaseRemarks}
                           onChange={(e) => setReleaseRemarks(e.target.value.slice(0, 100))}
-                          className="w-full p-3 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
+                          className="w-full p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none transition-all resize-none leading-relaxed shadow-2xs"
                         />
                       </div>
 
                       {/* Attachments Section */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] font-sans">
                             Reference Attachments
                           </label>
                           <span
@@ -969,8 +969,8 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               uploadedImages.length >= 2 && webLinks.length >= 1
                                 ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/40"
                                 : totalAttachments > 0
-                                ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:bg-[var(--accent-primary)]/20 dark:text-emerald-300 border border-[var(--accent-primary)]/20"
-                                : "bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400"
+                                ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/20"
+                                : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
                             }`}
                           >
                             {uploadedImages.length}/2 images · {webLinks.length}/1 link
@@ -978,20 +978,20 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                         </div>
 
                         <div className="space-y-2.5">
-                          <div className="inline-flex w-full rounded-xl bg-slate-100/90 dark:bg-zinc-800/80 p-1 text-[11px] border border-slate-200/70 dark:border-zinc-700/60">
+                          <div className="inline-flex w-full rounded-xl bg-[var(--surface-low)] p-1 text-[11px] border border-[var(--border-subtle)]">
                             <button
                               type="button"
                               onClick={() => setMediaTab("files")}
                               className={`flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                 mediaTab === "files"
-                                  ? "bg-white dark:bg-zinc-700 text-[var(--accent-primary)] dark:text-emerald-400 shadow-xs font-bold"
-                                  : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 font-medium"
+                                  ? "bg-[var(--surface-lowest)] text-[var(--accent-primary)] shadow-xs font-bold"
+                                  : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] font-medium"
                               }`}
                             >
                               <ImageIcon className="w-3.5 h-3.5" />
                               <span>Image Upload</span>
                               {uploadedImages.length > 0 && (
-                                <span className="ml-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:bg-[var(--accent-primary)]/30 dark:text-emerald-300">
+                                <span className="ml-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
                                   {uploadedImages.length}
                                 </span>
                               )}
@@ -1001,14 +1001,14 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               onClick={() => setMediaTab("links")}
                               className={`flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                 mediaTab === "links"
-                                  ? "bg-white dark:bg-zinc-700 text-[var(--accent-primary)] dark:text-emerald-400 shadow-xs font-bold"
-                                  : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 font-medium"
+                                  ? "bg-[var(--surface-lowest)] text-[var(--accent-primary)] shadow-xs font-bold"
+                                  : "text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] font-medium"
                               }`}
                             >
                               <Link2 className="w-3.5 h-3.5" />
                               <span>Web URL Link</span>
                               {webLinks.length > 0 && (
-                                <span className="ml-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:bg-[var(--accent-primary)]/30 dark:text-emerald-300">
+                                <span className="ml-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
                                   {webLinks.length}
                                 </span>
                               )}
@@ -1030,27 +1030,27 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => fileInputRef.current?.click()}
-                                  className="w-full py-3 px-3.5 rounded-xl border-2 border-dashed border-slate-200 dark:border-zinc-700 hover:border-[var(--accent-primary)] bg-slate-50/60 dark:bg-zinc-900/40 hover:bg-[var(--accent-primary)]/[0.03] text-slate-600 dark:text-zinc-400 hover:text-[var(--accent-primary)] flex items-center justify-between text-xs font-medium transition-all cursor-pointer group shadow-2xs"
+                                  className="w-full py-3 px-3.5 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--accent-primary)] bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] hover:text-[var(--accent-primary)] flex items-center justify-between text-xs font-medium transition-all cursor-pointer group shadow-2xs"
                                 >
                                   <div className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 group-hover:bg-[var(--accent-primary)]/10 text-slate-400 group-hover:text-[var(--accent-primary)] flex items-center justify-center transition-colors border border-slate-200 dark:border-zinc-700 group-hover:border-[var(--accent-primary)]/30">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--surface-lowest)] group-hover:bg-[var(--accent-primary-subtle)] text-[var(--on-surface-subtle)] group-hover:text-[var(--accent-primary)] flex items-center justify-center transition-colors border border-[var(--border-subtle)] group-hover:border-[var(--accent-primary)]/30">
                                       <UploadCloud className="w-4 h-4" />
                                     </div>
                                     <div className="text-left">
-                                      <span className="block font-semibold text-slate-800 dark:text-zinc-200 group-hover:text-[var(--accent-primary)] transition-colors">
+                                      <span className="block font-semibold text-[var(--on-surface)] group-hover:text-[var(--accent-primary)] transition-colors">
                                         Choose photos to upload
                                       </span>
-                                      <span className="block text-[10px] text-slate-500">
+                                      <span className="block text-[10px] text-[var(--on-surface-subtle)]">
                                         Supports PNG, JPG, WEBP
                                       </span>
                                     </div>
                                   </div>
-                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-zinc-800 text-slate-600 border border-slate-200 dark:border-zinc-700 group-hover:bg-[var(--accent-primary)]/10 group-hover:text-[var(--accent-primary)] transition-colors font-mono">
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)] group-hover:bg-[var(--accent-primary-subtle)] group-hover:text-[var(--accent-primary)] transition-colors font-mono">
                                     {2 - uploadedImages.length} slot{2 - uploadedImages.length === 1 ? "" : "s"} left
                                   </span>
                                 </button>
                               ) : (
-                                <div className="w-full h-9 px-3 rounded-xl bg-slate-100 dark:bg-zinc-800/60 text-slate-500 dark:text-zinc-400 text-xs font-medium flex items-center justify-center border border-slate-200 dark:border-zinc-700">
+                                <div className="w-full h-9 px-3 rounded-xl bg-[var(--surface-low)] text-[var(--on-surface-muted)] text-xs font-medium flex items-center justify-center border border-[var(--border-subtle)]">
                                   Maximum 2 images reached
                                 </div>
                               )}
@@ -1075,7 +1075,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                     handleAddWebLink(e);
                                   }
                                 }}
-                                className="flex-1 h-9 px-3.5 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none disabled:opacity-50 transition-all shadow-2xs"
+                                className="flex-1 h-9 px-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 outline-none disabled:opacity-50 transition-all shadow-2xs"
                               />
                               <button
                                 type="button"
@@ -1094,22 +1094,22 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               {uploadedImages.map((img) => (
                                 <div
                                   key={img.id}
-                                  className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-900 text-xs shadow-2xs group"
+                                  className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs shadow-2xs group"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                     <img
                                       src={img.url}
                                       alt={img.name}
-                                      className="w-7 h-7 rounded-lg object-cover border border-slate-200 dark:border-zinc-800 shrink-0"
+                                      className="w-7 h-7 rounded-lg object-cover border border-[var(--border-subtle)] shrink-0"
                                     />
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:bg-[var(--accent-primary)]/25 dark:text-emerald-300 border border-[var(--accent-primary)]/20 shrink-0 font-mono">
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/20 shrink-0 font-mono">
                                       IMG
                                     </span>
-                                    <span className="truncate font-medium text-slate-800 dark:text-zinc-200 text-xs" title={img.name}>
+                                    <span className="truncate font-medium text-[var(--on-surface)] text-xs" title={img.name}>
                                       {img.name}
                                     </span>
                                     {img.size && (
-                                      <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                      <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono shrink-0">
                                         ({img.size})
                                       </span>
                                     )}
@@ -1118,7 +1118,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                     type="button"
                                     onClick={() => handleRemoveImage(img.id)}
                                     title="Remove image"
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0 cursor-pointer"
+                                    className="p-1.5 rounded-lg text-[var(--on-surface-subtle)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0 cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -1128,10 +1128,10 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               {webLinks.map((url, idx) => (
                                 <div
                                   key={`link-${idx}`}
-                                  className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-900 text-xs shadow-2xs group"
+                                  className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] text-xs shadow-2xs group"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/25 shrink-0 font-mono">
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/25 shrink-0 font-mono">
                                       URL
                                     </span>
                                     <a
@@ -1149,7 +1149,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                     type="button"
                                     onClick={() => handleRemoveWebLink(idx)}
                                     title="Remove link"
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0 cursor-pointer"
+                                    className="p-1.5 rounded-lg text-[var(--on-surface-subtle)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0 cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -1157,8 +1157,8 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                               ))}
                             </div>
                           ) : (
-                            <div className="px-3 py-3 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-900/30 text-center">
-                              <span className="text-xs text-slate-500">
+                            <div className="px-3 py-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-low)]/50 text-center">
+                              <span className="text-xs text-[var(--on-surface-subtle)]">
                                 No attachments yet (optional · up to 2 images and 1 link)
                               </span>
                             </div>
@@ -1170,16 +1170,16 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                 </div>
 
                 {/* Footer Action Bar */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-zinc-800">
+                <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="h-9 px-4 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shadow-2xs"
+                    className="h-9 px-4 rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] transition-colors cursor-pointer shadow-2xs"
                   >
                     Discard
                   </button>
                   <div className="flex items-center gap-3">
-                    <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
+                    <span className="text-[11px] text-[var(--on-surface-subtle)] font-mono hidden sm:inline">
                       Ready to submit to Sampling Desk
                     </span>
                     <button
@@ -1203,11 +1203,11 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
             {selectedTrack === "marketing_request" && (
               <form onSubmit={handleSubmitSampling} className="space-y-4">
                 {/* Form Sheet Content */}
-                <div className="bg-white dark:bg-zinc-900 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-6 space-y-5 shadow-[0_4px_24px_rgba(11,28,48,0.03)]">
+                <div className="bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl p-6 space-y-5 shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
                   {/* Row 1: Customer Account & Program Name */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1.5 font-sans">
                         Customer Account <span className="text-rose-500">*</span>
                       </label>
                       <CustomerCombobox
@@ -1221,11 +1221,11 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
 
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans">
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] font-sans">
                           Program Name <span className="text-rose-500">*</span>
                         </label>
                         {matchingPrograms.length > 0 && (
-                          <span className="text-[10.5px] font-mono text-[var(--accent-primary)] dark:text-emerald-400 font-bold">
+                          <span className="text-[10.5px] font-mono text-[var(--accent-primary)] font-bold">
                             {matchingPrograms.length} open program{matchingPrograms.length !== 1 ? "s" : ""} found
                           </span>
                         )}
@@ -1237,7 +1237,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                         onYearChange={setMarketingProgramYear}
                       />
                       {marketingCustomer.trim() && matchingPrograms.length === 0 && (
-                        <p className="mt-1.5 text-[10.5px] text-slate-500 dark:text-zinc-400">
+                        <p className="mt-1.5 text-[10.5px] text-[var(--on-surface-subtle)]">
                           No saved programs for this customer. You can enter a program name.
                         </p>
                       )}
@@ -1246,7 +1246,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
 
                   {/* Program Year */}
                   <div className="pt-1">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-2 font-sans">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-2 font-sans">
                       Program Year <span className="text-rose-500">*</span>
                     </label>
                     <div className="grid grid-cols-3 gap-3">
@@ -1259,8 +1259,8 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                             onClick={() => setMarketingProgramYear(year)}
                             className={`h-11 px-4 rounded-xl border text-xs font-semibold transition-all flex items-center justify-center cursor-pointer select-none ${
                               isSelected
-                                ? "border-[var(--accent-primary)] bg-[var(--accent-primary-subtle)] dark:bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] dark:text-[var(--accent-primary)] font-bold ring-2 ring-[var(--accent-primary)]/20 shadow-xs"
-                                : "border-slate-200/80 dark:border-zinc-800 bg-[var(--surface-low)]/60 dark:bg-zinc-900/40 text-slate-600 dark:text-zinc-400 hover:border-slate-300 hover:bg-white dark:hover:bg-zinc-800/60"
+                                ? "border-[var(--accent-primary)] bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold ring-2 ring-[var(--accent-primary)]/20 shadow-xs"
+                                : "border-[var(--border-subtle)] bg-[var(--surface-low)] text-[var(--on-surface-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-lowest)]"
                             }`}
                           >
                             <span className="font-mono text-xs tracking-wide">{year}</span>
@@ -1276,7 +1276,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="h-10 px-5 rounded-xl bg-slate-100 dark:bg-white/[0.06] text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 hover:text-slate-900 transition-colors cursor-pointer"
+                    className="h-10 px-5 rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] transition-colors cursor-pointer"
                   >
                     Discard
                   </button>
@@ -1306,33 +1306,33 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
             {/* TAB 3: PROGRAM PLANNING FORM (Single-Page Setup) */}
             {selectedTrack === "program_planning" && (
               <form onSubmit={handleProceedToPlanning} className="space-y-4">
-                <div className="bg-white dark:bg-zinc-900 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-6 shadow-[0_4px_24px_rgba(11,28,48,0.03)] space-y-5">
+                <div className="bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)] space-y-5">
                   {/* Sheet Header Row */}
-                  <div className="flex flex-wrap items-center justify-between pb-3 border-b border-slate-100 dark:border-white/[0.06] gap-2">
+                  <div className="flex flex-wrap items-center justify-between pb-3 border-b border-[var(--border-subtle)] gap-2">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-zinc-100 font-display">
+                        <h4 className="text-sm font-bold text-[var(--on-surface)] font-display">
                           Seasonal Program Planning Setup
                         </h4>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-emerald-400 border border-[var(--accent-primary)]/20 font-bold uppercase tracking-wider">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/20 font-bold uppercase tracking-wider">
                           CAMPAIGN SETUP
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                      <p className="text-[11px] text-[var(--on-surface-muted)] mt-0.5">
                         Initialize high-volume seasonal line, define target facility, and setup planning workspace.
                       </p>
                     </div>
 
-                    <div className="hidden sm:flex items-center gap-2 bg-[var(--accent-primary-subtle)]/80 dark:bg-white/[0.04] border border-slate-200/50 dark:border-white/[0.05] px-3 py-1 rounded-xl">
-                      <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">PLANNING CYCLE</span>
-                      <span className="text-xs font-mono font-bold text-[var(--accent-primary)] dark:text-emerald-400">{byInfo.businessYearStr}</span>
+                    <div className="hidden sm:flex items-center gap-2 bg-[var(--surface-low)] border border-[var(--border-subtle)] px-3 py-1 rounded-xl">
+                      <span className="text-[10px] font-bold text-[var(--on-surface-subtle)] uppercase tracking-wider">PLANNING CYCLE</span>
+                      <span className="text-xs font-mono font-bold text-[var(--accent-primary)]">{byInfo.businessYearStr}</span>
                     </div>
                   </div>
 
                   {/* Customer Account & Target Plant */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1.5 font-sans">
                         Customer Name <span className="text-rose-500">*</span>
                       </label>
                       <CustomerCombobox
@@ -1345,7 +1345,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1.5 font-sans">
                         Target Plant <span className="text-rose-500">*</span>
                       </label>
                       <Select
@@ -1364,7 +1364,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
 
                   {/* Program Campaign Title */}
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1.5 font-sans">
                       Program Campaign Title <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -1373,13 +1373,13 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                       value={programPlanName}
                       onChange={(e) => setProgramPlanName(e.target.value)}
                       placeholder="e.g. Back-to-School 2026-2027 Hardcover Line"
-                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-900/80 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 transition-all shadow-2xs"
+                      className="w-full h-10 px-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 transition-all shadow-2xs"
                     />
                   </div>
 
                   {/* Program Business Year */}
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1.5 font-sans">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)] mb-1.5 font-sans">
                       Program Business Year <span className="text-rose-500">*</span>
                     </label>
                     <Select
@@ -1400,7 +1400,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="h-10 px-5 rounded-xl bg-slate-100 dark:bg-white/[0.06] text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 hover:text-slate-900 transition-colors cursor-pointer"
+                    className="h-10 px-5 rounded-xl bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] transition-colors cursor-pointer"
                   >
                     Discard
                   </button>

@@ -16,7 +16,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import settings
 from app.auth.permissions import require_workflow_write_access
-from app.routers import auth, downstream, feasibility, master, program_requests, request_workflows, sample_requests
+from app.routers import auth, downstream, feasibility, master, program_requests, request_closures, request_workflows, sample_requests
+from app.routers.request_closures import reject_closed_workflow_write
 from app.database import (
     SessionLocal,
     engine,
@@ -137,7 +138,7 @@ app.include_router(auth.router)
 app.include_router(master.router)
 app.include_router(
     feasibility.router,
-    dependencies=[Depends(require_workflow_write_access)],
+    dependencies=[Depends(require_workflow_write_access), Depends(reject_closed_workflow_write)],
 )
 app.include_router(
     program_requests.router,
@@ -145,11 +146,15 @@ app.include_router(
 )
 app.include_router(
     sample_requests.router,
+    dependencies=[Depends(require_workflow_write_access), Depends(reject_closed_workflow_write)],
+)
+app.include_router(
+    request_closures.router,
     dependencies=[Depends(require_workflow_write_access)],
 )
 app.include_router(
     request_workflows.router,
-    dependencies=[Depends(require_workflow_write_access)],
+    dependencies=[Depends(require_workflow_write_access), Depends(reject_closed_workflow_write)],
 )
 app.include_router(
     downstream.router,

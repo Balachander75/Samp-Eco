@@ -36,6 +36,7 @@ from app.models.request_workflows import (
     MockupWorkflow,
     MockupWorkflowLog,
 )
+from app.models.request_closure import RequestClosure
 from app.repositories.sample_request_repo import MISSING_TAXONOMY_FILTER
 from app.services.sample_request_service import SampleRequestService
 from app.services.design_request_service import DesignRequestService
@@ -55,6 +56,26 @@ def get_sample_request_service(db: Session = Depends(get_db)) -> SampleRequestSe
 
 def get_design_request_service(db: Session = Depends(get_db)) -> DesignRequestService:
     return DesignRequestService(db)
+
+
+def _require_marketing_request_owner(record: Any, current_user: Any, detail: str = "Sample request not found") -> None:
+    if not user_has_team(current_user, "marketing") or is_admin(current_user) or is_team_head(current_user):
+        return
+    creator_id = record.get("created_by_user_id") if isinstance(record, dict) else getattr(record, "created_by_user_id", None)
+    if creator_id != current_user.id:
+        raise HTTPException(status_code=404, detail=detail)
+
+
+def _require_parent_workflows_open(db: Session, sample_request_ids: List[int]) -> None:
+    ids = [int(value) for value in sample_request_ids if int(value) > 0]
+    if not ids:
+        return
+    closed_id = db.query(RequestClosure.request_id).filter(
+        RequestClosure.request_type.in_(("mockup", "sample", "costing")),
+        RequestClosure.request_id.in_(ids),
+    ).first()
+    if closed_id:
+        raise HTTPException(status_code=409, detail="This request has been closed and can no longer be changed")
 
 
 def _marketing_actor(user: Any) -> str:
@@ -480,6 +501,7 @@ def get_sample_request(
 
     if not record:
         raise HTTPException(status_code=404, detail="Sample request not found")
+    _require_marketing_request_owner(record, current_user)
     return record
 
 
@@ -589,6 +611,11 @@ def update_sample_request(
     current_user=Depends(get_current_user),
 ):
     require_any_team(current_user, ("marketing", "samp", "plant", "creative_studio"))
+    if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user):
+        existing = service.get_by_id(id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Sample request not found")
+        _require_marketing_request_owner(existing, current_user)
     payload["actor_user_id"] = current_user.id
     payload["actor_name"] = _marketing_actor(current_user)
     payload["actor_department"] = _actor_team_label(current_user)
@@ -623,7 +650,10 @@ def release_batch_sample_requests(
         raise HTTPException(status_code=422, detail="ids array is required")
 
     int_ids = [int(i) for i in ids if str(i).isdigit()]
-    records = service.db.query(CreateSampleRequest).filter(CreateSampleRequest.id.in_(int_ids)).all()
+    records = service.db.query(CreateSampleRequest).filter(CreateSampleRequest.id.in_(int_ids)).with_for_update().all()
+    _require_parent_workflows_open(service.db, int_ids)
+    for record in records:
+        _require_marketing_request_owner(record, current_user)
     if not str(new_status).strip().casefold().startswith("draft"):
         for record in records:
             _validate_staged_handoff_requirements(record)
@@ -639,31 +669,38 @@ def release_batch_sample_requests(
         if request_types == {"sample"}:
             state = dict(record.mockup_workflow_state or {})
             routing = dict(state.get("samplingRouting") or {})
-            needs_creative = bool(routing.get("creativeChangesRequired"))
-            is_resample = bool(state.get("isResample") or routing.get("isResample") or record.creation_mode == "resample")
-            if is_resample:
-                target_status = "Released to Plant"
-                routing["stage"] = "plant"
-                now = datetime.now(timezone.utc).isoformat()
-                state.update({"plantReleasedAt": now, "plantReleasedBy": _marketing_actor(current_user), "plantReleaseTarget": record.target_plant or "Khaniwade"})
-                events = list(state.get("events") or [])
-                events.append({"id": f"event-{uuid4().hex}", "action": "RESAMPLE_SENT_DIRECTLY_TO_PLANT", "title": "Unchanged resample sent directly to Plant", "actorName": _marketing_actor(current_user), "actorDepartment": "Marketing", "timestamp": now})
-                state["events"] = events[-100:]
-            elif needs_creative:
-                target_status = "Creative"
-                routing["stage"] = "creative"
-                routing["creativeDueAt"] = india_operational_deadline(datetime.now(timezone.utc), 1).isoformat()
-                routing["creativeDelayed"] = False
+            current_stage = str(routing.get("stage") or "").strip().casefold()
+            already_released = current_stage in {"creative", "sampling_review", "plant"}
+            if already_released:
+                # A client may retry after the server completed the release but the
+                # response was lost. Preserve the existing route and its event history.
+                target_status = record.status or target_status
             else:
-                target_status = "Sampling Review (PMT)"
-                routing["stage"] = "sampling_review"
-                now = datetime.now(timezone.utc).isoformat()
-                events = list(state.get("events") or [])
-                events.append({"id": f"event-{uuid4().hex}", "action": "SUBMITTED_TO_SAMPLING_REVIEW", "title": "Submitted to Sampling Team for technical review", "actorName": _marketing_actor(current_user), "actorDepartment": "Marketing", "timestamp": now})
-                state["events"] = events[-100:]
-            state["samplingRouting"] = routing
-            state["stage"] = routing["stage"]
-            record.mockup_workflow_state = state
+                needs_creative = bool(routing.get("creativeChangesRequired"))
+                is_resample = bool(state.get("isResample") or routing.get("isResample") or record.creation_mode == "resample")
+                if is_resample:
+                    target_status = "Released to Plant"
+                    routing["stage"] = "plant"
+                    now = datetime.now(timezone.utc).isoformat()
+                    state.update({"plantReleasedAt": now, "plantReleasedBy": _marketing_actor(current_user), "plantReleaseTarget": record.target_plant or "Khaniwade"})
+                    events = list(state.get("events") or [])
+                    events.append({"id": f"event-{uuid4().hex}", "action": "RESAMPLE_SENT_DIRECTLY_TO_PLANT", "title": "Unchanged resample sent directly to Plant", "actorName": _marketing_actor(current_user), "actorDepartment": "Marketing", "timestamp": now})
+                    state["events"] = events[-100:]
+                elif needs_creative:
+                    target_status = "Creative"
+                    routing["stage"] = "creative"
+                    routing["creativeDueAt"] = india_operational_deadline(datetime.now(timezone.utc), 1).isoformat()
+                    routing["creativeDelayed"] = False
+                else:
+                    target_status = "Sampling Review (PMT)"
+                    routing["stage"] = "sampling_review"
+                    now = datetime.now(timezone.utc).isoformat()
+                    events = list(state.get("events") or [])
+                    events.append({"id": f"event-{uuid4().hex}", "action": "SUBMITTED_TO_SAMPLING_REVIEW", "title": "Submitted to Sampling Team for technical review", "actorName": _marketing_actor(current_user), "actorDepartment": "Marketing", "timestamp": now})
+                    state["events"] = events[-100:]
+                state["samplingRouting"] = routing
+                state["stage"] = routing["stage"]
+                record.mockup_workflow_state = state
         if request_types == {"mockup"}:
             workflow = service.db.query(MockupWorkflow).filter(
                 MockupWorkflow.sample_request_id == record.id
@@ -757,6 +794,8 @@ def release_single_sample_request(
     require_team(current_user, "marketing")
     new_status = body.get("status") or "Creative"
     existing_record = service.db.query(CreateSampleRequest).filter(CreateSampleRequest.id == id).first()
+    if existing_record:
+        _require_marketing_request_owner(existing_record, current_user)
     if existing_record and not str(new_status).strip().casefold().startswith("draft"):
         _validate_staged_handoff_requirements(existing_record)
     req_types = existing_record.request_types or [] if existing_record else []
@@ -891,6 +930,9 @@ def batch_update_status(
     if len(records) != len(numeric_ids):
         db.rollback()
         raise HTTPException(status_code=404, detail="One or more sample requests were not found.")
+    _require_parent_workflows_open(db, numeric_ids)
+    for record in records:
+        _require_marketing_request_owner(record, current_user)
 
     actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Marketing")
     now = datetime.now(timezone.utc)
@@ -1228,6 +1270,7 @@ def get_product_details(
     sample = service.get_by_id(sample_request_id)
     if not sample:
         raise HTTPException(status_code=404, detail="Sample request not found")
+    _require_marketing_request_owner(sample, current_user)
     details = service.get_product_details(sample_request_id)
     if catalog_lookup:
         classes = sorted({str(item.get("class_name") or "").strip() for item in details if item.get("class_name")})
@@ -1294,8 +1337,10 @@ def save_product_details(
     sample = service.get_by_id(int(sr_id))
     if not sample:
         raise HTTPException(status_code=404, detail="Sample request not found")
+    _require_marketing_request_owner(sample, current_user)
 
     record = service.db.query(CreateSampleRequest).filter(CreateSampleRequest.id == int(sr_id)).with_for_update().first()
+    _require_parent_workflows_open(service.db, [int(sr_id)])
     sample_state = dict(record.mockup_workflow_state or {}) if record else {}
     sampling_routing = dict(sample_state.get("samplingRouting") or {})
     if (record and set(record.request_types or []) == {"sample"}
@@ -1721,8 +1766,8 @@ def decide_mockup_marketing_acceptance(
     remark = str(body.get("remark") or "").strip()
     is_direction_stage = previous_stage == "awaiting_marketing_direction"
     if is_direction_stage:
-        if decision not in {"request_new_mockup", "close"}:
-            raise HTTPException(status_code=422, detail="Choose whether to request a new mockup or close the request")
+        if decision != "request_new_mockup":
+            raise HTTPException(status_code=422, detail="Request a new mockup here, or close it from the request header")
     else:
         if previous_stage != "awaiting_marketing_acceptance":
             raise HTTPException(status_code=409, detail="This mockup is not awaiting Marketing acceptance")
@@ -1747,9 +1792,6 @@ def decide_mockup_marketing_acceptance(
     elif decision == "request_new_mockup":
         next_stage, next_status = "studio", "Studio"
         action, title = "MARKETING_REQUESTED_NEW_MOCKUP", "Marketing requested a new mockup from Studio"
-    else:
-        next_stage, next_status = "done", "Closed by Marketing"
-        action, title = "MARKETING_CLOSED_MOCKUP", "Marketing closed the mockup request"
     state.update({"stage": next_stage, "marketingDecision": decision, "marketingDecisionAt": now})
     if decision == "accept":
         state["marketingAcceptedAt"] = now
@@ -1780,12 +1822,6 @@ def decide_mockup_marketing_acceptance(
         state["marketingRevisionRemark"] = remark or "Marketing requested a new mockup"
         state.pop("studioRevisionRejectRemark", None)
         record.status = next_status
-    else:
-        state["closedAt"] = now
-        state["closedBy"] = actor
-        state["marketingCloseRemark"] = remark or None
-        record.status = next_status
-
     events = list(state.get("events") or [])
     events.append({
         "id": f"event-{uuid4().hex}",
@@ -2118,6 +2154,11 @@ def get_design_request(
     record = service.get_by_id(id)
     if not record:
         raise HTTPException(status_code=404, detail="Design request not found")
+    _require_marketing_request_owner(record, current_user, "Design request not found")
+    if user_has_team(current_user, "creative_studio") and not is_admin(current_user):
+        visible_statuses = {"creative", "creative remaining requested", "creative studio", "target date counter proposed"}
+        if str(record.get("status") or "").strip().casefold() not in visible_statuses:
+            raise HTTPException(status_code=404, detail="Design request not found")
     return record
 
 
@@ -2276,6 +2317,8 @@ def claim_design_request(
     service: DesignRequestService = Depends(get_design_request_service),
     current_user=Depends(get_current_user),
 ):
+    if not is_admin(current_user) and user_has_team(current_user, "marketing"):
+        raise HTTPException(status_code=403, detail="Marketing team members cannot claim Creative Studio tasks.")
     require_team(current_user, "creative_studio")
     if is_team_head(current_user):
         raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
@@ -2323,6 +2366,11 @@ def release_design_request_claim(
     service: DesignRequestService = Depends(get_design_request_service),
     current_user=Depends(get_current_user),
 ):
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Once claimed, a task cannot be self-released. Please contact an administrator to reassign."
+        )
     require_team(current_user, "creative_studio")
     if is_team_head(current_user):
         raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
@@ -2335,8 +2383,6 @@ def release_design_request_claim(
         claim_id = state.get("claimedByUserId")
         if claim_id is None and not state.get("claimedBy"):
             raise HTTPException(status_code=409, detail="This design request is not claimed")
-        if not is_admin(current_user) and str(claim_id) != str(current_user.id):
-            raise HTTPException(status_code=403, detail="Only the assigned designer or a global admin can release this claim")
         previous_owner = str(state.get("claimedBy") or "the assigned designer")
         for key in ("claimedBy", "claimedByUserId", "claimedAt"):
             state.pop(key, None)

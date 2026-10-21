@@ -1,4 +1,4 @@
-import { Ban, Loader2 } from "lucide-react";
+import { Ban, Loader2, Layers, ShieldCheck, Factory } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { UserProfile } from "@/features/auth";
@@ -292,21 +292,22 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG CHATTER) */}
         <div className="flex-1 flex overflow-hidden min-h-0">
           {/* LEFT: WORKSPACE CANVAS */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)] min-w-0">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)] [background-image:radial-gradient(var(--border-subtle)_1px,transparent_1px)] [background-size:20px_20px] min-w-0">
             <div className="max-w-6xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
               {/* ── 1. PRIMARY SECTION TABS (TOP) ── */}
-              <div className="px-6 sm:px-8 pt-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
+              <div className="px-6 sm:px-8 pt-2.5 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
                 <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
                   {/* Tab 1: Substrate Matrix */}
                   <button
                     type="button"
                     onClick={() => setActiveTab("matrix")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                    className={`pb-2.5 border-b-2 font-display transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                       activeTab === "matrix"
                         ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                         : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
+                    <Layers className="w-3.5 h-3.5" />
                     <span>1. Substrate &amp; SKU Matrix</span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--surface-base)] text-[var(--on-surface)] border border-[var(--border-subtle)]">
                       {materials.length} {materials.length === 1 ? "SKU" : "SKUs"}
@@ -317,19 +318,20 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                   <button
                     type="button"
                     onClick={() => setActiveTab("samp")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                    className={`pb-2.5 border-b-2 font-display transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                       activeTab === "samp"
                         ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                         : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
+                    <ShieldCheck className="w-3.5 h-3.5" />
                     <span>2. Sampling Team Review</span>
                     {hasSampNote ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
                         ✓ Reviewed
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-base)] text-[var(--on-surface-muted)]">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-medium bg-[var(--surface-base)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
                         {activeRequest.samplingClaimedBy ? "In Review" : "Pending Claim"}
                       </span>
                     )}
@@ -339,24 +341,24 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                   <button
                     type="button"
                     onClick={() => setActiveTab("plant")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                    className={`pb-2.5 border-b-2 font-display transition-all cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
                       activeTab === "plant"
                         ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                         : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
+                    <Factory className="w-3.5 h-3.5" />
                     <span>3. Plant Production Review</span>
                     {hasPlantNote ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25">
                         ✓ Confirmed
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-[var(--surface-base)] text-[var(--on-surface-muted)]">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-medium bg-[var(--surface-base)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
                         {activeRequest.plantClaimedBy ? "In Review" : "Pending Claim"}
                       </span>
                     )}
                   </button>
-
                 </div>
               </div>
 
@@ -431,17 +433,17 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
       {/* ── Confirm Dismantle Program Modal ── */}
       {isDismantleModalOpen && (
         <div
-          className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs select-text animate-in fade-in duration-150"
+          className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs select-text animate-in fade-in duration-150"
           onClick={() => !isDismantling && setIsDismantleModalOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md bg-[var(--surface-base)] border border-rose-300 dark:border-rose-800 rounded-2xl shadow-[0_24px_70px_-12px_rgba(225,29,72,0.25)] overflow-hidden p-5 space-y-4"
+            className="relative w-full max-w-md bg-[var(--surface-base)] border border-rose-300/70 dark:border-rose-900/70 rounded-2xl shadow-[0_24px_70px_-12px_rgba(225,29,72,0.25)] overflow-hidden p-5 sm:p-6 space-y-4"
           >
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-600 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/20">
                 <Ban className="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
@@ -449,13 +451,13 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                   Dismantle Program Plan?
                 </h3>
                 <p className="text-xs text-[var(--on-surface-muted)] mt-0.5">
-                  This action is permanent and cannot be undone. Once dismantled, the program is completely terminated and CANNOT be resumed.
+                  This action is permanent and cannot be undone. Once dismantled, the program is completely terminated and cannot be resumed.
                 </p>
               </div>
             </div>
 
             {dismantleError && (
-              <div className="p-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 text-xs">
+              <div className="p-2.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs font-semibold">
                 {dismantleError}
               </div>
             )}
@@ -469,7 +471,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                 value={dismantleReason}
                 onChange={(e) => setDismantleReason(e.target.value)}
                 placeholder="e.g. Seasonal campaign cancelled by customer / budget constraints"
-                className="w-full p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition resize-none"
+                className="w-full p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500/20 transition-all resize-none shadow-2xs font-sans"
               />
             </div>
 
@@ -478,7 +480,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                 type="button"
                 onClick={() => setIsDismantleModalOpen(false)}
                 disabled={isDismantling}
-                className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] transition cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] transition-all cursor-pointer"
               >
                 Keep Active
               </button>
@@ -486,7 +488,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                 type="button"
                 onClick={handleConfirmDismantle}
                 disabled={isDismantling}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
               >
                 {isDismantling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
                 <span>{isDismantling ? "Dismantling..." : "Confirm & Dismantle"}</span>

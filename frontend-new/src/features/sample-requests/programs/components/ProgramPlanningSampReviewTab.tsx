@@ -122,7 +122,7 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
         <div className="flex items-center gap-4 flex-wrap">
           {/* Target Plant */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
               <Factory className="w-4 h-4" />
             </div>
             <div>
@@ -139,7 +139,7 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
 
           {/* Substrate SKUs */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
               <FileCheck2 className="w-4 h-4" />
             </div>
             <div>
@@ -156,7 +156,7 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
 
           {/* Assigned Reviewer */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] flex items-center justify-center shrink-0 border border-[var(--accent-primary)]/20">
               <UserCheck className="w-4 h-4" />
             </div>
             <div>
@@ -175,7 +175,7 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
         {/* Claim / Status Action Button on Right */}
         <div className="flex items-center gap-2">
           {hasSampNote ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-xs font-bold shadow-2xs">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-bold shadow-2xs">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>Review Completed</span>
             </span>
@@ -184,21 +184,21 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
               type="button"
               onClick={() => onClaimTask?.("sampling")}
               disabled={isClaiming}
-              className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50"
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs active:scale-95 disabled:opacity-50"
             >
               {isClaiming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
               <span>{isClaiming ? "Claiming..." : "Claim Sampling Task"}</span>
             </button>
           ) : isClaimedByMe ? (
-            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
               ✓ Active Owner
             </span>
           ) : isClaimed ? (
-            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border border-sky-200">
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25">
               Claimed by {activeRequest.samplingClaimedBy}
             </span>
           ) : (
-            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200">
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25">
               Pending Claim
             </span>
           )}
@@ -225,16 +225,16 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
         </div>
 
         {submitError && (
-          <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+          <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-2">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>{submitError}</span>
           </div>
         )}
 
         {submitSuccess && (
-          <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-            <Check className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-            <span>✓ Technical observation successfully recorded into program audit log!</span>
+          <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2">
+            <Check className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <span>Technical observation successfully recorded into program audit log</span>
           </div>
         )}
 
@@ -246,16 +246,16 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
               value={draftRemark}
               onChange={(e) => setDraftRemark(e.target.value)}
               placeholder="Enter technical observations, tooling compatibility, caliper tolerances, grain directions, or alternative substrate recommendations..."
-              className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-2.5 text-xs leading-relaxed text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 font-sans shadow-2xs"
+              className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3 text-xs leading-relaxed text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 font-sans shadow-2xs"
             />
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-[10.5px] font-mono text-[var(--on-surface-subtle)]">
-                {draftRemark.length} / 4000 characters · Saved to permanent program audit chatter
+                {draftRemark.length} / 4000 characters · Saved to permanent audit chatter
               </span>
               <button
                 type="submit"
                 disabled={!draftRemark.trim() || isSubmitting}
-                className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -267,11 +267,22 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
             </div>
           </form>
         ) : hasSampNote ? (
-          <div className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs leading-relaxed text-[var(--on-surface)] font-sans whitespace-pre-wrap">
-            {activeRequest.samplingRemark}
+          <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-mono text-emerald-800 dark:text-emerald-300">
+              <span className="font-bold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                {activeRequest.samplingSignedBy || activeRequest.samplingClaimedBy || "Sampling Team Reviewer"}
+              </span>
+              {activeRequest.samplingSignedAt && (
+                <span className="opacity-75">{formatOdooDate(activeRequest.samplingSignedAt)}</span>
+              )}
+            </div>
+            <p className="text-xs text-[var(--on-surface)] leading-relaxed whitespace-pre-wrap font-sans">
+              {activeRequest.samplingRemark}
+            </p>
           </div>
         ) : (
-          <div className="p-4 rounded-lg border border-dashed border-[var(--border-subtle)] text-center text-[11.5px] text-[var(--on-surface-subtle)]">
+          <div className="p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-center text-xs text-[var(--on-surface-subtle)]">
             No technical review has been recorded yet. SAMP Team engineers can add observations here.
           </div>
         )}
@@ -279,8 +290,8 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
 
       {/* ── Section B: Line-by-Line Material Assessment ── */}
       {materials.length > 0 && (
-        <div className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-2xs space-y-2.5">
-          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 flex-wrap gap-2">
+        <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-2xs space-y-3">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2.5 flex-wrap gap-2">
             <div>
               <h3 className="font-display font-bold text-xs text-[var(--on-surface)] flex items-center gap-1.5">
                 <FileCheck2 className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
@@ -296,7 +307,7 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
                 type="button"
                 onClick={handleSaveLineRemarks}
                 disabled={isSavingLines}
-                className="px-2.5 py-1 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs active:scale-95 disabled:opacity-50"
               >
                 {isSavingLines ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -309,15 +320,15 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
           </div>
 
           {lineSuccess && (
-            <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5">
-              <Check className="w-3.5 h-3.5 text-emerald-600" />
-              <span>✓ Line-by-line SAMP remarks saved!</span>
+            <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Line-by-line SAMP remarks saved</span>
             </div>
           )}
 
           {lineError && (
-            <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+            <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
               <span>{lineError}</span>
             </div>
           )}
@@ -325,56 +336,56 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
           <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)]">
             <table className="w-full min-w-[880px] border-collapse text-left text-xs">
               <thead>
-                <tr className="bg-[var(--surface-low)] border-b border-[var(--border-subtle)] text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] select-none">
-                  <th className="px-2 py-1.5 w-10 text-center border-r border-[var(--border-subtle)]">#</th>
-                  <th className="px-2.5 py-1.5 min-w-[130px] border-r border-[var(--border-subtle)]">Material Type</th>
-                  <th className="px-2.5 py-1.5 min-w-[110px] border-r border-[var(--border-subtle)]">Supplier / Mill</th>
-                  <th className="px-2 py-1.5 min-w-[90px] border-r border-[var(--border-subtle)]">Caliper / Wt</th>
-                  <th className="px-2 py-1.5 min-w-[90px] border-r border-[var(--border-subtle)]">Grade</th>
-                  <th className="px-2.5 py-1.5 min-w-[80px] text-right border-r border-[var(--border-subtle)]">Quantity</th>
-                  <th className="px-2 py-1.5 min-w-[60px] text-center border-r border-[var(--border-subtle)]">Unit</th>
-                  <th className="px-2.5 py-1.5 min-w-[260px]">SAMP Technical Evaluation Remark</th>
+                <tr className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] select-none">
+                  <th className="px-3 py-2 w-12 text-center border-r border-[var(--border-subtle)]">#</th>
+                  <th className="px-3.5 py-2 min-w-[140px] border-r border-[var(--border-subtle)]">Material Type</th>
+                  <th className="px-3 py-2 min-w-[120px] border-r border-[var(--border-subtle)]">Supplier / Mill</th>
+                  <th className="px-3 py-2 min-w-[100px] border-r border-[var(--border-subtle)]">Caliper / Wt</th>
+                  <th className="px-3 py-2 min-w-[100px] border-r border-[var(--border-subtle)]">Grade</th>
+                  <th className="px-3 py-2 min-w-[90px] text-right border-r border-[var(--border-subtle)]">Quantity</th>
+                  <th className="px-2.5 py-2 min-w-[60px] text-center border-r border-[var(--border-subtle)]">Unit</th>
+                  <th className="px-3.5 py-2 min-w-[280px]">SAMP Technical Evaluation Remark</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
                 {materials.map((mat, idx) => (
                   <tr key={mat.id ?? idx} className="align-middle hover:bg-[var(--surface-low)]/70 transition-colors">
                     {/* Index */}
-                    <td className="px-2 py-1.5 text-center font-mono font-bold text-[10.5px] text-[var(--on-surface-subtle)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 text-center font-mono font-bold text-[10.5px] text-[var(--on-surface-subtle)] border-r border-[var(--border-subtle)]">
                       {String(idx + 1).padStart(2, "0")}
                     </td>
 
                     {/* Material Type */}
-                    <td className="px-2.5 py-1.5 border-r border-[var(--border-subtle)]">
+                    <td className="px-3.5 py-2 border-r border-[var(--border-subtle)]">
                       <span className="font-semibold text-xs text-[var(--on-surface)]">
                         {mat.materialType || "—"}
                       </span>
                     </td>
 
                     {/* Supplier / Mill */}
-                    <td className="px-2.5 py-1.5 text-xs text-[var(--on-surface-muted)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 text-xs text-[var(--on-surface-muted)] border-r border-[var(--border-subtle)]">
                       {mat.supplierName || "—"}
                     </td>
 
                     {/* Caliper / Wt */}
-                    <td className="px-2 py-1.5 font-mono text-xs text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 font-mono text-xs text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
                       {mat.caliperWt || "—"}
                     </td>
 
                     {/* Grade */}
-                    <td className="px-2 py-1.5 text-xs text-[var(--on-surface-muted)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 text-xs text-[var(--on-surface-muted)] border-r border-[var(--border-subtle)]">
                       {mat.grade || "—"}
                     </td>
 
                     {/* Quantity */}
-                    <td className="px-2.5 py-1.5 font-mono font-bold text-xs text-right text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 font-mono font-bold text-xs text-right text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
                       {mat.quantity ? Number(mat.quantity).toLocaleString() : "—"}
                     </td>
 
                     {/* Unit */}
-                    <td className="px-2 py-1.5 text-center font-mono border-r border-[var(--border-subtle)]">
+                    <td className="px-2.5 py-2 text-center font-mono border-r border-[var(--border-subtle)]">
                       {mat.unit ? (
-                        <span className="inline-block text-[9.5px] font-mono px-1 py-0.5 rounded bg-[var(--surface-low)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium">
+                        <span className="inline-block text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-low)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium">
                           {mat.unit}
                         </span>
                       ) : (
@@ -383,7 +394,7 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
                     </td>
 
                     {/* SAMP Technical Remark Input / Display */}
-                    <td className="px-2.5 py-1.5">
+                    <td className="px-3.5 py-2">
                       {canSubmitReview && mat.id != null ? (
                         <input
                           type="text"
@@ -394,13 +405,13 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
                               [String(mat.id)]: e.target.value,
                             }))
                           }
-                          placeholder="e.g. Approved · Caliper verified · Alternative 300 GSM tested"
-                          className="w-full h-7 px-2 rounded border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition"
+                          placeholder="e.g. Substrate verified · Grain parallel · Alternative approved..."
+                          className="w-full h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 transition-all font-sans shadow-2xs"
                         />
                       ) : (
                         <span className="text-[var(--on-surface)] text-xs">
                           {mat.sampRemark ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/50">
+                            <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20">
                               {mat.sampRemark}
                             </span>
                           ) : (

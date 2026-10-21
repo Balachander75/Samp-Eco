@@ -1,13 +1,12 @@
 import React from "react";
 import { SampleRequestItem } from "../../types";
+import { RequestClosureControl, type RequestClosureTarget } from "../common/RequestClosureControl";
 import {
   Copy,
   Check,
   X,
   CheckCircle2,
   ChevronRight,
-  FlaskConical,
-  Briefcase,
   AlertCircle,
   Clock,
 } from "lucide-react";
@@ -20,6 +19,9 @@ export interface FeasibilityControlPanelProps {
   mode?: "marketing" | "samp";
   activeTab?: "specs" | "review" | "decision";
   onSelectTab?: (tab: "specs" | "review" | "decision") => void;
+  closureRequests?: RequestClosureTarget[];
+  canCloseRequest?: boolean;
+  onRequestClosed?: () => void | Promise<void>;
 }
 
 export const FeasibilityControlPanel: React.FC<FeasibilityControlPanelProps> = ({
@@ -30,6 +32,9 @@ export const FeasibilityControlPanel: React.FC<FeasibilityControlPanelProps> = (
   mode = "marketing",
   activeTab = "specs",
   onSelectTab,
+  closureRequests = [],
+  canCloseRequest = false,
+  onRequestClosed,
 }) => {
   const code =
     activeRequest.materialCode ||
@@ -230,24 +235,24 @@ export const FeasibilityControlPanel: React.FC<FeasibilityControlPanelProps> = (
 
         {/* Role Desk Badge */}
         <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-semibold border ${
+          className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10.5px] font-semibold border ${
             isSampMode
               ? "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20"
               : "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20"
           }`}
         >
           {isSampMode ? (
-            <>
-              <FlaskConical className="w-3 h-3" />
-              <span>Sampling Team</span>
-            </>
+            <span>Sampling Team</span>
           ) : (
-            <>
-              <Briefcase className="w-3 h-3" />
-              <span>Marketing Desk</span>
-            </>
+            <span>Marketing Desk</span>
           )}
         </span>
+
+        <RequestClosureControl
+          requests={closureRequests}
+          canClose={canCloseRequest}
+          onClosed={onRequestClosed}
+        />
 
         {/* Modal Close [X] */}
         <button

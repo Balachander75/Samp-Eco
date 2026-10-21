@@ -474,7 +474,7 @@ def ensure_costing_detail_columns():
 
 
 def ensure_sample_reference_columns():
-    """Persist reference moodboards and links on sample request records."""
+    """Persist reference images and links on sample request records."""
     statements = (
         "ALTER TABLE create_sample_requests ADD COLUMN IF NOT EXISTS reference_images JSONB NOT NULL DEFAULT '[]'::jsonb",
         "ALTER TABLE create_sample_requests ADD COLUMN IF NOT EXISTS reference_links JSONB NOT NULL DEFAULT '[]'::jsonb",

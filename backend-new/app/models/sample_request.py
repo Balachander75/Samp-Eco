@@ -225,7 +225,7 @@ class ProductDetail(Base):
 class DesignRequest(Base):
     """
     Creative Design Request entity (table: design_requests).
-    Manages creative brief, trend, audience, artwork variants, reference moodboards, and design schedules.
+    Manages creative brief, trend, audience, artwork variants, reference images, and design schedules.
     """
 
     __tablename__ = "design_requests"

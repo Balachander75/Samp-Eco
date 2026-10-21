@@ -122,7 +122,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
         <div className="flex items-center gap-4 flex-wrap">
           {/* Target Plant */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
               <Factory className="w-4 h-4" />
             </div>
             <div>
@@ -139,7 +139,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
 
           {/* Plant Material Scope */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20">
               <Boxes className="w-4 h-4" />
             </div>
             <div>
@@ -156,7 +156,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
 
           {/* Assigned Plant Reviewer */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
               <UserCheck className="w-4 h-4" />
             </div>
             <div>
@@ -175,7 +175,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
         {/* Claim / Status Action Button on Right */}
         <div className="flex items-center gap-2">
           {hasPlantNote ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900/50 text-teal-800 dark:text-teal-300 text-xs font-bold shadow-2xs">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500/10 dark:bg-teal-950/40 border border-teal-500/25 text-teal-800 dark:text-teal-300 text-xs font-bold shadow-2xs">
               <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
               <span>Plant Confirmed</span>
             </span>
@@ -184,21 +184,21 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
               type="button"
               onClick={() => onClaimTask?.("plant")}
               disabled={isClaiming}
-              className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50"
+              className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs active:scale-95 disabled:opacity-50"
             >
               {isClaiming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
               <span>{isClaiming ? "Claiming..." : "Claim Plant Task"}</span>
             </button>
           ) : isClaimedByMe ? (
-            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25">
               ✓ Active Plant Owner
             </span>
           ) : isClaimed ? (
-            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border border-sky-200">
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25">
               Claimed by {activeRequest.plantClaimedBy}
             </span>
           ) : (
-            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200">
+            <span className="px-2.5 py-1 rounded-xl text-[10.5px] font-mono font-medium bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25">
               Pending Claim
             </span>
           )}
@@ -210,7 +210,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
           <div>
             <h3 className="font-display font-bold text-xs text-[var(--on-surface)] flex items-center gap-1.5">
-              <Factory className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+              <Factory className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
               <span>Plant Operational Review &amp; Capacity Allocation</span>
             </h3>
             <p className="text-[10.5px] text-[var(--on-surface-muted)]">
@@ -225,16 +225,16 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
         </div>
 
         {submitError && (
-          <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+          <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-2">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>{submitError}</span>
           </div>
         )}
 
         {submitSuccess && (
-          <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-            <Check className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-            <span>✓ Plant feasibility observation successfully recorded into program audit log!</span>
+          <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2">
+            <Check className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <span>Plant feasibility observation successfully recorded into program audit log</span>
           </div>
         )}
 
@@ -246,7 +246,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
               value={draftRemark}
               onChange={(e) => setDraftRemark(e.target.value)}
               placeholder={`Enter manufacturing line availability, tooling verification, shift allocation, substrate storage notes for Plant ${activeRequest.targetPlant || "1505"}...`}
-              className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-2.5 text-xs leading-relaxed text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20 font-sans shadow-2xs"
+              className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3 text-xs leading-relaxed text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none transition focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 font-sans shadow-2xs"
             />
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-[10.5px] font-mono text-[var(--on-surface-subtle)]">
@@ -255,7 +255,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
               <button
                 type="submit"
                 disabled={!draftRemark.trim() || isSubmitting}
-                className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -267,11 +267,22 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
             </div>
           </form>
         ) : hasPlantNote ? (
-          <div className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs leading-relaxed text-[var(--on-surface)] font-sans whitespace-pre-wrap">
-            {activeRequest.plantRemark}
+          <div className="p-3.5 rounded-xl border border-teal-500/20 bg-teal-500/5 dark:bg-teal-950/20 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-mono text-teal-800 dark:text-teal-300">
+              <span className="font-bold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                {activeRequest.plantSignedBy || activeRequest.plantClaimedBy || "Plant Operations"}
+              </span>
+              {activeRequest.plantSignedAt && (
+                <span className="opacity-75">{formatOdooDate(activeRequest.plantSignedAt)}</span>
+              )}
+            </div>
+            <p className="text-xs text-[var(--on-surface)] leading-relaxed whitespace-pre-wrap font-sans">
+              {activeRequest.plantRemark}
+            </p>
           </div>
         ) : (
-          <div className="p-4 rounded-lg border border-dashed border-[var(--border-subtle)] text-center text-[11.5px] text-[var(--on-surface-subtle)]">
+          <div className="p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-center text-xs text-[var(--on-surface-subtle)]">
             No plant operational review has been recorded yet. Factory desk at {activeRequest.targetPlant?.toLowerCase().startsWith("plant") ? activeRequest.targetPlant : `Plant ${activeRequest.targetPlant || "1505"}`} can add observations here.
           </div>
         )}
@@ -279,8 +290,8 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
 
       {/* ── Section B: Line-by-Line Material Assessment ── */}
       {materials.length > 0 && (
-        <div className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-2xs space-y-2.5">
-          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 flex-wrap gap-2">
+        <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-2xs space-y-3">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2.5 flex-wrap gap-2">
             <div>
               <h3 className="font-display font-bold text-xs text-[var(--on-surface)] flex items-center gap-1.5">
                 <FileCheck2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
@@ -296,7 +307,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
                 type="button"
                 onClick={handleSaveLineRemarks}
                 disabled={isSavingLines}
-                className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs active:scale-95 disabled:opacity-50"
               >
                 {isSavingLines ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -309,15 +320,15 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
           </div>
 
           {lineSuccess && (
-            <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5">
-              <Check className="w-3.5 h-3.5 text-emerald-600" />
-              <span>✓ Line-by-line Plant remarks saved!</span>
+            <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Line-by-line Plant remarks saved</span>
             </div>
           )}
 
           {lineError && (
-            <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+            <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
               <span>{lineError}</span>
             </div>
           )}
@@ -325,57 +336,57 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
           <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)]">
             <table className="w-full min-w-[940px] border-collapse text-left text-xs">
               <thead>
-                <tr className="bg-[var(--surface-low)] border-b border-[var(--border-subtle)] text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] select-none">
-                  <th className="px-2 py-1.5 w-10 text-center border-r border-[var(--border-subtle)]">#</th>
-                  <th className="px-2.5 py-1.5 min-w-[130px] border-r border-[var(--border-subtle)]">Material Type</th>
-                  <th className="px-2.5 py-1.5 min-w-[110px] border-r border-[var(--border-subtle)]">Supplier / Mill</th>
-                  <th className="px-2 py-1.5 min-w-[90px] border-r border-[var(--border-subtle)]">Caliper / Wt</th>
-                  <th className="px-2.5 py-1.5 min-w-[90px] border-r border-[var(--border-subtle)]">Grade</th>
-                  <th className="px-2.5 py-1.5 min-w-[80px] text-right border-r border-[var(--border-subtle)]">Quantity</th>
-                  <th className="px-2.5 py-1.5 min-w-[60px] text-center border-r border-[var(--border-subtle)]">Unit</th>
-                  <th className="px-2.5 py-1.5 min-w-[180px] border-r border-[var(--border-subtle)]">SAMP Note</th>
-                  <th className="px-2.5 py-1.5 min-w-[260px]">Plant Technical &amp; Machine Remark</th>
+                <tr className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] select-none">
+                  <th className="px-3 py-2 w-12 text-center border-r border-[var(--border-subtle)]">#</th>
+                  <th className="px-3.5 py-2 min-w-[140px] border-r border-[var(--border-subtle)]">Material Type</th>
+                  <th className="px-3 py-2 min-w-[120px] border-r border-[var(--border-subtle)]">Supplier / Mill</th>
+                  <th className="px-3 py-2 min-w-[100px] border-r border-[var(--border-subtle)]">Caliper / Wt</th>
+                  <th className="px-3 py-2 min-w-[100px] border-r border-[var(--border-subtle)]">Grade</th>
+                  <th className="px-3 py-2 min-w-[90px] text-right border-r border-[var(--border-subtle)]">Quantity</th>
+                  <th className="px-2.5 py-2 min-w-[60px] text-center border-r border-[var(--border-subtle)]">Unit</th>
+                  <th className="px-3.5 py-2 min-w-[180px] border-r border-[var(--border-subtle)]">SAMP Note</th>
+                  <th className="px-3.5 py-2 min-w-[280px]">Plant Technical &amp; Machine Remark</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
                 {materials.map((mat, idx) => (
                   <tr key={mat.id ?? idx} className="align-middle hover:bg-[var(--surface-low)]/70 transition-colors">
                     {/* Index */}
-                    <td className="px-2 py-1.5 text-center font-mono font-bold text-[10.5px] text-[var(--on-surface-subtle)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 text-center font-mono font-bold text-[10.5px] text-[var(--on-surface-subtle)] border-r border-[var(--border-subtle)]">
                       {String(idx + 1).padStart(2, "0")}
                     </td>
 
                     {/* Material Type */}
-                    <td className="px-2.5 py-1.5 border-r border-[var(--border-subtle)]">
+                    <td className="px-3.5 py-2 border-r border-[var(--border-subtle)]">
                       <span className="font-semibold text-xs text-[var(--on-surface)]">
                         {mat.materialType || "—"}
                       </span>
                     </td>
 
                     {/* Supplier / Mill */}
-                    <td className="px-2.5 py-1.5 text-xs text-[var(--on-surface-muted)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 text-xs text-[var(--on-surface-muted)] border-r border-[var(--border-subtle)]">
                       {mat.supplierName || "—"}
                     </td>
 
                     {/* Caliper / Wt */}
-                    <td className="px-2 py-1.5 font-mono text-xs text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 font-mono text-xs text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
                       {mat.caliperWt || "—"}
                     </td>
 
                     {/* Grade */}
-                    <td className="px-2.5 py-1.5 text-xs text-[var(--on-surface-muted)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 text-xs text-[var(--on-surface-muted)] border-r border-[var(--border-subtle)]">
                       {mat.grade || "—"}
                     </td>
 
                     {/* Quantity */}
-                    <td className="px-2.5 py-1.5 font-mono font-bold text-xs text-right text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 font-mono font-bold text-xs text-right text-[var(--on-surface)] border-r border-[var(--border-subtle)]">
                       {mat.quantity ? Number(mat.quantity).toLocaleString() : "—"}
                     </td>
 
                     {/* Unit */}
-                    <td className="px-2 py-1.5 text-center font-mono border-r border-[var(--border-subtle)]">
+                    <td className="px-2.5 py-2 text-center font-mono border-r border-[var(--border-subtle)]">
                       {mat.unit ? (
-                        <span className="inline-block text-[9.5px] font-mono px-1 py-0.5 rounded bg-[var(--surface-low)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium">
+                        <span className="inline-block text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-low)] text-[var(--on-surface)] border border-[var(--border-subtle)] font-medium">
                           {mat.unit}
                         </span>
                       ) : (
@@ -384,9 +395,9 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
                     </td>
 
                     {/* SAMP Technical Note (Reference) */}
-                    <td className="px-2.5 py-1.5 border-r border-[var(--border-subtle)]">
+                    <td className="px-3.5 py-2 border-r border-[var(--border-subtle)]">
                       {mat.sampRemark ? (
-                        <span className="inline-block px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/50">
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20">
                           {mat.sampRemark}
                         </span>
                       ) : (
@@ -395,7 +406,7 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
                     </td>
 
                     {/* Plant Technical & Machine Remark */}
-                    <td className="px-2.5 py-1.5">
+                    <td className="px-3.5 py-2">
                       {canSubmitReview && mat.id != null ? (
                         <input
                           type="text"
@@ -407,12 +418,12 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
                             }))
                           }
                           placeholder={`Plant ${activeRequest.targetPlant || "1505"}: Tooling checked · Feasible on machine...`}
-                          className="w-full h-7 px-2 rounded border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition"
+                          className="w-full h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs text-[var(--on-surface)] placeholder:text-[var(--on-surface-subtle)] outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all font-sans shadow-2xs"
                         />
                       ) : (
                         <span className="text-[var(--on-surface)] text-xs">
                           {mat.plantRemark ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200/50">
+                            <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-teal-500/10 text-teal-800 dark:text-teal-300 border border-teal-500/20">
                               {mat.plantRemark}
                             </span>
                           ) : (

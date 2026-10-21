@@ -291,7 +291,7 @@ export const AddProductDesignStep: React.FC<AddProductDesignStepProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
-                  Reference Image / Moodboard
+                  Reference Images
                 </label>
                 <span
                   className={`text-[10px] font-semibold px-2 py-0.5 rounded font-mono transition-colors ${

@@ -60,8 +60,8 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             >
               {customerName}
             </h1>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-2xs">
-              <Layers className="w-3 h-3 text-[var(--accent-primary)] shrink-0" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-display font-bold bg-[var(--surface-low)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-2xs">
+              <Layers className="w-3.5 h-3.5 text-[var(--accent-primary)] shrink-0" />
               <span>{campaignTitle}</span>
               {programYear !== "—" && <span className="font-mono text-[var(--on-surface-subtle)]">({programYear})</span>}
             </span>
@@ -89,7 +89,7 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("samp")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-xs font-medium shadow-2xs cursor-pointer hover:bg-emerald-100/60 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-semibold shadow-2xs cursor-pointer hover:bg-emerald-500/15 transition-all"
               title="Sampling Technical Review Completed. Click to view."
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -99,19 +99,19 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("samp")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface)] shadow-2xs cursor-pointer hover:bg-[var(--surface-base)] transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 dark:bg-sky-950/40 border border-sky-500/25 text-xs text-sky-800 dark:text-sky-300 shadow-2xs cursor-pointer hover:bg-sky-500/15 transition-all"
               title={`Claimed by ${activeRequest.samplingClaimedBy || "Sampling Reviewer"}`}
             >
-              <UserCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">SAMP:</span>
-              <span className="font-bold text-xs truncate max-w-[120px]">{activeRequest.samplingClaimedBy || "Claimed"}</span>
+              <UserCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+              <span className="text-[11px] font-mono opacity-70">SAMP:</span>
+              <span className="font-semibold text-xs truncate max-w-[120px]">{activeRequest.samplingClaimedBy || "Claimed"}</span>
             </button>
           ) : mode === "sampling" ? (
             <button
               type="button"
               onClick={() => onClaimTask?.("sampling")}
               disabled={isClaiming}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold transition cursor-pointer shadow-2xs disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
             >
               <UserCheck className="w-3.5 h-3.5" />
               <span>{isClaiming ? "Claiming..." : "Claim SAMP"}</span>
@@ -120,7 +120,7 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("samp")}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[11px] text-[var(--on-surface-subtle)] font-mono shadow-2xs cursor-pointer hover:text-[var(--on-surface)]"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-700 dark:text-amber-300 font-mono shadow-2xs cursor-pointer hover:bg-amber-500/15 transition-all"
             >
               <Clock className="w-3 h-3 text-amber-500" />
               <span>SAMP: Pending</span>
@@ -132,7 +132,7 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("plant")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900/50 text-teal-800 dark:text-teal-300 text-xs font-medium shadow-2xs cursor-pointer hover:bg-teal-100/60 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500/10 dark:bg-teal-950/40 border border-teal-500/25 text-teal-800 dark:text-teal-300 text-xs font-semibold shadow-2xs cursor-pointer hover:bg-teal-500/15 transition-all"
               title={`${targetPlant} Production Feasibility Confirmed. Click to view.`}
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
@@ -142,19 +142,19 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("plant")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface)] shadow-2xs cursor-pointer hover:bg-[var(--surface-base)] transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 dark:bg-sky-950/40 border border-sky-500/25 text-xs text-sky-800 dark:text-sky-300 shadow-2xs cursor-pointer hover:bg-sky-500/15 transition-all"
               title={`Claimed by ${activeRequest.plantClaimedBy || "Plant Reviewer"}`}
             >
-              <UserCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
-              <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">Plant:</span>
-              <span className="font-bold text-xs truncate max-w-[120px]">{activeRequest.plantClaimedBy || "Claimed"}</span>
+              <UserCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+              <span className="text-[11px] font-mono opacity-70">Plant:</span>
+              <span className="font-semibold text-xs truncate max-w-[120px]">{activeRequest.plantClaimedBy || "Claimed"}</span>
             </button>
           ) : mode === "plant" ? (
             <button
               type="button"
               onClick={() => onClaimTask?.("plant")}
               disabled={isClaiming}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition cursor-pointer shadow-2xs disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
             >
               <UserCheck className="w-3.5 h-3.5" />
               <span>{isClaiming ? "Claiming..." : "Claim Plant"}</span>
@@ -163,7 +163,7 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("plant")}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[11px] text-[var(--on-surface-subtle)] font-mono shadow-2xs cursor-pointer hover:text-[var(--on-surface)]"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-700 dark:text-amber-300 font-mono shadow-2xs cursor-pointer hover:bg-amber-500/15 transition-all"
             >
               <Clock className="w-3 h-3 text-amber-500" />
               <span>Plant: Pending</span>

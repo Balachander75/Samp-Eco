@@ -155,7 +155,8 @@ export const StatusPill: React.FC<StatusPillProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border font-mono select-none ${toneStyle.container} ${SIZE_CLASSES[size]} ${className}`}
+      data-status-tone={finalTone}
+      className={`status-pill inline-flex items-center rounded-full border font-mono select-none ${toneStyle.container} ${SIZE_CLASSES[size]} ${className}`}
     >
       {icon ? (
         <span className="shrink-0">{icon}</span>

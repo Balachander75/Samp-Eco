@@ -246,7 +246,7 @@ def claim_feasibility_task(
 @router.post(
     "/{request_id}/convert-to-sampling",
     response_model=Dict[str, Any],
-    summary="Link a staged Sample or Mockup draft to an accepted Feasibility request",
+    summary="Link a staged commercial draft to an accepted Feasibility request",
 )
 def convert_feasibility_to_sampling(
     request_id: int,

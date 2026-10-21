@@ -26,6 +26,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import type { UserProfile } from "@/features/auth";
+import { hasWorkflowTeam, isAdmin as isAdminUser } from "@/features/auth/permissions";
 import { reviewRequestWorkflowApi, type RequestWorkflowRecord } from "@/infrastructure/api";
 import { claimMockupRequestApi, fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
 import {
@@ -36,6 +37,7 @@ import { formatWorkflowAction } from "./workflowPresentation";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ScopeReferenceImagesGallery } from "@/features/sample-requests/components/staging/ScopeReferenceImagesGallery";
 import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
+import { RequestClosureControl } from "./common/RequestClosureControl";
 import type { ProductSearchResult, SampleRequestItem } from "../types";
 
 interface MockupSamplingInspectorModalProps {
@@ -148,6 +150,14 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
   const isClaimedByMe = Boolean(claim && user?.id != null && claim === String(user.id));
   const isClaimed = Boolean(data.claimedBy || claim);
   const isReadOnly = readOnlyTeamHead(user);
+  const canCloseMockupRequest = Boolean(
+    !isReadOnly && (
+      isAdminUser(user) ||
+      hasWorkflowTeam(user, "marketing") ||
+      hasWorkflowTeam(user, "samp") ||
+      hasWorkflowTeam(user, "creative_studio")
+    )
+  );
   const canReview = record.current_stage === "sampling_review" && !isReadOnly && isClaimedByMe;
   const isClosed = record.current_stage === "done";
   const isSamplingReview = record.current_stage === "sampling_review";
@@ -389,6 +399,12 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
             >
               {copiedCode ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
+
+            <RequestClosureControl
+              requests={[{ type: "mockup", id: record.sample_request_id }]}
+              canClose={canCloseMockupRequest}
+              onClosed={onSaved}
+            />
 
             <button
               type="button"

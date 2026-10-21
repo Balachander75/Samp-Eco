@@ -18,6 +18,7 @@ from app.models.request_workflows import (
 )
 from app.models.downstream import StudioDieline, CreativeBrief, CostingEstimation
 from app.models.request_code_sequence import RequestCodeSequence
+from app.models.request_closure import RequestClosure
 
 __all__ = [
     "User",
@@ -46,4 +47,5 @@ __all__ = [
     "CreativeBrief",
     "CostingEstimation",
     "RequestCodeSequence",
+    "RequestClosure",
 ]

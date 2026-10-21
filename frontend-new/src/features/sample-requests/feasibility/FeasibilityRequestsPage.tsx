@@ -71,6 +71,8 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
 
   const [requests, setRequests] = useState<SampleRequestItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadSequenceRef = useRef(0);
   const [filterTab, setFilterTab] = useState<MarketingFeasibilityTab>("all");
   const [outcomeFilter, setOutcomeFilter] = useState<MarketingFeasibilityOutcome>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -123,18 +125,27 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
 
   // Load requests from backend
   const loadRequests = useCallback(async () => {
+    const loadSequence = ++loadSequenceRef.current;
     setIsLoading(true);
+    setLoadError(null);
     try {
       const data = await fetchFeasibilityRequestsApi({
         year: currentBusinessYear || undefined,
       });
-      setRequests(data);
+      if (loadSequence === loadSequenceRef.current) setRequests(data);
     } catch (err) {
       console.error("Failed to load feasibility requests:", err);
+      if (loadSequence === loadSequenceRef.current) {
+        setLoadError(err instanceof Error ? err.message : "Check your connection and retry.");
+      }
     } finally {
-      setIsLoading(false);
+      if (loadSequence === loadSequenceRef.current) setIsLoading(false);
     }
   }, [currentBusinessYear]);
+
+  useEffect(() => () => {
+    loadSequenceRef.current += 1;
+  }, []);
 
   useEffect(() => {
     loadRequests();
@@ -761,6 +772,28 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
         onResetFilters={clearFilters}
         resetFiltersLabel="Clear Filters"
       >
+        {loadError && (
+          <div
+            role="alert"
+            className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200"
+          >
+            <div className="flex min-w-0 items-start gap-2 text-xs">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+              <div className="min-w-0">
+                <p className="font-semibold">{requests.length ? "Refresh failed. Showing the last loaded requests." : "Feasibility requests could not be loaded."}</p>
+                <p className="mt-0.5 break-words text-rose-700 dark:text-rose-300">{loadError}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadRequests()}
+              disabled={isLoading}
+              className="min-h-8 shrink-0 rounded-md border border-rose-300 px-3 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-950/70"
+            >
+              {isLoading ? "Retrying…" : "Try again"}
+            </button>
+          </div>
+        )}
         <DataTable
           data={filteredRequests}
           columns={columns}
@@ -773,7 +806,9 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
           tableClassName="w-full table-fixed min-w-0"
           containerClassName="overflow-y-auto overflow-x-hidden"
           emptyMessage={
-            requests.length === 0
+            loadError && requests.length === 0
+              ? "The request list is unavailable. Use Try again to reload it."
+              : requests.length === 0
               ? "No feasibility requests recorded yet for this year."
               : "No requests match the specified feasibility filters."
           }

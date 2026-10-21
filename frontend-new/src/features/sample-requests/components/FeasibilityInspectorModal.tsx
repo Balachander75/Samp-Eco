@@ -15,24 +15,15 @@ import {
 } from "@/infrastructure/api";
 import { useFeasibilityImageSources } from "../hooks/useFeasibilityImageSources";
 import {
-  CheckCircle2,
   AlertTriangle,
-  XCircle,
-  ArrowRight,
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Calendar,
   ExternalLink,
-  FileText,
-  User,
-  FolderGit2,
-  Layers,
-  MessageSquareQuote,
-  Maximize2,
 } from "lucide-react";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { formatOdooDate } from "../utils/dateUtils";
+import { isAdmin as isAdminUser, isReadOnlyTeamHead, hasWorkflowTeam } from "@/features/auth/permissions";
 
 // Modular Sub-Components
 import {
@@ -171,6 +162,15 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   const isMarketingDesk = sourceDesk === "marketing";
   const canEvaluateTechnical = sourceDesk === "samp";
   const canMakeCommercialDecision = isMarketingDesk;
+  const feasibilityRequestId = Number(String(activeRequest?.id || "").replace(/^feasibility-/, ""));
+  const canCloseFeasibilityRequest = Boolean(
+    !isReadOnlyTeamHead(user) && (
+      isAdmin ||
+      isAdminUser(user) ||
+      (sourceDesk === "marketing" && hasWorkflowTeam(user, "marketing")) ||
+      (sourceDesk === "samp" && hasWorkflowTeam(user, "samp"))
+    )
+  );
 
   // Parse feasibility technical data
   const feasibilityDetails = useMemo(() => {
@@ -504,6 +504,9 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
           mode={sourceDesk === "samp" ? "samp" : "marketing"}
           activeTab={activeTab}
           onSelectTab={setActiveTab}
+          closureRequests={feasibilityRequestId > 0 ? [{ type: "feasibility", id: feasibilityRequestId }] : []}
+          canCloseRequest={canCloseFeasibilityRequest}
+          onRequestClosed={onRefresh}
         />
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG) */}
@@ -626,9 +629,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         {/* 1. Technical Description & Product Scope (Prominent on Top) */}
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] flex items-center gap-1.5">
-                              <FileText className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-                              <span>Technical Description &amp; Scope</span>
+                            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                              Technical Description &amp; Scope
                             </span>
                             {displayDescription && (
                               <CopyBadge text={displayDescription} label="Copy Scope" className="text-[10px] py-0.5 px-2" />
@@ -647,9 +649,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         <div className={`grid gap-2.5 ${previewableImages.length > 0 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
                           {/* Box 1: Assigned Reviewer */}
                           <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex flex-col justify-between gap-1 shadow-2xs">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] flex items-center gap-1 font-semibold">
-                              <User className="w-3 h-3 text-[var(--accent-primary)] shrink-0" />
-                              <span>Reviewer</span>
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] font-semibold">
+                              Reviewer
                             </span>
                             <div className="font-sans font-bold text-xs truncate">
                               {activeRequest.takenBySamp ? (
@@ -664,9 +665,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
                           {/* Box 2: Feasibility Required Date */}
                           <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex flex-col justify-between gap-1 shadow-2xs">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] flex items-center gap-1 font-semibold">
-                              <Calendar className="w-3 h-3 text-teal-600 dark:text-teal-400 shrink-0" />
-                              <span>Required Date</span>
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] font-semibold">
+                              Required Date
                             </span>
                             <div className="font-mono font-bold text-xs text-[var(--on-surface)] flex items-center justify-between gap-1">
                               <span className="truncate">
@@ -686,9 +686,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
                           {/* Box 3: NPD Technical Feasibility Dossier */}
                           <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex flex-col justify-between gap-1 shadow-2xs">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] flex items-center gap-1 font-semibold">
-                              <FolderGit2 className="w-3 h-3 text-sky-600 dark:text-sky-400 shrink-0" />
-                              <span>NPD Dossier</span>
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] font-semibold">
+                              NPD Dossier
                             </span>
                             <div className="font-mono font-bold text-xs text-[var(--on-surface)] truncate">
                               {activeRequest.materialCode || activeRequest.requestCode || "—"}
@@ -697,9 +696,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
                           {/* Box 4: Feasibility Scope / Category */}
                           <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex flex-col justify-between gap-1 shadow-2xs">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] flex items-center gap-1 font-semibold">
-                              <Layers className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                              <span>Feasibility Scope</span>
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] font-semibold">
+                              Feasibility Scope
                             </span>
                             <div className="font-display font-bold text-xs text-[var(--on-surface)] truncate">
                               {classificationLabel || "—"}
@@ -710,9 +708,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         {/* 3. Marketing Directives & Commercial Notes */}
                         {displayRemark && (
                           <div className="space-y-1.5">
-                            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                              <MessageSquareQuote className="w-3.5 h-3.5" />
-                              <span>Marketing Directives &amp; Commercial Notes</span>
+                            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                              Marketing Directives &amp; Commercial Notes
                             </div>
                             <div className="p-3.5 rounded-xl border border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20 text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs whitespace-pre-wrap">
                               {displayRemark}
@@ -723,9 +720,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         {/* 4. Reference URLs & Benchmark Links */}
                         {feasibilityDetails.referenceLinks.length > 0 && (
                           <div className="space-y-2">
-                            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)] flex items-center gap-1.5">
-                              <ExternalLink className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-                              <span>Reference URLs &amp; Benchmark Links ({feasibilityDetails.referenceLinks.length})</span>
+                            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
+                              Reference URLs &amp; Benchmark Links ({feasibilityDetails.referenceLinks.length})
                             </div>
                             <div className="flex flex-col gap-2">
                               {feasibilityDetails.referenceLinks.map((url, i) => (
@@ -750,68 +746,6 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                             </div>
                           </div>
                         )}
-
-                        {/* 5. In-Context SAMP Team Technical Verdict Spotlight */}
-                        {activeRequest.samplingFeasibilityResponse && (
-                          <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] space-y-2.5 shadow-2xs">
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-mono font-bold text-[var(--on-surface)]">
-                                  Sampling Team Sign-Off:
-                                </span>
-                                <span
-                                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-display font-bold border ${
-                                    activeRequest.samplingFeasibilityResponse === "Yes"
-                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                      : activeRequest.samplingFeasibilityResponse === "No"
-                                      ? "bg-rose-50 text-rose-700 border-rose-200/70 dark:bg-rose-950/50 dark:text-rose-300"
-                                      : "bg-amber-50 text-amber-800 border-amber-200/70 dark:bg-amber-950/50 dark:text-amber-300"
-                                  }`}
-                                >
-                                  {activeRequest.samplingFeasibilityResponse === "Yes" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
-                                  {activeRequest.samplingFeasibilityResponse === "No" && <XCircle className="w-3.5 h-3.5 text-rose-600" />}
-                                  {activeRequest.samplingFeasibilityResponse === "Maybe" && <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
-                                  <span>
-                                    {activeRequest.samplingFeasibilityResponse === "Yes" && "Feasible (Full Scope)"}
-                                    {activeRequest.samplingFeasibilityResponse === "No" && "Not Feasible"}
-                                    {activeRequest.samplingFeasibilityResponse === "Maybe" && "Conditional"}
-                                  </span>
-                                </span>
-                              </div>
-                              <span className="text-[11px] font-mono text-[var(--on-surface-muted)]">
-                                Evaluated by: <span className="font-bold text-[var(--on-surface)]">{activeRequest.samplingFeasibilityApprovedBy || "Sampling Team"}</span>
-                              </span>
-                            </div>
-
-                            {activeRequest.samplingFeasibilityRemark && (
-                              <p className="text-xs text-[var(--on-surface)] bg-[var(--surface-lowest)] p-3 rounded-xl border border-[var(--border-subtle)] leading-relaxed font-sans shadow-2xs">
-                                {activeRequest.samplingFeasibilityRemark}
-                              </p>
-                            )}
-
-                            <div className="flex items-center justify-between pt-1 text-xs">
-                              <button
-                                type="button"
-                                onClick={() => setActiveTab("review")}
-                                className="text-[var(--accent-primary)] hover:underline font-semibold text-xs flex items-center gap-1 cursor-pointer"
-                              >
-                                <span>View Full Technical Sign-Off</span>
-                                <ArrowRight className="w-3 h-3" />
-                              </button>
-
-                              {canMakeCommercialDecision && !activeRequest.marketingDecision && (
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveTab("decision")}
-                                  className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
-                                >
-                                  <span>Take Commercial Decision</span>
-                                  <ArrowRight className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
 
                       {/* ── RIGHT COLUMN: PURE IMMERSIVE DIRECT IMAGE VIEWER ── */}
@@ -820,42 +754,37 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         const currentImg = previewableImages[safeIdx] || previewableImages[0];
                         return (
                           <div className="lg:col-span-6 sticky top-4">
-                            <div className="relative w-full h-[480px] sm:h-[520px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] overflow-hidden shadow-sm flex items-center justify-center p-3 select-none group">
+                            <div className="relative w-full h-[480px] sm:h-[520px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-low)]/50 overflow-hidden shadow-inner flex items-center justify-center p-4 sm:p-6 select-none group">
+                              {/* Studio Light-Table Grid Backdrop (blends seamlessly with active theme) */}
+                              <div
+                                className="absolute inset-0 opacity-[0.35] dark:opacity-[0.18] pointer-events-none"
+                                style={{
+                                  backgroundImage: `radial-gradient(var(--border-strong) 1px, transparent 1px)`,
+                                  backgroundSize: "20px 20px",
+                                }}
+                              />
+                              {/* Soft Radial Ambient Vignette */}
+                              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,var(--surface-container)_100%)] opacity-40 pointer-events-none" />
+
                               {/* Direct Full Image */}
                               {imageSourceFor(currentImg.url) ? (
                                 <img
                                   src={imageSourceFor(currentImg.url)}
                                   alt={currentImg.name || "Reference image"}
                                   onClick={() => setSelectedPreviewImage(currentImg.url)}
-                                  className="w-full h-full object-contain rounded-xl transition duration-300 group-hover:scale-[1.01] cursor-zoom-in"
+                                  className="max-w-full max-h-full object-contain rounded-xl transition duration-300 group-hover:scale-[1.015] cursor-zoom-in filter drop-shadow-[0_8px_20px_rgba(11,28,48,0.12)] dark:drop-shadow-[0_12px_28px_rgba(0,0,0,0.6)] z-[1]"
                                 />
                               ) : imageStatusFor(currentImg.url) === "error" ? (
-                                <div className="flex flex-col items-center justify-center gap-2 text-rose-500 text-xs">
+                                <div className="flex flex-col items-center justify-center gap-2 text-rose-500 text-xs z-[1]">
                                   <AlertTriangle className="w-8 h-8 opacity-60" />
                                   <span>Could not load image</span>
                                 </div>
                               ) : (
-                                <div className="flex flex-col items-center justify-center gap-2 text-[var(--on-surface-subtle)] text-xs">
+                                <div className="flex flex-col items-center justify-center gap-2 text-[var(--on-surface-subtle)] text-xs z-[1]">
                                   <Loader2 className="w-7 h-7 animate-spin text-[var(--accent-primary)]" />
                                   <span>Loading image…</span>
                                 </div>
                               )}
-
-                              {/* Hover Floating Top Bar (Counter + Enlarge Hint) */}
-                              <div
-                                onClick={() => setSelectedPreviewImage(currentImg.url)}
-                                className="absolute top-3 inset-x-3 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition duration-200 z-10"
-                              >
-                                {previewableImages.length > 1 ? (
-                                  <span className="px-2.5 py-1 rounded-full bg-slate-950/75 backdrop-blur-md text-white font-mono text-[11px] font-bold shadow-md">
-                                    {safeIdx + 1} / {previewableImages.length}
-                                  </span>
-                                ) : <div />}
-                                <span className="px-3 py-1 rounded-full bg-slate-950/75 backdrop-blur-md text-white font-sans text-[11px] font-semibold flex items-center gap-1.5 shadow-md">
-                                  <Maximize2 className="w-3 h-3 text-slate-300" />
-                                  <span>Click to inspect &amp; zoom</span>
-                                </span>
-                              </div>
 
                               {/* Direct Navigation Arrows (< and >) */}
                               {previewableImages.length > 1 && (
@@ -866,11 +795,11 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                                       e.stopPropagation();
                                       setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : previewableImages.length - 1));
                                     }}
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-md transition shadow-xl cursor-pointer active:scale-95 z-10 border border-white/10"
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-[var(--surface-base)]/85 hover:bg-[var(--surface-base)] text-[var(--on-surface)] flex items-center justify-center backdrop-blur-md transition shadow-md cursor-pointer active:scale-95 z-10 border border-[var(--border-subtle)] opacity-0 group-hover:opacity-100 hover:scale-105"
                                     title="Previous Image"
                                     aria-label="Previous image"
                                   >
-                                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                                    <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
                                   </button>
                                   <button
                                     type="button"
@@ -878,18 +807,18 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                                       e.stopPropagation();
                                       setActiveImageIndex((prev) => (prev < previewableImages.length - 1 ? prev + 1 : 0));
                                     }}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-md transition shadow-xl cursor-pointer active:scale-95 z-10 border border-white/10"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-[var(--surface-base)]/85 hover:bg-[var(--surface-base)] text-[var(--on-surface)] flex items-center justify-center backdrop-blur-md transition shadow-md cursor-pointer active:scale-95 z-10 border border-[var(--border-subtle)] opacity-0 group-hover:opacity-100 hover:scale-105"
                                     title="Next Image"
                                     aria-label="Next image"
                                   >
-                                    <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                                    <ChevronRight className="w-4 h-4 stroke-[2.5]" />
                                   </button>
                                 </>
                               )}
 
                               {/* Minimal Bottom Indicator Dots */}
                               {previewableImages.length > 1 && (
-                                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 flex items-center gap-1.5 z-10 shadow-lg">
+                                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-[var(--surface-base)]/85 backdrop-blur-md border border-[var(--border-subtle)] flex items-center gap-1.5 z-10 shadow-sm">
                                   {previewableImages.map((_, dotIdx) => (
                                     <button
                                       key={dotIdx}
@@ -900,8 +829,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                                       }}
                                       className={`transition-all rounded-full cursor-pointer ${
                                         safeIdx === dotIdx
-                                          ? "w-4 h-1.5 bg-emerald-400"
-                                          : "w-1.5 h-1.5 bg-white/40 hover:bg-white/80"
+                                          ? "w-4 h-1.5 bg-[var(--accent-primary)] shadow-xs"
+                                          : "w-1.5 h-1.5 bg-[var(--on-surface-subtle)]/30 hover:bg-[var(--on-surface-subtle)]/60"
                                       }`}
                                       title={`Go to image ${dotIdx + 1}`}
                                     />

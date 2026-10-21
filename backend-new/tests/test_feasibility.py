@@ -16,6 +16,41 @@ def _get_upcoming_workday(days_ahead: int = 5) -> str:
     return current.isoformat()
 
 
+def _create_staged_commercial_request(
+    client: TestClient,
+    headers: dict,
+    customer: str,
+    request_types: list[str],
+    required_date: str,
+) -> int:
+    """Create the complete Product Staging draft required by feasibility conversion."""
+    payload = {
+        "customer": customer,
+        "program_name": "Feasibility conversion",
+        "product_description": "Staged product for feasibility conversion",
+        "date_request_created": datetime.now(timezone.utc).date().isoformat(),
+        "request_types": request_types,
+        "status": "Draft (Pre-SMT)",
+        "creation_mode": "new",
+        "unit_pc_pack": "PC",
+        "qty_per_pack": "1",
+        "qty_for_sampling": "1" if "sample" in request_types else None,
+        "sample_required_date": required_date if "sample" in request_types else None,
+        "qty_design_costing": "1" if "costing" in request_types else None,
+        "costing_required_date": required_date if "costing" in request_types else None,
+        "mockup_required": "Yes" if "mockup" in request_types else "No",
+        "mockup_workflow_state": {
+            "qtyForMockup": 1,
+            "requiredDate": required_date,
+            "designNeeded": False,
+            "marketingRemark": "Ready for feasibility conversion",
+        } if "mockup" in request_types else {},
+    }
+    response = client.post("/api/v1/sample-requests", headers=headers, json=payload)
+    assert response.status_code == 201, f"Could not stage the commercial request: {response.text}"
+    return int(response.json()["id"])
+
+
 # Minimal 1x1 valid PNG in base64
 TINY_PNG_DATA_URL = (
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
@@ -77,6 +112,7 @@ def test_feasibility_full_lifecycle_and_conversion(
         "description_notes": "Automated feasibility verification test",
         "required_date": workday,
         "marketing_remarks": "Critical client launch",
+        "created_by": "Impersonated User",
         "reference_images": [TINY_PNG_DATA_URL],
         "reference_image_names": ["spec-drawing-1.png"],
         "reference_links": ["https://drive.google.com/test-spec"],
@@ -87,6 +123,7 @@ def test_feasibility_full_lifecycle_and_conversion(
     req_id = req_data["id"]
     req_code = req_data["request_code"]
     assert req_data["status"] == "Pending Feasibility"
+    assert req_data["created_by"] != create_payload["created_by"]
     assert len(req_data["reference_links"]) == 1
     assert len(req_data["reference_images"]) == 1
 
@@ -168,10 +205,21 @@ def test_feasibility_full_lifecycle_and_conversion(
     assert mktg_data["status"] == "Marketing Accepted"
 
     # 9. Convert to commercial Sample and Costing request (Issue 3 fix verification)
-    conv_res = client.post(
+    missing_stage = client.post(
         f"/api/v1/feasibility-requests/{req_id}/convert-to-sampling",
         headers=marketing_headers,
         json={"request_types": ["sample", "costing"]},
+    )
+    assert missing_stage.status_code == 422
+    assert "Product Staging" in missing_stage.text
+
+    staged_request_id = _create_staged_commercial_request(
+        client, marketing_headers, create_payload["customer"], ["sample", "costing"], workday
+    )
+    conv_res = client.post(
+        f"/api/v1/feasibility-requests/{req_id}/convert-to-sampling",
+        headers=marketing_headers,
+        json={"request_types": ["sample", "costing"], "sample_request_id": staged_request_id},
     )
     assert conv_res.status_code == 200
     conv_data = conv_res.json()
@@ -190,8 +238,9 @@ def test_feasibility_full_lifecycle_and_conversion(
         .filter(SampleRequestReferenceImage.sample_request_id == sample_req_id)
         .all()
     )
-    assert len(copied_images) >= 1
+    assert len(copied_images) == 2
     assert copied_images[0].original_name == "spec-drawing-1.png"
+    assert {image.scope for image in copied_images} == {"sample", "costing"}
 
     # Request deletion is disabled; remove this test data through the DB fixture.
     del_res = client.delete(f"/api/v1/feasibility-requests/{req_id}", headers=admin_headers)
@@ -234,10 +283,13 @@ def test_feasibility_convert_both_sample_and_mockup_together(
     )
 
     # Convert to BOTH Sample and Mockup together
+    staged_request_id = _create_staged_commercial_request(
+        client, marketing_headers, create_payload["customer"], ["sample", "mockup"], workday
+    )
     conv_res = client.post(
         f"/api/v1/feasibility-requests/{req_id}/convert-to-sampling",
         headers=marketing_headers,
-        json={"request_types": ["sample", "mockup"]},
+        json={"request_types": ["sample", "mockup"], "sample_request_id": staged_request_id},
     )
     assert conv_res.status_code == 200
     conv_data = conv_res.json()
@@ -336,10 +388,13 @@ def test_feasibility_convert_mockup_only(
         json={"decision": "Accepted", "decision_remark": "Proceed with mockup."},
     )
 
+    staged_request_id = _create_staged_commercial_request(
+        client, marketing_headers, create_payload["customer"], ["mockup"], workday
+    )
     conv_res = client.post(
         f"/api/v1/feasibility-requests/{req_id}/convert-to-sampling",
         headers=marketing_headers,
-        json={"request_types": ["mockup"]},
+        json={"request_types": ["mockup"], "sample_request_id": staged_request_id},
     )
     assert conv_res.status_code == 200
     conv_data = conv_res.json()
@@ -508,10 +563,13 @@ def test_feasibility_convert_costing_only_and_all_three_types(
     )
 
     # Convert to Costing only
+    staged_request_id = _create_staged_commercial_request(
+        client, marketing_headers, "Costing Conversion Client", ["costing"], workday
+    )
     conv_res = client.post(
         f"/api/v1/feasibility-requests/{req_id}/convert-to-sampling",
         headers=marketing_headers,
-        json={"request_types": ["costing"]},
+        json={"request_types": ["costing"], "sample_request_id": staged_request_id},
     )
     assert conv_res.status_code == 200
     conv_data = conv_res.json()

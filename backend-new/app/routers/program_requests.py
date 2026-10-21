@@ -46,7 +46,7 @@ def _require_marketing_request_owner(request_id: int, service: ProgramRequestSer
     if not item:
         raise HTTPException(status_code=404, detail="Program planning request was not found")
     creator_id = item.get("created_by_user_id")
-    if creator_id is not None and creator_id != current_user.id:
+    if creator_id != current_user.id:
         raise HTTPException(status_code=404, detail="Program planning request was not found")
 
 
@@ -55,7 +55,7 @@ def _require_program_request_visibility(request_id: int, service: ProgramRequest
     if not item:
         raise HTTPException(status_code=404, detail="Program planning request was not found")
     creator_id = item.get("created_by_user_id")
-    if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user) and creator_id is not None and creator_id != current_user.id:
+    if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user) and creator_id != current_user.id:
         raise HTTPException(status_code=404, detail="Program planning request was not found")
     if user_has_team(current_user, "samp") and not is_admin(current_user) and not is_team_head(current_user) and item.get("sampling_claimed_by_user_id") not in (None, current_user.id):
         raise HTTPException(status_code=404, detail="Program planning request was not found")
@@ -76,6 +76,7 @@ def list_program_requests(
     current_user=Depends(get_current_user),
 ):
     """Retrieve all program requests with their material specification matrix rows and audit logs."""
+    require_any_team(current_user, ("marketing", "samp", "plant"))
     plant_labels = (
         assigned_plant_labels(current_user, service.db)
         if user_has_team(current_user, "plant") and not is_admin(current_user)
@@ -100,6 +101,7 @@ def get_program_request(
     current_user=Depends(get_current_user),
 ):
     """Fetch single program planning request with full matrix rows and audit logs."""
+    require_any_team(current_user, ("marketing", "samp", "plant"))
     return _require_program_request_visibility(request_id, service, current_user)
 
 

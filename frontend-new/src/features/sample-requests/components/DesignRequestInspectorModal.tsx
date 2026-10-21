@@ -2,19 +2,7 @@ import { UniversalChatterFeed, UniversalChatterEvent } from "./common/UniversalC
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import {
-  X,
-  Copy,
-  Check,
-  CheckCircle2,
-  Clock,
-  FileText,
-  Layers,
-  Palette,
-  ChevronRight,
-  ShieldCheck,
-  ExternalLink,
-} from "lucide-react";
+import { ExternalLink, CheckCircle2, Clock } from "lucide-react";
 import { DesignFollowupArtwork, DesignFollowupScope, DesignFollowupSelection, SampleRequestItem } from "../types";
 import {
   submitCreativeDesignOutputApi,
@@ -25,24 +13,24 @@ import {
   proposeDesignCounterDateApi,
   decideDesignCounterDateApi,
   mapDesignRequestToSampleRequest,
+  fetchDesignRequestsApi,
 } from "@/infrastructure/api/sampleRequestsApi";
-import { StatusPill } from "@/components/ui/StatusPill";
 import type { UserProfile } from "@/features/auth/types";
-import { isAdmin as isAdminUser, isReadOnlyTeamHead } from "@/features/auth/permissions";
+import { isAdmin as isAdminUser, isReadOnlyTeamHead, hasWorkflowTeam } from "@/features/auth/permissions";
 import { readAuthUser } from "@/lib/session";
 import {
   mergeWithWorkflowState,
   checkCounterDateSla,
 } from "../utils/designWorkflowStorage";
 import {
-  DesignClaimStrip,
   DesignCounterDateModal,
-  MarketingCounterDateBanner,
   DesignBriefTab,
   DesignDeliverablesTab,
   DesignNextWorkTab,
-  DesignMetadataStrip,
   DesignReferenceAsset,
+  ImageLightboxModal,
+  DesignControlPanel,
+  DesignSheetHeader,
 } from "./inspector";
 
 interface ChatterMessage {
@@ -205,8 +193,10 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     (activeRequest.claimedBy === currentUser?.name || activeRequest.claimedBy === currentUser?.userid)
   );
   const isClaimedByCurrentUser = hasVerifiedClaimOwnership || isLegacyClaimForCurrentUser;
+  // Business rule: Once anyone claims any task, they cannot release themselves from that task.
+  // Only a global admin can perform administrative reassignment if needed.
   const canReleaseClaim = Boolean(activeRequest?.claimedBy) &&
-    (isGlobalAdmin || hasVerifiedClaimOwnership) &&
+    isGlobalAdmin &&
     !isReadOnlyTeamHead(currentUser);
 
   // SLA Calculation for 48h Counter-Date Negotiation
@@ -279,7 +269,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, isCounterDateModalOpen, isSubmittingOutput, isDeciding, isAddingFollowups, onClose]);
 
-  // Computed Values
+  // Computed Values - Resolves DesignRequest primary ID without collisions
   const effectiveDesignId = useMemo(() => {
     if (!activeRequest) return null;
     if (activeRequest.designRequestId != null) {
@@ -291,12 +281,40 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       const num = parseInt(idStr.replace("design-", ""), 10);
       if (!isNaN(num) && num > 0) return num;
     }
-    const numDirect = Number(activeRequest.id);
-    if (Number.isInteger(numDirect) && numDirect > 0) {
-      return numDirect;
+    if (activeRequest.requestKind === "design") {
+      const numDirect = Number(activeRequest.id);
+      if (Number.isInteger(numDirect) && numDirect > 0) {
+        return numDirect;
+      }
     }
     return null;
   }, [activeRequest]);
+
+  // Fallback: If opened without designRequestId, auto-resolve by DR request code
+  useEffect(() => {
+    if (!isOpen || !activeRequest || effectiveDesignId != null) return;
+    const designCode =
+      activeRequest.requestCode?.startsWith("DR-")
+        ? activeRequest.requestCode
+        : (activeRequest.requestCodes as any)?.design;
+    if (!designCode) return;
+    let cancelled = false;
+    fetchDesignRequestsApi(undefined, false)
+      .then((records) => {
+        if (cancelled) return;
+        const matched = records.find((item) => item.requestCode === designCode);
+        if (matched) {
+          const mapped = mapDesignRequestToSampleRequest(matched);
+          setLocalOverride((prev) => (prev ? { ...prev, ...mapped, designRequestId: matched.id } : mapped));
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not auto-resolve design request by code:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, activeRequest?.requestCode, activeRequest?.requestCodes, effectiveDesignId]);
 
   const activeStage = useMemo(() => getDesignStageIndex(activeRequest), [activeRequest]);
   const isRemainingRequested = Boolean(
@@ -396,14 +414,14 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     };
 
     addImageOrLegacyLink(activeRequest.productImagePath, "Product Reference Image");
-    addImageOrLegacyLink(activeRequest.referenceImage, "Primary Moodboard Image");
+    addImageOrLegacyLink(activeRequest.referenceImage, "Primary Reference Image");
     const rawImages = [
       ...(Array.isArray(activeRequest.referenceImages) ? activeRequest.referenceImages : []),
       ...(Array.isArray(requestWithRawReferences.reference_images) ? requestWithRawReferences.reference_images as unknown[] : []),
     ];
     rawImages.forEach((value, index) => {
       const item = value && typeof value === "object" ? value as Record<string, unknown> : null;
-      addImageOrLegacyLink(value, typeof item?.name === "string" ? item.name : `Moodboard Image ${index + 1}`);
+      addImageOrLegacyLink(value, typeof item?.name === "string" ? item.name : `Reference Image ${index + 1}`);
     });
     referenceLinks.forEach((value, index) => {
       const url = getReferenceUrl(value);
@@ -411,6 +429,25 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     });
     return list;
   }, [activeRequest]);
+
+  const previewableImages = useMemo(
+    () =>
+      references
+        .filter((r) => r.kind === "image")
+        .map((r, i) => ({
+          id: `design-ref-${i}-${r.url}`,
+          url: r.url,
+          name: r.label || `Reference Asset ${i + 1}`,
+        })),
+    [references]
+  );
+
+  const movePreview = (direction: -1 | 1) => {
+    const currentIndex = previewableImages.findIndex((image) => image.url === lightboxImage);
+    if (previewableImages.length < 2 || currentIndex < 0) return;
+    const nextIndex = (currentIndex + direction + previewableImages.length) % previewableImages.length;
+    setLightboxImage(previewableImages[nextIndex].url || null);
+  };
 
   // Dynamic Chatter Stream Compilation
   const chatterEvents = useMemo<ChatterMessage[]>(() => {
@@ -655,8 +692,29 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   };
 
 
+  const isCreativeUser = Boolean(
+    currentUser && (isGlobalAdmin || hasWorkflowTeam(currentUser, "creative_studio"))
+  );
+  const isMarketingUser = Boolean(
+    currentUser && hasWorkflowTeam(currentUser, "marketing") && !isGlobalAdmin
+  );
+  const requestStageLabel = String(activeRequest?.designRequestStatus || activeRequest?.status || "").toLowerCase();
+  const isCreativeWorkStage = activeStage === 1 || requestStageLabel.includes("target date counter proposed");
+
+  // Business rule: Marketing users cannot claim tasks or start working on creative deliverables.
+  // Only Creative Studio team members in Creative mode can claim an unclaimed task.
+  const canClaim = Boolean(
+    mode === "creative" &&
+    isCreativeUser &&
+    !isMarketingUser &&
+    !activeRequest?.claimedBy &&
+    !isReadOnlyTeamHead(currentUser) &&
+    isCreativeWorkStage &&
+    slaStatus.isEligible
+  );
+
   const handleClaim = async () => {
-    if (isClaiming || !activeRequest || !effectiveDesignId) return;
+    if (isClaiming || !activeRequest || !effectiveDesignId || !canClaim) return;
     const name = currentUser?.name || currentUser?.userid || "Creative Designer (Studio)";
     setIsClaiming(true);
     setWorkflowError(null);
@@ -966,6 +1024,17 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     activeStage === 2;
   const isClosed = activeStage === 3;
   const isAcceptedByMarketing = mode === "marketing" && activeRequest.marketingDesignDecision === "accepted";
+  const canSubmitCreativeOutput = Boolean(
+    mode === "creative" &&
+    isCreativeUser &&
+    !isMarketingUser &&
+    !isReadOnlyTeamHead(currentUser) &&
+    hasVerifiedClaimOwnership &&
+    isCreativeWorkStage &&
+    !isAwaitingReview &&
+    !isClosed &&
+    remainingCount > 0
+  );
   const includedFollowups = (activeRequest.requestTypes || []) as string[];
   const availableDesigns: DesignFollowupArtwork[] = (activeRequest.creativeSubmissions || []).flatMap((batch: any) =>
     (Array.isArray(batch?.rows) ? batch.rows : []).map((row: any, index: number) => ({
@@ -980,15 +1049,21 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const isCounterDatePending = Boolean(
     activeRequest.isCounterDateActive || activeRequest.counterDateDecision === "pending"
   );
-  const requestStageLabel = String(activeRequest.designRequestStatus || activeRequest.status || "").toLowerCase();
-  const isCreativeWorkStage = activeStage === 1 || requestStageLabel.includes("target date counter proposed");
-  const canSubmitCreativeOutput = mode === "creative" && !isReadOnlyTeamHead(currentUser) && hasVerifiedClaimOwnership && isCreativeWorkStage && !isAwaitingReview && !isClosed && remainingCount > 0;
+  const designRequestId = Number(
+    activeRequest.designRequestId || String(activeRequest.id).replace(/^design-/, "")
+  );
+  const canCloseDesignRequest = Boolean(
+    !isReadOnlyTeamHead(currentUser) && (
+      isGlobalAdmin ||
+      (mode === "marketing" && isMarketingUser) ||
+      (mode === "creative" && currentUser && hasWorkflowTeam(currentUser, "creative_studio"))
+    )
+  );
   const canCloseInspector = !isSubmittingOutput && !isDeciding && !isAddingFollowups;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-xs animate-smooth-backdrop sm:p-4"
-      role="presentation"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-950/70"
       onClick={(event) => {
         if (event.target === event.currentTarget && canCloseInspector) onClose();
       }}
@@ -997,288 +1072,164 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
         role="dialog"
         aria-modal="true"
         aria-labelledby="design-inspector-title"
-        className="relative flex h-[92vh] max-h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] select-text xl:max-w-7xl animate-smooth-modal"
+        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── 1. TOP CONTROL PANEL (MODERN ERP STYLE) ── */}
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-4 py-2.5 shadow-2xs sm:px-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => canCloseInspector && onClose()}
-              disabled={!canCloseInspector}
-              className="inline-flex items-center rounded-xl bg-[var(--accent-primary)] px-4 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-[var(--accent-primary-hover)] disabled:cursor-wait disabled:opacity-60 cursor-pointer"
-            >
-              Save &amp; Close
-            </button>
-            <button
-              type="button"
-              onClick={() => canCloseInspector && onClose()}
-              disabled={!canCloseInspector}
-              className="rounded-xl bg-[var(--surface-low)] px-3.5 py-1.5 text-xs font-medium text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-container)] disabled:cursor-wait disabled:opacity-60 cursor-pointer"
-            >
-              Discard
-            </button>
-            <span className="mx-1 hidden h-4 w-px bg-[var(--border-subtle)] sm:block" />
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium text-[var(--on-surface-muted)] transition hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] cursor-pointer"
-              title="Copy request code"
-            >
-              {copiedCode ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-[var(--on-surface-subtle)]" />}
-              <span>{copiedCode ? "Copied" : "Copy Code"}</span>
-            </button>
-          </div>
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="hidden min-w-0 items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-1 sm:flex">
-              {[
-                { label: "1. Intake", state: "done" as const },
-                { label: "2. Creative Studio", state: activeStage > 1 ? "done" as const : activeStage === 1 ? "active" as const : "pending" as const },
-                { label: "3. Marketing Review", state: activeStage > 2 ? "done" as const : activeStage === 2 ? "active" as const : "pending" as const },
-                { label: "4. Next Work", state: activeStage >= 3 ? (includedFollowups.some((value) => value === "mockup" || value === "sample") ? "done" as const : "active" as const) : "pending" as const },
-              ].map((step, index, steps) => (
-                <React.Fragment key={step.label}>
-                  <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] ${step.state === "done" ? "bg-[var(--surface-lowest)] font-bold text-[var(--accent-primary)] shadow-2xs" : step.state === "active" ? "border border-[var(--accent-primary)] bg-[var(--surface-lowest)] font-bold text-[var(--on-surface)] shadow-2xs" : "font-medium text-[var(--on-surface-subtle)]"}`}>
-                    {step.state === "done" ? <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent-primary)]" /> : step.state === "active" ? <span className="h-2 w-2 rounded-full bg-[var(--accent-primary)]" /> : <span className="h-1.5 w-1.5 rounded-full bg-[var(--border-strong)]" />}
-                    {step.label}
-                  </span>
-                  {index < steps.length - 1 && <ChevronRight className="h-3 w-3 shrink-0 text-[var(--border-strong)]" />}
-                </React.Fragment>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => canCloseInspector && onClose()}
-              disabled={!canCloseInspector}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--on-surface-subtle)] transition hover:bg-[var(--surface-low)] hover:text-[var(--on-surface)] disabled:cursor-wait disabled:opacity-60 cursor-pointer"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+        {/* 1. TOP CONTROL PANEL */}
+        <DesignControlPanel
+          activeRequest={activeRequest}
+          refCode={refCode}
+          copiedCode={copiedCode}
+          onClose={onClose}
+          onCopyCode={handleCopyCode}
+          mode={mode}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          activeStage={activeStage}
+          deliveredCount={deliveredCount}
+          requestedCount={requestedCount}
+          isAwaitingReview={isAwaitingReview}
+          isClosed={isClosed}
+          isAcceptedByMarketing={isAcceptedByMarketing}
+          isCounterDatePending={isCounterDatePending}
+          closureRequests={designRequestId > 0 ? [{ type: "design", id: designRequestId }] : []}
+          canCloseRequest={canCloseDesignRequest}
+          onRequestClosed={onRefresh}
+        />
 
-        {/* ── 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + CHATTER) ── */}
-        {workflowError && (
-          <div role="alert" className="shrink-0 px-5 py-2 bg-rose-50 text-rose-800 border-b border-rose-200 text-xs font-medium dark:bg-rose-950/30 dark:text-rose-200 dark:border-rose-900">
-            {workflowError}
-          </div>
-        )}
+        {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG) */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
+            {workflowError && (
+              <div role="alert" className="max-w-4xl mx-auto px-4 py-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 text-xs font-medium dark:bg-rose-950/30 dark:text-rose-200 dark:border-rose-900 shadow-2xs">
+                {workflowError}
+              </div>
+            )}
 
-        {mode === "marketing" && activeRequest.mockupWorkflowState?.stage === "marketing" && activeRequest.mockupWorkflowState.mockupUrl && (
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-emerald-200 bg-emerald-50 px-5 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/25">
-            <div>
-              <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Studio mockup ready</p>
-              <p className="mt-0.5 text-xs text-emerald-800/80 dark:text-emerald-300/80">Studio submitted the mockup for this request.</p>
-            </div>
-            <a
-              href={activeRequest.mockupWorkflowState.mockupUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-700 px-3.5 text-xs font-semibold text-white transition hover:bg-emerald-800"
-            >
-              Open mockup <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </div>
-        )}
+            {mode === "marketing" && activeRequest.mockupWorkflowState?.stage === "marketing" && activeRequest.mockupWorkflowState.mockupUrl && (
+              <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/25 shadow-2xs">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Studio mockup ready</p>
+                  <p className="mt-0.5 text-xs text-emerald-800/80 dark:text-emerald-300/80">Studio submitted the mockup for this request.</p>
+                </div>
+                <a
+                  href={activeRequest.mockupWorkflowState.mockupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800 shadow-2xs"
+                >
+                  <span>Open mockup</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-          {/* ── LEFT: FORM SHEET (DOCUMENT BODY) ── */}
-          <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto bg-[var(--bg-app)] p-4 md:p-6">
             <div className="max-w-4xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
-              {/* Sheet Header */}
-              <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-base)]">
-                {/* Request reference */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 sm:px-8">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-[var(--accent-primary)] dark:text-emerald-300">
-                      {refCode}
-                    </span>
-                    <span className="text-zinc-300 dark:text-zinc-700">/</span>
-                    <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
-                      {mode === "sampling" ? "Sampling PMT Technical Review" : "Design Request"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Document Hero & Primary Details */}
-                <div className="px-4 py-4 sm:px-8">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <h1 id="design-inspector-title" className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-zinc-50 font-display">
-                        {activeRequest.customer || ""}
-                      </h1>
-                      <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-                        {activeRequest.productDescription || "Commercial Creative Design Brief"}
-                        {activeRequest.createdBy ? <> · Initiated by <span className="font-semibold text-slate-800 dark:text-zinc-200">{activeRequest.createdBy}</span></> : ""}
-                        {activeRequest.createdBy && (activeRequest.dateRequestCreated || activeRequest.createdAt) ? " · " : ""}
-                        {formatDate(activeRequest.dateRequestCreated || activeRequest.createdAt)}
-                      </p>
-                    </div>
-
-                    {/* Context Badges */}
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border ${
-                        mode === "sampling"
-                          ? "bg-purple-50 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 border-purple-500/20"
-                          : "bg-emerald-50 text-[var(--accent-primary)] dark:bg-emerald-950/50 dark:text-emerald-300 border-[var(--accent-primary)]/20"
-                      }`}>
-                        <Palette className="w-3.5 h-3.5" />
-                        <span>{mode === "sampling" ? "Sampling Review (Design Brief)" : "Design Request"}</span>
+              {/* ── 1. PRIMARY SECTION TABS (TOP OF SHEET) ── */}
+              <div className="px-6 sm:px-8 pt-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
+                <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("specs")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "specs"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <span>1. Scope &amp; Design Brief</span>
+                    {references.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-base)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                        {references.length}
                       </span>
-                      <StatusPill
-                        status={activeRequest.designRequestStatus || activeRequest.status || "Creative"}
-                        size="md"
-                      />
-                    </div>
-                  </div>
-
-                  {mode === "sampling" && (
-                    <div className="mt-4 p-3.5 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/70 dark:bg-purple-950/20 flex items-start gap-3">
-                      <Palette className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
-                      <div className="space-y-0.5 text-xs">
-                        <p className="font-bold text-purple-950 dark:text-purple-200">
-                          Sampling PMT Feasibility &amp; Technical Reference View
-                        </p>
-                        <p className="text-purple-900/80 dark:text-purple-300/80">
-                          Review design trends, target audience, moodboard assets, and submitted artwork variants to prepare tooling, color separations, and die estimations.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 4-Point Metadata Strip (Memoized Component) */}
-                  <DesignMetadataStrip
-                    activeRequest={activeRequest}
-                    mode={mode}
-                    requestedCount={requestedCount}
-                    isCounterDatePending={isCounterDatePending}
-                    slaStatus={slaStatus}
-                    canProposeCounterDate={!isReadOnlyTeamHead(currentUser) && hasVerifiedClaimOwnership && slaStatus.isEligible}
-                    onOpenCounterDateModal={() => {
-                      if (isReadOnlyTeamHead(currentUser) || !hasVerifiedClaimOwnership || !slaStatus.isEligible) return;
-                      setWorkflowError(null);
-                      setIsCounterDateModalOpen(true);
-                    }}
-                  />
-                </div>
-
-                {/* Workflow Negotiation & Task Claim Strips */}
-                <div className="px-8 space-y-2.5 pb-2.5">
-                  {/* Counter Date Negotiation Banner */}
-                  {isCounterDatePending && (
-                    <MarketingCounterDateBanner
-                      originalDate={formatDate(activeRequest.targetArtworkDateCreative || activeRequest.sampleRequiredDate)}
-                      proposedDate={formatDate(activeRequest.proposedTargetDate)}
-                      reason={activeRequest.counterDateReason}
-                      claimedBy={activeRequest.counterDateRequestedBy || activeRequest.claimedBy}
-                      requestedAt={activeRequest.counterDateRequestedAt}
-                      isMarketingMode={mode === "marketing"}
-                      onAccept={() => handleCounterDateDecision("accepted")}
-                      onReject={(notes) => handleCounterDateDecision("rejected", notes)}
-                    />
-                  )}
-
-                  {/* Task Ownership & Claim Strip */}
-                  <DesignClaimStrip
-                    claimedBy={activeRequest.claimedBy}
-                    isClaimedByCurrentUser={isClaimedByCurrentUser}
-                    claimedAt={activeRequest.claimedAt}
-                    isCreativeMode={mode === "creative"}
-                    canReleaseClaim={canReleaseClaim}
-                    canRefreshLegacyClaim={mode === "creative" && !isReadOnlyTeamHead(currentUser) && isClaimedByCurrentUser && activeRequest.claimedByUserId == null}
-                    isReleasingClaim={isReleasingClaim}
-                    onReleaseClaim={handleReleaseClaim}
-                    isClaiming={isClaiming}
-                    canClaim={!isReadOnlyTeamHead(currentUser) && isCreativeWorkStage && slaStatus.isEligible}
-                    claimDisabledReason={
-                      isReadOnlyTeamHead(currentUser)
-                        ? "Team head access is read-only."
-                        : isCreativeWorkStage
-                        ? slaStatus.label
-                        : "This design request must be released to Creative before it can be claimed."
-                    }
-                    slaLabel={mode === "creative" ? slaStatus.label : undefined}
-                    onClaim={() => handleClaim()}
-                  />
-                </div>
-
-                {/* Notebook Tab Strip */}
-                <div className="px-8 pb-1 pt-3">
-                  <div className="border-b border-slate-100 dark:border-white/10 flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("specs")}
-                      className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-1.5 whitespace-nowrap ${
-                        activeTab === "specs"
-                          ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-300 font-bold"
-                          : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
-                      }`}
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Scope &amp; Design Brief</span>
-                      {references.length > 0 && (
-                        <span className="rounded-full border border-[var(--accent-primary)]/20 bg-emerald-50 px-2 py-0.5 text-[10px] font-mono font-bold text-[var(--accent-primary)] dark:bg-emerald-950/40 dark:text-emerald-300">
-                          {references.length}
-                        </span>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("deliverables")}
-                      className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-1.5 whitespace-nowrap ${
-                        activeTab === "deliverables"
-                          ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-300 font-bold"
-                          : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
-                      }`}
-                    >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>Creative Deliverables &amp; Review</span>
-                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold font-mono tabular-nums">
-                        {deliveredCount}/{requestedCount}
-                      </span>
-                      {isAwaitingReview && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-white font-bold">
-                          Pending
-                        </span>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("signoff")}
-                      className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-1.5 whitespace-nowrap ${
-                        activeTab === "signoff"
-                          ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-300 font-bold"
-                          : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
-                      }`}
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Commercial Sign-Off</span>
-                    </button>
-
-                    {mode === "marketing" && isAcceptedByMarketing && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("next_work")}
-                        className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-1.5 whitespace-nowrap ${
-                          activeTab === "next_work"
-                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] dark:text-emerald-300 font-bold"
-                            : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
-                        }`}
-                      >
-                        <span>4. Next Work</span>
-                        <span className="rounded-full bg-[var(--accent-primary-subtle)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--accent-primary)]">Optional</span>
-                      </button>
                     )}
-                  </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("deliverables")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "deliverables"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <span>2. Creative Deliverables &amp; Review</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold tabular-nums bg-[var(--surface-base)] text-[var(--on-surface)] border border-[var(--border-subtle)]">
+                      {deliveredCount}/{requestedCount}
+                    </span>
+                    {isAwaitingReview && (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                        Review Pending
+                      </span>
+                    )}
+                    {isRemainingRequested && (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
+                        Revisions
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("signoff")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "signoff"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <span>3. Commercial Sign-Off</span>
+                    {isClosed && (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        ✓ Approved
+                      </span>
+                    )}
+                  </button>
+
+                  {mode === "marketing" && isAcceptedByMarketing && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("next_work")}
+                      className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                        activeTab === "next_work"
+                          ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                          : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                      }`}
+                    >
+                      <span>4. Next Work</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
+                        Mockup / Sampling
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Tab Contents Area */}
-              <div className="px-8 py-5 space-y-5">
+              {/* ── 2. DOCUMENT HERO & HEADER STRIP ── */}
+              <DesignSheetHeader
+                activeRequest={activeRequest}
+                mode={mode}
+                currentUserName={currentUser?.name}
+                currentUserId={currentUser?.id}
+                isClaimed={Boolean(activeRequest.claimedBy)}
+                claimedBy={activeRequest.claimedBy || undefined}
+                isClaimedByCurrentUser={isClaimedByCurrentUser}
+                canClaim={canClaim}
+                isClaiming={isClaiming}
+                onClaim={() => handleClaim()}
+                canReleaseClaim={canReleaseClaim}
+                isReleasingClaim={isReleasingClaim}
+                onReleaseClaim={handleReleaseClaim}
+                isCounterDatePending={isCounterDatePending}
+                onCounterDateDecision={handleCounterDateDecision}
+                onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
+                onSelectTab={setActiveTab}
+              />
+
+              {/* ── 3. ACTIVE TAB CONTENT ── */}
+              <div className="px-6 sm:px-8 pb-6 pt-2">
                 {/* ── TAB 1: SCOPE & DESIGN BRIEF ── */}
                 {activeTab === "specs" && (
                   <DesignBriefTab
@@ -1330,25 +1281,87 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
                 {/* ── TAB 3: COMMERCIAL SIGN-OFF ── */}
                 {activeTab === "signoff" && (
-                  <div className="space-y-4">
-                    {isClosed ? (
-                      <div className="p-6 rounded-lg border border-emerald-200 bg-emerald-50/70 text-center dark:border-emerald-900/50 dark:bg-emerald-950/20 shadow-2xs">
-                        <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600 mb-2" />
-                        <h4 className="text-base font-bold text-emerald-900 dark:text-emerald-200">
-                          Design request approved
-                        </h4>
-                        <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 max-w-md mx-auto">
-                          Marketing accepted the submitted artwork. This design request is now closed.
+                  <div className="py-4 space-y-4">
+                    {isClosed || isAcceptedByMarketing ? (
+                      <div className="p-8 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center shadow-2xs space-y-3">
+                        <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+                        <div>
+                          <h4 className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                            Design Request Approved &amp; Signed Off
+                          </h4>
+                          <p className="text-xs text-[var(--on-surface-muted)] mt-1 max-w-md mx-auto">
+                            Marketing approved the artwork deliverables ({deliveredCount} of {requestedCount} completed). This design cycle is completed.
+                          </p>
+                        </div>
+                        {mode === "marketing" && (
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab("next_work")}
+                              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold shadow-xs transition cursor-pointer active:scale-95"
+                            >
+                              <span>Configure Next Work (Mockup / Sampling)</span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : mode === "marketing" && (isAwaitingReview || isRemainingRequested || deliveredCount > 0) ? (
+                      <div className="p-5 rounded-2xl border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/[0.03] space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs font-bold text-[var(--accent-primary)]">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Commercial Review &amp; Sign-Off</span>
+                          </div>
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
+                            {deliveredCount}/{requestedCount} Artworks Delivered
+                          </span>
+                        </div>
+                        <p className="text-xs text-[var(--on-surface-muted)] leading-relaxed">
+                          Creative Studio has submitted deliverables for review. You can record commercial sign-off to finalize this request and proceed with Mockup or Sampling conversion.
                         </p>
+                        {decisionError && (
+                          <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs font-semibold text-rose-600 dark:text-rose-400">
+                            {decisionError}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            disabled={isDeciding}
+                            onClick={() => handleMarketingDecision("accept")}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold shadow-xs transition cursor-pointer active:scale-95"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>{isDeciding ? "Processing..." : "Accept Artwork & Sign Off"}</span>
+                          </button>
+                          {remainingCount > 0 && (
+                            <button
+                              type="button"
+                              disabled={isDeciding}
+                              onClick={() => handleMarketingDecision("request_remaining")}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)] text-xs font-semibold text-[var(--on-surface)] transition cursor-pointer"
+                            >
+                              <span>Request Remaining ({remainingCount})</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("deliverables")}
+                            className="text-xs text-[var(--accent-primary)] hover:underline font-semibold ml-2 cursor-pointer"
+                          >
+                            View Deliverables Details →
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="p-6 rounded-lg border border-zinc-200 bg-zinc-50 text-center dark:border-zinc-800 dark:bg-zinc-900/40 shadow-2xs">
-                        <Clock className="mx-auto h-8 w-8 text-zinc-400 mb-2" />
-                        <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                          Awaiting Marketing decision
+                      <div className="p-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-center shadow-2xs space-y-2">
+                        <Clock className="mx-auto h-10 w-10 text-[var(--on-surface-muted)]/60" />
+                        <h4 className="text-sm font-semibold text-[var(--on-surface)]">
+                          Awaiting Creative Studio Submission
                         </h4>
-                        <p className="text-xs text-zinc-500 mt-1">
-                          Marketing has not accepted the submitted artwork yet.
+                        <p className="text-xs text-[var(--on-surface-muted)] max-w-md mx-auto leading-relaxed">
+                          Creative deliverables are currently in progress ({deliveredCount} of {requestedCount} artworks ready). Once submitted by the designer, Marketing can review and execute commercial sign-off here.
                         </p>
                       </div>
                     )}
@@ -1440,28 +1453,14 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
         </div>
       )}
 
-      {/* Lightbox Image Preview Modal */}
-      {lightboxImage && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setLightboxImage(null)}
-        >
-          <div className="relative max-h-[90vh] max-w-[90vw] overflow-hidden rounded-xl bg-black shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setLightboxImage(null)}
-              className="absolute top-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-black transition cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <img
-              src={lightboxImage}
-              alt="Reference preview"
-              className="max-h-[85vh] max-w-[85vw] object-contain"
-            />
-          </div>
-        </div>
-      )}
+      {/* Full Resolution Image Lightbox Modal */}
+      <ImageLightboxModal
+        selectedImage={lightboxImage}
+        images={previewableImages}
+        onClose={() => setLightboxImage(null)}
+        onNavigate={movePreview}
+        onSelectImage={(url) => setLightboxImage(url)}
+      />
     </div>,
     document.body
   );

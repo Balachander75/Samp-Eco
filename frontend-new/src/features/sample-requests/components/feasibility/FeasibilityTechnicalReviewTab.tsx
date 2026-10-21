@@ -237,10 +237,6 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
             </button>
           </div>
 
-          <p className="text-[11px] text-[var(--on-surface-muted)] leading-relaxed">
-            If tooling, material testing, or plant availability requires extra turnaround, notify Marketing directly with a proposed date.
-          </p>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             {/* Target Date Input */}
             <div>
@@ -410,24 +406,21 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
             </div>
           </div>
 
-          <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block mb-1.5 font-semibold">
-              Technical Assessment &amp; Findings:
-            </span>
-            <div className="text-xs text-[var(--on-surface)] font-sans leading-relaxed whitespace-pre-wrap p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
-              {activeRequest.samplingFeasibilityRemark ||
-                (activeRequest.samplingFeasibilityResponse === "Yes"
-                  ? "Technical specifications verified feasible with plant tooling."
-                  : activeRequest.samplingFeasibilityResponse === "No"
-                  ? "Marked as not feasible for standard plant machinery and tooling."
-                  : "Marked as conditionally feasible.")}
+          {activeRequest.samplingFeasibilityRemark && (
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] block mb-1 font-semibold">
+                Technical Assessment Remarks:
+              </span>
+              <div className="text-xs text-[var(--on-surface)] font-sans leading-relaxed whitespace-pre-wrap p-3 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] shadow-2xs">
+                {activeRequest.samplingFeasibilityRemark}
+              </div>
             </div>
-          </div>
+          )}
 
           {(activeRequest.feasibilityConditions || activeRequest.leadTimeNote) && (
             <div className="grid sm:grid-cols-2 gap-3">
               {activeRequest.feasibilityConditions && (
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5 shadow-2xs">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3 shadow-2xs">
                   <div className="mb-1 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                     Conditions / Constraints
                   </div>
@@ -437,7 +430,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
                 </div>
               )}
               {activeRequest.leadTimeNote && (
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5 shadow-2xs">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3 shadow-2xs">
                   <div className="mb-1 text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
                     Lead-Time Note
                   </div>
@@ -449,11 +442,8 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
             </div>
           )}
 
-          <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between flex-wrap gap-2 text-xs">
-            <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
-              <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Technical sign-off recorded. Ready for commercial review.
-            </span>
-            {onNavigateToDecision && (
+          {onNavigateToDecision && (
+            <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-end">
               <button
                 type="button"
                 onClick={onNavigateToDecision}
@@ -462,8 +452,8 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
                 <span>Proceed to Commercial Decision</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ) : canEvaluateTechnical && isCreator && !isAdmin ? (
         <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 p-6 text-center space-y-2">
@@ -507,21 +497,17 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
               </div>
               <div>
                 <h3 className="text-sm font-display font-bold text-[var(--on-surface)]">
-                  Task Claim Required to Begin Technical Review
+                  Claim Task to Begin Technical Review
                 </h3>
-                <p className="text-xs text-[var(--on-surface-muted)] mt-1 max-w-md mx-auto leading-relaxed">
-                  To ensure single ownership and avoid duplicate efforts across the SAMP Team, please
-                  claim this feasibility check. The technical assessment form unlocks immediately once claimed.
-                </p>
               </div>
               <button
                 type="button"
                 onClick={onClaimTask}
                 disabled={isClaiming}
-                className="inline-flex items-center gap-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-2xs cursor-pointer transition disabled:opacity-50"
+                className="inline-flex items-center gap-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-2xs cursor-pointer transition disabled:opacity-50"
               >
                 <Clock className={`w-4 h-4 ${isClaiming ? "animate-spin" : ""}`} />
-                <span>{isClaiming ? "Claiming Ownership..." : "Claim This Feasibility Check"}</span>
+                <span>{isClaiming ? "Claiming..." : "Claim Feasibility Task"}</span>
               </button>
             </div>
           </div>

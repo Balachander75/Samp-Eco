@@ -846,6 +846,33 @@ def _add_high_performance_workflow_and_queue_indexes() -> None:
             connection.execute(text(stmt))
 
 
+def _add_request_closure_audit() -> None:
+    """Persist an auditable, scope-specific closure for supported request workflows."""
+    with engine.begin() as connection:
+        connection.execute(text("""
+            CREATE TABLE IF NOT EXISTS request_closures (
+                id SERIAL PRIMARY KEY,
+                request_type VARCHAR(16) NOT NULL,
+                request_id INTEGER NOT NULL CHECK (request_id > 0),
+                request_code VARCHAR(64),
+                closed_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                closed_by VARCHAR(255) NOT NULL,
+                closed_by_team VARCHAR(100),
+                reason TEXT,
+                closed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                CONSTRAINT ck_request_closures_supported_type
+                    CHECK (request_type IN ('design', 'mockup', 'sample', 'costing', 'feasibility')),
+                CONSTRAINT uq_request_closures_type_id UNIQUE (request_type, request_id)
+            )
+        """))
+        connection.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_request_closures_closed_at ON request_closures (closed_at DESC)"
+        ))
+        connection.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_request_closures_closed_by_user_id ON request_closures (closed_by_user_id)"
+        ))
+
+
 MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0001_legacy_schema_bootstrap", "Record and run existing schema upgrades", _bootstrap_existing_schema),
     ("0002_feasibility_conversion_relations", "Connect Feasibility conversions to sample requests", _link_feasibility_conversions),
@@ -867,6 +894,7 @@ MIGRATIONS: List[Tuple[str, str, Callable[[], None]]] = [
     ("0018_design_sample_request_link", "Link Design workflow records to their Sample Request parent", _link_design_requests_to_sample_requests),
     ("0019_optimize_product_details_and_queries", "Add functional normalized index on product_details for fast listing summaries", _optimize_product_details_and_queries),
     ("0020_high_performance_workflow_and_queue_indexes", "Add targeted composite indexes for plant queues, user requests, and workflow stages", _add_high_performance_workflow_and_queue_indexes),
+    ("0021_request_closure_audit", "Persist request closure identity, actor, reason, and time", _add_request_closure_audit),
 ]
 
 

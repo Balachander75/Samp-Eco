@@ -3,7 +3,6 @@ import {
   Layers,
   Plus,
   X,
-  FolderOpen,
   Send,
   AlertTriangle,
   ShieldCheck,
@@ -102,13 +101,13 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
   return (
     <div className="space-y-6">
       {/* Deliverable Progress Card */}
-      <div className="p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 shadow-2xs">
+      <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-[11px] font-mono font-bold uppercase text-zinc-500">
+            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
               Deliverable Fulfillment
             </div>
-            <div className="text-base font-bold text-zinc-900 dark:text-zinc-100 mt-0.5 tabular-nums">
+            <div className="text-base font-bold text-[var(--on-surface)] mt-0.5 tabular-nums">
               {deliveredCount} of {requestedCount} Artworks Completed
             </div>
           </div>
@@ -133,7 +132,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
 
         {/* Progress Bar */}
         <div
-          className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
+          className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[var(--surface-mid)]"
           role="progressbar"
           aria-label="Artwork deliverables completed"
           aria-valuemin={0}
@@ -141,7 +140,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
           aria-valuenow={deliveredCount}
         >
           <div
-            className="h-full bg-teal-600 dark:bg-teal-500 rounded-full transition-all duration-500"
+            className="h-full bg-[var(--accent-primary)] rounded-full transition-all duration-500"
             style={{
               width: `${Math.min(100, Math.round((deliveredCount / Math.max(1, requestedCount)) * 100))}%`,
             }}
@@ -156,29 +155,28 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
           aria-labelledby="creative-output-matrix-title"
           aria-busy={isSubmittingOutput}
           onSubmit={onSubmitBatch}
-          className="space-y-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200/80 dark:bg-zinc-900/40 dark:ring-zinc-800"
+          className="space-y-4 rounded-xl bg-[var(--surface-lowest)] p-4 shadow-sm border border-[var(--border-subtle)]"
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-zinc-100">
-                <FolderOpen className="h-4 w-4 text-[var(--accent-primary)] dark:text-emerald-300" />
+              <div className="flex items-center gap-2 text-sm font-bold text-[var(--on-surface)]">
                 <h3 id="creative-output-matrix-title">Artwork submission matrix</h3>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-primary)] dark:bg-emerald-950/50 dark:text-emerald-300 font-mono">
+                <span className="rounded-full bg-[var(--accent-primary)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-primary)] font-mono">
                   Batch #{submissions.length + 1}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-slate-600 dark:text-zinc-400">
+              <p className="mt-1 text-xs text-[var(--on-surface-muted)]">
                 Shutterstock No. and remark are optional individually; enter at least one for each artwork.
               </p>
             </div>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-white/5 dark:text-zinc-300 font-mono">
+            <span className="rounded-full bg-[var(--surface-mid)] px-2.5 py-1 text-[11px] font-semibold text-[var(--on-surface-muted)] font-mono">
               {remainingCount} remaining
             </span>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
             <div>
-              <label htmlFor="creative-output-file-link" className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+              <label htmlFor="creative-output-file-link" className="block text-xs font-semibold text-[var(--on-surface)]">
                 Artwork folder or design file link/path <span className="text-rose-500">*</span>
               </label>
               <input
@@ -190,12 +188,12 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                 value={designFileUrl}
                 onChange={(e) => onChangeDesignFileUrl(e.target.value)}
                 placeholder="Paste a share link or file/folder path"
-                className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs text-[var(--on-surface)] placeholder-[var(--on-surface-muted)]/50 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20"
               />
-              <p className="mt-1 text-[10px] text-slate-500 dark:text-zinc-400">Paste any reference text that helps the team locate the artwork files. URLs and paths also work.</p>
+              <p className="mt-1 text-[10px] text-[var(--on-surface-muted)]">Paste any reference text that helps the team locate the artwork files. URLs and paths also work.</p>
             </div>
             <div>
-              <label htmlFor="creative-output-count" className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+              <label htmlFor="creative-output-count" className="block text-xs font-semibold text-[var(--on-surface)]">
                 Artworks in this batch
               </label>
               <input
@@ -206,15 +204,15 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                 disabled={isSubmittingOutput}
                 value={outputCount}
                 onChange={(e) => onChangeOutputCount(Number(e.target.value))}
-                className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-mono text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 tabular-nums"
+                className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-xs font-mono text-[var(--on-surface)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 tabular-nums"
               />
             </div>
           </div>
 
           {/* Dynamic Rows */}
-          <div className="overflow-x-auto rounded-lg ring-1 ring-slate-200 dark:ring-zinc-800">
+          <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)]">
             <div className="min-w-[520px]">
-              <div className="grid grid-cols-[52px_minmax(180px,1.2fr)_minmax(170px,0.9fr)_minmax(150px,0.8fr)] gap-2 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+              <div className="grid grid-cols-[52px_minmax(180px,1.2fr)_minmax(170px,0.9fr)_minmax(150px,0.8fr)] gap-2 bg-[var(--surface-low)] px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--on-surface-muted)]">
                 <span>Code</span>
                 <span>Marketing Description</span>
                 <span>Shutterstock No. (optional)</span>
@@ -223,12 +221,12 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
               {outputRows.map((row, index) => (
                 <div
                   key={index}
-                  className="grid grid-cols-[52px_minmax(180px,1.2fr)_minmax(170px,0.9fr)_minmax(150px,0.8fr)] items-center gap-2 border-t border-slate-100 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/70"
+                  className="grid grid-cols-[52px_minmax(180px,1.2fr)_minmax(170px,0.9fr)_minmax(150px,0.8fr)] items-center gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2"
                 >
-                  <span className="font-mono text-xs font-bold text-[var(--accent-primary)] dark:text-emerald-300">
+                  <span className="font-mono text-xs font-bold text-[var(--accent-primary)]">
                     D{deliveredCount + index + 1}
                   </span>
-                  <span className="min-w-0 text-xs font-medium text-slate-700 dark:text-zinc-200 truncate">
+                  <span className="min-w-0 text-xs font-medium text-[var(--on-surface)] truncate">
                     {(activeRequest.productDescription || "").trim()} - D{deliveredCount + index + 1}
                   </span>
                   <input
@@ -243,7 +241,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                         outputRows.map((r, i) => (i === index ? { ...r, shutterstockNo: e.target.value } : r))
                       )
                     }
-                    className="h-9 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                    className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-xs text-[var(--on-surface)] placeholder-[var(--on-surface-muted)]/50 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20"
                   />
                   <input
                     type="text"
@@ -257,7 +255,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                         outputRows.map((r, i) => (i === index ? { ...r, remarks: e.target.value } : r))
                       )
                     }
-                    className="h-9 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                    className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-xs text-[var(--on-surface)] placeholder-[var(--on-surface-muted)]/50 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20"
                   />
                 </div>
               ))}
@@ -265,7 +263,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
           </div>
 
           {submitError && (
-            <div role="alert" className="flex items-center gap-2 rounded-lg bg-rose-50 p-3 text-xs font-medium text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
+            <div role="alert" className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 p-3 text-xs font-medium text-rose-600 dark:text-rose-400">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span>{submitError}</span>
             </div>
@@ -276,7 +274,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
               type="button"
               disabled={isSubmittingOutput}
               onClick={onCancelSubmit}
-              className="h-9 rounded-lg px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-white/5 cursor-pointer"
+              className="h-9 rounded-lg px-3 text-xs font-semibold text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] disabled:opacity-50 cursor-pointer"
             >
               Cancel
             </button>
@@ -293,7 +291,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
       )}
 
       {mode === "creative" && (isAwaitingReview || isRemainingRequested) && (
-        <div role="status" className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-950 ring-1 ring-amber-200/80 dark:bg-amber-950/25 dark:text-amber-200 dark:ring-amber-900/50">
+        <div role="status" className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 text-xs text-amber-800 dark:text-amber-200">
           {isRemainingRequested ? (
             <>
               <strong className="font-semibold">Marketing requested the remaining artwork.</strong>{" "}
@@ -310,20 +308,20 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
 
       {/* Marketing Review Verdict Spotlight */}
       {mode === "marketing" && (isAwaitingReview || isRemainingRequested) && (
-        <div className="p-4 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/[0.03] dark:border-[var(--accent-primary)]/40 dark:bg-[var(--accent-primary)]/10 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-[var(--accent-primary)] dark:text-emerald-300">
+        <div className="p-4 rounded-xl border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/[0.04] space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-[var(--accent-primary)]">
             <ShieldCheck className="w-4 h-4" />
             <span>Marketing Review &amp; Commercial Sign-Off</span>
           </div>
-          <p className="text-xs text-zinc-600 dark:text-zinc-400">
-            Creative Studio has submitted <strong className="tabular-nums">{deliveredCount} of {requestedCount}</strong> requested artworks.
+          <p className="text-xs text-[var(--on-surface-muted)]">
+            Creative Studio has submitted <strong className="tabular-nums text-[var(--on-surface)]">{deliveredCount} of {requestedCount}</strong> requested artworks.
             {isRemainingRequested && remainingCount > 0
               ? <> Creative is continuing the remaining work ({remainingCount} left); you can accept the delivered set whenever it is ready.</>
               : " Review the deliverables and select your verdict."}
           </p>
 
           {decisionError && (
-            <div className="flex items-center gap-2 rounded bg-rose-50 p-2 text-xs font-semibold text-rose-700">
+            <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 p-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{decisionError}</span>
             </div>
@@ -334,7 +332,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
               type="button"
               disabled={isDeciding}
               onClick={() => onMarketingDecision("accept")}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold shadow-xs transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold shadow-xs transition cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
               <span>{isDeciding ? "Processing..." : isRemainingRequested ? "Accept Delivered Designs & Close" : "Accept & Continue"}</span>
@@ -345,7 +343,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                 type="button"
                 disabled={isDeciding}
                 onClick={() => onMarketingDecision("request_remaining")}
-                className="inline-flex items-center gap-1.5 rounded border border-[var(--accent-primary)]/40 bg-white px-3 py-1.5 text-xs font-bold text-[var(--accent-primary)] transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/40 bg-[var(--surface-lowest)] px-3 py-1.5 text-xs font-bold text-[var(--accent-primary)] transition hover:bg-[var(--surface-low)] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span>Request Remaining Artworks ({remainingCount})</span>
@@ -366,9 +364,9 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
 
       {/* Submissions History List */}
       {submissions.length === 0 ? (
-        <div className="p-8 text-center border border-dashed border-zinc-300 dark:border-zinc-800 rounded-lg">
-          <Layers className="mx-auto h-8 w-8 text-zinc-400 mb-2" />
-          <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+        <div className="p-8 text-center border border-dashed border-[var(--border-subtle)] rounded-xl bg-[var(--surface-lowest)]">
+          <Layers className="mx-auto h-8 w-8 text-[var(--on-surface-muted)]/60 mb-2" />
+          <div className="text-xs font-semibold text-[var(--on-surface-muted)]">
             No artwork outputs submitted yet.
           </div>
         </div>
@@ -377,18 +375,18 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
           {submissions.map((batch, bIdx) => (
             <div
               key={bIdx}
-              className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/40 overflow-hidden shadow-2xs"
+              className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] overflow-hidden shadow-2xs"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 bg-zinc-50/70 px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-800/40">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-2.5">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                  <span className="font-bold text-[var(--on-surface)]">
                     Batch #{bIdx + 1}
                   </span>
-                  <span className="text-zinc-400">•</span>
-                  <span className="text-zinc-500 font-mono">
+                  <span className="text-[var(--on-surface-muted)]">•</span>
+                  <span className="text-[var(--on-surface-muted)] font-mono">
                     {formatDate(batch.submittedAt)}
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 font-mono tabular-nums">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] font-mono tabular-nums">
                     {batch.rows?.length || 0} Artworks
                   </span>
                 </div>
@@ -398,7 +396,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                     href={batch.designFileUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-[11px] font-semibold transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-[11px] font-semibold transition shadow-2xs"
                   >
                     <span>Open Artwork Files</span>
                     <ExternalLink className="w-3 h-3" />
@@ -407,17 +405,17 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                   <button
                     type="button"
                     onClick={() => onCopyArtworkPath(batch.designFileUrl)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-[11px] font-semibold transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--surface-mid)] hover:bg-[var(--surface-high)] text-[var(--on-surface)] border border-[var(--border-subtle)] text-[11px] font-semibold transition cursor-pointer shadow-2xs"
                     title={batch.designFileUrl}
                   >
-                    <Copy className="w-3 h-3" />
+                    <Copy className="w-3 h-3 text-[var(--on-surface-muted)]" />
                     <span>{copiedArtworkPath === batch.designFileUrl ? "Path Copied" : "Copy Artwork Path"}</span>
                   </button>
                 ))}
               </div>
 
               <table className="w-full text-left text-xs">
-                <thead className="bg-zinc-50 dark:bg-zinc-900/40 text-[10.5px] uppercase font-mono text-zinc-500 border-b border-zinc-100 dark:border-zinc-800">
+                <thead className="bg-[var(--surface-low)] text-[10.5px] uppercase font-mono tracking-wider text-[var(--on-surface-muted)] border-b border-[var(--border-subtle)]">
                   <tr>
                     <th className="px-3.5 py-2 w-16">Code</th>
                     <th className="px-3.5 py-2">Marketing Description</th>
@@ -425,19 +423,19 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                     <th className="px-3.5 py-2">Creative Remark</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <tbody className="divide-y divide-[var(--border-subtle)]">
                   {(batch.rows || []).map((row: any) => (
                     <tr key={row.designNumber}>
-                      <td className="px-3.5 py-2.5 font-mono font-bold text-[var(--accent-primary)] dark:text-emerald-300">
+                      <td className="px-3.5 py-2.5 font-mono font-bold text-[var(--accent-primary)]">
                         {row.designNumber}
                       </td>
-                      <td className="px-3.5 py-2.5 font-medium text-zinc-900 dark:text-zinc-100">
+                      <td className="px-3.5 py-2.5 font-medium text-[var(--on-surface)]">
                         {row.description}
                       </td>
-                      <td className="px-3.5 py-2.5 font-mono font-medium text-zinc-800 dark:text-zinc-200">
+                      <td className="px-3.5 py-2.5 font-mono font-medium text-[var(--on-surface)]">
                         {row.shutterstockNo || "—"}
                       </td>
-                      <td className="px-3.5 py-2.5 text-zinc-600 dark:text-zinc-400">
+                      <td className="px-3.5 py-2.5 text-[var(--on-surface-muted)]">
                         {row.remarks || ""}
                       </td>
                     </tr>

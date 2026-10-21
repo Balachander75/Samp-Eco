@@ -46,6 +46,7 @@ export function mapFeasibilityResponse(item: Record<string, unknown>): Feasibili
     requestCreatedBy: typeof item.request_created_by === "string"
       ? item.request_created_by
       : typeof item.created_by === "string" ? item.created_by : null,
+    createdByUserId: item.created_by_user_id != null ? Number(item.created_by_user_id) : null,
     status: String(item.status || "Pending Feasibility"),
     requestRaisedAt: String(item.request_raised_at || ""),
     updatedAt: typeof item.updated_at === "string" ? item.updated_at : null,

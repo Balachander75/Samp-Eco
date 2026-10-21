@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle2, AlertCircle, X } from "lucide-react";
+import { CheckCircle2, AlertCircle, X, Send, Plus, Loader2 } from "lucide-react";
 import { UserProfile } from "@/features/auth";
 import {
   searchProductsByMaterialApi,
@@ -123,7 +123,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     }
 
     try {
-      const cached = sessionStorage.getItem("samp_active_program_form");
+      const cached = sessionStorage.getItem(programContextStorageKey);
       if (cached) {
         const parsed = JSON.parse(cached);
         return {
@@ -303,6 +303,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   const [isSubmittingAll, setIsSubmittingAll] = useState(false);
   const [isCompressingReferenceImages, setIsCompressingReferenceImages] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
+  const releaseInProgressRef = useRef(false);
   const [inspectingProduct, setInspectingProduct] = useState<StagedProductItem | null>(null);
   const [inspectingCatalogProduct, setInspectingCatalogProduct] = useState<ProductSearchResult | null>(null);
   const [editingProduct, setEditingProduct] = useState<StagedProductItem | null>(null);
@@ -328,10 +329,14 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     sessionStorage.setItem(programContextStorageKey, JSON.stringify(programContext));
   }, [programContext, programContextStorageKey]);
 
-  // If user navigates away / unmounts with staged products that haven't been saved yet, auto-save to draft
+  // Preserve ordinary staging work as Drafts on exit; feasibility work stays on this screen until Release.
   useEffect(() => {
     return () => {
-      if (!hasAutoSavedRef.current && stagedProductsRef.current.length > 0) {
+      if (
+        !hasAutoSavedRef.current &&
+        stagedProductsRef.current.length > 0 &&
+        !programContextRef.current.feasibilityRequestId
+      ) {
         const cached = sessionStorage.getItem(stagedProductsStorageKey);
         if (cached) {
           hasAutoSavedRef.current = true;
@@ -454,6 +459,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   // Ask which deliverable is needed before opening the product form.
   const handleOpenAddProduct = () => {
     if (feasibilityHandoff) {
+      if (stagedProductsRef.current.length > 0) {
+        showToast("This feasibility request can stage one product. Add its other processes as scopes on that product.", "error");
+        return;
+      }
       setIsAddModalOpen(true);
       return;
     }
@@ -519,15 +528,20 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       setStagedProducts(nextProducts);
       sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
       try {
-        const result = await autoSaveStagedProductsToDraft(nextProducts, programContext, user);
-        if (!result.success) throw new Error(result.error || "Could not save the staged request details.");
+        const shouldPersistNow = !feasibilityHandoff || Boolean(item.savedRequestId);
+        if (shouldPersistNow) {
+          const result = await autoSaveStagedProductsToDraft(nextProducts, programContext, user);
+          if (!result.success) throw new Error(result.error || "Could not save the staged request details.");
+        }
         const savedProducts = nextProducts.map((product) =>
-          product.id === item.id ? { ...product, isDraftSaved: true } : product
+          product.id === item.id ? { ...product, isDraftSaved: shouldPersistNow || product.isDraftSaved } : product
         );
         stagedProductsRef.current = savedProducts;
         setStagedProducts(savedProducts);
         sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(savedProducts));
-        showToast("Staged request details updated.");
+        showToast(feasibilityHandoff
+          ? "Staged details updated. Release here to start the selected workflows."
+          : "Staged request details updated.");
         return true;
       } catch (error) {
         console.error("Failed to save staged request details:", error);
@@ -630,7 +644,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         mockupWorkflowState,
       });
       if (!saved) throw new Error("The staged product could not be updated. Please retry.");
-    } else {
+    } else if (!feasibilityHandoff) {
       const saved = await autoSaveStagedProductsToDraft(nextProducts, programContext, user);
       if (!saved.success) throw new Error(saved.error || "The staged product could not be saved. Please retry.");
     }
@@ -639,7 +653,9 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     stagedProductsRef.current = nextProducts;
     sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
     setInspectingProduct(updatedItem);
-    showToast("Product description and characteristics saved.");
+    showToast(feasibilityHandoff
+      ? "Product details updated. Release here to start the selected workflows."
+      : "Product description and characteristics saved.");
   };
 
   // Load the shared binding hierarchy; category is not a filter for material code search.
@@ -1475,31 +1491,15 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     setIsAddModalOpen(false);
     resetSamplingState();
 
+    if (feasibilityHandoff) {
+      showToast("Product staged here. Use Release to start the selected team workflows.");
+      return;
+    }
+
     // Persist staged product directly into Draft
     autoSaveStagedProductsToDraft(nextProducts, programContext, user)
       .then((res) => {
         if (res.success) {
-          if (feasibilityHandoff) {
-            hasAutoSavedRef.current = true;
-            stagedProductsRef.current = [];
-            setStagedProducts([]);
-            sessionStorage.removeItem(stagedProductsStorageKey);
-            sessionStorage.removeItem(programContextStorageKey);
-            navigate("/sample-requests", { state: { refresh: Date.now(), stage: "draft" } });
-            window.dispatchEvent(new CustomEvent("app:show-toast", {
-              detail: {
-                message: `${
-                  (programContext.feasibilityRequestTypes && programContext.feasibilityRequestTypes.length > 0)
-                    ? programContext.feasibilityRequestTypes
-                        .map((t: string) => t.charAt(0).toUpperCase() + t.slice(1))
-                        .join(" & ")
-                    : "Sample"
-                } details staged and linked to ${programContext.feasibilityRequestCode || "the feasibility request"}.`,
-                tone: "success",
-              },
-            }));
-            return;
-          }
           nextItem.isDraftSaved = true;
           setStagedProducts([...nextProducts]);
           showToast(`✓ Staged product saved to Draft (${res.srNumber || programContext.parentSrNumber || "Draft queue"}).`);
@@ -1513,6 +1513,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   const handleRemoveStagedItem = (id: string) => {
     const item = stagedProducts.find((staged) => staged.id === id);
+    if (feasibilityHandoff && item?.savedRequestId) {
+      showToast("This feasibility product is already prepared for release. Update its details and retry Release instead of removing it.", "error");
+      return;
+    }
     const nextProducts = stagedProducts.filter((staged) => staged.id !== id);
     setStagedProducts(nextProducts);
     stagedProductsRef.current = nextProducts;
@@ -1529,6 +1533,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   };
 
   const handleClearStaging = () => {
+    if (feasibilityHandoff && stagedProducts.some((item) => item.savedRequestId)) {
+      showToast("This feasibility product is already prepared for release. Update its details and retry Release instead of clearing it.", "error");
+      return;
+    }
     setStagedProducts([]);
     stagedProductsRef.current = [];
     try {
@@ -1540,6 +1548,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   };
 
   const handleDuplicateStagedItem = async (item: StagedProductItem) => {
+    if (feasibilityHandoff) {
+      showToast("A feasibility request can stage one product. Use its selected scopes for the required processes.", "error");
+      return;
+    }
     const plantCode = marketingPlantCode;
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const now = new Date();
@@ -1630,8 +1642,16 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       : `Duplicated "${item.productDescription}".`);
   };
 
-  // Return to Sample Requests desk with automatic draft preservation if items staged
-  const handleReturnToDesk = async () => {
+  // Return to the desk while keeping feasibility staging in this session; ordinary staging is draft-preserved.
+  const handleReturnToDesk = () => {
+    if (isReleasing || isSubmittingAll) return;
+    if (feasibilityHandoff) {
+      showToast(stagedProducts.length > 0
+        ? "Staged feasibility details are saved in this session. Reopen the request to continue or release them."
+        : "Returning to the feasibility request desk.");
+      navigate("/sample-requests", { state: { refresh: Date.now() } });
+      return;
+    }
     if (stagedProducts.length > 0) {
       hasAutoSavedRef.current = true;
       showToast(`Auto-saving ${stagedProducts.length} product(s) directly to Drafts...`);
@@ -1658,10 +1678,6 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       return;
     }
     if (designMockupHandoff) {
-      sessionStorage.removeItem(stagedProductsStorageKey);
-      sessionStorage.removeItem(programContextStorageKey);
-    }
-    if (feasibilityHandoff) {
       sessionStorage.removeItem(stagedProductsStorageKey);
       sessionStorage.removeItem(programContextStorageKey);
     }
@@ -1710,7 +1726,6 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       if (res.success) {
         sessionStorage.removeItem(programContextStorageKey);
         sessionStorage.removeItem(stagedProductsStorageKey);
-        sessionStorage.removeItem("samp_active_staged_items");
         setStagedProducts([]);
       showToast(`Successfully saved ${res.count} product(s) to ${programContext.parentSrNumber || "the request"}. Returning to desk...`);
         setTimeout(() => {
@@ -1732,6 +1747,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Release each staged request to the destination selected in its workflow details.
   const handleReleaseRequest = async () => {
+    if (releaseInProgressRef.current) return;
     if (!programContext.customer && !programContext.parentRequestId) {
       showToast("Customer account is required before releasing.", "error");
       return;
@@ -1740,30 +1756,46 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       showToast("Please add at least one product before releasing.", "error");
       return;
     }
+    if (feasibilityHandoff && stagedProducts.length !== 1) {
+      showToast("Stage one product for this feasibility request before releasing.", "error");
+      return;
+    }
 
+    let releaseProducts: StagedProductItem[] = [];
+    const cacheReleaseProducts = (products: StagedProductItem[]) => {
+      stagedProductsRef.current = products;
+      setStagedProducts(products);
+      sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(products));
+    };
+
+    releaseInProgressRef.current = true;
     setIsReleasing(true);
     hasAutoSavedRef.current = true;
 
     let allDraftsSaved = stagedProducts.length === 0;
     try {
+      await stagedProductUpdateQueueRef.current;
+      releaseProducts = stagedProductsRef.current.map((product) => ({ ...product }));
+      allDraftsSaved = releaseProducts.length === 0;
       let targetSrNumber = programContext.parentSrNumber;
 
       // 1. If there are staged products in memory, persist them to draft first
-      if (stagedProducts.length > 0) {
-        const res = await autoSaveStagedProductsToDraft(stagedProducts, programContext, user);
-        if (!res.success) throw new Error(res.error || "Could not save the staged products before release.");
-        allDraftsSaved = true;
-        if (res.srNumber) targetSrNumber = targetSrNumber || res.srNumber;
-        if (res.savedIds && res.savedIds.length === stagedProducts.length) {
-          res.savedIds.forEach((id, idx) => {
-            if (stagedProducts[idx]) stagedProducts[idx].savedRequestId = id;
+      if (releaseProducts.length > 0) {
+        const res = await autoSaveStagedProductsToDraft(releaseProducts, programContext, user);
+        if (res.savedIds?.length === releaseProducts.length) {
+          res.savedIds.forEach((id, index) => {
+            releaseProducts[index].savedRequestId = releaseProducts[index].savedRequestId ?? id;
           });
         }
+        allDraftsSaved = releaseProducts.every((product) => product.savedRequestId !== undefined && product.savedRequestId !== null);
+        if (allDraftsSaved) cacheReleaseProducts(releaseProducts);
+        if (!res.success) throw new Error(res.error || "Could not save the staged products before release.");
+        if (res.srNumber) targetSrNumber = targetSrNumber || res.srNumber;
       }
 
       // 2. Release every persisted product; Costing's workflow follows the saved Creative input choice.
       const itemsByStatus = new Map<string, StagedProductItem[]>();
-      for (const item of stagedProducts) {
+      for (const item of releaseProducts) {
         const isDirectStudioMockup = item.scopes.length === 1
           && item.scopes.includes("mockup")
           && item.mockupMetadata?.designNeeded === false;
@@ -1776,7 +1808,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
             : "Creative";
         itemsByStatus.set(status, [...(itemsByStatus.get(status) || []), item]);
       }
-      if (stagedProducts.length === 0 && programContext.parentRequestId) {
+      if (releaseProducts.length === 0 && programContext.parentRequestId) {
         const status = "Creative";
         itemsByStatus.set(status, []);
       }
@@ -1785,7 +1817,9 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       for (const [status, items] of itemsByStatus) {
         const ids = items.map((item) => item.savedRequestId).filter((id): id is string | number => id !== undefined && id !== null);
         if (items.length > 0 && ids.length !== items.length) {
-          throw new Error("One or more staged products were not saved. They remain in Draft; retry after saving.");
+          throw new Error(feasibilityHandoff
+            ? "The staged product could not be saved for release. It is still on this page; retry Release."
+            : "One or more staged products were not saved. They remain in Draft; retry after saving.");
         }
         if (!items.length && programContext.parentRequestId) ids.push(programContext.parentRequestId);
         if (ids.length > 0) {
@@ -1800,21 +1834,20 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       // 4. Clear staging session storage, in-memory list and refs
       sessionStorage.removeItem(programContextStorageKey);
       sessionStorage.removeItem(stagedProductsStorageKey);
-      sessionStorage.removeItem("samp_active_staged_items");
       stagedProductsRef.current = [];
       hasAutoSavedRef.current = true;
       setStagedProducts([]);
 
       const label = targetSrNumber ? `Request ${targetSrNumber}` : "Draft request";
-      const creativeFirstCount = stagedProducts.filter((item) => item.scopes.includes("costing") && item.costingCreativeInputNeeded === true).length;
-      const directCostingCount = stagedProducts.filter((item) => item.scopes.includes("costing") && item.costingCreativeInputNeeded !== true).length;
-      const mockupStudioCount = stagedProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === false).length;
-      const mockupCreativeCount = stagedProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === true).length;
-      const samplingResampleDirectPlantCount = stagedProducts.filter((item) => item.scopes.length === 1 && getAutomaticSampleRoute(item).isResample).length;
-      const samplingReviewCount = stagedProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
+      const creativeFirstCount = releaseProducts.filter((item) => item.scopes.includes("costing") && item.costingCreativeInputNeeded === true).length;
+      const directCostingCount = releaseProducts.filter((item) => item.scopes.includes("costing") && item.costingCreativeInputNeeded !== true).length;
+      const mockupStudioCount = releaseProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === false).length;
+      const mockupCreativeCount = releaseProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === true).length;
+      const samplingResampleDirectPlantCount = releaseProducts.filter((item) => item.scopes.length === 1 && getAutomaticSampleRoute(item).isResample).length;
+      const samplingReviewCount = releaseProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
         && !getAutomaticSampleRoute(item).isResample && !getAutomaticSampleRoute(item).creativeChangesRequired).length;
-      const samplingCreativeCount = stagedProducts.filter((item) => item.scopes.length === 1 && getAutomaticSampleRoute(item).creativeChangesRequired).length;
-      const otherScopeCount = stagedProducts.filter((item) => item.scopes.some((scope) => scope !== "costing" && scope !== "mockup" && scope !== "sample")).length;
+      const samplingCreativeCount = releaseProducts.filter((item) => item.scopes.length === 1 && getAutomaticSampleRoute(item).creativeChangesRequired).length;
+      const otherScopeCount = releaseProducts.filter((item) => item.scopes.some((scope) => scope !== "costing" && scope !== "mockup" && scope !== "sample")).length;
       const routes = [
         creativeFirstCount ? `${creativeFirstCount} Costing request(s) to Creative first` : "",
         directCostingCount ? `${directCostingCount} directly to Costing` : "",
@@ -1842,15 +1875,25 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       }, 700);
     } catch (err) {
       console.error("Failed to release request from staging:", err);
+      if (releaseProducts.some((product) => product.savedRequestId !== undefined && product.savedRequestId !== null)) {
+        cacheReleaseProducts(releaseProducts);
+        allDraftsSaved = releaseProducts.every((product) => product.savedRequestId !== undefined && product.savedRequestId !== null);
+      }
       hasAutoSavedRef.current = allDraftsSaved;
       showToast(err instanceof Error ? err.message : "Could not release the draft request.", "error");
     } finally {
+      releaseInProgressRef.current = false;
       setIsReleasing(false);
     }
   };
 
+  const stagedDesignCount = stagedProducts.filter((product) => product.scopes.includes("design")).length;
+  const stagedMockupCount = stagedProducts.filter((product) => product.scopes.includes("mockup")).length;
+  const stagedSamplingCount = stagedProducts.filter((product) => product.scopes.includes("sample")).length;
+  const stagedCostingCount = stagedProducts.filter((product) => product.scopes.includes("costing")).length;
+
   return (
-    <div className="flex-1 flex min-h-0 flex-col overflow-y-auto bg-[var(--surface-base)] text-zinc-900 dark:text-zinc-100 font-sans select-text">
+    <div className="flex-1 flex min-h-0 flex-col overflow-y-auto bg-[var(--surface-base)] text-[var(--on-surface)] font-sans select-text">
       {/* Main Container */}
       <div className="w-full flex-1 space-y-4 px-4 py-4 sm:px-6 lg:px-8">
 
@@ -1858,7 +1901,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         <StagingWorkspaceHeader
           programContext={programContext}
           stagedProducts={stagedProducts}
-          isSubmittingAll={isSubmittingAll}
+          isSubmittingAll={isSubmittingAll || isSavingDetails}
           isReleasing={isReleasing}
           onNavigateBack={handleReturnToDesk}
           onOpenAddModal={handleOpenAddProduct}
@@ -1871,12 +1914,91 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         {/* 2. Staged Products Queue & Table */}
         <StagingProductList
           stagedProducts={stagedProducts}
+          isFeasibilityHandoff={feasibilityHandoff}
           onOpenAddModal={handleOpenAddProduct}
           onInspectProduct={(prod) => setInspectingProduct(prod)}
           onUpdateProduct={handleUpdateStagedProduct}
           onDuplicateProduct={handleDuplicateStagedItem}
           onRemoveProduct={handleRemoveStagedItem}
+          onReleaseRequest={handleReleaseRequest}
+          isReleasing={isReleasing}
         />
+
+        {/* 3. Sticky Bottom Action Dock (Guarantees Release button is always prominently visible) */}
+        {stagedProducts.length > 0 && (
+          <div className="sticky bottom-4 z-30 mt-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)]/95 p-3.5 sm:p-4 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-md transition-all animate-smooth-modal">
+            <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" />
+                  <span className="text-xs font-bold text-[var(--on-surface)]">
+                    Ready to Release
+                  </span>
+                </div>
+                <span className="text-[var(--border-strong)]">|</span>
+                <span className="font-mono text-xs font-bold text-[var(--accent-primary)]">
+                  {stagedProducts.length} Product{stagedProducts.length !== 1 ? "s" : ""} Staged
+                </span>
+                <div className="hidden sm:flex items-center gap-1.5 pl-2 border-l border-[var(--border-subtle)] text-[10.5px] font-mono">
+                  {stagedSamplingCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 font-semibold border border-teal-200 dark:border-teal-800/50">
+                      {stagedSamplingCount} Sample
+                    </span>
+                  )}
+                  {stagedMockupCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800/50">
+                      {stagedMockupCount} Mockup
+                    </span>
+                  )}
+                  {stagedDesignCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800/50">
+                      {stagedDesignCount} Design
+                    </span>
+                  )}
+                  {stagedCostingCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-800/50">
+                      {stagedCostingCount} Costing
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 sm:gap-3 ml-auto">
+                <button
+                  type="button"
+                  onClick={handleOpenAddProduct}
+                  disabled={isSubmittingAll || isSavingDetails || isReleasing}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-all cursor-pointer shadow-2xs active:scale-95"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add Another Product</span>
+                  <span className="sm:hidden">Add</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReleaseRequest}
+                  disabled={isReleasing || isSubmittingAll || isSavingDetails || stagedProducts.length === 0}
+                  data-action="release"
+                  data-keep-color="true"
+                  className="release-cta-button inline-flex h-10 items-center gap-2 rounded-xl px-5 sm:px-6 text-xs font-bold uppercase tracking-wider shadow-lg shadow-emerald-600/30 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                >
+                  {isReleasing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      <span>Releasing to Teams...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 stroke-[2.5]" />
+                      <span>Release Request ({stagedProducts.length} {stagedProducts.length === 1 ? "Item" : "Items"})</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. Add Product Modal Flow (Steps 1, 2, 3) */}

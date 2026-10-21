@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { UserProfile } from "@/features/auth";
-import { hasWorkflowTeam, isAdmin } from "@/features/auth/permissions";
+import { getAssignedWorkflowTeam, getAssignedWorkspaceTeam, hasWorkflowTeam, isAdmin, isRootAdmin } from "@/features/auth/permissions";
 import { getNavigationGroupsForUser, NavigationItem, NavigationSubItem } from "./navigation";
 import { useBusinessYear } from "@/context/BusinessYearContext";
 import { fetchSidebarBadges } from "./sidebarBadges";
@@ -21,12 +21,28 @@ import {
   ChevronDown,
   ChevronsLeft,
   ChevronsRight,
+  CalendarRange,
+  ChartNoAxesCombined,
+  ClipboardList,
+  FlaskConical,
+  ListChecks,
+  PackageSearch,
+  UsersRound,
 } from "lucide-react";
 
 // Canonical ultra-modern Lucide icons mapped strictly per department
 const ITEM_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   dashboard: CircleGauge,
   operations: CircleGauge,
+  "team-overview": CircleGauge,
+  "marketing-overview": ChartNoAxesCombined,
+  "marketing-sampling": PackageSearch,
+  "marketing-feasibility": ListChecks,
+  "marketing-programs": CalendarRange,
+  "team-members": UsersRound,
+  "team-sample-requests": Boxes,
+  "team-feasibility": FlaskConical,
+  "team-program-planning": ClipboardList,
   marketing: BriefcaseBusiness,
   creative: PenTool,
   studio: Shapes,
@@ -59,12 +75,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [dynamicBadges, setDynamicBadges] = useState<Record<string, number>>({});
   const [badgeRefreshVersion, setBadgeRefreshVersion] = useState(0);
   const navigationGroups = user ? getNavigationGroupsForUser(user) : [];
-  const admin = isAdmin(user);
-  const canSeeMarketing = Boolean(user && (admin || hasWorkflowTeam(user, "marketing")));
-  const canSeeSamp = Boolean(user && (admin || hasWorkflowTeam(user, "samp")));
-  const canSeeCreativeStudio = Boolean(user && (admin || hasWorkflowTeam(user, "creative_studio")));
-  const canSeeCosting = Boolean(user && (admin || hasWorkflowTeam(user, "costing")));
-  const canSeePlant = Boolean(user && (admin || hasWorkflowTeam(user, "plant")));
+  const rootAdmin = isRootAdmin(user);
+  const assignedTeam = getAssignedWorkflowTeam(user);
+  const assignedWorkspaceTeam = getAssignedWorkspaceTeam(user);
+  const canSeeMarketing = Boolean(user && (rootAdmin || assignedTeam === "marketing" || hasWorkflowTeam(user, "marketing")));
+  const canSeeSamp = Boolean(user && (rootAdmin || assignedTeam === "samp" || hasWorkflowTeam(user, "samp")));
+  const canSeeCreativeStudio = Boolean(user && (rootAdmin || assignedTeam === "creative_studio" || hasWorkflowTeam(user, "creative_studio")));
+  const canSeeCosting = Boolean(user && (rootAdmin || assignedTeam === "costing" || hasWorkflowTeam(user, "costing")));
+  const canSeePlant = Boolean(user && (rootAdmin || assignedTeam === "plant" || hasWorkflowTeam(user, "plant")));
 
   // Sidebar width collapsed rail state (persisted in localStorage)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -93,20 +111,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => clearTimeout(timer);
   }, [isCollapsed]);
 
-  // Single active accordion state: only ONE team is expanded at a time!
-  // When switching from Marketing to Creative, Marketing automatically collapses.
-  const [expandedSection, setExpandedSection] = useState<string | null>("marketing");
+  // Start with the signed-in user's active workspace expanded.
+  const [expandedSection, setExpandedSection] = useState<string | null>(() => {
+    for (const group of navigationGroups) {
+      const activeItem = group.items
+        .filter((item) => Boolean(item.subItems?.length || item.subTeams?.length))
+        .filter((item) => [item.path, ...(item.aliases ?? [])].some(
+          (path) => selectedPath === path || selectedPath.startsWith(`${path}/`),
+        ))
+        .sort((a, b) => b.path.length - a.path.length)[0];
+      if (activeItem) return activeItem.id;
+    }
+    return null;
+  });
 
   const isItemActive = (item: NavigationItem) => {
-    if (selectedPath === item.path) return true;
-    if (selectedPath.startsWith(`${item.path}/`)) return true;
-    if (
-      item.aliases &&
-      item.aliases.some(
-        (alias) => selectedPath === alias || selectedPath.startsWith(`${alias}/`)
-      )
-    ) return true;
-    return false;
+    const itemPaths = [item.path, ...(item.aliases ?? [])];
+    if (itemPaths.some((path) => selectedPath === path)) return true;
+
+    const matchedItemPaths = itemPaths.filter((path) => selectedPath.startsWith(`${path}/`));
+    if (!matchedItemPaths.length) return false;
+
+    const ownDepth = Math.max(...matchedItemPaths.map((path) => path.length));
+    const siblingDepth = navigationGroups
+      .flatMap((group) => group.items)
+      .filter((candidate) => candidate.id !== item.id)
+      .flatMap((candidate) => [candidate.path, ...(candidate.aliases ?? [])])
+      .filter((path) => selectedPath === path || selectedPath.startsWith(`${path}/`))
+      .reduce((depth, path) => Math.max(depth, path.length), 0);
+
+    return siblingDepth <= ownDepth;
   };
 
   const isSubItemActive = (sub: NavigationSubItem, parent: NavigationItem) => {
@@ -203,11 +237,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleItemClick = (item: NavigationItem) => {
     if (isCollapsed) {
-      setIsCollapsed(false);
-      try {
-        localStorage.setItem("samp_sidebar_collapsed", "false");
-      } catch {}
-      setExpandedSection(item.id);
       onSelectPath(item.path);
       if (onCloseMobile) onCloseMobile();
       return;
@@ -243,7 +272,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .join("")
     .toUpperCase();
 
-  const roleLabel = isAdmin(user) ? "Admin" : user?.team || user?.sub_role || user?.role || "Member";
+  const roleLabel = isAdmin(user)
+    ? assignedWorkspaceTeam
+      ? `${assignedWorkspaceTeam.charAt(0).toUpperCase() + assignedWorkspaceTeam.slice(1)} Admin`
+      : isRootAdmin(user)
+        ? "Root Admin"
+        : `${user?.team || "Team"} Admin`
+    : user?.team || user?.sub_role || user?.role || "Member";
 
   const renderNavContent = (isDrawer = false) => {
     const compact = isCollapsed && !isDrawer;
@@ -325,7 +360,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   const active = isItemActive(item);
                   const isExpanded = expandedSection === item.id;
                   const IconComponent = ITEM_ICONS[item.id] || ITEM_ICONS[item.departmentKey];
-                  const badgeValue = dynamicBadges[item.id];
+                  const badgeValue = dynamicBadges[item.badgeKey || item.id];
                   const hasSubItems = Boolean(item.subItems && item.subItems.length > 0);
                   const hasSubTeams = Boolean(!item.subItems && item.subTeams && item.subTeams.length > 0);
 
@@ -342,6 +377,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             handleItemClick(item);
                           }
                         }}
+                        title={compact ? item.title : undefined}
+                        aria-label={item.title}
+                        aria-current={active ? "page" : undefined}
                         className={`w-full flex items-center h-9 rounded-xl cursor-pointer select-none text-left transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-accent)] focus-visible:ring-offset-1 ${
                           compact ? "justify-center px-0" : "px-2.5 gap-2.5"
                         } ${
