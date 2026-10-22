@@ -24,7 +24,6 @@ import {
   Printer,
 } from "lucide-react";
 import type { UserProfile } from "@/features/auth";
-import { hasWorkflowTeam } from "@/features/auth/permissions";
 import {
   claimCostingWorkflowApi,
   completeCostingWorkflowApi,
@@ -1009,8 +1008,8 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
                           <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Customer Account</span>
                           <p className="text-xs font-semibold text-[var(--on-surface)]">{record.customer || "Commercial Account"}</p>
-                          {requestData.customer_product_code && (
-                            <p className="text-[11px] text-[var(--on-surface-muted)]">SKU: {requestData.customer_product_code}</p>
+                          {Boolean(requestData.customer_product_code) && (
+                            <p className="text-[11px] text-[var(--on-surface-muted)]">SKU: {String(requestData.customer_product_code)}</p>
                           )}
                         </div>
 
@@ -1018,13 +1017,13 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                           <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Target Quotation Due</span>
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--on-surface)]">
                             <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>{formatDate(record.due_date || requestData.due_date) || "Immediate"}</span>
+                            <span>{formatDate(String(record.due_date || requestData.due_date || "")) || "Immediate"}</span>
                           </div>
                         </div>
 
                         <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
                           <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Target Substrate / Material</span>
-                          <p className="text-xs font-mono font-bold text-[var(--on-surface)]">{record.material_code || requestData.material_code || "Custom Substrate"}</p>
+                          <p className="text-xs font-mono font-bold text-[var(--on-surface)]">{String(record.material_code || requestData.material_code || "Custom Substrate")}</p>
                         </div>
                       </div>
 

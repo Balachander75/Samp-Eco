@@ -128,6 +128,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const [isCounterDateModalOpen, setIsCounterDateModalOpen] = useState(false);
   const [localOverride, setLocalOverride] = useState<SampleRequestItem | null>(null);
   const [slaClockNow, setSlaClockNow] = useState(() => Date.now());
+  const [localClosed, setLocalClosed] = useState(false);
+  const [closureData, setClosureData] = useState<any>((request as any)?.closure || null);
   const requestUpdatedAtRef = useRef(request?.updatedAt);
 
   useEffect(() => {
@@ -138,6 +140,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     setSelectedFollowupDesigns({ mockup: [], sample: [] });
     setFollowupError(null);
     setMockupHandoffDialog(null);
+    setLocalClosed(false);
+    setClosureData((request as any)?.closure || null);
     requestUpdatedAtRef.current = request?.updatedAt;
   }, [request?.id]);
 
@@ -317,7 +321,37 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     };
   }, [isOpen, activeRequest?.requestCode, activeRequest?.requestCodes, effectiveDesignId]);
 
+  // Synchronize request closure events from window dispatch
+  useEffect(() => {
+    const handleClosed = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+      const targetId = detail?.requestId;
+      if (
+        detail &&
+        targetId &&
+        (String(targetId) === String(request?.id) ||
+         String(targetId) === String(request?.designRequestId) ||
+         String(targetId) === String(activeRequest?.id) ||
+         String(targetId) === String(activeRequest?.designRequestId) ||
+         (effectiveDesignId != null && String(targetId) === String(effectiveDesignId)))
+      ) {
+        setLocalClosed(true);
+        if (detail.closure) setClosureData(detail.closure);
+      }
+    };
+    window.addEventListener("app:request-closed", handleClosed);
+    return () => window.removeEventListener("app:request-closed", handleClosed);
+  }, [request?.id, request?.designRequestId, activeRequest?.id, activeRequest?.designRequestId, effectiveDesignId]);
+
   const activeStage = useMemo(() => getDesignStageIndex(activeRequest), [activeRequest]);
+  const isClosed = Boolean(
+    localClosed ||
+    activeStage === 3 ||
+    activeRequest?.status === "Closed" ||
+    Boolean((activeRequest as any)?.is_closed) ||
+    closureData != null
+  );
   const isRemainingRequested = Boolean(
     activeRequest?.marketingDesignDecision === "remaining_requested" ||
     String(activeRequest?.designRequestStatus || activeRequest?.status || "").toLowerCase().includes("remaining requested")
@@ -344,6 +378,19 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const remainingCount = useMemo(() => {
     return Math.max(0, requestedCount - deliveredCount);
   }, [requestedCount, deliveredCount]);
+
+  const availableDesigns: DesignFollowupArtwork[] = useMemo(() => {
+    return (submissions || []).flatMap((batch: any) =>
+      (Array.isArray(batch?.rows) ? batch.rows : []).map((row: any, index: number) => ({
+        designNumber: String(row.designNumber || `D${index + 1}`),
+        description: String(row.description || ""),
+        shutterstockNo: String(row.shutterstockNo || ""),
+        remarks: String(row.remarks || ""),
+        designFileUrl: String(batch.designFileUrl || ""),
+        submittedAt: String(batch.submittedAt || ""),
+      }))
+    );
+  }, [submissions]);
 
   useEffect(() => {
     setShowSubmitForm(false);
@@ -1019,43 +1066,10 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     }
   };
 
-  if (!isOpen || !activeRequest) return null;
-
-  const designRequestId = Number(
-    activeRequest.designRequestId || String(activeRequest.id).replace(/^design-/, "")
-  );
-  const [localClosed, setLocalClosed] = useState(false);
-  const [closureData, setClosureData] = useState<any>((activeRequest as any)?.closure || null);
-
-  useEffect(() => {
-    const handleClosed = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const detail = customEvent.detail;
-      if (
-        detail &&
-        (String(detail.requestId) === String(activeRequest.id) ||
-         String(detail.requestId) === String(activeRequest.designRequestId) ||
-         String(detail.requestId) === String(designRequestId))
-      ) {
-        setLocalClosed(true);
-        if (detail.closure) setClosureData(detail.closure);
-      }
-    };
-    window.addEventListener("app:request-closed", handleClosed);
-    return () => window.removeEventListener("app:request-closed", handleClosed);
-  }, [activeRequest.id, activeRequest.designRequestId, designRequestId]);
-
   const isAwaitingReview =
-    activeRequest.marketingDesignDecision === "awaiting_marketing_review" ||
+    activeRequest?.marketingDesignDecision === "awaiting_marketing_review" ||
     activeStage === 2;
-  const isClosed = Boolean(
-    localClosed ||
-    activeStage === 3 ||
-    activeRequest.status === "Closed" ||
-    Boolean((activeRequest as any)?.is_closed) ||
-    closureData != null
-  );
-  const isAcceptedByMarketing = mode === "marketing" && activeRequest.marketingDesignDecision === "accepted";
+  const isAcceptedByMarketing = mode === "marketing" && activeRequest?.marketingDesignDecision === "accepted";
   const canSubmitCreativeOutput = Boolean(
     mode === "creative" &&
     isCreativeUser &&
@@ -1067,23 +1081,13 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     !isClosed &&
     remainingCount > 0
   );
-  const includedFollowups = (activeRequest.requestTypes || []) as string[];
-  const availableDesigns: DesignFollowupArtwork[] = (activeRequest.creativeSubmissions || []).flatMap((batch: any) =>
-    (Array.isArray(batch?.rows) ? batch.rows : []).map((row: any, index: number) => ({
-      designNumber: String(row.designNumber || `D${index + 1}`),
-      description: String(row.description || ""),
-      shutterstockNo: String(row.shutterstockNo || ""),
-      remarks: String(row.remarks || ""),
-      designFileUrl: String(batch.designFileUrl || ""),
-      submittedAt: String(batch.submittedAt || ""),
-    })),
-  );
+  const includedFollowups = (activeRequest?.requestTypes || []) as string[];
   const isCounterDatePending = Boolean(
-    activeRequest.isCounterDateActive || activeRequest.counterDateDecision === "pending"
+    activeRequest?.isCounterDateActive || activeRequest?.counterDateDecision === "pending"
   );
   const isCreator = Boolean(
-    (activeRequest.createdByUserId && currentUser?.id && Number(activeRequest.createdByUserId) === Number(currentUser.id)) ||
-    (activeRequest.createdBy && (
+    (activeRequest?.createdByUserId && currentUser?.id && Number(activeRequest.createdByUserId) === Number(currentUser.id)) ||
+    (activeRequest?.createdBy && (
       (currentUser?.userid && activeRequest.createdBy.toLowerCase() === currentUser.userid.toLowerCase()) ||
       (currentUser?.name && activeRequest.createdBy.toLowerCase() === currentUser.name.toLowerCase())
     ))
@@ -1093,6 +1097,14 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     !isReadOnlyTeamHead(currentUser) && (isGlobalAdmin || (isMarketingUser && isCreator))
   );
   const canCloseInspector = !isSubmittingOutput && !isDeciding && !isAddingFollowups;
+
+  const designRequestId = Number(
+    effectiveDesignId ||
+    activeRequest?.designRequestId ||
+    String(activeRequest?.id || "").replace(/^design-/, "")
+  ) || 0;
+
+  if (!isOpen || !activeRequest) return null;
 
   return createPortal(
     <div

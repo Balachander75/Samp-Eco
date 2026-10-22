@@ -24,9 +24,9 @@ import {
   X,
   ZoomIn,
   FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 import type { UserProfile } from "@/features/auth";
-import { hasWorkflowTeam, isAdmin as isAdminUser } from "@/features/auth/permissions";
 import { reviewRequestWorkflowApi, type RequestWorkflowRecord } from "@/infrastructure/api";
 import { claimMockupRequestApi, fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
 import {
@@ -838,23 +838,23 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Required Due Date</span>
                         <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--on-surface)]">
                           <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>{formatDate(record.due_date || data.requiredDate || requestData.due_date) || "Immediate"}</span>
+                          <span>{formatDate(String(record.due_date || data.requiredDate || requestData.due_date || "")) || "Immediate"}</span>
                         </div>
                       </div>
 
                       <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Deliverable Quantity</span>
-                        <p className="text-xs font-semibold text-[var(--on-surface)]">Mockup: <strong className="font-mono text-[var(--accent-primary)] font-bold">{requestData.qty_for_mockup || data.qty_for_mockup || 1}</strong> pcs</p>
+                        <p className="text-xs font-semibold text-[var(--on-surface)]">Mockup: <strong className="font-mono text-[var(--accent-primary)] font-bold">{String(requestData.qty_for_mockup || data.qty_for_mockup || 1)}</strong> pcs</p>
                       </div>
 
                       <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Material / Reference</span>
-                        <p className="text-xs font-mono font-bold text-[var(--on-surface)]">{record.material_code || requestData.material_code || "Custom Mockup"}</p>
+                        <p className="text-xs font-mono font-bold text-[var(--on-surface)]">{String(record.material_code || requestData.material_code || "Custom Mockup")}</p>
                       </div>
 
                       <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Category Taxonomy</span>
-                        <p className="text-xs font-semibold text-[var(--on-surface)]">{record.product_category || "Paper Stationery"}</p>
+                        <p className="text-xs font-semibold text-[var(--on-surface)]">{String(record.product_category || "Paper Stationery")}</p>
                       </div>
                     </div>
 

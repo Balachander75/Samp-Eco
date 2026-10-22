@@ -31,11 +31,13 @@ export interface RequestWorkflowRecord {
   closed_at?: string | null;
   created_by?: string | null;
   created_by_user_id?: number | null;
-  request_data?: Record<string, unknown>;
+  due_date?: string | null;
+  product_category?: string | null;
+  request_data?: Record<string, any>;
   costing_creative_input_needed?: boolean;
   costing_creative_input_remark?: string | null;
   creative_due_at?: string | null;
-  workflow_data?: Record<string, unknown>;
+  workflow_data?: Record<string, any>;
   costing_output_path?: string | null;
   costing_notes?: string | null;
   reviewer_status: string;

@@ -401,6 +401,8 @@ export interface DesignFollowupSelection {
 
 export interface MockupWorkflowState {
   stage: "marketing" | "awaiting_design_acceptance" | "creative" | "studio" | "creative_approval" | "sampling_review" | "awaiting_marketing_acceptance" | "awaiting_marketing_direction" | "done" | string;
+  is_closed?: boolean;
+  closure?: any;
   designNeeded?: boolean;
   isResample?: boolean;
   creativeBypassed?: boolean;

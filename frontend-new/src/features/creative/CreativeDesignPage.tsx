@@ -105,6 +105,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       createdDate: string;
       proofStatus: CreativeBriefItem["proofStatus"];
       isBrief: boolean;
+      isClosed?: boolean;
       rawBrief?: CreativeBriefItem;
       rawReq?: SampleRequestItem;
     }> = [];
@@ -124,6 +125,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
         createdDate: (b as any).createdAt || (b as any).dateRequestCreated || "",
         proofStatus: b.proofStatus,
         isBrief: true,
+        isClosed: false,
         rawBrief: b,
       });
     });
