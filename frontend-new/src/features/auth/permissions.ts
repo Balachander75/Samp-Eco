@@ -71,7 +71,7 @@ export function canAccessWorkspacePath(user: UserProfile, rawPath: string): bool
   }
 
   const assignedTeam = getAssignedWorkflowTeam(user);
-  if (path === "/team-work/feasibility") return ["plant", "creative_studio", "costing"].includes(assignedTeam || "");
+  if (path === "/team-work/feasibility") return ["creative_studio", "costing"].includes(assignedTeam || "");
   if (path === "/team-work/programs") return ["creative_studio", "costing"].includes(assignedTeam || "");
   const hasTeam = (team: WorkflowTeam) => assignedTeam === team || hasWorkflowTeam(user, team);
 

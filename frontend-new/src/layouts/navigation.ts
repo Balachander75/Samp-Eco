@@ -334,14 +334,16 @@ export function getNavigationGroupsForUser(user: UserProfile): NavigationGroup[]
       departmentKey: "samp",
       subItems: "subItems" in sampleRoute ? [...sampleRoute.subItems] : undefined,
     },
-    {
-      id: "team-feasibility",
-      title: "Feasibility Checks",
-      shortCode: "FC",
-      path: feasibilityPath,
-      badgeKey: workflowTeam === "samp" ? "sampFeasibility" : undefined,
-      departmentKey: "samp",
-    },
+    ...(team !== "plant"
+      ? [{
+          id: "team-feasibility",
+          title: "Feasibility Checks",
+          shortCode: "FC",
+          path: feasibilityPath,
+          badgeKey: workflowTeam === "samp" ? "sampFeasibility" : undefined,
+          departmentKey: "samp",
+        }]
+      : []),
     {
       id: "team-program-planning",
       title: "Program Planning",
