@@ -16,7 +16,8 @@ import {
 export interface SidebarBadgeAccess {
   marketing: boolean;
   samp: boolean;
-  creativeStudio: boolean;
+  creative: boolean;
+  studio: boolean;
   costing: boolean;
   plant: boolean;
 }
@@ -142,7 +143,7 @@ function safeLoad<T>(load: () => Promise<T[]>, enabled: boolean): Promise<T[]> {
 }
 
 export async function fetchSidebarBadges(year: string, access: SidebarBadgeAccess): Promise<Record<string, number>> {
-  const needsMarketingSampling = access.marketing || access.creativeStudio;
+  const needsMarketingSampling = access.marketing || access.creative;
   const needsFeasibility = access.marketing || access.samp;
   const needsPrograms = access.marketing || access.samp || access.plant;
 
@@ -151,9 +152,9 @@ export async function fetchSidebarBadges(year: string, access: SidebarBadgeAcces
     safeLoad(() => fetchFeasibilityRequestsApi({ year }), needsFeasibility),
     safeLoad(() => fetchProgramRequestsApi(year), needsPrograms),
     safeLoad(() => fetchSamplingWorkflowReviewsApi(year), access.samp),
-    safeLoad(() => fetchCreativeBriefsApi(), access.creativeStudio),
-    safeLoad(() => fetchCostingWorkflowsApi(year, "creative"), access.creativeStudio),
-    safeLoad(() => fetchSampleRequestsApi(year, false, "mockup"), access.creativeStudio),
+    safeLoad(() => fetchCreativeBriefsApi(), access.creative),
+    safeLoad(() => fetchCostingWorkflowsApi(year, "creative"), access.creative),
+    safeLoad(() => fetchSampleRequestsApi(year, false, "mockup"), access.studio),
     safeLoad(() => fetchPlantSamplingQueueApi(year), access.plant),
     safeLoad(() => fetchCostingWorkflowsApi(year), access.costing),
   ]);
@@ -178,17 +179,17 @@ export async function fetchSidebarBadges(year: string, access: SidebarBadgeAcces
     : 0;
   const plantSamplingCount = access.plant ? plantSampling.length : 0;
 
-  const creativeDesignCount = access.creativeStudio
+  const creativeDesignCount = access.creative
     ? marketingSampling.filter(isCreativeDesignRequest).length
       + creativeBriefs.filter(isPendingCreativeBrief).length
     : 0;
-  const creativeSamplingCount = access.creativeStudio
+  const creativeSamplingCount = access.creative
     ? marketingSampling.filter(isCreativeSamplingRequest).length
     : 0;
-  const creativeCostingCount = access.creativeStudio
+  const creativeCostingCount = access.creative
     ? creativeCosting.filter((record) => record.workflow_type === "costing" && record.current_stage === "creative").length
     : 0;
-  const studioQueueCount = access.creativeStudio
+  const studioQueueCount = access.studio
     ? studioRequests.filter(isPendingStudioRequest).length
     : 0;
   const costingQueueCount = access.costing
@@ -202,11 +203,13 @@ export async function fetchSidebarBadges(year: string, access: SidebarBadgeAcces
       pendingFeas: marketingFeasibilityCount,
       programs: programCount,
     }),
-    ...(access.creativeStudio && {
+    ...(access.creative && {
       creative: creativeDesignCount + creativeSamplingCount + creativeCostingCount,
       creativeDesign: creativeDesignCount,
       creativeSampling: creativeSamplingCount,
       creativeCosting: creativeCostingCount,
+    }),
+    ...(access.studio && {
       studio: studioQueueCount,
       studioMockup: studioQueueCount,
       studioSampling: studioQueueCount,

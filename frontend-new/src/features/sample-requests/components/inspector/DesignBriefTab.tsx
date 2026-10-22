@@ -46,12 +46,14 @@ export interface DesignBriefTabProps {
   activeRequest: SampleRequestItem;
   references: DesignReferenceAsset[];
   onPreviewImage: (url: string) => void;
+  mode?: "marketing" | "creative" | "sampling";
 }
 
 export const DesignBriefTab: React.FC<DesignBriefTabProps> = React.memo(({
   activeRequest,
   references,
   onPreviewImage,
+  mode = "marketing",
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [imageErrorMap, setImageErrorMap] = useState<Record<string, boolean>>({});
@@ -111,10 +113,10 @@ export const DesignBriefTab: React.FC<DesignBriefTabProps> = React.memo(({
             {/* Box 1: Assigned Designer */}
             <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] flex flex-col justify-between gap-1 shadow-2xs">
               <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--on-surface-subtle)] font-semibold">
-                Designer
+                {mode === "sampling" ? "Sampling Reviewer" : "Designer"}
               </span>
               <div className="font-sans font-bold text-xs truncate text-[var(--on-surface)]">
-                {activeRequest.claimedBy || (
+                {(mode === "sampling" ? activeRequest.samplingClaimedBy : activeRequest.claimedBy) || (
                   <span className="text-[var(--on-surface-subtle)] font-normal italic">Pending Assignment</span>
                 )}
               </div>

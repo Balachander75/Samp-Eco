@@ -43,6 +43,10 @@ function draftKeyFor(item: StagedProductItem, user?: UserProfile | null): string
   return `samp-draft:${owner}:${item.id}`.slice(0, 160);
 }
 
+function isSampleRequestNotFoundError(error: unknown): boolean {
+  return error instanceof Error && /sample request not found/i.test(error.message);
+}
+
 async function linkStagedFeasibilityRequest(
   items: StagedProductItem[],
   context?: ProgramContextData | null,
@@ -396,24 +400,42 @@ export async function autoSaveStagedProductsToDraft(
       costingCreativeInputRemark: prod.costingCreativeInputNeeded ? prod.costingCreativeInputRemark?.trim() || undefined : undefined,
     };
 
+    const createAndRecordDraft = async () => {
+      const created = await createSampleRequestApi(payload);
+      if (!created) throw new Error("A staged product could not be saved.");
+      prod.savedRequestId = created.id;
+      prod.savedSrNumber = created.srNumber;
+      if (index === 0) {
+        firstSavedId = created.id;
+        firstSavedSr = created.srNumber;
+      }
+    };
+
     try {
       if (prod.savedRequestId) {
-        const updated = await updateSampleRequestApi(prod.savedRequestId, payload);
-        if (!updated) throw new Error("The saved draft could not be updated.");
-      } else if (index === 0 && programContext?.parentRequestId) {
-        const updated = await updateSampleRequestApi(programContext.parentRequestId, payload);
-        if (!updated) throw new Error("The sampling request could not be updated with the first product.");
-        prod.savedRequestId = programContext.parentRequestId;
-        prod.savedSrNumber = programContext.parentSrNumber;
-      } else {
-        const created = await createSampleRequestApi(payload);
-        if (!created) throw new Error("A staged product could not be saved.");
-        prod.savedRequestId = created.id;
-        prod.savedSrNumber = created.srNumber;
-        if (index === 0) {
-          firstSavedId = created.id;
-          firstSavedSr = created.srNumber;
+        try {
+          const updated = await updateSampleRequestApi(prod.savedRequestId, payload);
+          if (!updated) throw new Error("The saved draft could not be updated.");
+        } catch (err) {
+          if (!isSampleRequestNotFoundError(err)) throw err;
+          console.warn(`Staged draft ${prod.savedRequestId} no longer exists; creating a replacement draft.`);
+          prod.savedRequestId = undefined;
+          prod.savedSrNumber = undefined;
+          await createAndRecordDraft();
         }
+      } else if (index === 0 && programContext?.parentRequestId) {
+        try {
+          const updated = await updateSampleRequestApi(programContext.parentRequestId, payload);
+          if (!updated) throw new Error("The sampling request could not be updated with the first product.");
+          prod.savedRequestId = programContext.parentRequestId;
+          prod.savedSrNumber = programContext.parentSrNumber;
+        } catch (err) {
+          if (!isSampleRequestNotFoundError(err)) throw err;
+          console.warn(`Parent sample request ${programContext.parentRequestId} no longer exists; creating a replacement draft.`);
+          await createAndRecordDraft();
+        }
+      } else {
+        await createAndRecordDraft();
       }
       prod.isDraftSaved = true;
       savedCount++;

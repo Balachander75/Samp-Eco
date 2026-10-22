@@ -3,6 +3,7 @@ import { SampleRequestItem } from "../../types";
 import { formatOdooDate } from "../../utils/dateUtils";
 import { ArrowRight } from "lucide-react";
 import { indiaDateKey, operationalWorkdaysBetween } from "@/lib/operationalWorkdays";
+import { TaskClaimBanner } from "@/components/ui/TaskClaimBanner";
 
 const formatRelativeTime = (timestamp?: string): string => {
   if (!timestamp) return "";
@@ -76,6 +77,13 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
     String(activeRequest.status || "").toLowerCase().includes("closed")
   );
   const isClaimed = Boolean(activeRequest.takenBySamp);
+  const isClaimedByCurrentUser = Boolean(
+    activeRequest.takenBySamp && (
+      activeRequest.takenBySampUserId != null && currentUserId != null
+        ? String(activeRequest.takenBySampUserId) === String(currentUserId)
+        : Boolean(currentUserName && activeRequest.takenBySamp.trim().toLowerCase() === currentUserName.trim().toLowerCase())
+    )
+  );
   const canClaim = Boolean(!isClosed && canEvaluateTechnical && !activeRequest.takenBySamp && !activeRequest.samplingFeasibilityResponse);
 
   return (
@@ -161,6 +169,15 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
           )}
         </div>
       </div>
+      {isClaimed && (
+        <TaskClaimBanner
+          claimedBy={activeRequest.takenBySamp}
+          claimedAt={activeRequest.takenAtSamp}
+          isClaimedByCurrentUser={isClaimedByCurrentUser}
+          compact
+          className="mt-3"
+        />
+      )}
     </div>
   );
 };

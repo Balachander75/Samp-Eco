@@ -38,8 +38,6 @@ def require_department(current_user, department: str):
 def _require_request_visibility(request: Dict[str, Any], current_user) -> None:
     if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user) and request.get("created_by_user_id") != current_user.id:
         raise HTTPException(status_code=404, detail="Feasibility request was not found")
-    if user_has_team(current_user, "samp") and not is_admin(current_user) and not is_team_head(current_user) and request.get("taken_by_samp_user_id") not in (None, current_user.id):
-        raise HTTPException(status_code=404, detail="Feasibility request was not found")
 
 
 @router.get("", response_model=List[FeasibilityRequestOut], summary="List feasibility requests")
@@ -58,16 +56,13 @@ def list_feasibility_requests(
         if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user)
         else None
     )
-    visible_samp_user_id = (
-        current_user.id
-        if user_has_team(current_user, "samp") and not is_admin(current_user) and not is_team_head(current_user)
-        else None
-    )
     rows = service.list_requests(
         status_filter=status_filter,
         year=year,
         created_by_user_id=created_by_user_id,
-        visible_samp_user_id=visible_samp_user_id,
+        # Claimed work remains visible to every eligible SAMP teammate. The
+        # claim controls write access; it must never remove the row from view.
+        visible_samp_user_id=None,
         offset=offset,
         limit=limit,
         before_id=before_id,

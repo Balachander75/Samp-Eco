@@ -30,6 +30,7 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
   const [brand, setBrand] = useState(item.brandName || "");
   const [sku, setSku] = useState(item.customerProductCode || "");
   const [sampleQty, setSampleQty] = useState(String(item.qtyForSampling || "1"));
+  const [sampleDate, setSampleDate] = useState(item.sampleRequiredDate || "");
   const [unitPcPack, setUnitPcPack] = useState(item.unitPcPack || "PC");
   const [qtyPerPack, setQtyPerPack] = useState(String(item.qtyPerPack || (item.unitPcPack === "Pack" ? "" : "1")));
   const [sampleType, setSampleType] = useState(item.samplingMetadata?.sampleType || "full");
@@ -68,8 +69,16 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
         setError("Enter a whole-number sample quantity (minimum 1).");
         return;
       }
+      if (hasSample && !sampleDate.trim()) {
+        setError("Choose a required date for the Sampling request.");
+        return;
+      }
       if (hasCosting && (!Number.isInteger(Number(costingQty)) || Number(costingQty) < 1)) {
         setError("Enter a whole-number costing quantity (minimum 1).");
+        return;
+      }
+      if (hasCosting && !costingDate.trim()) {
+        setError("Choose a required date for Costing.");
         return;
       }
       await onSave({
@@ -82,8 +91,8 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
           unitPcPack,
           qtyPerPack: unitPcPack === "Pack" ? qtyPerPack.trim() : "1",
         }),
-        ...(hasSample && { qtyForSampling: sampleQty.trim() }),
-        ...(hasCosting && { qtyDesignCosting: costingQty.trim() }),
+        ...(hasSample && { qtyForSampling: sampleQty.trim(), sampleRequiredDate: sampleDate }),
+        ...(hasCosting && { qtyDesignCosting: costingQty.trim(), costingRequiredDate: costingDate }),
         mockupMetadata: {
           ...item.mockupMetadata,
           designNeeded: designNeeded === true,
@@ -113,6 +122,10 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
     }
     if (hasSample && (!Number.isInteger(Number(sampleQty)) || Number(sampleQty) < 1)) {
       setError("Enter a whole-number sample quantity (minimum 1).");
+      return;
+    }
+    if (hasSample && !sampleDate.trim()) {
+      setError("Choose a required date for the Sampling request.");
       return;
     }
     if (hasSample && sampleType === "partial" && !partialRequirements.trim()) {
@@ -154,6 +167,7 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
       }),
       ...(hasSample && {
         qtyForSampling: sampleQty.trim(),
+        sampleRequiredDate: sampleDate,
         samplingMetadata: {
           ...item.samplingMetadata,
           searchMode: item.samplingMetadata?.searchMode || (item.creationMode === "binding" || item.creationMode === "material_code" ? item.creationMode : "new"),
@@ -188,9 +202,10 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
             <>
               <section className={`${sectionClass} border-l-2 border-l-[var(--accent-primary)]`}>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <label className={labelClass}>Mockup quantity<input type="number" min="1" step="1" value={mockupQty} onChange={(event) => setMockupQty(event.target.value)} className={fieldClass} autoFocus /></label>
+                  <label className={labelClass}>Mockup quantity<input type="number" required min="1" step="1" value={mockupQty} onChange={(event) => setMockupQty(event.target.value)} className={fieldClass} autoFocus /></label>
                   <OperationalDatePicker
                     label="Mockup required date *"
+                    required
                     value={mockupDate}
                     onChange={setMockupDate}
                     placeholder="Select required date..."
@@ -206,8 +221,10 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
                   {hasCosting && <label className={labelClass}>Barcode<input value={barcode} onChange={(event) => setBarcode(event.target.value)} placeholder="Barcode" className={fieldClass} /></label>}
                   {(hasSample || hasCosting) && <label className={labelClass}>Unit<select value={unitPcPack} onChange={(event) => { setUnitPcPack(event.target.value); setQtyPerPack(event.target.value === "PC" ? "1" : ""); }} className={fieldClass}><option value="PC">PC</option><option value="Pack">Pack</option></select></label>}
                   {(hasSample || hasCosting) && unitPcPack === "Pack" && <label className={labelClass}>Pieces per pack *<input type="number" min="1" step="1" value={qtyPerPack} onChange={(event) => setQtyPerPack(event.target.value)} className={fieldClass} /></label>}
-                  {hasSample && <label className={labelClass}>Sampling quantity<input type="number" min="1" step="1" value={sampleQty} onChange={(event) => setSampleQty(event.target.value)} className={fieldClass} /></label>}
-                  {hasCosting && <label className={labelClass}>Costing quantity<input type="number" min="1" step="1" value={costingQty} onChange={(event) => setCostingQty(event.target.value)} className={fieldClass} /></label>}
+                  {hasSample && <label className={labelClass}>Sampling quantity<input type="number" required min="1" step="1" value={sampleQty} onChange={(event) => setSampleQty(event.target.value)} className={fieldClass} /></label>}
+                  {hasSample && <OperationalDatePicker label="Sample required date" required value={sampleDate} onChange={(value) => { setSampleDate(value); setError(""); }} placeholder="Select required date..." calendarAlign="left" />}
+                  {hasCosting && <label className={labelClass}>Costing quantity<input type="number" required min="1" step="1" value={costingQty} onChange={(event) => setCostingQty(event.target.value)} className={fieldClass} /></label>}
+                  {hasCosting && <OperationalDatePicker label="Costing required date" required value={costingDate} onChange={(value) => { setCostingDate(value); setError(""); }} placeholder="Select required date..." calendarAlign="left" />}
                 </div>
               </section>
               <section className={sectionClass}>
@@ -222,11 +239,11 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
                 {designNeeded === false && <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label className={labelClass}>Shutterstock / stock number<input value={stockNumber} onChange={(event) => setStockNumber(event.target.value)} placeholder="Enter stock number" className={fieldClass} /></label>
                   <label className={labelClass}>Marketing remark<input value={mockupRemark} onChange={(event) => setMockupRemark(event.target.value)} placeholder="Add reference notes for Studio" className={fieldClass} /></label>
-                  <p className="sm:col-span-2 text-[10px] text-emerald-600 font-medium">No new design needed: Creative is bypassed. Enter a Shutterstock number or remark for Studio CAD.</p>
+                  <p className="sm:col-span-2 text-[10px] text-emerald-600 font-medium">No new design needed: Creative is bypassed. Enter a Shutterstock number or remark for Studio.</p>
                 </div>}
                 {designNeeded === true && <div className="mt-3">
                   <label className={labelClass}>Marketing design brief / remarks (optional)<input value={mockupRemark} onChange={(event) => setMockupRemark(event.target.value)} placeholder="Add design requirements for Creative" className={fieldClass} /></label>
-                  <p className="text-[10px] text-[var(--accent-primary)] font-medium mt-1">Request will route to Creative Studio to prepare artwork before Studio CAD.</p>
+                  <p className="text-[10px] text-[var(--accent-primary)] font-medium mt-1">Request will route to Creative to prepare artwork before Studio.</p>
                 </div>}
               </section>
             </>
@@ -252,9 +269,10 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className={labelClass}>Mockup quantity<input type="number" min="1" step="1" value={mockupQty} onChange={(event) => setMockupQty(event.target.value)} className={fieldClass} /></label>
+                <label className={labelClass}>Mockup quantity<input type="number" required min="1" step="1" value={mockupQty} onChange={(event) => setMockupQty(event.target.value)} className={fieldClass} /></label>
                 <OperationalDatePicker
                   label="Mockup required date *"
+                  required
                   value={mockupDate}
                   onChange={setMockupDate}
                   placeholder="Select required date..."
@@ -274,13 +292,13 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <label className={labelClass}>Shutterstock / stock number<input value={stockNumber} onChange={(event) => setStockNumber(event.target.value)} placeholder="Enter Shutterstock No." className={fieldClass} /></label>
                     <label className={labelClass}>Marketing remark<input value={mockupRemark} onChange={(event) => setMockupRemark(event.target.value)} placeholder="Add reference notes for Studio" className={fieldClass} /></label>
-                    <p className="sm:col-span-2 text-[10px] text-emerald-600 font-medium">No new design needed: Creative is bypassed. Enter a Shutterstock number or remark for Studio CAD.</p>
+                    <p className="sm:col-span-2 text-[10px] text-emerald-600 font-medium">No new design needed: Creative is bypassed. Enter a Shutterstock number or remark for Studio.</p>
                   </div>
                 )}
                 {designNeeded === true && (
                   <div>
                     <label className={labelClass}>Marketing design brief / remarks (optional)<input value={mockupRemark} onChange={(event) => setMockupRemark(event.target.value)} placeholder="Add design requirements for Creative" className={fieldClass} /></label>
-                    <p className="text-[10px] text-[var(--accent-primary)] font-medium mt-1">Request will route to Creative Studio to prepare artwork before Studio CAD.</p>
+                    <p className="text-[10px] text-[var(--accent-primary)] font-medium mt-1">Request will route to Creative to prepare artwork before Studio.</p>
                   </div>
                 )}
               </div>
@@ -294,7 +312,8 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
                 <h3 className="text-xs font-bold text-[var(--on-surface)]">Sampling request</h3>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className={labelClass}>Sample quantity<input type="number" min="1" step="1" value={sampleQty} onChange={(event) => setSampleQty(event.target.value)} className={fieldClass} /></label>
+                <label className={labelClass}>Sample quantity<input type="number" required min="1" step="1" value={sampleQty} onChange={(event) => setSampleQty(event.target.value)} className={fieldClass} /></label>
+                <OperationalDatePicker label="Sample required date" required value={sampleDate} onChange={(value) => { setSampleDate(value); setError(""); }} placeholder="Select required date..." calendarAlign="left" />
                 <label className={labelClass}>Sample type<select value={sampleType} onChange={(event) => setSampleType(event.target.value as "full" | "partial")} className={fieldClass}><option value="full">Full sample</option><option value="partial">Partial sample</option></select></label>
                 {sampleType === "partial" && <label className={`${labelClass} sm:col-span-2`}>Partial sample requirements<textarea value={partialRequirements} onChange={(event) => setPartialRequirements(event.target.value)} rows={2} className="w-full rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 py-2 text-xs text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-subtle)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15" /></label>}
               </div>
@@ -308,7 +327,7 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
                 <h3 className="text-xs font-bold text-[var(--on-surface)]">Costing request</h3>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className={labelClass}>Costing quantity<input type="number" min="1" step="1" value={costingQty} onChange={(event) => setCostingQty(event.target.value)} className={fieldClass} /></label>
+                <label className={labelClass}>Costing quantity<input type="number" required min="1" step="1" value={costingQty} onChange={(event) => setCostingQty(event.target.value)} className={fieldClass} /></label>
                 <OperationalDatePicker
                   label="Costing required date"
                   required

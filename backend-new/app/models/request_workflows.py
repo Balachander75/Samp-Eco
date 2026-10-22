@@ -74,6 +74,7 @@ class CostingWorkflow(Base):
     status = Column(String(64), nullable=False, default="In Progress", server_default="In Progress")
     current_stage = Column(String(32), nullable=False, default="creative", server_default="creative")
     request_data = Column(JSONB, nullable=False, default=dict, server_default="{}")
+    workflow_data = Column(JSONB, nullable=False, default=dict, server_default="{}")
     creative_due_at = Column(DateTime(timezone=True), nullable=True)
     costing_output_path = Column(Text, nullable=True)
     costing_notes = Column(Text, nullable=True)

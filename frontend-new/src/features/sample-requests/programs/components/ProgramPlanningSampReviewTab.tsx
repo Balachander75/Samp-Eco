@@ -13,6 +13,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { updateBatchProgramSampRemarksApi } from "@/infrastructure/api/programsApi";
+import { TaskClaimBanner } from "@/components/ui/TaskClaimBanner";
 
 export interface ProgramPlanningSampReviewTabProps {
   activeRequest: SampleRequestItem;
@@ -46,8 +47,15 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
   // Claim & Ownership Verification
   const claimUserId = activeRequest.samplingClaimedByUserId != null ? String(activeRequest.samplingClaimedByUserId) : null;
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
-  const isClaimed = Boolean(claimUserId);
-  const isClaimedByMe = Boolean(claimUserId && currentUserId && claimUserId === currentUserId);
+  const claimOwner = activeRequest.samplingClaimedBy || null;
+  const isClaimed = Boolean(claimUserId || claimOwner);
+  const isClaimedByMe = Boolean(isClaimed && (
+    claimUserId && currentUserId
+      ? claimUserId === currentUserId
+      : [currentUser?.name, currentUser?.userid].some((value) =>
+          Boolean(value && claimOwner && value.trim().toLowerCase() === claimOwner.trim().toLowerCase())
+        )
+  ));
 
   // Every SAMP response must be submitted by the reviewer who owns the claim.
   const canSubmitReview = isSamplingDesk && !readOnly && isClaimedByMe;
@@ -206,6 +214,9 @@ export const ProgramPlanningSampReviewTab: React.FC<ProgramPlanningSampReviewTab
       </div>
 
       {/* ── Section A: Primary Technical Observation ── */}
+      {isClaimed && (
+        <TaskClaimBanner claimedBy={claimOwner} isClaimedByCurrentUser={isClaimedByMe} compact />
+      )}
       <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-2xs space-y-2.5">
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
           <div>

@@ -70,13 +70,22 @@ export function mapDesignRequest(item: Record<string, unknown>): DesignRequest {
     })),
     marketingDecision: (item.marketing_decision || item.marketingDecision || null) as DesignRequest["marketingDecision"],
     remainingDesignCount: Number(item.remaining_design_count ?? item.remainingDesignCount ?? 0),
+    acceptedDesignNumbers: Array.isArray(workflow.acceptedDesignNumbers ?? workflow.accepted_design_numbers)
+      ? (workflow.acceptedDesignNumbers ?? workflow.accepted_design_numbers).map(String)
+      : [],
     releasedAt: workflow.releasedAt || workflow.released_at || null,
     claimedBy: workflow.claimedBy || workflow.claimed_by || null,
     claimedByUserId: workflow.claimedByUserId == null && workflow.claimed_by_user_id == null
       ? null
       : Number(workflow.claimedByUserId ?? workflow.claimed_by_user_id),
     claimedAt: workflow.claimedAt || workflow.claimed_at || null,
+    samplingClaimedBy: workflow.samplingClaimedBy || workflow.sampling_claimed_by || null,
+    samplingClaimedByUserId: workflow.samplingClaimedByUserId == null && workflow.sampling_claimed_by_user_id == null
+      ? null
+      : Number(workflow.samplingClaimedByUserId ?? workflow.sampling_claimed_by_user_id),
+    samplingClaimedAt: workflow.samplingClaimedAt || workflow.sampling_claimed_at || null,
     isCounterDateActive: Boolean(workflow.isCounterDateActive ?? workflow.is_counter_date_active ?? false),
+    counterDateOriginalTargetDate: workflow.counterDateOriginalTargetDate || workflow.counter_date_original_target_date || null,
     proposedTargetDate: workflow.proposedTargetDate || workflow.proposed_target_date || null,
     counterDateReason: workflow.counterDateReason || workflow.counter_date_reason || null,
     counterDateRequestedAt: workflow.counterDateRequestedAt || workflow.counter_date_requested_at || null,
@@ -127,12 +136,17 @@ export function mapDesignRequestToSampleRequest(item: DesignRequest): SampleRequ
     creativeSubmissions: item.creativeSubmissions,
     marketingDesignDecision: item.marketingDecision,
     remainingDesignCount: item.remainingDesignCount,
+    acceptedDesignNumbers: item.acceptedDesignNumbers || [],
     releasedAt: item.releasedAt,
     designRequestCreatedAt: item.createdAt,
     claimedBy: item.claimedBy,
     claimedByUserId: item.claimedByUserId ?? null,
     claimedAt: item.claimedAt,
+    samplingClaimedBy: item.samplingClaimedBy,
+    samplingClaimedByUserId: item.samplingClaimedByUserId ?? null,
+    samplingClaimedAt: item.samplingClaimedAt,
     isCounterDateActive: item.isCounterDateActive,
+    counterDateOriginalTargetDate: item.counterDateOriginalTargetDate,
     proposedTargetDate: item.proposedTargetDate,
     counterDateReason: item.counterDateReason,
     counterDateRequestedAt: item.counterDateRequestedAt,
@@ -383,10 +397,14 @@ export async function submitCreativeDesignOutputApi(id: number, payload: {
   return mapDesignRequest(data);
 }
 
-export async function recordMarketingDesignDecisionApi(id: number, decision: "accept" | "request_remaining"): Promise<DesignRequest> {
+export async function recordMarketingDesignDecisionApi(
+  id: number,
+  decision: "accept" | "request_remaining",
+  designNumbers?: string[],
+): Promise<DesignRequest> {
   const data = await apiFetch<Record<string, unknown>>(`/api/v1/design-requests/${id}/marketing-decision`, {
     method: "POST",
-    jsonBody: { decision },
+    jsonBody: { decision, design_numbers: designNumbers },
   });
   notifyDesignWorkflowUpdated(id);
   return mapDesignRequest(data);
@@ -419,6 +437,14 @@ export async function claimDesignRequestApi(id: number, designerName: string): P
   return mapDesignRequest(data);
 }
 
+export async function claimSamplingDesignRequestApi(id: number): Promise<DesignRequest> {
+  const data = await apiFetch<Record<string, unknown>>(`/api/v1/design-requests/${id}/sampling-claim`, {
+    method: "POST",
+  });
+  notifyDesignWorkflowUpdated(id);
+  return mapDesignRequest(data);
+}
+
 export async function releaseDesignRequestClaimApi(id: number): Promise<DesignRequest> {
   const data = await apiFetch<Record<string, unknown>>(`/api/v1/design-requests/${id}/claim`, {
     method: "DELETE",
@@ -427,10 +453,24 @@ export async function releaseDesignRequestClaimApi(id: number): Promise<DesignRe
   return mapDesignRequest(data);
 }
 
-export async function proposeDesignCounterDateApi(id: number, proposedDate: string, reason: string, designerName?: string): Promise<DesignRequest> {
+export async function releaseSamplingDesignRequestClaimApi(id: number): Promise<DesignRequest> {
+  const data = await apiFetch<Record<string, unknown>>(`/api/v1/design-requests/${id}/sampling-claim`, {
+    method: "DELETE",
+  });
+  notifyDesignWorkflowUpdated(id);
+  return mapDesignRequest(data);
+}
+
+export async function proposeDesignCounterDateApi(
+  id: number,
+  proposedDate: string,
+  reason: string,
+  designerName?: string,
+  claimType: "creative" | "sampling" = "creative",
+): Promise<DesignRequest> {
   const data = await apiFetch<Record<string, unknown>>(`/api/v1/design-requests/${id}/counter-date-proposal`, {
     method: "POST",
-    jsonBody: { proposed_date: proposedDate, reason, designer_name: designerName },
+    jsonBody: { proposed_date: proposedDate, reason, designer_name: designerName, claim_type: claimType },
   });
   notifyDesignWorkflowUpdated(id);
   return mapDesignRequest(data);
@@ -878,12 +918,17 @@ function mergeSampleAndDesignRequests(
       creativeSubmissions: design.creativeSubmissions,
       marketingDesignDecision: design.marketingDesignDecision,
       remainingDesignCount: design.remainingDesignCount,
+      acceptedDesignNumbers: design.acceptedDesignNumbers || [],
       releasedAt: design.releasedAt,
       designRequestCreatedAt: design.designRequestCreatedAt,
       claimedBy: design.claimedBy,
       claimedByUserId: design.claimedByUserId ?? null,
       claimedAt: design.claimedAt,
+      samplingClaimedBy: design.samplingClaimedBy,
+      samplingClaimedByUserId: design.samplingClaimedByUserId ?? null,
+      samplingClaimedAt: design.samplingClaimedAt,
       isCounterDateActive: design.isCounterDateActive,
+      counterDateOriginalTargetDate: design.counterDateOriginalTargetDate,
       proposedTargetDate: design.proposedTargetDate,
       counterDateReason: design.counterDateReason,
       counterDateRequestedAt: design.counterDateRequestedAt,

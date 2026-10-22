@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { SampleRequestItem } from "../../types";
-import { ArrowRight } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { TaskClaimBanner } from "@/components/ui/TaskClaimBanner";
 
 function formatRelativeTime(timestamp?: string): string {
   if (!timestamp) return "";
@@ -37,17 +37,9 @@ export interface DesignSheetHeaderProps {
   currentUserId?: number;
   isClaimed: boolean;
   claimedBy?: string;
-  isClaimedByCurrentUser?: boolean;
   canClaim: boolean;
   isClaiming: boolean;
   onClaim: () => void;
-  canReleaseClaim: boolean;
-  isReleasingClaim: boolean;
-  onReleaseClaim: () => void;
-  isCounterDatePending: boolean;
-  onCounterDateDecision?: (decision: "accepted" | "rejected", notes?: string) => Promise<void> | void;
-  onOpenCounterDateModal?: () => void;
-  onSelectTab?: (tab: "specs" | "deliverables" | "signoff" | "next_work") => void;
 }
 
 export const DesignSheetHeader: React.FC<DesignSheetHeaderProps> = ({
@@ -57,17 +49,9 @@ export const DesignSheetHeader: React.FC<DesignSheetHeaderProps> = ({
   currentUserId,
   isClaimed,
   claimedBy,
-  isClaimedByCurrentUser: _isClaimedByCurrentUser = false,
   canClaim,
   isClaiming,
   onClaim,
-  canReleaseClaim,
-  isReleasingClaim,
-  onReleaseClaim,
-  isCounterDatePending,
-  onCounterDateDecision,
-  onOpenCounterDateModal,
-  onSelectTab,
 }) => {
   const lastViewer = useMemo(() => {
     const activities = (activeRequest.workflowEvents || activeRequest.activities || []) as any[];
@@ -89,6 +73,17 @@ export const DesignSheetHeader: React.FC<DesignSheetHeaderProps> = ({
     }
     return null;
   }, [activeRequest.workflowEvents, activeRequest.activities, currentUserId, currentUserName]);
+
+  const claimOwnerId = mode === "sampling" ? activeRequest.samplingClaimedByUserId : activeRequest.claimedByUserId;
+  const claimOwnerName = mode === "sampling" ? activeRequest.samplingClaimedBy : activeRequest.claimedBy;
+  const claimTime = mode === "sampling" ? activeRequest.samplingClaimedAt : activeRequest.claimedAt;
+  const isClaimedByCurrentUser = Boolean(
+    claimOwnerName && (
+      claimOwnerId != null && currentUserId != null
+        ? String(claimOwnerId) === String(currentUserId)
+        : Boolean(currentUserName && claimOwnerName.trim().toLowerCase() === currentUserName.trim().toLowerCase())
+    )
+  );
 
   return (
     <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] px-6 sm:px-8 py-3.5">
@@ -119,71 +114,11 @@ export const DesignSheetHeader: React.FC<DesignSheetHeaderProps> = ({
 
         {/* ── Right: Sleek Badges & Compact Actions ── */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          {/* Pending Counter-Date Compact Micro-Pill */}
-          {isCounterDatePending && activeRequest.proposedTargetDate && (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 text-xs shadow-2xs">
-              <span className="font-semibold">
-                Revised Target: <span className="font-mono font-bold">{formatDate(activeRequest.proposedTargetDate)}</span>
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
-                Waiting Decision
-              </span>
-              {mode === "marketing" && (
-                <div className="flex items-center gap-1.5 ml-0.5">
-                  {onCounterDateDecision ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => onCounterDateDecision("accepted")}
-                        className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-bold cursor-pointer shadow-2xs transition active:scale-95"
-                        title="Accept revised target date"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onCounterDateDecision("rejected")}
-                        className="px-2 py-0.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10.5px] font-bold cursor-pointer shadow-2xs transition active:scale-95"
-                        title="Reject revised target date"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (onOpenCounterDateModal) onOpenCounterDateModal();
-                        else if (onSelectTab) onSelectTab("deliverables");
-                      }}
-                      className="text-[11px] text-[var(--accent-primary)] hover:underline font-bold ml-0.5 cursor-pointer flex items-center gap-0.5"
-                    >
-                      <span>Review</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Reviewer / Claim Pill */}
           {isClaimed ? (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface)] shadow-2xs">
-              <span className="font-medium">
-                Designer: <strong className="font-semibold">{claimedBy}</strong>
-              </span>
-              {canReleaseClaim && (
-                <button
-                  type="button"
-                  onClick={onReleaseClaim}
-                  disabled={isReleasingClaim}
-                  className="ml-1 text-[10.5px] text-rose-600 hover:text-rose-700 dark:text-rose-400 font-semibold cursor-pointer underline disabled:opacity-50"
-                  title="Admin: Reassign task claim"
-                >
-                  {isReleasingClaim ? "Releasing…" : "Reassign"}
-                </button>
-              )}
+              <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">Assigned:</span>
+              <strong className="font-bold text-xs truncate max-w-[150px]">{claimedBy}</strong>
             </div>
           ) : canClaim ? (
             <button
@@ -200,7 +135,7 @@ export const DesignSheetHeader: React.FC<DesignSheetHeaderProps> = ({
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-xs shadow-2xs font-medium">
-              <span>Pending Designer Claim</span>
+              <span>{mode === "sampling" ? "Pending Sampling Claim" : "Pending Designer Claim"}</span>
             </span>
           )}
 
@@ -211,6 +146,15 @@ export const DesignSheetHeader: React.FC<DesignSheetHeaderProps> = ({
           />
         </div>
       </div>
+      {isClaimed && (
+        <TaskClaimBanner
+          claimedBy={claimOwnerName}
+          claimedAt={claimTime}
+          isClaimedByCurrentUser={isClaimedByCurrentUser}
+          compact
+          className="mt-3"
+        />
+      )}
     </div>
   );
 };

@@ -155,7 +155,7 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
         { header: "Plant", accessor: (r) => r.targetPlant },
         { header: "Due Date", accessor: (r) => getRequestRequiredDate(r, "mockup") },
         {
-          header: "Mockup CAD Output (Link / Path)",
+          header: "Studio Mockup Output (Link / Path)",
           accessor: (r) => r.mockupWorkflowState?.mockupUrl || "Awaiting Output",
         },
         { header: "Status", accessor: (r) => r.status },
@@ -185,7 +185,7 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
     {
       label: "All Mockup Deliverables",
       value: totalCount,
-      detail: "Total CAD deliverables",
+      detail: "Total Studio mockup outputs",
       color: "bg-indigo-500",
       isActive: selectedKpiFilter === "all",
       onClick: () => setSelectedKpiFilter("all"),
@@ -239,9 +239,9 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
             <div className="max-w-xs">
               <div
                 className="font-semibold text-xs text-[var(--on-surface)] truncate"
-                title={r.productDescription || "CAD Deliverable"}
+                title={r.productDescription || "Studio Mockup"}
               >
-                {r.productDescription || "CAD Deliverable"}
+                {r.productDescription || "Studio Mockup"}
               </div>
               <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 truncate">
                 {categoryHierarchy || r.materialCode || "Packaging"}
@@ -294,7 +294,7 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
       },
       {
         id: "output",
-        header: "CAD Output (Link / Path)",
+        header: "Studio Output (Link / Path)",
         cell: (r) => {
           const outputUrl = r.mockupWorkflowState?.mockupUrl;
           const isWebUrl =
@@ -368,7 +368,7 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
 
   return (
     <DeskWorkspaceLayout
-      title="Studio CAD & Mockup Deliverables"
+      title="Studio Mockup Deliverables"
       businessYear={selectedYear}
       onRefresh={handleRefreshClick}
       isRefreshing={isRefreshing || isLoading}

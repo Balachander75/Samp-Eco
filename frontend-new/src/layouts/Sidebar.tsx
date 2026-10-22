@@ -80,7 +80,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const assignedWorkspaceTeam = getAssignedWorkspaceTeam(user);
   const canSeeMarketing = Boolean(user && (rootAdmin || assignedTeam === "marketing" || hasWorkflowTeam(user, "marketing")));
   const canSeeSamp = Boolean(user && (rootAdmin || assignedTeam === "samp" || hasWorkflowTeam(user, "samp")));
-  const canSeeCreativeStudio = Boolean(user && (rootAdmin || assignedTeam === "creative_studio" || hasWorkflowTeam(user, "creative_studio")));
+  const canSeeCreative = Boolean(user && (rootAdmin || assignedTeam === "creative" || hasWorkflowTeam(user, "creative")));
+  const canSeeStudio = Boolean(user && (rootAdmin || assignedTeam === "studio" || hasWorkflowTeam(user, "studio")));
   const canSeeCosting = Boolean(user && (rootAdmin || assignedTeam === "costing" || hasWorkflowTeam(user, "costing")));
   const canSeePlant = Boolean(user && (rootAdmin || assignedTeam === "plant" || hasWorkflowTeam(user, "plant")));
 
@@ -191,7 +192,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const access = {
       marketing: canSeeMarketing,
       samp: canSeeSamp,
-      creativeStudio: canSeeCreativeStudio,
+      creative: canSeeCreative,
+      studio: canSeeStudio,
       costing: canSeeCosting,
       plant: canSeePlant,
     };
@@ -211,7 +213,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     badgeRefreshVersion,
     canSeeMarketing,
     canSeeSamp,
-    canSeeCreativeStudio,
+    canSeeCreative,
+    canSeeStudio,
     canSeeCosting,
     canSeePlant,
     selectedYear,
@@ -272,13 +275,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .join("")
     .toUpperCase();
 
+  const canonicalTeamLabel = assignedWorkspaceTeam === "creative"
+    ? "Creative"
+    : assignedWorkspaceTeam === "studio"
+      ? "Studio"
+      : user?.team;
   const roleLabel = isAdmin(user)
     ? assignedWorkspaceTeam
       ? `${assignedWorkspaceTeam.charAt(0).toUpperCase() + assignedWorkspaceTeam.slice(1)} Admin`
       : isRootAdmin(user)
         ? "Root Admin"
         : `${user?.team || "Team"} Admin`
-    : user?.team || user?.sub_role || user?.role || "Member";
+    : canonicalTeamLabel || user?.sub_role || user?.role || "Member";
 
   const renderNavContent = (isDrawer = false) => {
     const compact = isCollapsed && !isDrawer;

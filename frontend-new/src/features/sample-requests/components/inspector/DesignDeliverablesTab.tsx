@@ -60,7 +60,9 @@ export interface DesignDeliverablesTabProps {
   onCancelSubmit: () => void;
   isDeciding: boolean;
   decisionError: string | null;
-  onMarketingDecision: (decision: "accept" | "request_remaining") => void;
+  onMarketingDecision: (decision: "accept" | "request_remaining", designNumbers?: string[]) => void;
+  selectedMarketingDesignNumbers: string[];
+  onToggleMarketingDesign: (designNumber: string) => void;
   isAcceptedByMarketing: boolean;
   onOpenNextWork: () => void;
   submissions: any[];
@@ -92,12 +94,17 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
   isDeciding,
   decisionError,
   onMarketingDecision,
+  selectedMarketingDesignNumbers,
+  onToggleMarketingDesign,
   isAcceptedByMarketing,
   onOpenNextWork,
   submissions,
   copiedArtworkPath,
   onCopyArtworkPath,
 }) => {
+  const canReviewDesigns = mode === "marketing" && (isAwaitingReview || isRemainingRequested);
+  const acceptedDesignNumbers = activeRequest.acceptedDesignNumbers || [];
+
   return (
     <div className="space-y-6">
       {/* Deliverable Progress Card */}
@@ -316,8 +323,8 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
           <p className="text-xs text-[var(--on-surface-muted)]">
             Creative Studio has submitted <strong className="tabular-nums text-[var(--on-surface)]">{deliveredCount} of {requestedCount}</strong> requested artworks.
             {isRemainingRequested && remainingCount > 0
-              ? <> Creative is continuing the remaining work ({remainingCount} left); you can accept the delivered set whenever it is ready.</>
-              : " Review the deliverables and select your verdict."}
+              ? <> Creative is continuing the remaining work ({remainingCount} left). Select the client-approved design(s) below to accept; this closes the design request.</>
+              : " Select the client-approved design(s) below, then accept to close the design request."}
           </p>
 
           {decisionError && (
@@ -330,12 +337,12 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
           <div className="flex items-center gap-2 pt-1">
             <button
               type="button"
-              disabled={isDeciding}
-              onClick={() => onMarketingDecision("accept")}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold shadow-xs transition cursor-pointer"
+              disabled={isDeciding || selectedMarketingDesignNumbers.length === 0}
+              onClick={() => onMarketingDecision("accept", selectedMarketingDesignNumbers)}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Check className="w-3.5 h-3.5" />
-              <span>{isDeciding ? "Processing..." : isRemainingRequested ? "Accept Delivered Designs & Close" : "Accept & Continue"}</span>
+              <span>{isDeciding ? "Processing..." : `Accept selected & close${selectedMarketingDesignNumbers.length ? ` (${selectedMarketingDesignNumbers.length})` : ""}`}</span>
             </button>
 
             {!isRemainingRequested && remainingCount > 0 && (
@@ -421,11 +428,15 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                     <th className="px-3.5 py-2">Marketing Description</th>
                     <th className="px-3.5 py-2">Shutterstock No.</th>
                     <th className="px-3.5 py-2">Creative Remark</th>
+                    {(canReviewDesigns || isAcceptedByMarketing) && <th className="px-3.5 py-2 w-28">Marketing</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">
                   {(batch.rows || []).map((row: any) => (
-                    <tr key={row.designNumber}>
+                    <tr
+                      key={row.designNumber}
+                      className={selectedMarketingDesignNumbers.includes(String(row.designNumber)) ? "bg-[var(--accent-primary)]/[0.04]" : undefined}
+                    >
                       <td className="px-3.5 py-2.5 font-mono font-bold text-[var(--accent-primary)]">
                         {row.designNumber}
                       </td>
@@ -438,6 +449,26 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                       <td className="px-3.5 py-2.5 text-[var(--on-surface-muted)]">
                         {row.remarks || ""}
                       </td>
+                      {(canReviewDesigns || isAcceptedByMarketing) && (
+                        <td className="px-3.5 py-2.5">
+                          {canReviewDesigns ? (
+                            <label className="inline-flex cursor-pointer items-center gap-2 text-[11px] font-medium text-[var(--on-surface)]">
+                              <input
+                                type="checkbox"
+                                checked={selectedMarketingDesignNumbers.includes(String(row.designNumber))}
+                                onChange={() => onToggleMarketingDesign(String(row.designNumber))}
+                                disabled={isDeciding}
+                                aria-label={`Select ${row.designNumber} for Marketing acceptance`}
+                                className="h-4 w-4 rounded border-[var(--border-subtle)]"
+                                style={{ accentColor: "var(--accent-primary)" }}
+                              />
+                              Accept
+                            </label>
+                          ) : isAcceptedByMarketing && (!acceptedDesignNumbers.length || acceptedDesignNumbers.includes(String(row.designNumber))) ? (
+                            <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Accepted</span>
+                          ) : null}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

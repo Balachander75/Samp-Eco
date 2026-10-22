@@ -6,7 +6,7 @@ import { StagedProductItem, DELIVERABLES } from "../../types/staging";
 const cellInputClass = "h-10 w-full min-w-[100px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-sm text-[var(--on-surface)] outline-none transition-shadow focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 disabled:opacity-60";
 
 type RequiredDateField = "mockupRequiredDate" | "sampleRequiredDate" | "costingRequiredDate" | "designRequiredDate";
-type QuantityField = "qtyForMockup" | "qtyForSampling" | "qtyDesignCosting";
+type QuantityField = "qtyForMockup" | "qtyForSampling" | "qtyDesignCosting" | "designCount";
 type MockupExtraField = "marketingShutterstockNo" | "marketingRemark";
 type EditableField = keyof StagedProductItem | RequiredDateField | QuantityField | MockupExtraField;
 
@@ -18,9 +18,10 @@ const getRequiredDateRows = (item: StagedProductItem): Array<{ label: string; fi
 ];
 
 const getQuantityRows = (item: StagedProductItem): Array<{ label: string; field: QuantityField; value: string }> => [
-  ...(item.scopes.includes("mockup") ? [{ label: "Mockup", field: "qtyForMockup" as const, value: item.qtyForMockup || item.mockupMetadata?.qtyForMockup || "1" }] : []),
-  ...(item.scopes.includes("sample") ? [{ label: "Sampling", field: "qtyForSampling" as const, value: item.qtyForSampling || "1" }] : []),
-  ...(item.scopes.includes("costing") ? [{ label: "Costing", field: "qtyDesignCosting" as const, value: item.qtyDesignCosting || "1" }] : []),
+  ...(item.scopes.includes("design") ? [{ label: "Design", field: "designCount" as const, value: String(item.designMetadata?.numberOfDesigns ?? "") }] : []),
+  ...(item.scopes.includes("mockup") ? [{ label: "Mockup", field: "qtyForMockup" as const, value: item.qtyForMockup || item.mockupMetadata?.qtyForMockup || "" }] : []),
+  ...(item.scopes.includes("sample") ? [{ label: "Sampling", field: "qtyForSampling" as const, value: item.qtyForSampling || "" }] : []),
+  ...(item.scopes.includes("costing") ? [{ label: "Costing", field: "qtyDesignCosting" as const, value: item.qtyDesignCosting || "" }] : []),
 ];
 
 interface EditableValueProps {
@@ -74,6 +75,7 @@ const EditableValue: React.FC<EditableValueProps> = ({ value = "", placeholder, 
     return (
       <OperationalDatePicker
         value={value}
+        required
         onChange={(nextDate) => {
           if (nextDate !== value) void onCommit(nextDate);
         }}
@@ -260,7 +262,14 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
   const editable = Boolean(onUpdateProduct);
   const updateField = async (item: StagedProductItem, field: EditableField, value: string) => {
     if (!onUpdateProduct) return false;
-    if ((field === "costingRequiredDate" || field === "mockupRequiredDate") && !value.trim()) return false;
+    if (
+      ["costingRequiredDate", "mockupRequiredDate", "sampleRequiredDate", "designRequiredDate"].includes(field)
+      && !value.trim()
+    ) return false;
+    if (
+      ["qtyForMockup", "qtyForSampling", "qtyDesignCosting", "designCount"].includes(field)
+      && (!Number.isInteger(Number(value)) || Number(value) < 1)
+    ) return false;
     let updates: Partial<StagedProductItem>;
     switch (field) {
       case "customerProductCode": updates = { customerProductCode: value.trim() }; break;
@@ -270,6 +279,18 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
       case "qtyPerPack": updates = { qtyPerPack: value.trim() }; break;
       case "qtyForSampling": updates = { qtyForSampling: value.trim() }; break;
       case "qtyDesignCosting": updates = { qtyDesignCosting: value.trim() }; break;
+      case "designCount": updates = {
+        designMetadata: {
+          numberOfDesigns: Number(value) || 1,
+          designRequiredDate: item.designMetadata?.designRequiredDate || "",
+          trend: item.designMetadata?.trend || "",
+          targetAudience: item.designMetadata?.targetAudience || "",
+          remarks: item.designMetadata?.remarks,
+          images: item.designMetadata?.images || [],
+          webLinks: item.designMetadata?.webLinks || [],
+          referenceImage: item.designMetadata?.referenceImage || "",
+        },
+      }; break;
       case "sampleRequiredDate": updates = { sampleRequiredDate: value || undefined }; break;
       case "costingRequiredDate": updates = { costingRequiredDate: value || undefined }; break;
       case "designRequiredDate": updates = {
@@ -414,8 +435,8 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
               <th className="px-2.5 py-2.5 font-mono">Material</th>
               <th className="px-2.5 py-2.5">Description</th>
               <th className="px-2.5 py-2.5">Scope</th>
-              <th className="px-2.5 py-2.5">Required Date</th>
-              <th className="px-2.5 py-2.5 text-center">Qty</th>
+              <th className="px-2.5 py-2.5">Required Date <span className="text-rose-600">*</span></th>
+              <th className="px-2.5 py-2.5 text-center">Qty <span className="text-rose-600">*</span></th>
               <th className="px-2.5 py-2.5 text-center">Unit</th>
               <th className="px-2.5 py-2.5">Brand</th>
               <th className="px-2.5 py-2.5">Customer SKU</th>
@@ -428,6 +449,8 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
               const requiredDateRows = getRequiredDateRows(prod);
               const quantityRows = getQuantityRows(prod);
               const isMockup = prod.scopes.includes("mockup");
+              const isDesignOnly = prod.scopes.length === 1 && prod.scopes.includes("design");
+              const canDuplicate = !isFeasibilityHandoff && prod.scopes.length === 1 && prod.scopes[0] === "sample";
               const mockupMeta = prod.mockupMetadata;
               return (
               <tr key={prod.id} className="group transition-colors duration-150 hover:bg-[var(--surface-low)]/40">
@@ -560,7 +583,7 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
 
                 {/* 6. Unit (Blank for Mockup requests) */}
                 <td className="px-2.5 py-2.5 text-center align-middle text-[11px] text-[var(--on-surface-muted)]">
-                  {isMockup ? (
+                  {isMockup || isDesignOnly ? (
                     <span className="text-[11px] text-[var(--on-surface-subtle)]/50">—</span>
                   ) : (
                     <div className="flex justify-center">
@@ -619,7 +642,7 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                     >
                       <Eye className="h-3.5 w-3.5" />
                     </button>
-                    {!isFeasibilityHandoff && !prod.scopes.includes("mockup") && (
+                    {canDuplicate && (
                       <button
                         type="button"
                         onClick={() => onDuplicateProduct(prod)}

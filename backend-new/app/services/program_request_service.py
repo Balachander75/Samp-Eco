@@ -643,16 +643,20 @@ class ProgramRequestService:
             raise HTTPException(status_code=422, detail="Department must be sampling or plant")
 
         actor_id, actor_name, _ = self._get_actor_info(current_user)
-        is_admin_user = is_admin(current_user) if current_user else False
         now = datetime.now(timezone.utc)
 
         if dept == "sampling":
             current_id = item.sampling_claimed_by_user_id
             current_name = item.sampling_claimed_by
-            if current_id and current_id != actor_id and not is_admin_user:
+            if current_id and current_id != actor_id:
                 raise HTTPException(
                     status_code=409,
-                    detail=f"This Sampling review is already claimed by {current_name or 'another team member'}",
+                    detail=f"Someone else is working on this task. It is claimed by {current_name or 'another team member'}.",
+                )
+            if current_id is None and current_name and current_name.casefold() != actor_name.casefold():
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Someone else is working on this task. It is claimed by {current_name}.",
                 )
             if current_id == actor_id and item.sampling_claimed_by:
                 return self.serialize(item)
@@ -667,10 +671,15 @@ class ProgramRequestService:
         else:
             current_id = item.plant_claimed_by_user_id
             current_name = item.plant_claimed_by
-            if current_id and current_id != actor_id and not is_admin_user:
+            if current_id and current_id != actor_id:
                 raise HTTPException(
                     status_code=409,
-                    detail=f"This Plant review is already claimed by {current_name or 'another team member'}",
+                    detail=f"Someone else is working on this task. It is claimed by {current_name or 'another team member'}.",
+                )
+            if current_id is None and current_name and current_name.casefold() != actor_name.casefold():
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Someone else is working on this task. It is claimed by {current_name}.",
                 )
             if current_id == actor_id and item.plant_claimed_by:
                 return self.serialize(item)
@@ -700,8 +709,6 @@ class ProgramRequestService:
         """Ensure the user has claimed the SAMP/Plant review lane before submitting remarks."""
         if not current_user:
             raise HTTPException(status_code=401, detail="Sign in and claim this review before submitting remarks.")
-        if is_admin(current_user):
-            return
         field_prefix = "sampling" if department == "sampling" else "plant"
         id_field = f"{field_prefix}_claimed_by_user_id"
         name_field = f"{field_prefix}_claimed_by"
@@ -717,7 +724,7 @@ class ProgramRequestService:
         if actor_id is None or current_id != actor_id:
             raise HTTPException(
                 status_code=409,
-                detail=f"This {department} review is already claimed by {current_name or 'another team member'}."
+                detail=f"Someone else is working on this task. It is claimed by {current_name or 'another team member'}."
             )
 
     @staticmethod

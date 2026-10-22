@@ -24,6 +24,7 @@ const editableCharacteristicValue = (value: unknown) => {
 
 export interface StagedProductDrawerProps {
   inspectingProduct: StagedProductItem | null;
+  isFeasibilityHandoff?: boolean;
   programYear: string;
   programContext?: {
     customer?: string;
@@ -45,6 +46,7 @@ export interface StagedProductDrawerProps {
 
 export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
   inspectingProduct,
+  isFeasibilityHandoff = false,
   programYear,
   programContext,
   onClose,
@@ -71,6 +73,9 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
     inspectingProduct &&
     inspectingProduct.scopes.includes("design") &&
     (inspectingProduct.scopes.length === 1 || !inspectingProduct.catalogMetadata || Boolean(inspectingProduct.designMetadata))
+  );
+  const canDuplicate = Boolean(
+    !isFeasibilityHandoff && inspectingProduct?.scopes.length === 1 && inspectingProduct.scopes[0] === "sample"
   );
 
   const designDesc = inspectingProduct?.productDescription || "";
@@ -109,7 +114,9 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
     setIsLoadingDetails(true);
     // Load the full catalog so the All view can include blank characteristics.
     // Scope it back to classes represented by saved detail rows on this product.
-    fetchProductDetailsApi(detailsRequestId, false)
+    // A staged item can point to any Marketing user's catalog product. This
+    // is a read-only source lookup; saving still targets the current draft.
+    fetchProductDetailsApi(detailsRequestId, false, false, true)
       .then((details: any) => {
         if (!cancelled) setSourceDetails(details);
       })
@@ -995,18 +1002,20 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  const toDuplicate = inspectingProduct;
-                  onClose();
-                  onDuplicateProduct(toDuplicate);
-                }}
-                className="h-8 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-white/[0.06] dark:text-zinc-300 dark:hover:bg-white/10 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span>Duplicate</span>
-              </button>
+              {canDuplicate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toDuplicate = inspectingProduct;
+                    onClose();
+                    onDuplicateProduct(toDuplicate);
+                  }}
+                  className="h-8 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-white/[0.06] dark:text-zinc-300 dark:hover:bg-white/10 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Duplicate</span>
+                </button>
+              )}
 
               <button
                 type="button"

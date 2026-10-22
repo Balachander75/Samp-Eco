@@ -145,6 +145,9 @@ def ensure_request_workflow_schema():
         connection.execute(text(
             "ALTER TABLE costing_workflows ADD COLUMN IF NOT EXISTS creative_due_at TIMESTAMPTZ"
         ))
+        connection.execute(text(
+            "ALTER TABLE costing_workflows ADD COLUMN IF NOT EXISTS workflow_data JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
 
     statements = (
         """

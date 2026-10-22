@@ -420,10 +420,10 @@ class FeasibilityService:
         is_admin = "admin" in f"{getattr(current_user, 'role', '')} {getattr(current_user, 'sub_role', '')}".lower() if current_user else False
         if not is_admin and current_user and req.created_by_user_id and req.created_by_user_id == current_user.id:
             raise HTTPException(status_code=403, detail="The creator of this feasibility request cannot submit the technical verdict. A separate SAMP team member must review it.")
-        if not is_admin and current_user and req.taken_by_samp_user_id and req.taken_by_samp_user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="This review is assigned to another SAMP team member")
-        if not is_admin and current_user and not req.taken_by_samp_user_id and req.taken_by_samp != current_user.name:
-            raise HTTPException(status_code=403, detail="This review is assigned to another SAMP team member")
+        if current_user and req.taken_by_samp_user_id and req.taken_by_samp_user_id != current_user.id:
+            raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {req.taken_by_samp or 'another SAMP member'}.")
+        if current_user and not req.taken_by_samp_user_id and req.taken_by_samp != current_user.name:
+            raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {req.taken_by_samp or 'another SAMP member'}.")
 
         if req.marketing_decision or req.converted_sample_request_id:
             raise HTTPException(
@@ -539,11 +539,10 @@ class FeasibilityService:
             raise HTTPException(status_code=404, detail="Feasibility request was not found")
         if not req.taken_by_samp:
             raise HTTPException(status_code=409, detail="Claim the SAMP review before proposing a revised date")
-        is_admin = "admin" in f"{getattr(current_user, 'role', '')} {getattr(current_user, 'sub_role', '')}".lower() if current_user else False
-        if not is_admin and current_user and req.taken_by_samp_user_id and req.taken_by_samp_user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Only the assigned SAMP reviewer can propose a revised date")
-        if not is_admin and current_user and not req.taken_by_samp_user_id and req.taken_by_samp != current_user.name:
-            raise HTTPException(status_code=403, detail="Only the assigned SAMP reviewer can propose a revised date")
+        if current_user and req.taken_by_samp_user_id and req.taken_by_samp_user_id != current_user.id:
+            raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {req.taken_by_samp or 'another SAMP member'}.")
+        if current_user and not req.taken_by_samp_user_id and req.taken_by_samp != current_user.name:
+            raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {req.taken_by_samp or 'another SAMP member'}.")
         if req.sampling_feasibility_response or req.marketing_decision or req.converted_sample_request_id:
             raise HTTPException(status_code=409, detail="A counter-date can only be proposed while technical review is open")
         if req.samp_counter_date is not None:
@@ -711,8 +710,8 @@ class FeasibilityService:
                 (current_user and req.taken_by_samp_user_id == current_user.id)
                 or (not req.taken_by_samp_user_id and current_user and req.taken_by_samp == current_user.name)
             )
-            if not is_admin and not same_claimant:
-                raise HTTPException(status_code=409, detail="This feasibility review is already claimed by another SAMP member")
+            if not same_claimant:
+                raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {req.taken_by_samp or 'another SAMP member'}.")
             if same_claimant:
                 return self.serialize_request(self.repo.get_with_details(req.id))
 

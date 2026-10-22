@@ -248,6 +248,7 @@ export interface SampleRequestItem {
   samplingSignedBy?: string | null;
   samplingClaimedByUserId?: number | null;
   samplingClaimedBy?: string | null;
+  samplingClaimedAt?: string | null;
   plantSeenAt?: string | null;
   plantSeenBy?: string | null;
   plantVerdict?: string | null;
@@ -328,6 +329,7 @@ export interface SampleRequestItem {
   creativeSubmissions?: any[];
   marketingDesignDecision?: "awaiting_marketing_review" | "remaining_requested" | "accepted" | null;
   remainingDesignCount?: number;
+  acceptedDesignNumbers?: string[];
   numberOfDesigns?: number;
   designRequiredDate?: string | null;
   trend?: string | null;
@@ -337,6 +339,7 @@ export interface SampleRequestItem {
   claimedByUserId?: number | null;
   claimedAt?: string | null;
   isCounterDateActive?: boolean;
+  counterDateOriginalTargetDate?: string | null;
   proposedTargetDate?: string | null;
   counterDateReason?: string | null;
   counterDateRequestedAt?: string | null;

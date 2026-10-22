@@ -103,7 +103,6 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
 
   const claimBelongsToOther = Boolean(
     activeRequest.takenBySamp &&
-      !isAdmin &&
       (activeRequest.takenBySampUserId != null
         ? activeRequest.takenBySampUserId !== currentUserId
         : activeRequest.takenBySamp !== currentUserName)
@@ -201,7 +200,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
         </div>
 
         {/* Propose Revised Date Action Button */}
-        {canEvaluateTechnical && activeRequest.takenBySamp && !activeRequest.sampCounterDate && !isEvaluated && (
+        {canEvaluateTechnical && activeRequest.takenBySamp && !claimBelongsToOther && !activeRequest.sampCounterDate && !isEvaluated && (
           <button
             type="button"
             onClick={() => {
@@ -471,10 +470,10 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-6 text-center">
           <Lock className="mx-auto mb-2 h-6 w-6 text-[var(--on-surface-muted)]" />
           <h3 className="text-sm font-bold text-[var(--on-surface)]">
-            Review owned by {activeRequest.takenBySamp}
+            Someone else is working on this task
           </h3>
           <p className="mt-1 text-xs text-[var(--on-surface-muted)]">
-            Only the assigned SAMP reviewer or an Admin can submit the technical assessment.
+            Reserved for {activeRequest.takenBySamp}. You can view the request, but only the claimant can edit or submit the technical assessment.
           </p>
         </div>
       ) : canEvaluateTechnical ? (

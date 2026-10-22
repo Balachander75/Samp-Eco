@@ -19,6 +19,7 @@ import {
   Palette,
   Search,
   Tag,
+  Users,
   X,
   Download,
   Printer,
@@ -42,9 +43,10 @@ import { ProductDocketView } from "@/features/sample-requests/components/staging
 import type { ProductSearchResult, SampleRequestItem } from "@/features/sample-requests/types";
 import { formatWorkflowAction } from "./workflowPresentation";
 import { RequestClosedStamp } from "./common/RequestClosedWatermark";
+import { TaskClaimBanner } from "@/components/ui/TaskClaimBanner";
 
 export type InspectorMode = "creative" | "costing" | "sampling";
-export type CostingTab = "scope" | "specs" | "output" | "commercial" | "review";
+export type CostingTab = "scope" | "specs" | "creative" | "output" | "review" | "sampling_team";
 
 export interface CostingWorkflowInspectorModalProps {
   record: RequestWorkflowRecord;
@@ -122,6 +124,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   const [isSaving, setIsSaving] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [locallyClaimedRequestId, setLocallyClaimedRequestId] = useState<number | null>(null);
+  const [teamCounterDate, setTeamCounterDate] = useState(record.team_counter_date || "");
   const [error, setError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -173,13 +176,20 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   );
   const isReturned = record.reviewer_status === "returned";
 
-  const isGlobalAdmin = ["admin", "administrator"].includes(String(user?.role || "").toLowerCase());
   const isClaimedByMe = Boolean(record.is_claimed_by_me) || locallyClaimedRequestId === record.sample_request_id;
   const isClaimed = Boolean(record.is_claimed || record.claimed_by || isClaimedByMe);
-  const canClaimCosting = !isClosed && mode === "costing" && isCostingWork && !readOnly;
-  const canSubmitCosting = !isClosed && mode === "costing" && isCostingWork && !readOnly && (isClaimedByMe || isGlobalAdmin);
-  const canReview = !isClosed && (mode === "sampling" || isSamplingReview) && !readOnly;
-  const canReleaseToCosting = !isClosed && (mode === "creative" || isCreativeReview) && !readOnly;
+  const canClaimCurrentTask = !isClosed && !readOnly && (
+    (mode === "creative" && isCreativeReview) ||
+    (mode === "costing" && isCostingWork) ||
+    (mode === "sampling" && isSamplingReview)
+  );
+  const canSubmitCosting = !isClosed && mode === "costing" && isCostingWork && !readOnly && isClaimedByMe;
+  const canReview = !isClosed && mode === "sampling" && isSamplingReview && !readOnly && isClaimedByMe;
+  const canReleaseToCosting = !isClosed && mode === "creative" && isCreativeReview && !readOnly && isClaimedByMe;
+  const hasCreativeHandoff = Boolean(record.costing_creative_input_needed || mode === "creative" || isCreativeReview);
+  const costingStep = hasCreativeHandoff ? 4 : 3;
+  const samplingStep = costingStep + 1;
+  const samplingTeamStep = samplingStep + 1;
 
   const creativeDeadline = record.creative_due_at ? new Date(record.creative_due_at) : null;
   const creativeDeadlineLabel =
@@ -190,6 +200,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
           timeZone: "Asia/Kolkata",
         }).format(creativeDeadline)
       : null;
+
+  useEffect(() => {
+    setTeamCounterDate(record.team_counter_date || "");
+  }, [record.sample_request_id, record.team_counter_date]);
 
   // Group specs by class
   const specificationGroups = useMemo(() => {
@@ -234,7 +248,6 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
 
   useEffect(() => {
     if (mode === "creative") {
-      setActiveTab("specs");
       setSpecViewMode("all");
     }
   }, [mode]);
@@ -383,11 +396,13 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
     setIsClaiming(true);
     setError(null);
     try {
-      await claimCostingWorkflowApi(record.sample_request_id);
+      await claimCostingWorkflowApi(record.sample_request_id, {
+        teamCounterDate: teamCounterDate.trim() || undefined,
+      });
       setLocallyClaimedRequestId(record.sample_request_id);
       await onSaved();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not claim this Costing task.");
+      setError(reason instanceof Error ? reason.message : "Could not claim this team task.");
     } finally {
       setIsClaiming(false);
     }
@@ -479,22 +494,30 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
         role="dialog"
         aria-modal="true"
         aria-labelledby="costing-inspector-title"
-        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
+        className="relative w-full max-w-[96vw] 2xl:max-w-[1600px] h-[96vh] max-h-[96vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
         {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
         {/* ── 1. TOP CONTROL PANEL WITH STEPPER ── */}
-        <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] px-3 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
           {/* Left Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="order-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-low)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--on-surface-muted)]">
+              <Clock className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
+              Stage: {stageLabels[record.current_stage] || record.status}
+            </span>
+            <span className="inline-flex items-center rounded-lg bg-[var(--accent-primary-subtle)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--accent-primary)]">
+              {mode === "creative" ? "Creative Desk" : mode === "sampling" ? "Sampling Desk" : "Costing Desk"}
+            </span>
             <button
               type="button"
               disabled={isSaving}
               onClick={onClose}
-              className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+              aria-label="Close inspector"
+              title="Close inspector"
+              className="order-last grid h-8 w-8 place-items-center rounded-lg bg-rose-50 text-rose-700 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/70"
             >
               <X className="w-3.5 h-3.5" />
-              <span>Close Inspector</span>
             </button>
 
             <div className="h-4 w-px bg-[var(--border-subtle)] mx-1" />
@@ -502,7 +525,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
             <button
               type="button"
               onClick={handleCopyCode}
-              className="text-[var(--on-surface-muted)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-low)] font-medium px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition"
+              className="hidden"
               title="Copy request code"
             >
               {copiedCode ? (
@@ -512,27 +535,50 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
               )}
               <span className="font-mono">{copiedCode ? "Copied" : code}</span>
             </button>
-            {mode === "costing" && isCostingWork && (
-              <div role="status" aria-live="polite" className="ml-1 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-low)] px-2.5 py-1.5">
-                <span className="text-[11px] font-medium text-[var(--on-surface-muted)]">
-                  {isClaimedByMe
-                    ? "Claimed by you"
-                    : record.claimed_by
-                      ? `Claimed by ${record.claimed_by}`
-                      : isClosed
-                        ? "Request Closed"
-                        : isClaimed
-                          ? "Claimed by another Costing member"
-                          : "Available to claim"}
-                </span>
-                {!isClosed && canClaimCosting && (!isClaimed || isGlobalAdmin) && !isClaimedByMe && (
+            {canClaimCurrentTask && (
+              <div className="ml-1 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-low)] px-2.5 py-1.5">
+                <div className="flex flex-col">
+                  <span role="status" aria-live="polite" className="text-[11px] font-medium text-[var(--on-surface-muted)]">
+                    {isClaimedByMe ? "Claimed by you" : record.claimed_by ? `Claimed by ${record.claimed_by}` : "Awaiting team claim"}
+                  </span>
+                  <span className="text-[10px] text-[var(--on-surface-subtle)]">
+                    Claim within 48 hours{record.claim_due_at ? ` · due ${formatDateTime(record.claim_due_at)}` : ""}
+                  </span>
+                  {record.claim_overdue && (
+                    <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">Claim window passed</span>
+                  )}
+                  {record.is_delayed && (
+                    <span className="text-[10px] font-semibold text-rose-700 dark:text-rose-300">Delayed for {record.delay_team || "this team"}</span>
+                  )}
+                </div>
+                <label className="flex items-center gap-1.5 text-[10px] font-medium text-[var(--on-surface-muted)]">
+                  <span>Counter date (optional)</span>
+                  <input
+                    type="date"
+                    value={teamCounterDate}
+                    disabled={isSaving || isClaiming || (isClaimed && !isClaimedByMe)}
+                    onChange={(event) => setTeamCounterDate(event.target.value)}
+                    className="h-7 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2 text-[10px] text-[var(--on-surface)] disabled:opacity-60"
+                  />
+                </label>
+                {!isClaimedByMe && !isClaimed && (
                   <button
                     type="button"
                     disabled={isClaiming || isSaving}
                     onClick={() => void claimTask()}
                     className="inline-flex min-h-7 items-center rounded-md bg-[var(--accent-primary)] px-2.5 text-[10px] font-semibold text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isClaiming ? "Claiming..." : isClaimed ? "Reassign to me" : "Claim task"}
+                    {isClaiming ? "Claiming..." : "Claim task"}
+                  </button>
+                )}
+                {isClaimedByMe && teamCounterDate && teamCounterDate !== record.team_counter_date && (
+                  <button
+                    type="button"
+                    disabled={isClaiming || isSaving}
+                    onClick={() => void claimTask()}
+                    className="inline-flex min-h-7 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2.5 text-[10px] font-semibold text-[var(--on-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isClaiming ? "Saving..." : "Save counter date"}
                   </button>
                 )}
               </div>
@@ -540,7 +586,18 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
           </div>
 
           {/* Right: Modern Workflow Stepper */}
-          <div className="flex items-center gap-1.5 p-1 bg-[var(--surface-low)] rounded-xl border border-[var(--border-subtle)] overflow-x-auto max-w-full">
+          <div className="order-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto rounded-xl bg-[var(--surface-low)] p-1">
+            <button
+              type="button"
+              onClick={handleCopyCode}
+              aria-label="Copy request code"
+              title={copiedCode ? "Copied" : "Copy request code"}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--surface-lowest)] px-2.5 py-1.5 font-mono text-[11px] font-bold text-[var(--accent-primary)] transition hover:text-[var(--on-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+            >
+              {copiedCode ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              <span>{code}</span>
+            </button>
+            <span className="mx-0.5 h-5 w-px shrink-0 bg-[var(--border-subtle)]" />
             {steps.map((st, i) => {
               const isCurrent =
                 (st.id === "marketing" && record.current_stage === "marketing") ||
@@ -596,14 +653,41 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
 
 
         {/* ── 2. MAIN SPLIT VIEW (LEFT: DOCUMENT SHEET + RIGHT: TIME LOG CHATTER) ── */}
-        <div className="flex-1 flex overflow-hidden">
+        {isClaimed && canClaimCurrentTask && (
+          <TaskClaimBanner
+            claimedBy={record.claimed_by}
+            claimedAt={record.claimed_at}
+            isClaimedByCurrentUser={isClaimedByMe}
+            compact
+            className="mx-3 mt-3 shrink-0 sm:mx-5"
+          />
+        )}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
-            <div className={`mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-300 ${
-              "max-w-6xl"
-            }`}>
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--surface-low)] p-3 sm:p-4 lg:p-5">
+            <div className="mx-auto w-full max-w-[1100px] overflow-hidden rounded-2xl bg-[var(--surface-base)] shadow-[0_8px_30px_rgba(11,28,48,0.04)]">
+              <div className="flex items-center justify-between gap-4 bg-[var(--surface-lowest)] px-5 py-3.5 sm:px-7">
+                <div className="min-w-0">
+                  <h1 id="costing-inspector-title" className="truncate text-sm font-bold text-[var(--on-surface)] sm:text-base">
+                    {record.product_description || "Commercial Product Costing Request"}
+                  </h1>
+                  <p className="mt-0.5 truncate text-[11px] text-[var(--on-surface-muted)]">
+                    {record.customer || "Commercial Account"}{record.brand_name ? ` · ${record.brand_name}` : ""}
+                  </p>
+                </div>
+                <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold ${
+                  isReturned
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                    : isClosed
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+                    : "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
+                }`}>
+                  {isClosed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                  {record.status}
+                </span>
+              </div>
               {/* ── Dossier Header ── */}
-              <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
+              <div className="hidden">
                 {/* Reference, Account & Status Badges */}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-6 sm:px-8 py-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
                   <div className="flex items-center gap-2.5 flex-wrap">
@@ -657,12 +741,9 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--border-subtle)]">
                         {mode === "creative" ? "Creative Product Inspection" : "Technical Costing Dossier"}
                       </span>
-                      <h1
-                        id="costing-inspector-title"
-                        className="text-lg sm:text-xl font-display font-bold tracking-tight text-[var(--on-surface)] mt-1"
-                      >
+                      <h2 className="text-lg sm:text-xl font-display font-bold tracking-tight text-[var(--on-surface)] mt-1">
                         {record.product_description || "Commercial Product Costing Request"}
-                      </h1>
+                      </h2>
                     </div>
                   </div>
 
@@ -733,9 +814,60 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
               </div>
 
               {/* ── Tab Navigation Strip ── */}
-              <div className="px-6 sm:px-8 pt-2 bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
-                <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
-                  {/* Tab 1: Costing Output Workspace (Primary Action Tab) */}
+              <div className="bg-[var(--surface-low)] px-3 py-2 sm:px-4">
+                <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("scope")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "scope"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>1. Scope &amp; Specification</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("specs")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "specs"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>2. Product Classes &amp; Characteristics</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                      {specViewMode === "configured"
+                        ? `${configuredCount} Configured`
+                        : `${productSpecifications.length} Specs`}
+                    </span>
+                  </button>
+
+                  {/* Creative handoff, when Marketing requested it */}
+                  {/* Creative handoff, when Marketing requested it */}
+                  {hasCreativeHandoff && <button
+                    type="button"
+                    onClick={() => setActiveTab("creative")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "creative"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <Palette className="w-3.5 h-3.5" />
+                    <span>3. Creative Input</span>
+                    {record.costing_creative_input_needed && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-violet-500/10 text-violet-700 dark:text-violet-300 font-bold">
+                        Requested
+                      </span>
+                    )}
+                  </button>}
+
+                  {/* Costing Sheet Workspace */}
                   {mode !== "creative" && <button
                     type="button"
                     onClick={() => setActiveTab("output")}
@@ -746,7 +878,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     }`}
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5" />
-                    <span>1. Costing Sheet &amp; Submission</span>
+                    <span>{costingStep}. Costing Work &amp; Submission</span>
                     {record.costing_output_path ? (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200/50">
                         ✓ Attached
@@ -758,45 +890,8 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     )}
                   </button>}
 
-                  {/* Tab 2: Specifications & BOM Docket */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("specs")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                      activeTab === "specs"
-                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>{mode === "creative" ? "Product Classes & Characteristics" : "2. Technical BOM &amp; Classes"}</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
-                      {specViewMode === "configured"
-                        ? `${configuredCount} Configured`
-                        : `${productSpecifications.length} Specs`}
-                    </span>
-                  </button>
 
-                  {/* Tab 3: Commercial & Creative Inputs */}
-                  {mode !== "creative" && <button
-                    type="button"
-                    onClick={() => setActiveTab("commercial")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                      activeTab === "commercial"
-                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>3. Commercial Terms &amp; Creative</span>
-                    {record.costing_creative_input_needed && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-violet-500/10 text-violet-700 dark:text-violet-300 font-bold">
-                        Creative Spec
-                      </span>
-                    )}
-                  </button>}
-
-                  {/* Tab 4: Sampling Review */}
+                  {/* Sampling Review */}
                   {mode !== "creative" && <button
                     type="button"
                     onClick={() => setActiveTab("review")}
@@ -807,7 +902,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     }`}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>4. Sampling Sign-Off</span>
+                    <span>{samplingStep}. Sampling Sign-Off</span>
                     {isClosed ? (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
                         ✓ Approved
@@ -821,6 +916,23 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         {isSamplingReview ? "In Review" : "Pending Costing"}
                       </span>
                     )}
+                  </button>}
+
+                  {/* Placeholder for the Sampling Team workflow to be defined later. */}
+                  {mode !== "creative" && <button
+                    type="button"
+                    onClick={() => setActiveTab("sampling_team")}
+                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === "sampling_team"
+                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>{samplingTeamStep}. Sampling Team</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface-muted)] font-normal">
+                      To be defined
+                    </span>
                   </button>}
                 </div>
               </div>
@@ -879,9 +991,9 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                             <p className="text-xs text-[var(--on-surface-muted)]">
                               {canSubmitCosting
                                 ? "Paste the link to the completed costing spreadsheet or server file path."
-                                : isCostingWork && isClaimed && !isClaimedByMe && !isGlobalAdmin
-                                  ? `This Costing task is claimed by ${record.claimed_by || "another Costing member"}.`
-                                  : isCostingWork && !isClaimedByMe && !isGlobalAdmin
+                                : isCostingWork && isClaimed && !isClaimedByMe
+                                  ? `Someone else is working on this task. It is claimed by ${record.claimed_by || "another Costing member"}.`
+                                  : isCostingWork && !isClaimedByMe
                                     ? "Claim this task to edit and submit the Costing sheet."
                                     : "The costing sheet submitted by the Costing team."}
                             </p>
@@ -1004,7 +1116,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         </h3>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
                           <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Customer Account</span>
                           <p className="text-xs font-semibold text-[var(--on-surface)]">{record.customer || "Commercial Account"}</p>
@@ -1014,10 +1126,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         </div>
 
                         <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Target Quotation Due</span>
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Costing Required Date</span>
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--on-surface)]">
                             <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>{formatDate(String(record.due_date || requestData.due_date || "")) || "Immediate"}</span>
+                            <span>{formatDate(String(requestData.required_date || "")) || "Not specified"}</span>
                           </div>
                         </div>
 
@@ -1025,6 +1137,35 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                           <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Target Substrate / Material</span>
                           <p className="text-xs font-mono font-bold text-[var(--on-surface)]">{String(record.material_code || requestData.material_code || "Custom Substrate")}</p>
                         </div>
+
+                        <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Deliverable Quantity</span>
+                          <p className="text-xs font-semibold text-[var(--on-surface)]">
+                            {display(requestData.quantity)} {display(requestData.unit_pc_pack)}
+                          </p>
+                          {requestData.qty_per_pack && (
+                            <p className="text-[11px] text-[var(--on-surface-muted)]">{String(requestData.qty_per_pack)} pcs per pack</p>
+                          )}
+                        </div>
+
+                        <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Category Taxonomy</span>
+                          <p className="text-xs font-semibold text-[var(--on-surface)]">{display(requestData.category || "Paper Stationery")}</p>
+                          <p className="text-[11px] text-[var(--on-surface-muted)]">{display(requestData.subcategory || requestData.product_type)}</p>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">SKU &amp; Barcode</span>
+                          <p className="truncate text-xs font-mono font-bold text-[var(--on-surface)]">{display(requestData.customer_product_code || requestData.barcode)}</p>
+                          <p className="truncate text-[11px] text-[var(--on-surface-muted)]">Barcode: {display(requestData.barcode)}</p>
+                        </div>
+
+                        {(requestData.target_plant || requestData.plant) && (
+                          <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Target Manufacturing Plant</span>
+                            <p className="text-xs font-semibold text-[var(--on-surface)]">{String(requestData.target_plant || requestData.plant)}</p>
+                          </div>
+                        )}
                       </div>
 
                       <ScopeReferenceImagesGallery
@@ -1040,11 +1181,11 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                   {/* ═════════ TAB 2: PRODUCT CLASSES & SPECIFICATIONS ═════════ */}
                   {activeTab === "specs" && (
                     <div className="space-y-4">
-                      {/* ── Section 2: Product Classes & Specifications ── */}
+                      {/* ── Section 2: Product Classes & Characteristics ── */}
                     <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2 pt-2">
                       <Layers className="w-4 h-4 text-teal-600" />
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
-                        2. Product Classes & Specifications
+                        2. Product Classes & Characteristics
                       </h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
                         {specViewMode === "configured"
@@ -1052,6 +1193,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                           : `${productSpecifications.length} Specs`}
                       </span>
                     </div>
+                    <p className="rounded-lg bg-[var(--surface-low)] px-3.5 py-2.5 text-xs text-[var(--on-surface-muted)]">
+                      <span className="font-semibold text-[var(--on-surface)]">Product description:</span>{" "}
+                      {record.product_description || "No product description provided."}
+                    </p>
                     {mode === "creative" && (
                       <div className="rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3 text-xs text-violet-950 dark:border-violet-900/50 dark:bg-violet-950/20 dark:text-violet-100">
                         Review each product class and characteristic. You can edit any value here;
@@ -1364,9 +1509,44 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                       })()
                     )}
 
-                    {/* Creative Handoff Button if in Creative Mode */}
+                  </div>
+                )}
+
+                {/* ════════════════════════════════════════════════════════════════════
+                     TAB 3: CREATIVE INPUT
+                   ════════════════════════════════════════════════════════════════════ */}
+                {activeTab === "creative" && (
+                  <div className="space-y-5">
+                    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-3">
+                        <div className="flex items-center gap-2">
+                          <Palette className="w-4 h-4 text-violet-600" />
+                          <h3 className="text-sm font-bold text-[var(--on-surface)]">Creative Input</h3>
+                        </div>
+                        {creativeDeadlineLabel && (
+                          <span className="text-[11px] font-semibold text-[var(--accent-primary)] bg-[var(--surface-low)] px-2.5 py-1 rounded-md">
+                            Creative SLA: {creativeDeadlineLabel} IST
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-[var(--on-surface)]">
+                        {isCreativeReview
+                          ? "Awaiting Creative review before Costing can begin."
+                          : "Creative review was requested before this Costing task."}
+                      </p>
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+                          Marketing remarks
+                        </span>
+                        <p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--on-surface-muted)] bg-[var(--surface-low)] p-3 rounded-xl">
+                          {record.costing_creative_input_remark?.trim() ||
+                            "Marketing requested Creative Studio review without additional remarks."}
+                        </p>
+                      </div>
+                    </section>
+
                     {canReleaseToCosting && (
-                      <div className="pt-3 flex justify-end">
+                      <div className="flex justify-end">
                         <button
                           type="button"
                           disabled={
@@ -1388,76 +1568,20 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                 )}
 
                 {/* ════════════════════════════════════════════════════════════════════
-                     TAB 3: COMMERCIAL TERMS & CREATIVE INPUTS
-                   ════════════════════════════════════════════════════════════════════ */}
-                {activeTab === "commercial" && (
-                  <div className="space-y-5">
-                    {/* Creative Studio Handoff Card */}
-                    {record.costing_creative_input_needed && (
-                      <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-5 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="text-xs font-bold text-[var(--on-surface)] uppercase font-mono tracking-wider flex items-center gap-2">
-                            <Palette className="w-3.5 h-3.5 text-violet-600" />
-                            <span>Creative Input Requested by Marketing</span>
-                          </h3>
-                          {creativeDeadlineLabel && (
-                            <span className="text-[11px] font-semibold text-[var(--accent-primary)] bg-[var(--surface-lowest)] px-2.5 py-0.5 rounded-md border border-[var(--border-subtle)]">
-                              Creative SLA: {creativeDeadlineLabel} IST
-                            </span>
-                          )}
-                        </div>
-                        <p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--on-surface-muted)] bg-[var(--surface-lowest)] p-3 rounded-xl border border-[var(--border-subtle)]">
-                          {record.costing_creative_input_remark?.trim() ||
-                            "Marketing requested Creative Studio review without additional remarks."}
-                        </p>
-                      </section>
-                    )}
-
-                    {/* Commercial Inputs Specification Grid */}
-                    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 space-y-4">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] font-mono">
-                        Commercial Product Registration Fields
-                      </h3>
-                      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {[
-                          ["Customer Account", record.customer],
-                          ["Brand Label", record.brand_name],
-                          ["Material Code", record.material_code],
-                          ["Customer SKU Code", requestData.customer_product_code],
-                          ["Barcode / EAN", requestData.barcode],
-                          ["Costing Target Quantity", requestData.quantity],
-                          ["Target Unit", requestData.unit_pc_pack],
-                          [
-                            "Packaging Breakdown",
-                            requestData.unit_pc_pack === "Pack"
-                              ? `${requestData.qty_per_pack} pcs / pack`
-                              : "PC (Individual Units)",
-                          ],
-                          ["Primary Category", requestData.category],
-                          ["Sub-Category", requestData.sub_category],
-                          ["Third Category", requestData.third_category],
-                          ["Target Delivery Date", formatDate(requestData.required_date)],
-                        ].map(([lbl, val]) => (
-                          <div
-                            key={String(lbl)}
-                            className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]"
-                          >
-                            <dt className="text-[10px] font-mono font-medium uppercase tracking-wider text-[var(--on-surface-subtle)]">
-                              {String(lbl)}
-                            </dt>
-                            <dd className="mt-1 text-xs font-semibold text-[var(--on-surface)] break-words">
-                              {display(val)}
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </div>
-                  </div>
-                )}
-
-                {/* ════════════════════════════════════════════════════════════════════
                      TAB 4: SAMPLING REVIEW & SIGN-OFF
                    ════════════════════════════════════════════════════════════════════ */}
+                {activeTab === "sampling_team" && (
+                  <section className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+                      <Users className="w-4 h-4 text-[var(--accent-primary)]" />
+                      <h3 className="text-sm font-bold text-[var(--on-surface)]">Sampling Team</h3>
+                    </div>
+                    <p className="text-xs leading-relaxed text-[var(--on-surface-muted)]">
+                      Sampling Team section is in place. Its checks and actions will be added after the workflow is defined.
+                    </p>
+                  </section>
+                )}
+
                 {activeTab === "review" && (
                   <div className="space-y-5">
                     {/* Review Decision Workspace */}
@@ -1580,7 +1704,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
             title="Audit & Activity Log"
             events={costingChatterEvents}
             currentUser={user}
-            className="w-80 lg:w-96"
+            className="h-[34vh] w-full shrink-0 border-l-0 border-t border-[var(--border-subtle)] lg:h-full lg:w-[360px] lg:border-l lg:border-t-0 xl:w-[440px]"
           />
         </div>
       </section>

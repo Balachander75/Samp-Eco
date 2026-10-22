@@ -204,10 +204,15 @@ export async function fetchAllProductCharacteristics(): Promise<ProductCharacter
 
 export async function fetchProductDetailsApi(
   sampleRequestId: number | string,
-  excludeNa: boolean = false
+  excludeNa: boolean = false,
+  onlyProductClasses: boolean = false,
+  catalogLookup: boolean = false,
 ): Promise<ProductDetailItem[]> {
   try {
-    const endpoint = `/api/v1/product-characteristics/details/${sampleRequestId}${excludeNa ? "?exclude_na=true" : ""}`;
+    const query = new URLSearchParams();
+    if (excludeNa) query.set("exclude_na", "true");
+    if (catalogLookup) query.set("catalog_lookup", "true");
+    const endpoint = `/api/v1/product-characteristics/details/${sampleRequestId}${query.size ? `?${query.toString()}` : ""}`;
     const [rawDetails, characteristics] = await Promise.all([
       apiFetch<any[]>(endpoint).catch(() => []),
       fetchAllProductCharacteristics(),
@@ -232,8 +237,9 @@ export async function fetchProductDetailsApi(
         ? configuredClasses
         : new Set(data.map((d: any) => (d.class_name || "").toUpperCase()).filter(Boolean));
 
-    const targetCharacteristics =
-      excludeNa && presentClasses.size > 0
+    const targetCharacteristics = onlyProductClasses
+      ? characteristics.filter((c) => presentClasses.has(c.class_name.toUpperCase()))
+      : excludeNa && presentClasses.size > 0
         ? characteristics.filter((c) => presentClasses.has(c.class_name.toUpperCase()))
         : characteristics;
 
@@ -268,7 +274,7 @@ export async function fetchProductDetailsApi(
       const dVal = (d.value || "").toString().trim().toUpperCase();
       const isConfigured = dVal && !["NA", "N/A", "NAN", "NULL", "NONE", "—", "-"].includes(dVal);
       const isPresentClass = d.class_name && presentClasses.has(d.class_name.toUpperCase());
-      if (!seenKeys.has(key) && (isPresentClass || isConfigured)) {
+      if (!seenKeys.has(key) && (isPresentClass || (!onlyProductClasses && isConfigured))) {
         mergedList.push({
           id: d.id,
           sampleRequestId: d.sample_request_id ?? (Number(sampleRequestId) || 0),

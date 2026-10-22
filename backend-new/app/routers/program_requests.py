@@ -57,10 +57,6 @@ def _require_program_request_visibility(request_id: int, service: ProgramRequest
     creator_id = item.get("created_by_user_id")
     if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user) and creator_id != current_user.id:
         raise HTTPException(status_code=404, detail="Program planning request was not found")
-    if user_has_team(current_user, "samp") and not is_admin(current_user) and not is_team_head(current_user) and item.get("sampling_claimed_by_user_id") not in (None, current_user.id):
-        raise HTTPException(status_code=404, detail="Program planning request was not found")
-    if user_has_team(current_user, "plant") and not is_admin(current_user) and not is_team_head(current_user) and item.get("plant_claimed_by_user_id") not in (None, current_user.id):
-        raise HTTPException(status_code=404, detail="Program planning request was not found")
     require_plant_access(current_user, item.get("target_plant"), service.db)
     return item
 
@@ -85,8 +81,9 @@ def list_program_requests(
     rows = service.list_all(
         year=year, status_filter=status_filter, plant_labels=plant_labels,
         created_by_user_id=(current_user.id if user_has_team(current_user, "marketing") and not is_admin(current_user) and not is_team_head(current_user) else None),
-        visible_samp_user_id=(current_user.id if user_has_team(current_user, "samp") and not is_admin(current_user) and not is_team_head(current_user) else None),
-        visible_plant_user_id=(current_user.id if user_has_team(current_user, "plant") and not is_admin(current_user) and not is_team_head(current_user) else None),
+        # Claims reserve write access but do not hide work from teammates.
+        visible_samp_user_id=None,
+        visible_plant_user_id=None,
         offset=offset,
         limit=limit,
         before_id=before_id,

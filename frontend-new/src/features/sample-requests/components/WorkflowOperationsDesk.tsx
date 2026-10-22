@@ -83,6 +83,7 @@ function isPastDate(value: unknown) {
 
 function needsCostingAttention(record: RequestWorkflowRecord) {
   if (record.reviewer_status === "returned") return true;
+  if (record.claim_overdue || record.is_delayed) return true;
   if (record.current_stage === "done") return false;
   const dueDate = record.current_stage === "creative"
     ? record.creative_due_at
@@ -173,6 +174,19 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
     () => records.filter((record) => record.reviewer_status === "returned").length,
     [records]
   );
+  const teamDelayCounts = useMemo(() => {
+    const counts: Record<string, number> = { "Creative Studio": 0, Costing: 0, Sampling: 0 };
+    records
+      .filter((record) => record.workflow_type === "costing")
+      .forEach((record) => {
+        Object.entries(record.delay_counts_by_team || {}).forEach(([team, count]) => {
+          if (team in counts) counts[team] += Number(count) || 0;
+        });
+      });
+    return counts;
+  }, [records]);
+  const teamDelayCount = Object.values(teamDelayCounts).reduce((total, count) => total + count, 0);
+  const teamDelayDetail = `Creative ${teamDelayCounts["Creative Studio"]} · Costing ${teamDelayCounts.Costing} · Sampling ${teamDelayCounts.Sampling}`;
 
   const visibleRecords = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -190,7 +204,8 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
       // Stage filter
       const matchesStage = stageFilter === "all"
         || (stageFilter === "returned" ? record.reviewer_status === "returned"
-          : stageFilter === "needs_attention" ? needsCostingAttention(record)
+          : stageFilter === "delayed" ? record.workflow_type === "costing" && Boolean(record.delay_count)
+            : stageFilter === "needs_attention" ? needsCostingAttention(record)
             : stageFilter === "my_work" ? record.current_stage === "costing" && Boolean(record.is_claimed_by_me)
               : record.current_stage === stageFilter);
       if (!matchesStage) return false;
@@ -271,9 +286,10 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
       ...stages.map((stage) => ({ value: stage, label: stageLabels[stage] || stage })),
       ...(mode === "costing" ? [{ value: "my_work", label: "My claimed work" }] : []),
       ...(mode === "costing" ? [{ value: "needs_attention", label: "Needs attention" }] : []),
+      ...(teamDelayCount ? [{ value: "delayed", label: `Team delays (${teamDelayCount})` }] : []),
       ...(returnedCount ? [{ value: "returned", label: "Returned for revision" }] : []),
     ];
-  }, [records, returnedCount, mode]);
+  }, [records, returnedCount, mode, teamDelayCount]);
 
   const columns = useMemo<ColumnDef<RequestWorkflowRecord>[]>(() => {
     const inspectColumn: ColumnDef<RequestWorkflowRecord> = {
@@ -353,7 +369,17 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
             );
           },
         },
-        { id: "required", header: "Required Date", width: widths.required, cell: (record) => <span className="whitespace-nowrap text-[11px] tabular-nums text-[var(--on-surface-muted)]">{formatRequiredDate(record.request_data?.required_date)}</span> },
+        {
+          id: "required",
+          header: "Required / Counter Date",
+          width: widths.required,
+          cell: (record) => (
+            <div className="whitespace-nowrap text-[11px] tabular-nums text-[var(--on-surface-muted)]">
+              <span className="block">Required: {formatRequiredDate(record.request_data?.required_date)}</span>
+              {record.team_counter_date && <span className="mt-0.5 block font-semibold text-[var(--accent-primary)]">Counter: {formatRequiredDate(record.team_counter_date)}</span>}
+            </div>
+          ),
+        },
         {
           id: "output",
           header: "Costing Sheet",
@@ -380,7 +406,9 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
               <span className="max-w-full whitespace-normal break-words rounded-full bg-[var(--surface-low)] px-2 py-0.5 text-[10px] font-semibold leading-tight text-[var(--on-surface-muted)]">{stageLabels[record.current_stage] || record.current_stage}</span>
               {record.reviewer_status === "bypassed" && <span className="max-w-full text-[9px] leading-tight font-semibold text-blue-700 dark:text-blue-300">SAMP approval bypassed · sent directly to Plant</span>}
               {record.reviewer_status === "returned" && <span className="text-[9px] leading-tight font-semibold text-amber-700 dark:text-amber-300">Returned for revision</span>}
-              {record.reviewer_status !== "returned" && needsCostingAttention(record) && <span className="text-[9px] leading-tight font-semibold text-rose-700 dark:text-rose-300">Past due</span>}
+              {record.is_delayed && <span className="text-[9px] leading-tight font-semibold text-rose-700 dark:text-rose-300">Delayed for {record.delay_team || "team"}</span>}
+              {!record.is_delayed && record.claim_overdue && <span className="text-[9px] leading-tight font-semibold text-amber-700 dark:text-amber-300">Claim window passed</span>}
+              {!record.is_delayed && !record.claim_overdue && record.reviewer_status !== "returned" && needsCostingAttention(record) && <span className="text-[9px] leading-tight font-semibold text-rose-700 dark:text-rose-300">Past due</span>}
             </div>
           ),
         },
@@ -534,6 +562,16 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
                   Returned for revision
                 </span>
               )}
+              {record.is_delayed && (
+                <span className="mt-1 block text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+                  Delayed for {record.delay_team || "team"}
+                </span>
+              )}
+              {!record.is_delayed && record.claim_overdue && (
+                <span className="mt-1 block text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                  Claim window passed
+                </span>
+              )}
             </div>
           );
         },
@@ -573,6 +611,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
       { label: "My Work", value: myCostingWorkCount, detail: "Costing requests claimed by you", color: "bg-emerald-600", isActive: stageFilter === "my_work", onClick: () => setStageFilter((current) => current === "my_work" ? "costing" : "my_work") },
       { label: "In Review", value: inReviewCount, detail: "Submitted to Sampling for review", color: "bg-blue-600", isActive: stageFilter === "sampling_review", onClick: () => setStageFilter((current) => current === "sampling_review" ? "all" : "sampling_review") },
       { label: "Needs Attention", value: needsAttentionCount, detail: "Returned or past the required date", color: "bg-amber-600", isActive: stageFilter === "needs_attention", onClick: () => setStageFilter((current) => current === "needs_attention" ? "all" : "needs_attention") },
+      { label: "Team Delays", value: teamDelayCount, detail: teamDelayDetail, color: "bg-rose-700", isActive: stageFilter === "delayed", onClick: () => setStageFilter((current) => current === "delayed" ? "all" : "delayed") },
       { label: "Done", value: doneCount, detail: "Approved and closed", color: "bg-teal-600", isActive: stageFilter === "done", onClick: () => setStageFilter((current) => current === "done" ? "all" : "done") },
     ]
     : [
@@ -615,6 +654,14 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
         color: "bg-amber-600",
         isActive: deliverableFilter === "costing",
         onClick: () => setDeliverableFilter((c) => c === "costing" ? "all" : "costing"),
+      },
+      {
+        label: "Team Delays",
+        value: teamDelayCount,
+        detail: teamDelayDetail,
+        color: "bg-rose-700",
+        isActive: stageFilter === "delayed",
+        onClick: () => setStageFilter((current) => current === "delayed" ? "all" : "delayed"),
       },
       {
         label: "Direct Resamples",
@@ -732,7 +779,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
                   <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-[var(--border-subtle)] pt-2">
                     <span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-wide text-[var(--on-surface-subtle)]">Material</span><span className="block truncate text-[11px] font-mono text-[var(--on-surface)]">{record.material_code || "—"}</span></span>
                     <span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-wide text-[var(--on-surface-subtle)]">Quantity</span><span className="block truncate text-[11px] text-[var(--on-surface)]">{quantity ? `${String(quantity)} ${unit}` : "—"}{unit === "PACK" && record.request_data?.qty_per_pack ? ` · ${String(record.request_data.qty_per_pack)} per pack` : ""}</span></span>
-                    <span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-wide text-[var(--on-surface-subtle)]">Required Date</span><span className="block truncate text-[11px] text-[var(--on-surface)]">{formatRequiredDate(record.request_data?.required_date)}</span></span>
+                    <span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-wide text-[var(--on-surface-subtle)]">Required / Counter Date</span><span className="block truncate text-[11px] text-[var(--on-surface)]">Required: {formatRequiredDate(record.request_data?.required_date)}</span>{record.team_counter_date && <span className="block truncate text-[10px] font-semibold text-[var(--accent-primary)]">Counter: {formatRequiredDate(record.team_counter_date)}</span>}</span>
                     <span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-wide text-[var(--on-surface-subtle)]">Costing Sheet</span><span className="block truncate text-[11px] text-[var(--on-surface)]">{record.costing_output_path ? "Available · open request" : "Not submitted"}</span></span>
                   </div>
                   {canViewCostingClaims && (

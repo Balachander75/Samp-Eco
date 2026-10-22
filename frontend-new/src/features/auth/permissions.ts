@@ -1,6 +1,6 @@
 import type { UserProfile } from "./types";
 
-export type WorkflowTeam = "marketing" | "samp" | "plant" | "creative_studio" | "costing";
+export type WorkflowTeam = "marketing" | "samp" | "plant" | "creative" | "studio" | "costing";
 export type AssignedWorkspaceTeam = "marketing" | "samp" | "plant" | "creative" | "studio" | "costing";
 
 function normalize(value: unknown): string {
@@ -23,8 +23,7 @@ export function getAssignedWorkspaceTeam(user?: UserProfile | null): AssignedWor
 }
 
 export function getAssignedWorkflowTeam(user?: UserProfile | null): WorkflowTeam | null {
-  const team = getAssignedWorkspaceTeam(user);
-  return team === "creative" || team === "studio" ? "creative_studio" : team;
+  return getAssignedWorkspaceTeam(user);
 }
 
 export function isRootAdmin(user?: UserProfile | null): boolean {
@@ -38,15 +37,7 @@ export function isReadOnlyTeamHead(user?: UserProfile | null): boolean {
 
 export function hasWorkflowTeam(user: UserProfile | null | undefined, team: WorkflowTeam): boolean {
   if (!user || isAdmin(user)) return false;
-  const aliases: Record<WorkflowTeam, string[]> = {
-    marketing: ["marketing"],
-    samp: ["samp", "sampling"],
-    plant: ["plant"],
-    creative_studio: ["creative", "studio"],
-    costing: ["costing"],
-  };
-  const values = user.team ? [user.team] : [];
-  return values.some((value) => aliases[team].some((alias) => normalize(value).includes(alias)));
+  return getAssignedWorkspaceTeam(user) === team;
 }
 
 export function getWorkspaceHome(user?: UserProfile | null): string {
@@ -56,7 +47,7 @@ export function getWorkspaceHome(user?: UserProfile | null): string {
   if (assignedTeam === "samp" || hasWorkflowTeam(user, "samp")) return "/samp-team-work";
   if (assignedTeam === "plant" || hasWorkflowTeam(user, "plant")) return "/plant";
   if (assignedTeam === "studio") return "/studio-work";
-  if (assignedTeam === "creative" || hasWorkflowTeam(user, "creative_studio")) return "/creative-work";
+  if (assignedTeam === "creative" || hasWorkflowTeam(user, "creative")) return "/creative-work";
   if (assignedTeam === "costing" || hasWorkflowTeam(user, "costing")) return "/costing-team";
   return "/help";
 }
@@ -71,8 +62,8 @@ export function canAccessWorkspacePath(user: UserProfile, rawPath: string): bool
   }
 
   const assignedTeam = getAssignedWorkflowTeam(user);
-  if (path === "/team-work/feasibility") return ["creative_studio", "costing"].includes(assignedTeam || "");
-  if (path === "/team-work/programs") return ["creative_studio", "costing"].includes(assignedTeam || "");
+  if (path === "/team-work/feasibility") return ["creative", "studio", "costing"].includes(assignedTeam || "");
+  if (path === "/team-work/programs") return ["creative", "studio", "costing"].includes(assignedTeam || "");
   const hasTeam = (team: WorkflowTeam) => assignedTeam === team || hasWorkflowTeam(user, team);
 
   if (path === "/dashboard" || path === "/") return false;
@@ -86,10 +77,10 @@ export function canAccessWorkspacePath(user: UserProfile, rawPath: string): bool
     return hasTeam("samp");
   }
   if (["/creative-work", "/creative", "/artwork"].some((p) => path === p || path.startsWith(`${p}/`))) {
-    return hasTeam("creative_studio");
+    return hasTeam("creative");
   }
   if (["/studio-work", "/studio", "/cad", "/prepress"].some((p) => path === p || path.startsWith(`${p}/`))) {
-    return hasTeam("creative_studio");
+    return hasTeam("studio");
   }
   if (["/plant", "/plants", "/plant-execution", "/plant-work"].some((p) => path === p || path.startsWith(`${p}/`))) {
     return hasTeam("plant");

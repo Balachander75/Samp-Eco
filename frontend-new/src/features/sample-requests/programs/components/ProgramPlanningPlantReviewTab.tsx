@@ -13,6 +13,7 @@ import {
   FileCheck2,
 } from "lucide-react";
 import { updateBatchProgramPlantRemarksApi } from "@/infrastructure/api/programsApi";
+import { TaskClaimBanner } from "@/components/ui/TaskClaimBanner";
 
 export interface ProgramPlanningPlantReviewTabProps {
   activeRequest: SampleRequestItem;
@@ -46,8 +47,15 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
   // Claim & Ownership Verification
   const claimUserId = activeRequest.plantClaimedByUserId != null ? String(activeRequest.plantClaimedByUserId) : null;
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
-  const isClaimed = Boolean(claimUserId);
-  const isClaimedByMe = Boolean(claimUserId && currentUserId && claimUserId === currentUserId);
+  const claimOwner = activeRequest.plantClaimedBy || null;
+  const isClaimed = Boolean(claimUserId || claimOwner);
+  const isClaimedByMe = Boolean(isClaimed && (
+    claimUserId && currentUserId
+      ? claimUserId === currentUserId
+      : [currentUser?.name, currentUser?.userid].some((value) =>
+          Boolean(value && claimOwner && value.trim().toLowerCase() === claimOwner.trim().toLowerCase())
+        )
+  ));
 
   // Every Plant response must be submitted by the reviewer who owns the claim.
   const canSubmitReview = isPlantDesk && !readOnly && isClaimedByMe;
@@ -206,6 +214,9 @@ export const ProgramPlanningPlantReviewTab: React.FC<ProgramPlanningPlantReviewT
       </div>
 
       {/* ── Section A: Primary Factory Feasibility Observation ── */}
+      {isClaimed && (
+        <TaskClaimBanner claimedBy={claimOwner} isClaimedByCurrentUser={isClaimedByMe} compact />
+      )}
       <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-2xs space-y-2.5">
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
           <div>

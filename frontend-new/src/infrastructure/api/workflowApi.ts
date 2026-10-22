@@ -47,8 +47,19 @@ export interface RequestWorkflowRecord {
   claimed_by?: string | null;
   claimed_by_user_id?: number | null;
   claimed_at?: string | null;
+  claimed_stage?: string | null;
   is_claimed?: boolean;
   is_claimed_by_me?: boolean;
+  claim_due_at?: string | null;
+  team_counter_date?: string | null;
+  team_counter_date_reason?: string | null;
+  claim_overdue?: boolean;
+  is_delayed?: boolean;
+  delay_team?: string | null;
+  delay_history?: Array<Record<string, unknown>>;
+  delayed_teams?: string[];
+  delay_counts_by_team?: Record<string, number>;
+  delay_count?: number;
   marketing_decision?: string | null;
   is_closed?: boolean;
   closure?: any;
@@ -116,10 +127,16 @@ export function completeCostingWorkflowApi(
   });
 }
 
-export function claimCostingWorkflowApi(sampleRequestId: number): Promise<RequestWorkflowRecord> {
+export function claimCostingWorkflowApi(
+  sampleRequestId: number,
+  payload: { teamCounterDate?: string; counterDateReason?: string } = {},
+): Promise<RequestWorkflowRecord> {
   return apiFetch<RequestWorkflowRecord>(`/api/v1/workflows/costing/${sampleRequestId}/claim`, {
     method: "POST",
-    jsonBody: {},
+    jsonBody: {
+      team_counter_date: payload.teamCounterDate,
+      counter_date_reason: payload.counterDateReason,
+    },
   }).then((result) => {
     if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("samp:requests-changed"));
     return result;

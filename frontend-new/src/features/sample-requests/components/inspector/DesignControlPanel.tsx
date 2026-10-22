@@ -26,7 +26,6 @@ export interface DesignControlPanelProps {
   isAwaitingReview: boolean;
   isClosed: boolean;
   isAcceptedByMarketing: boolean;
-  isCounterDatePending: boolean;
   closureRequests?: RequestClosureTarget[];
   canCloseRequest?: boolean;
   onRequestClosed?: () => void | Promise<void>;
@@ -47,7 +46,6 @@ export const DesignControlPanel: React.FC<DesignControlPanelProps> = ({
   isAwaitingReview,
   isClosed,
   isAcceptedByMarketing,
-  isCounterDatePending,
   closureRequests = [],
   canCloseRequest = false,
   onRequestClosed,
@@ -114,15 +112,30 @@ export const DesignControlPanel: React.FC<DesignControlPanelProps> = ({
   ];
 
   const getRoleStatusIndicator = () => {
-    if (isCreativeMode) {
-      if (isCounterDatePending) {
+    if (isSamplingMode) {
+      if (isClosed || isAcceptedByMarketing) {
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
-            <Clock className="w-3 h-3" />
-            Date Proposal Pending
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <CheckCircle2 className="w-3 h-3" />
+            Review Complete
           </span>
         );
       }
+      if (activeRequest.samplingClaimedBy) {
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
+            Assigned: {activeRequest.samplingClaimedBy}
+          </span>
+        );
+      }
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+          <AlertCircle className="w-3 h-3" />
+          Sampling Claim Required
+        </span>
+      );
+    }
+    if (isCreativeMode) {
       if (isAwaitingReview) {
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/20 font-bold">
@@ -150,14 +163,6 @@ export const DesignControlPanel: React.FC<DesignControlPanelProps> = ({
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
             <CheckCircle2 className="w-3 h-3" />
             Artwork Accepted
-          </span>
-        );
-      }
-      if (isCounterDatePending) {
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 animate-pulse">
-            <Clock className="w-3 h-3" />
-            Action: Review Counter Date
           </span>
         );
       }

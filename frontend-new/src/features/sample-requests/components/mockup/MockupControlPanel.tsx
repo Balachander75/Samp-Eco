@@ -91,7 +91,7 @@ export const MockupControlPanel: React.FC<MockupControlPanelProps> = ({
     },
     {
       tabId: "studio" as const,
-      label: isStudioOutputReady ? "3. CAD Output" : "3. Studio CAD",
+      label: isStudioOutputReady ? "3. Studio Output" : "3. Studio",
       status: isStudioDone || isStudioOutputReady
         ? ("done" as const)
         : ws.stage === "studio"
@@ -129,12 +129,12 @@ export const MockupControlPanel: React.FC<MockupControlPanelProps> = ({
     switch (role) {
       case "creative":
         return {
-          label: "Creative Studio",
+          label: "Creative",
           className: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
         };
       case "studio":
         return {
-          label: "Studio CAD Desk",
+          label: "Studio",
           className: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20",
         };
       case "sampling":
@@ -186,7 +186,7 @@ export const MockupControlPanel: React.FC<MockupControlPanelProps> = ({
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
             <Clock className="w-3 h-3" />
-            In Studio CAD
+            In Studio
           </span>
         );
       }
@@ -194,7 +194,7 @@ export const MockupControlPanel: React.FC<MockupControlPanelProps> = ({
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
             <Clock className="w-3 h-3" />
-            In Creative Studio
+            In Creative
           </span>
         );
       }

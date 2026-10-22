@@ -33,7 +33,13 @@ export const StudioWorkDesk: React.FC<StudioWorkDeskProps> = ({ user }) => {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const rows = await fetchSampleRequestsApi(selectedYear, false, "mockup");
+      const [sampleRows, mockupRows] = await Promise.all([
+        fetchSampleRequestsApi(selectedYear, false, "sample"),
+        fetchSampleRequestsApi(selectedYear, false, "mockup"),
+      ]);
+      const rows = Array.from(new Map(
+        [...sampleRows, ...mockupRows].map((request) => [String(request.id), request] as const)
+      ).values());
       const studioRows = rows.filter((request) => {
         if (isDirectPlantResampleRequest(request)) return false;
         const stage = String(request.mockupWorkflowState?.stage || "").toLowerCase();

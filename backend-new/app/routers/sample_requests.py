@@ -39,6 +39,7 @@ from app.models.request_workflows import (
 from app.models.request_closure import RequestClosure
 from app.repositories.sample_request_repo import MISSING_TAXONOMY_FILTER
 from app.services.sample_request_service import SampleRequestService
+from app.services.costing_workflow_sla import activate_stage, record_stage_delay
 from app.services.design_request_service import DesignRequestService
 from app.utils.operational_workdays import india_operational_deadline
 
@@ -175,6 +176,7 @@ def _record_workflow_event(db, *, kind: str, record: CreateSampleRequest, user: 
                 request_data={
                     "customer": record.customer,
                     "brand_name": record.brand_name,
+                    "target_plant": record.target_plant,
                     "material_code": record.material_code,
                     "quantity": record.qty_design_costing,
                     "unit_pc_pack": record.unit_pc_pack,
@@ -203,22 +205,28 @@ def _record_workflow_event(db, *, kind: str, record: CreateSampleRequest, user: 
             ))
         if not workflow.request_code:
             workflow.request_code = SampleRequestService(db)._reserve_scope_code(record, "costing")
-        else:
-            workflow.request_data = {
-                **(workflow.request_data or {}),
-                "customer": record.customer,
-                "brand_name": record.brand_name,
-                "material_code": record.material_code,
-                "quantity": record.qty_design_costing,
-                "unit_pc_pack": record.unit_pc_pack,
-                "qty_per_pack": record.qty_per_pack,
-                "required_date": record.costing_required_date,
-                "costing_creative_input_needed": bool(record.costing_creative_input_needed),
-                "costing_creative_input_remark": record.costing_creative_input_remark,
-                "product_description": record.product_description,
-            }
+        workflow.request_data = {
+            **(workflow.request_data or {}),
+            "customer": record.customer,
+            "brand_name": record.brand_name,
+            "target_plant": record.target_plant,
+            "material_code": record.material_code,
+            "quantity": record.qty_design_costing,
+            "unit_pc_pack": record.unit_pc_pack,
+            "qty_per_pack": record.qty_per_pack,
+            "required_date": record.costing_required_date,
+            "costing_creative_input_needed": bool(record.costing_creative_input_needed),
+            "costing_creative_input_remark": record.costing_creative_input_remark,
+            "product_description": record.product_description,
+        }
 
     if kind == "costing":
+        previous_stage = workflow.current_stage
+        stage_transition_at = datetime.now(timezone.utc)
+        previous_stage_delay = (
+            record_stage_delay(workflow, record, stage_transition_at)
+            if previous_stage != to_stage else None
+        )
         if to_stage == "creative":
             workflow.creative_due_at = (
                 india_operational_deadline(datetime.now(timezone.utc), 2)
@@ -229,12 +237,17 @@ def _record_workflow_event(db, *, kind: str, record: CreateSampleRequest, user: 
 
     workflow.sr_number = record.sr_number
     workflow.current_stage = to_stage
+    if kind == "costing" and previous_stage != to_stage:
+        activate_stage(workflow, to_stage, stage_transition_at)
     workflow.status = to_status or record.status
     workflow.updated_at = datetime.now(timezone.utc)
     if to_stage == "done":
         workflow.closed_at = datetime.now(timezone.utc)
     elif from_stage == "done":
         workflow.closed_at = None
+    event_details = dict(details or {})
+    if kind == "costing" and previous_stage_delay:
+        event_details["previous_stage_delay"] = previous_stage_delay
     db.add(log_model(
         workflow_id=workflow.id,
         sample_request_id=record.id,
@@ -247,7 +260,7 @@ def _record_workflow_event(db, *, kind: str, record: CreateSampleRequest, user: 
         to_stage=to_stage,
         from_status=from_status,
         to_status=to_status or record.status,
-        details=details or {},
+        details=event_details,
     ))
 
 
@@ -285,8 +298,8 @@ def _initialize_scoped_workflows(db, record: CreateSampleRequest, user: Any) -> 
             initial_stage = "studio"
             mockup_action = "MARKETING_SUBMITTED_TO_STUDIO"
             state["creativeBypassed"] = True
-            state["creativeShutterstockNo"] = state.get("marketingShutterstockNo") or ""
-            state["creativeRemark"] = state.get("marketingRemark") or ""
+            state.pop("creativeShutterstockNo", None)
+            state.pop("creativeRemark", None)
             if not record.status or record.status in {"Brief Intake", "Draft (Pre-SMT)"}:
                 record.status = "Studio"
 
@@ -681,29 +694,42 @@ def delete_sample_request(
 
 
 
+def _sampling_creative_changes_required(state: dict, routing: dict) -> bool:
+    return bool(
+        state.get("creativeChangesRequired")
+        or state.get("hasCreativeChanges")
+        or state.get("creativeCharacteristicsCleared")
+        or state.get("creativePendingCharacteristicKeys")
+        or state.get("isDesignVariant")
+        or routing.get("creativeChangesRequired")
+        or routing.get("hasCreativeChanges")
+        or routing.get("creativeCharacteristicsCleared")
+        or routing.get("creativePendingCharacteristicKeys")
+        or state.get("variantNumber")
+        or routing.get("variantNumber")
+        or routing.get("isDesignVariant")
+    )
+
+
 def _evaluate_is_resample(
     record: CreateSampleRequest,
     service: SampleRequestService,
     state: dict,
     routing: dict,
 ) -> bool:
-    """Bulletproof determination if a sample request is a Resample to be released directly to Plant.
-
-    Rules:
-    1. If creation_mode is 'new', it is NEVER a resample (must go to Sampling Review PMT).
-    2. If state or routing explicitly says isResample:
-       Return True (as long as creation_mode != 'new').
-    3. Auto-detection fallback for catalog/existing products:
-       - creation_mode is not 'new'
-       - creative_changes_required is False
-       - not a design variant (no variantNumber)
-       - has an existing product source:
-         a) source_sample_request_id or source_sample_code is present and not temporary, OR
-         b) creation_mode in ("material_code", "binding", "resample"), OR
-         c) material_code is a valid catalog code (not starting with TMP- or NEW- or DSG-)
-    """
+    """Return true only for unchanged, standalone samples that bypass teams to Plant."""
     creation_mode = str(record.creation_mode or "").strip().lower()
     if creation_mode == "new":
+        return False
+
+    request_types = set(record.request_types or [])
+    if request_types and request_types != {"sample"}:
+        return False
+
+    creative_changes_required = _sampling_creative_changes_required(state, routing)
+    # An explicit resample marker can be stale after Marketing edits a source
+    # product. Changed specs and design variants must always go through teams.
+    if creative_changes_required:
         return False
 
     explicit_resample = bool(
@@ -715,11 +741,6 @@ def _evaluate_is_resample(
     )
     if explicit_resample:
         return True
-
-    creative_changes_required = bool(routing.get("creativeChangesRequired") or state.get("creativeChangesRequired"))
-    is_variant = bool(state.get("variantNumber") or routing.get("isDesignVariant"))
-    if creative_changes_required or is_variant:
-        return False
 
     mat_code = str(record.material_code or "").strip().upper()
     src_code = str(record.source_sample_code or "").strip().upper()
@@ -771,11 +792,10 @@ def release_batch_sample_requests(
         request_types = set(record.request_types or [])
         state = dict(record.mockup_workflow_state or {})
         routing = dict(state.get("samplingRouting") or {})
-        if "sample" in request_types:
+        if request_types == {"sample"}:
             current_stage = str(routing.get("stage") or "").strip().casefold()
             already_released = current_stage in {"creative", "sampling_review", "plant"}
             if not already_released:
-                needs_creative = bool(routing.get("creativeChangesRequired"))
                 is_resample = _evaluate_is_resample(record, service, state, routing)
                 if is_resample:
                     routing["isResample"] = True
@@ -786,21 +806,17 @@ def release_batch_sample_requests(
                     events = list(state.get("events") or [])
                     events.append({"id": f"event-{uuid4().hex}", "action": "RESAMPLE_SENT_DIRECTLY_TO_PLANT", "title": "Unchanged resample sent directly to Plant", "actorName": _marketing_actor(current_user), "actorDepartment": "Marketing", "timestamp": now})
                     state["events"] = events[-100:]
-                elif needs_creative:
+                else:
+                    routing["isResample"] = False
+                    state["isResample"] = False
                     routing["stage"] = "creative"
                     routing["creativeDueAt"] = india_operational_deadline(datetime.now(timezone.utc), 1).isoformat()
                     routing["creativeDelayed"] = False
-                else:
-                    routing["stage"] = "sampling_review"
-                    now = datetime.now(timezone.utc).isoformat()
-                    events = list(state.get("events") or [])
-                    events.append({"id": f"event-{uuid4().hex}", "action": "SUBMITTED_TO_SAMPLING_REVIEW", "title": "Submitted to Sampling Team for technical review", "actorName": _marketing_actor(current_user), "actorDepartment": "Marketing", "timestamp": now})
-                    state["events"] = events[-100:]
                 state["samplingRouting"] = routing
                 state["stage"] = routing["stage"]
                 record.mockup_workflow_state = state
 
-        sample_needs_creative = "sample" in request_types and bool(routing.get("creativeChangesRequired"))
+        sample_needs_creative = request_types == {"sample"} and routing.get("stage") == "creative"
         mockup_needs_creative = "mockup" in request_types and (_parse_mockup_design_needed(state.get("designNeeded")) is not False)
         costing_needs_creative = "costing" in request_types and bool(record.costing_creative_input_needed)
 
@@ -841,8 +857,8 @@ def release_batch_sample_requests(
                 target_stage = "studio" if design_needed is False else "creative"
                 if design_needed is False:
                     state["creativeBypassed"] = True
-                    state["creativeShutterstockNo"] = state.get("marketingShutterstockNo") or ""
-                    state["creativeRemark"] = state.get("marketingRemark") or ""
+                    state.pop("creativeShutterstockNo", None)
+                    state.pop("creativeRemark", None)
                 else:
                     state.pop("creativeBypassed", None)
                 state["stage"] = target_stage
@@ -906,8 +922,7 @@ def release_single_sample_request(
     actual_status = new_status
     mockup_state = dict(existing_record.mockup_workflow_state or {}) if existing_record else {}
     routing = dict(mockup_state.get("samplingRouting") or {})
-    if existing_record and "sample" in req_types:
-        needs_creative = bool(routing.get("creativeChangesRequired"))
+    if existing_record and set(req_types) == {"sample"}:
         is_resample = _evaluate_is_resample(existing_record, service, mockup_state, routing)
         if is_resample:
             routing["isResample"] = True
@@ -918,21 +933,17 @@ def release_single_sample_request(
             events = list(mockup_state.get("events") or [])
             events.append({"id": f"event-{uuid4().hex}", "action": "RESAMPLE_SENT_DIRECTLY_TO_PLANT", "title": "Unchanged resample sent directly to Plant", "actorName": _marketing_actor(current_user), "actorDepartment": "Marketing", "timestamp": now})
             mockup_state["events"] = events[-100:]
-        elif needs_creative:
+        else:
+            routing["isResample"] = False
+            mockup_state["isResample"] = False
             routing["stage"] = "creative"
             routing["creativeDueAt"] = india_operational_deadline(datetime.now(timezone.utc), 1).isoformat()
             routing["creativeDelayed"] = False
-        else:
-            routing["stage"] = "sampling_review"
-            now = datetime.now(timezone.utc).isoformat()
-            events = list(mockup_state.get("events") or [])
-            events.append({"id": f"event-{uuid4().hex}", "action": "SUBMITTED_TO_SAMPLING_REVIEW", "title": "Submitted to Sampling Team for technical review", "actorName": _marketing_actor(current_user), "actorDepartment": "Marketing", "timestamp": now})
-            mockup_state["events"] = events[-100:]
         mockup_state["samplingRouting"] = routing
         mockup_state["stage"] = routing["stage"]
         existing_record.mockup_workflow_state = mockup_state
 
-    sample_needs_creative = "sample" in req_types and bool(routing.get("creativeChangesRequired"))
+    sample_needs_creative = set(req_types) == {"sample"} and routing.get("stage") == "creative"
     mockup_needs_creative = "mockup" in req_types and (_parse_mockup_design_needed(mockup_state.get("designNeeded")) is not False)
     costing_needs_creative = "costing" in req_types and bool(existing_record.costing_creative_input_needed)
 
@@ -962,8 +973,8 @@ def release_single_sample_request(
             target_stage = "studio" if design_needed is False else "creative"
             if design_needed is False:
                 state["creativeBypassed"] = True
-                state["creativeShutterstockNo"] = state.get("marketingShutterstockNo") or ""
-                state["creativeRemark"] = state.get("marketingRemark") or ""
+                state.pop("creativeShutterstockNo", None)
+                state.pop("creativeRemark", None)
             else:
                 state.pop("creativeBypassed", None)
             state["stage"] = target_stage
@@ -1087,7 +1098,6 @@ def batch_update_status(
         if request_types == {"sample"} and is_releasing:
             state = dict(record.mockup_workflow_state or {})
             sampling_routing = dict(state.get("samplingRouting") or {})
-            creative_changes_required = bool(sampling_routing.get("creativeChangesRequired"))
             is_resample = _evaluate_is_resample(record, service, state, sampling_routing)
             if is_resample:
                 sampling_routing["isResample"] = True
@@ -1099,18 +1109,13 @@ def batch_update_status(
                 events = list(state.get("events") or [])
                 events.append({"id": f"event-{uuid4().hex}", "action": "RESAMPLE_SENT_DIRECTLY_TO_PLANT", "title": "Unchanged resample sent directly to Plant", "actorName": actor, "actorDepartment": "Marketing", "timestamp": released_at})
                 state["events"] = events[-100:]
-            elif creative_changes_required:
+            else:
+                sampling_routing["isResample"] = False
+                state["isResample"] = False
                 target_status = "Creative"
                 sampling_routing["stage"] = "creative"
                 sampling_routing["creativeDueAt"] = india_operational_deadline(datetime.now(timezone.utc), 1).isoformat()
                 sampling_routing["creativeDelayed"] = False
-            else:
-                target_status = "Sampling Review (PMT)"
-                sampling_routing["stage"] = "sampling_review"
-                released_at = datetime.now(timezone.utc).isoformat()
-                events = list(state.get("events") or [])
-                events.append({"id": f"event-{uuid4().hex}", "action": "SUBMITTED_TO_SAMPLING_REVIEW", "title": "Submitted to Sampling Team for technical review", "actorName": actor, "actorDepartment": "Marketing", "timestamp": released_at})
-                state["events"] = events[-100:]
             state["samplingRouting"] = sampling_routing
             state["stage"] = sampling_routing["stage"]
             record.mockup_workflow_state = state
@@ -1127,8 +1132,8 @@ def batch_update_status(
             target_stage = "studio" if design_needed is False else "creative"
             if design_needed is False:
                 state["creativeBypassed"] = True
-                state["creativeShutterstockNo"] = state.get("marketingShutterstockNo") or ""
-                state["creativeRemark"] = state.get("marketingRemark") or ""
+                state.pop("creativeShutterstockNo", None)
+                state.pop("creativeRemark", None)
                 if len(request_types) == 1:
                     target_status = "Studio"
             else:
@@ -1408,7 +1413,11 @@ def get_product_details(
     sample = service.get_by_id(sample_request_id)
     if not sample:
         raise HTTPException(status_code=404, detail="Sample request not found")
-    _require_marketing_request_owner(sample, current_user)
+    # Marketing's product finder is a shared catalog. Its read-only inspection
+    # request must allow viewing a product created by another Marketing user.
+    # Ordinary request-detail reads remain scoped to the request owner.
+    if not catalog_lookup:
+        _require_marketing_request_owner(sample, current_user)
     details = service.get_product_details(sample_request_id)
     if catalog_lookup:
         classes = sorted({str(item.get("class_name") or "").strip() for item in details if item.get("class_name")})
@@ -1554,15 +1563,13 @@ def _clear_mockup_stage_claim(state: Dict[str, Any]) -> None:
 
 def _require_mockup_stage_claim(state: Dict[str, Any], user: Any, expected_stage: str) -> None:
     """Require the current user to claim the exact Mockup stage before acting."""
-    if is_admin(user):
-        return
     claimed_stage = str(state.get("claimedStage") or "")
     claimed_by_id = state.get("claimedByUserId")
     if claimed_stage != expected_stage or claimed_by_id is None:
         raise HTTPException(status_code=409, detail="Claim this task before continuing")
     if str(claimed_by_id) != str(getattr(user, "id", None)):
         claimed_by = str(state.get("claimedBy") or "another teammate")
-        raise HTTPException(status_code=409, detail=f"This task is claimed by {claimed_by}")
+        raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {claimed_by}.")
 
 
 def _require_design_request_claim(state: Dict[str, Any], user: Any) -> None:
@@ -1651,8 +1658,10 @@ def claim_mockup_request(
     claimed_by = str(state.get("claimedBy") or "").strip()
     claimed_by_id = state.get("claimedByUserId")
 
-    if claimed_by and claimed_by_id and claimed_by_id != current_user.id and not is_admin(current_user):
-        raise HTTPException(status_code=409, detail=f"This task is already claimed by {claimed_by}")
+    if claimed_by and claimed_by_id and str(claimed_by_id) != str(current_user.id):
+        raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {claimed_by}.")
+    if claimed_by and claimed_by_id is None and claimed_by.casefold() != actor.casefold():
+        raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {claimed_by}.")
     if claimed_by_id is not None and str(claimed_by_id) == str(current_user.id) and state.get("claimedStage") == stage:
         return service.serialize(record)
 
@@ -1729,7 +1738,6 @@ def send_mockup_request_to_studio(
     sampling_routing = dict(state.get("samplingRouting") or {})
     is_sampling_creative_handoff = (
         request_types == {"sample"}
-        and bool(sampling_routing.get("creativeChangesRequired"))
         and previous_stage == "creative"
     )
     if "mockup" in request_types:
@@ -1751,6 +1759,19 @@ def send_mockup_request_to_studio(
             missing = pending - configured
             if missing:
                 raise HTTPException(status_code=422, detail="Complete all Creative-owned characteristics before sending this variant to Studio.")
+    if "costing" in request_types:
+        costing_workflow = service.db.query(CostingWorkflow).filter(
+            CostingWorkflow.sample_request_id == record.id
+        ).with_for_update().first()
+        if not costing_workflow or costing_workflow.current_stage != "creative":
+            raise HTTPException(status_code=409, detail="This Costing request is not awaiting Creative handoff")
+        if costing_workflow.claimed_by_user_id is None:
+            raise HTTPException(status_code=409, detail="Claim the Creative task before continuing")
+        claimed_stage = (costing_workflow.workflow_data or {}).get("claimed_stage") or "costing"
+        if claimed_stage != "creative":
+            raise HTTPException(status_code=409, detail="Claim the Creative task before continuing")
+        if str(costing_workflow.claimed_by_user_id) != str(getattr(current_user, "id", None)):
+            raise HTTPException(status_code=409, detail="This task is claimed by another Creative teammate")
     previous_status = record.status
     actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Creative Studio").strip()[:100]
 
@@ -2023,7 +2044,7 @@ def submit_studio_mockup(
     now = datetime.now(timezone.utc).isoformat()
     is_sampling_variant = (
         set(record.request_types or []) == {"sample"}
-        and bool((state.get("samplingRouting") or {}).get("creativeChangesRequired"))
+        and str((state.get("samplingRouting") or {}).get("stage") or "").casefold() == "studio"
     )
     if is_sampling_variant:
         next_stage = "creative_approval"
@@ -2077,7 +2098,7 @@ def decide_sampling_creative_artwork(
     if not record:
         raise HTTPException(status_code=404, detail="Sample request not found")
     state = dict(record.mockup_workflow_state or {})
-    if set(record.request_types or []) != {"sample"} or not (state.get("samplingRouting") or {}).get("creativeChangesRequired"):
+    if set(record.request_types or []) != {"sample"}:
         raise HTTPException(status_code=409, detail="This request is not in the sample artwork approval flow")
     if state.get("stage") != "creative_approval":
         raise HTTPException(status_code=409, detail="This sample is not awaiting Creative artwork approval")
@@ -2148,9 +2169,7 @@ def release_sample_to_plant(
     is_legacy_sampling_queue = not current_stage and str(record.status or "").strip().casefold() in legacy_sampling_statuses
     if current_stage != "sampling_review" and not is_legacy_sampling_queue:
         raise HTTPException(status_code=409, detail="This sample is not awaiting Sampling release")
-    if state.get("claimedStage") == "sampling_review" and state.get("claimedByUserId") is not None:
-        if str(state.get("claimedByUserId")) != str(getattr(current_user, "id", None)):
-            raise HTTPException(status_code=409, detail=f"This task is claimed by {state.get('claimedBy') or 'another teammate'}")
+    _require_mockup_stage_claim(state, current_user, "sampling_review")
     previous_status = record.status
     now = datetime.now(timezone.utc).isoformat()
     actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Sampling").strip()[:100]
@@ -2194,9 +2213,7 @@ def save_sampling_feedback(
     if not record:
         raise HTTPException(status_code=404, detail="Sample request not found")
     state = dict(record.mockup_workflow_state or {})
-    if state.get("claimedStage") == "sampling_review" and state.get("claimedByUserId") is not None:
-        if str(state.get("claimedByUserId")) != str(getattr(current_user, "id", None)):
-            raise HTTPException(status_code=409, detail=f"This task is claimed by {state.get('claimedBy') or 'another teammate'}")
+    _require_mockup_stage_claim(state, current_user, "sampling_review")
     feedback = str(body.get("feedback") or body.get("sampling_remark") or "").strip()
     if not feedback:
         raise HTTPException(status_code=422, detail="Enter Sampling remarks before saving")
@@ -2522,6 +2539,8 @@ def claim_design_request(
         current_claim_id = state.get("claimedByUserId")
         if current_claim_id is not None and str(current_claim_id) != str(current_user.id):
             raise HTTPException(status_code=409, detail=f"This task is already claimed by {current_claim}")
+        if current_claim_id is None and current_claim and current_claim.casefold() != actor.casefold():
+            raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {current_claim}.")
         if current_claim_id is None:
             _require_design_claim_window(item, state)
             now = datetime.now(timezone.utc).isoformat()
@@ -2600,6 +2619,95 @@ def release_design_request_claim(
     return saved
 
 
+@router.post("/api/v1/design-requests/{id}/sampling-claim", summary="Claim a Sampling review for a design request")
+def claim_sampling_design_request(
+    id: int,
+    service: DesignRequestService = Depends(get_design_request_service),
+    current_user=Depends(get_current_user),
+):
+    require_team(current_user, "samp")
+    if is_team_head(current_user):
+        raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
+    actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Sampling Reviewer").strip()[:100]
+
+    def mutate(item: DesignRequest):
+        if not _is_design_creative_stage(item):
+            raise HTTPException(status_code=409, detail="This design request is not awaiting Sampling review")
+        state = dict(item.workflow_state or {})
+        current_claim_id = state.get("samplingClaimedByUserId")
+        current_claim = str(state.get("samplingClaimedBy") or "another Sampling teammate")
+        if current_claim_id is not None and str(current_claim_id) != str(current_user.id):
+            raise HTTPException(status_code=409, detail=f"This Sampling review is already claimed by {current_claim}")
+        if current_claim_id is None and state.get("samplingClaimedBy") and current_claim.casefold() != actor.casefold():
+            raise HTTPException(status_code=409, detail=f"Someone else is working on this task. It is claimed by {current_claim}.")
+        if current_claim_id is None:
+            now = datetime.now(timezone.utc).isoformat()
+            state.update({
+                "samplingClaimedBy": actor,
+                "samplingClaimedByUserId": current_user.id,
+                "samplingClaimedAt": now,
+            })
+            events = list(state.get("events") or [])
+            events.insert(0, {
+                "id": f"event-{uuid4().hex}",
+                "actorName": actor,
+                "actorDepartment": "Sampling PMT",
+                "action": "SAMPLING_REVIEW_CLAIMED",
+                "title": "Design review claimed by Sampling",
+                "body": f"{actor} claimed the Sampling review for this design request.",
+                "timestamp": now,
+                "isNote": False,
+                "badge": {"text": "Sampling Claimed", "variant": "teal"},
+            })
+            state["events"] = events[:500]
+            item.workflow_state = state
+
+    saved = service.mutate(id, mutate, actor_user_id=current_user.id)
+    if not saved:
+        raise HTTPException(status_code=404, detail="Design request not found")
+    return saved
+
+
+@router.delete("/api/v1/design-requests/{id}/sampling-claim", summary="Administrator release of a Sampling design claim")
+def release_sampling_design_request_claim(
+    id: int,
+    service: DesignRequestService = Depends(get_design_request_service),
+    current_user=Depends(get_current_user),
+):
+    require_admin(current_user)
+    actor = str(getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Administrator").strip()[:100]
+
+    def mutate(item: DesignRequest):
+        state = dict(item.workflow_state or {})
+        previous_owner = str(state.get("samplingClaimedBy") or "")
+        previous_owner_id = state.get("samplingClaimedByUserId")
+        if previous_owner_id is None and not previous_owner:
+            raise HTTPException(status_code=409, detail="This design request has no Sampling claim")
+        if str(previous_owner_id) == str(current_user.id):
+            raise HTTPException(status_code=403, detail="The Sampling reviewer who claimed this task cannot reassign it")
+        for key in ("samplingClaimedBy", "samplingClaimedByUserId", "samplingClaimedAt"):
+            state.pop(key, None)
+        events = list(state.get("events") or [])
+        events.insert(0, {
+            "id": f"event-{uuid4().hex}",
+            "actorName": actor,
+            "actorDepartment": "Administration",
+            "action": "SAMPLING_REVIEW_CLAIM_RELEASED",
+            "title": "Sampling review claim reassigned by administrator",
+            "body": f"{actor} released the Sampling review claim held by {previous_owner or 'a team member'}.",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "isNote": False,
+            "badge": {"text": "Claim Reassigned", "variant": "amber"},
+        })
+        state["events"] = events[:500]
+        item.workflow_state = state
+
+    saved = service.mutate(id, mutate, actor_user_id=current_user.id)
+    if not saved:
+        raise HTTPException(status_code=404, detail="Design request not found")
+    return saved
+
+
 @router.post("/api/v1/design-requests/{id}/counter-date-proposal", summary="Propose a revised design target date")
 def propose_design_counter_date(
     id: int,
@@ -2607,7 +2715,14 @@ def propose_design_counter_date(
     service: DesignRequestService = Depends(get_design_request_service),
     current_user=Depends(get_current_user),
 ):
-    require_team(current_user, "creative_studio")
+    claim_type = str(body.get("claim_type") or "creative").strip().casefold()
+    if claim_type not in {"creative", "sampling"}:
+        raise HTTPException(status_code=422, detail="Claim type must be creative or sampling")
+    is_sampling_reviewer = claim_type == "sampling"
+    if is_sampling_reviewer:
+        require_team(current_user, "samp")
+    else:
+        require_team(current_user, "creative_studio")
     if is_team_head(current_user):
         raise HTTPException(status_code=403, detail="Team heads have read-only access to operational workflows")
     proposed_date = str(body.get("proposed_date") or "").strip()
@@ -2625,7 +2740,14 @@ def propose_design_counter_date(
         state = dict(item.workflow_state or {})
         if not _is_design_creative_stage(item):
             raise HTTPException(status_code=409, detail="This design request is not waiting for Creative work")
-        _require_design_request_claim(state, current_user)
+        if is_sampling_reviewer:
+            sampling_claim_id = state.get("samplingClaimedByUserId")
+            if sampling_claim_id is None:
+                raise HTTPException(status_code=409, detail="Claim this Sampling review before proposing a counter date")
+            if str(sampling_claim_id) != str(current_user.id):
+                raise HTTPException(status_code=409, detail=f"This Sampling review is claimed by {state.get('samplingClaimedBy') or 'another teammate'}")
+        else:
+            _require_design_request_claim(state, current_user)
         _require_design_claim_window(item, state)
         if any(state.get(key) for key in ("isCounterDateActive", "counterDateRequestedAt", "proposedTargetDate", "counterDateDecision")):
             raise HTTPException(status_code=409, detail="A counter-date proposal has already been used for this request")
@@ -2633,6 +2755,7 @@ def propose_design_counter_date(
         state.update(
             {
                 "isCounterDateActive": True,
+                "counterDateOriginalTargetDate": state.get("counterDateOriginalTargetDate") or item.design_required_date,
                 "proposedTargetDate": proposed_date,
                 "counterDateReason": reason,
                 "counterDateRequestedAt": now,
@@ -2646,7 +2769,7 @@ def propose_design_counter_date(
             {
                 "id": f"event-{uuid4().hex}",
                 "actorName": str(actor),
-                "actorDepartment": "Creative Studio",
+                "actorDepartment": "Sampling PMT" if is_sampling_reviewer else "Creative Studio",
                 "action": "COUNTER_DATE_PROPOSED",
                 "title": "Revised target date proposed",
                 "body": f"Proposed {proposed_date}. {reason}",
@@ -3006,17 +3129,49 @@ def marketing_design_decision(
     decision = body.get("decision")
     if decision not in {"accept", "request_remaining"}:
         raise HTTPException(status_code=422, detail="Decision must be accept or request_remaining")
+    target_decision = "accepted" if decision == "accept" else "remaining_requested"
+    raw_design_numbers = body.get("design_numbers")
+    selected_design_numbers = list(dict.fromkeys(
+        str(value).strip() for value in raw_design_numbers
+        if value is not None and str(value).strip()
+    )) if isinstance(raw_design_numbers, list) else []
+    if decision == "accept" and not selected_design_numbers:
+        raise HTTPException(status_code=422, detail="Select at least one delivered design to accept")
     actor = getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "Marketing"
 
     def mutate(item: DesignRequest):
+        state = dict(item.workflow_state or {})
+        if item.marketing_decision == target_decision:
+            if decision == "request_remaining":
+                return
+            previous_selection = state.get("acceptedDesignNumbers") or []
+            if set(map(str, previous_selection)) == set(selected_design_numbers):
+                return
+            raise HTTPException(status_code=409, detail="This design request was already accepted with a different design selection")
         status_value = str(item.status or "").casefold()
-        if (
-            item.marketing_decision != "awaiting_marketing_review"
-            and "awaiting marketing review" not in status_value
-        ):
+        awaiting_review = (
+            item.marketing_decision == "awaiting_marketing_review"
+            or "awaiting marketing review" in status_value
+        )
+        remaining_requested = (
+            item.marketing_decision == "remaining_requested"
+            or "creative remaining requested" in status_value
+        )
+        if not awaiting_review and not (decision == "accept" and remaining_requested):
             raise HTTPException(status_code=409, detail="This design request is not awaiting Marketing review")
         if not any(isinstance(batch, dict) and batch.get("rows") for batch in (item.creative_submissions or [])):
             raise HTTPException(status_code=409, detail="Creative has not submitted any artwork for review")
+        available_design_numbers = {
+            str(row.get("design_number") or row.get("designNumber") or "").strip()
+            for batch in (item.creative_submissions or [])
+            if isinstance(batch, dict)
+            for row in (batch.get("rows") or [])
+            if isinstance(row, dict)
+        }
+        if decision == "accept":
+            unavailable = [number for number in selected_design_numbers if number not in available_design_numbers]
+            if unavailable:
+                raise HTTPException(status_code=422, detail="One or more selected designs are no longer available. Refresh and select again.")
         remaining = max(0, int(item.number_of_designs or 0) - sum(
             len(batch.get("rows") or []) for batch in (item.creative_submissions or []) if isinstance(batch, dict)
         ))
@@ -3026,8 +3181,10 @@ def marketing_design_decision(
             item.marketing_decision = "accepted"
             item.status = "Approved / Closed"
             item.remaining_design_count = 0
-            title = "Artwork approved and closed"
-            body_text = "Marketing accepted the submitted artwork."
+            state["acceptedDesignNumbers"] = selected_design_numbers
+            design_label = "design" if len(selected_design_numbers) == 1 else "designs"
+            title = f"{len(selected_design_numbers)} selected {design_label} accepted and closed"
+            body_text = f"Marketing accepted {', '.join(selected_design_numbers)} and closed the design request."
             badge = "Accepted"
             variant = "emerald"
         else:
@@ -3039,7 +3196,6 @@ def marketing_design_decision(
             badge = "Revisions"
             variant = "amber"
 
-        state = dict(item.workflow_state or {})
         events = list(state.get("events") or [])
         events.insert(
             0,
@@ -3135,6 +3291,20 @@ def request_post_design_deliverables(
                     detail=f"One or more selected {scope} designs are no longer available. Refresh and choose again.",
                 )
             selected_designs_by_scope[scope] = [available_designs[number] for number in design_numbers]
+
+        accepted_design_numbers = (item.workflow_state or {}).get("acceptedDesignNumbers") or []
+        if accepted_design_numbers:
+            accepted_design_numbers = {str(number) for number in accepted_design_numbers}
+            unapproved_by_scope = {
+                scope: [number for number in numbers if number not in accepted_design_numbers]
+                for scope, numbers in design_numbers_by_scope.items()
+            }
+            unapproved = [number for numbers in unapproved_by_scope.values() for number in numbers]
+            if unapproved:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Only designs accepted by Marketing can be sent to Mockup or Sampling.",
+                )
 
         requested_at = datetime.now(timezone.utc).isoformat()
         if "sample" in deliverables:
@@ -3236,8 +3406,8 @@ def request_post_design_deliverables(
                 workflow_data["creativeBypassed"] = True
                 workflow_data["marketingShutterstockNo"] = stock_number
                 workflow_data["marketingRemark"] = creative_remark
-                workflow_data["creativeShutterstockNo"] = stock_number
-                workflow_data["creativeRemark"] = creative_remark
+                workflow_data.pop("creativeShutterstockNo", None)
+                workflow_data.pop("creativeRemark", None)
                 workflow_data["designRequestId"] = item.id
                 workflow_data["requiredDate"] = required_date_value
                 mockup_record.mockup_workflow_state = workflow_data

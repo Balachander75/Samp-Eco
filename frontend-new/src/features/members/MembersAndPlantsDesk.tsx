@@ -300,8 +300,8 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
                     className={FIELD_CLASS}
                   >
                     <option value="marketing">Marketing</option>
-                    <option value="creative">Creative Studio</option>
-                    <option value="studio">Structural CAD Studio</option>
+                    <option value="creative">Creative</option>
+                    <option value="studio">Studio</option>
                     <option value="samp">Sampling Team</option>
                     <option value="costing">Commercial Costing</option>
                     <option value="plant">Plant Operations</option>

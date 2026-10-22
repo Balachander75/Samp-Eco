@@ -6,7 +6,6 @@ import {
   AlignLeft,
   Bookmark,
   Package,
-  Info,
   SlidersHorizontal,
   ChevronDown,
   ChevronUp,
@@ -29,11 +28,14 @@ export interface ProductDocketViewProps {
   classGroups: [string, ProductDetailItem[]][];
   searchQuery?: string;
   containerId?: string;
+  creativeFields?: ProductDetailItem[];
+  onCreativeFieldChange?: (field: ProductDetailItem, value: string) => void;
 }
 
 interface CellProps {
   cell: DocketCellDef;
   searchFilter?: string;
+  onCreativeFieldChange?: (field: ProductDetailItem, value: string) => void;
 }
 
 // Helper to map colSpan (1..6) to Tailwind column classes in a strict 6-column grid
@@ -62,17 +64,38 @@ function getSectionIcon(id: string): React.ReactNode {
   if (id.startsWith("comp-")) return <FileText className="w-4 h-4" />;
   if (id === "ruling") return <AlignLeft className="w-4 h-4" />;
   if (id === "dividers") return <Bookmark className="w-4 h-4" />;
-  if (id === "packaging") return <Package className="w-4 h-4" />;
-  if (id === "notes") return <Info className="w-4 h-4" />;
+  if (id === "packaging" || id === "packing") return <Package className="w-4 h-4" />;
   return <SlidersHorizontal className="w-4 h-4" />;
 }
 
+function normalizeDocketKey(value: string): string {
+  return value.replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
+
+function docketFieldKey(className: string, characteristicName: string): string {
+  return `${normalizeDocketKey(className)}::${normalizeDocketKey(characteristicName)}`;
+}
+
+function classNamesForDocketSection(sectionId: string): string[] {
+  if (sectionId === "binding") return ["NB_BINDING"];
+  if (sectionId.startsWith("comp-")) return [`NB_COMPONENT_${sectionId.slice("comp-".length)}`];
+  if (sectionId === "ruling") return ["RULLING_DETAILS"];
+  if (sectionId === "dividers") return ["NB_DIVIDER_SPECS"];
+  if (sectionId === "packaging") return ["PACKAGING_SPECS_1"];
+  if (sectionId === "packing") return ["PACKING_DETAILS"];
+  if (sectionId.startsWith("custom-")) return [sectionId.slice("custom-".length)];
+  if (sectionId.startsWith("creative-")) return [sectionId.slice("creative-".length)];
+  return [];
+}
+
 // Laser-straight, aligned Docket Cell component mirroring the official PDF format
-const DocketCell: React.FC<CellProps> = React.memo(({ cell, searchFilter }) => {
+const DocketCell: React.FC<CellProps> = React.memo(({ cell, searchFilter, onCreativeFieldChange }) => {
   const { label, value, uom, colSpan = 1 } = cell;
+  const creativeField = cell.creativeField;
   const rawVal = value ? String(value).trim() : "";
-  const isNa = isMissingSpec(rawVal);
-  const displayVal = isNa ? "—" : rawVal;
+  const hasUnitForMissingValue = isMissingSpec(rawVal) && Boolean(rawVal && uom);
+  const isNa = isMissingSpec(rawVal) && !hasUnitForMissingValue;
+  const displayVal = hasUnitForMissingValue ? "NA" : isNa ? "—" : rawVal;
 
   const matchesSearch = useMemo(() => {
     if (!searchFilter || searchFilter.trim() === "") return false;
@@ -105,7 +128,41 @@ const DocketCell: React.FC<CellProps> = React.memo(({ cell, searchFilter }) => {
         className="px-2.5 py-2 flex-1 flex items-center text-left min-h-[40px] bg-white dark:bg-zinc-950 overflow-hidden"
         title={!isNa ? displayVal : undefined}
       >
-        {isNa ? (
+        {creativeField && onCreativeFieldChange ? (
+          <div className="w-full min-w-0 space-y-1">
+            {label.toLowerCase().includes("printing") && !isNa && (
+              <p className="truncate text-[9px] font-mono text-slate-600 dark:text-zinc-300" title={displayVal}>{displayVal}</p>
+            )}
+            {Array.isArray(creativeField.options) && creativeField.options.length > 0 ? (
+              <select
+                aria-label={`${creativeField.className} ${creativeField.characteristicName}`}
+                value={creativeField.value || ""}
+                onChange={(event) => onCreativeFieldChange(creativeField, event.target.value)}
+                className="docket-screen-control w-full min-w-0 rounded border border-sky-300 bg-white px-1.5 py-1 text-[10px] font-mono font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-sky-700 dark:bg-zinc-900 dark:text-zinc-100"
+              >
+                {!creativeField.value && <option value="">Select an option</option>}
+                {creativeField.value && !creativeField.options.includes(creativeField.value) && (
+                  <option value={creativeField.value}>{creativeField.value} (current)</option>
+                )}
+                {creativeField.options.map((option, index) => (
+                  <option key={`${creativeField.id}-${index}`} value={option}>{option}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                aria-label={`${creativeField.className} ${creativeField.characteristicName}`}
+                value={creativeField.value || ""}
+                onChange={(event) => onCreativeFieldChange(creativeField, event.target.value)}
+                placeholder="Enter value"
+                className="docket-screen-control w-full min-w-0 rounded border border-sky-300 bg-white px-1.5 py-1 text-[10px] font-mono font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-sky-700 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+            )}
+            <span className="docket-print-value hidden text-xs font-mono font-bold text-[#141f2e]">
+              {creativeField.value || "—"}
+              {uom && <span className="ml-1 font-sans font-medium uppercase">{uom}</span>}
+            </span>
+          </div>
+        ) : isNa ? (
           <span className="text-xs font-mono text-slate-300 dark:text-zinc-600 italic select-none">
             —
           </span>
@@ -143,14 +200,20 @@ const DocketEmptyCell: React.FC<{ colSpan?: number }> = React.memo(({ colSpan = 
 const DocketRow: React.FC<{
   cells: DocketCellDef[];
   searchFilter?: string;
-}> = React.memo(({ cells, searchFilter }) => {
+  onCreativeFieldChange?: (field: ProductDetailItem, value: string) => void;
+}> = React.memo(({ cells, searchFilter, onCreativeFieldChange }) => {
   const totalCols = cells.reduce((acc, c) => acc + (c.colSpan || 1), 0);
   const remainingCols = 6 - (totalCols % 6 || 6);
 
   return (
     <div className="grid grid-cols-6 border-b border-[#bde0fa] dark:border-sky-900/40 last:border-b-0 w-full auto-rows-fr items-stretch">
       {cells.map((cell, idx) => (
-        <DocketCell key={`${cell.label}-${idx}`} cell={cell} searchFilter={searchFilter} />
+        <DocketCell
+          key={`${cell.label}-${idx}`}
+          cell={cell}
+          searchFilter={searchFilter}
+          onCreativeFieldChange={onCreativeFieldChange}
+        />
       ))}
       {remainingCols > 0 && <DocketEmptyCell colSpan={remainingCols} />}
     </div>
@@ -224,6 +287,8 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = React.memo(({
   classGroups,
   searchQuery: externalSearchQuery = "",
   containerId = "product-docket-container",
+  creativeFields,
+  onCreativeFieldChange,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
@@ -231,13 +296,81 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = React.memo(({
 
   // Filter out empty classes and collect all present classes
   const allPresentClasses = useMemo(() => {
-    return classGroups.filter(([, specs]) => isClassPresent(specs));
-  }, [classGroups]);
+    const creativeClassKeys = new Set((creativeFields || []).map((field) => normalizeDocketKey(field.className)));
+    return classGroups.filter(([className, specs]) =>
+      isClassPresent(specs) || creativeClassKeys.has(normalizeDocketKey(className))
+    );
+  }, [classGroups, creativeFields]);
 
-  // Construct official technical docket sections identical to PDF output
+  // Keep Creative-owned values inside the matching docket class section.
   const docketSections = useMemo(() => {
-    return buildDocketSections(product, allPresentClasses, false);
-  }, [product, allPresentClasses]);
+    const sections = buildDocketSections(product, allPresentClasses, false);
+    if (!creativeFields?.length) return sections;
+
+    for (const field of creativeFields) {
+      const classKey = normalizeDocketKey(field.className);
+      let section = sections.find((candidate) =>
+        classNamesForDocketSection(candidate.id).some((name) => normalizeDocketKey(name) === classKey)
+      );
+
+      if (!section) {
+        const classSpecs = classGroups.find(([name]) => normalizeDocketKey(name) === classKey)?.[1] || [field];
+        section = {
+          id: `creative-${field.className}`,
+          sectionNumber: sections.length + 1,
+          title: productDocketSectionTitle(field.className),
+          countBadge: `${classSpecs.length} SPECS`,
+          totalSpecs: classSpecs.length,
+          configuredSpecs: classSpecs.filter((item) => !isMissingSpec(item.value)).length,
+          rows: [],
+        };
+        sections.push(section);
+      }
+    }
+
+    return sections.map((section) => {
+      const sectionClassKeys = new Set(classNamesForDocketSection(section.id).map(normalizeDocketKey));
+      const sectionFields = creativeFields.filter((field) => sectionClassKeys.has(normalizeDocketKey(field.className)));
+      if (sectionFields.length === 0) return section;
+
+      const represented = new Set<string>();
+      const rows = section.rows.map((row) => row.map((cell) => {
+        if (!cell.className || !cell.characteristicName) return cell;
+        const match = sectionFields.find((field) =>
+          docketFieldKey(field.className, field.characteristicName) === docketFieldKey(cell.className!, cell.characteristicName!)
+        );
+        if (!match) return cell;
+        represented.add(docketFieldKey(match.className, match.characteristicName));
+        return { ...cell, creativeField: match };
+      }));
+
+      const unplacedFields = sectionFields.filter((field) =>
+        !represented.has(docketFieldKey(field.className, field.characteristicName))
+      );
+      for (let index = 0; index < unplacedFields.length; index += 6) {
+        rows.push(unplacedFields.slice(index, index + 6).map((field) => ({
+          label: field.characteristicName,
+          value: field.value || "NA",
+          uom: field.uom || undefined,
+          colSpan: 1 as const,
+          creativeField: field,
+        })));
+      }
+
+      if (section.id === "packaging") {
+        const visibleFields = rows.flat();
+        return {
+          ...section,
+          rows,
+          countBadge: `${visibleFields.length} SPECS`,
+          totalSpecs: visibleFields.length,
+          configuredSpecs: visibleFields.filter((cell) => !isMissingSpec(cell.value)).length,
+        };
+      }
+
+      return { ...section, rows };
+    });
+  }, [product, allPresentClasses, creativeFields, classGroups]);
 
   const toggleSectionCollapse = (secId: string) => {
     setCollapsedSections((prev) => ({
@@ -274,17 +407,20 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = React.memo(({
             onToggleCollapse={() => toggleSectionCollapse(sec.id)}
           />
 
-          {!collapsedSections[sec.id] && (
-            <div className="divide-y divide-[#bde0fa] dark:divide-sky-900/40">
-              {sec.rows.map((rowCells, rIdx) => (
-                <DocketRow
-                  key={`${sec.id}-row-${rIdx}`}
-                  cells={rowCells}
-                  searchFilter={effectiveSearch}
-                />
-              ))}
-            </div>
-          )}
+          <div
+            data-docket-print-body
+            hidden={Boolean(collapsedSections[sec.id])}
+            className="divide-y divide-[#bde0fa] dark:divide-sky-900/40"
+          >
+            {sec.rows.map((rowCells, rIdx) => (
+              <DocketRow
+                key={`${sec.id}-row-${rIdx}`}
+                cells={rowCells}
+                searchFilter={effectiveSearch}
+                onCreativeFieldChange={onCreativeFieldChange}
+              />
+            ))}
+          </div>
         </section>
       ))}
     </div>

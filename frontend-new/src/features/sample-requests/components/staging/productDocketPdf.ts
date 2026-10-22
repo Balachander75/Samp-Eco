@@ -98,6 +98,9 @@ export interface CellDef {
   value: string;
   uom?: string;
   colSpan?: 1 | 2 | 3 | 4 | 5 | 6;
+  className?: string;
+  characteristicName?: string;
+  creativeField?: ProductDetailItem;
 }
 
 export interface DocketSectionDef {
@@ -182,7 +185,7 @@ export function buildDocketSections(
       productRows.push(
         filteredExtraProduct.slice(i, i + NUM_COLS).map((item) => ({
           label: item.characteristicName,
-          value: item.value ? (item.uom ? `${item.value} ${item.uom}` : item.value) : "NA",
+          value: item.value || "NA",
           uom: item.uom || undefined,
           colSpan: 1,
         }))
@@ -224,7 +227,13 @@ export function buildDocketSections(
       [
         { label: "Opening of Product", value: getCharValue(bindingSpecs, "OPENINGOFPRODUCT").value, colSpan: 1 },
         { label: "Binding Material", value: getCharValue(bindingSpecs, "BINDINGMATERIAL").value, colSpan: 1 },
-        { label: "Binding Color / Style", value: getCharValue(bindingSpecs, "BINDINGCOLOR_STYLE").value, colSpan: 1 },
+        {
+          label: "Binding Color / Style",
+          value: getCharValue(bindingSpecs, "BINDINGCOLOR_STYLE").value,
+          colSpan: 1,
+          className: "NB_BINDING",
+          characteristicName: "BINDINGCOLOR_STYLE",
+        },
         { label: "Special Binding", value: getCharValue(bindingSpecs, "SPECIALBINDING").value, colSpan: 1 },
         { label: "Additional Process On Binding", value: getCharValue(bindingSpecs, "ADDITIONALPROCESSONBINDING").value, colSpan: 1 },
         { label: "Spiral / Wiro Hole Punch", value: getCharValue(bindingSpecs, "SPIRAL-WIROBINDINGHOLEPUNCH").value, colSpan: 1 },
@@ -245,9 +254,11 @@ export function buildDocketSections(
       bindingRows.push(
         filteredExtraBinding.slice(i, i + NUM_COLS).map((s) => ({
           label: s.characteristicName,
-          value: s.value ? (s.uom ? `${s.value} ${s.uom}` : s.value) : "NA",
+          value: s.value || "NA",
           uom: s.uom || undefined,
           colSpan: 1,
+          className: s.className,
+          characteristicName: s.characteristicName,
         }))
       );
     }
@@ -301,6 +312,8 @@ export function buildDocketSections(
           label: "Printing - No & Name of Colors",
           value: `${!cPrt.isNa ? cPrt.value : "OFFSET COMMON"} ${!cCol.isNa ? cCol.value : "4/1 CMYK"}`,
           colSpan: 1,
+          className: cKey,
+          characteristicName: `C${cIdx}NAMEOFCOLORSF_B_1`,
         },
         {
           label: "GSM / Caliper",
@@ -326,9 +339,11 @@ export function buildDocketSections(
       compRows.push(
         filteredExtraComp.slice(i, i + NUM_COLS).map((s) => ({
           label: s.characteristicName,
-          value: s.value ? (s.uom ? `${s.value} ${s.uom}` : s.value) : "NA",
+          value: s.value || "NA",
           uom: s.uom || undefined,
           colSpan: 1,
+          className: s.className,
+          characteristicName: s.characteristicName,
         }))
       );
     }
@@ -404,6 +419,8 @@ export function buildDocketSections(
           label: "Divider Printing, No & Name of Colors",
           value: `${getCharValue(dividerSpecs, "D1PRINTINGTYPE").value} ${getCharValue(dividerSpecs, "D1NAMEOFCOLORSF_B").value}`,
           colSpan: 1,
+          className: "NB_DIVIDER_SPECS",
+          characteristicName: "D1NAMEOFCOLORSF_B",
         },
         { label: "Divider GSM", value: getCharValue(dividerSpecs, "D1DIVIDERCALIPER_WEIGHT").value, colSpan: 1 },
         { label: "Divider 1 Tab Style", value: getCharValue(dividerSpecs, "TABSTYLEOF1STDIVIDERS").value, colSpan: 1 },
@@ -420,6 +437,8 @@ export function buildDocketSections(
           label: "Divider Printing, No & Name of Colors",
           value: `${getCharValue(dividerSpecs, "D2PRINTINGTYPE").value} ${getCharValue(dividerSpecs, "D2NAMEOFCOLORSF_B").value}`,
           colSpan: 1,
+          className: "NB_DIVIDER_SPECS",
+          characteristicName: "D2NAMEOFCOLORSF_B",
         },
         { label: "Divider GSM", value: getCharValue(dividerSpecs, "D2DIVIDERCALIPER_WEIGHT").value, colSpan: 1 },
         { label: "Divider 2 Tab Style", value: getCharValue(dividerSpecs, "TABSTYLEOF2NDDIVIDERS").value, colSpan: 1 },
@@ -438,49 +457,57 @@ export function buildDocketSections(
     });
   }
 
-  // 6. PACKAGING DETAILS (Only if present and has data)
+  // 6. PACKAGING DETAILS
   const pkgSpecs1 = groupsMap.get("PACKAGING_SPECS_1");
   const pkgDetails = groupsMap.get("PACKING_DETAILS");
-  if ((pkgSpecs1 && isClassPresent(pkgSpecs1)) || (pkgDetails && isClassPresent(pkgDetails))) {
-    const pkgRows: CellDef[][] = [];
-    if (pkgSpecs1 && isClassPresent(pkgSpecs1)) {
-      pkgRows.push([
+  if (pkgSpecs1 && isClassPresent(pkgSpecs1)) {
+    const pkgRows: CellDef[][] = [
+      [
         { label: "Packaging 1 Name", value: getCharValue(pkgSpecs1, "PACKAGING1NAME").value, colSpan: 1 },
         { label: "Material", value: getCharValue(pkgSpecs1, "PACKAGING1MATERIAL").value, colSpan: 1 },
         { label: "Printing - No & Name of Colors", value: getCharValue(pkgSpecs1, "PACKAGING1PRINTING").value, colSpan: 1 },
         { label: "GSM", value: getCharValue(pkgSpecs1, "PACKAGING1GSM").value, colSpan: 1 },
         { label: "Size (CM)", value: getCharValue(pkgSpecs1, "PACKAGING1SIZE").value, colSpan: 1 },
         { label: "Finish Details", value: getCharValue(pkgSpecs1, "PACKAGING1FINISH").value, colSpan: 1 },
-      ]);
-    }
-    if (pkgDetails && isClassPresent(pkgDetails)) {
-      const filteredPkg = onlyConfigured
-        ? pkgDetails.filter((s) => !isMissingSpec(s.value))
-        : pkgDetails;
-      for (let i = 0; i < filteredPkg.length; i += NUM_COLS) {
-        pkgRows.push(
-          filteredPkg.slice(i, i + NUM_COLS).map((s) => ({
-            label: s.characteristicName,
-            value: s.value ? (s.uom ? `${s.value} ${s.uom}` : s.value) : "NA",
-            uom: s.uom || undefined,
-            colSpan: 1,
-          }))
-        );
-      }
-    }
-    const totalPkgSpecs = (pkgSpecs1?.length || 0) + (pkgDetails?.length || 0);
-    const configuredPkgSpecs =
-      (pkgSpecs1 ? pkgSpecs1.filter((s) => !isMissingSpec(s.value)).length : 0) +
-      (pkgDetails ? pkgDetails.filter((s) => !isMissingSpec(s.value)).length : 0);
-
+      ],
+    ];
+    const visiblePackagingSpecs = pkgRows.flat();
     sections.push({
       id: "packaging",
       sectionNumber: secNum++,
       title: "Packaging Details",
-      countBadge: `${totalPkgSpecs} SPECS`,
-      totalSpecs: totalPkgSpecs,
-      configuredSpecs: configuredPkgSpecs,
+      countBadge: `${visiblePackagingSpecs.length} SPECS`,
+      totalSpecs: visiblePackagingSpecs.length,
+      configuredSpecs: visiblePackagingSpecs.filter((spec) => !isMissingSpec(spec.value)).length,
       rows: pkgRows,
+    });
+  }
+
+  if (pkgDetails && isClassPresent(pkgDetails)) {
+    const filteredPkgDetails = onlyConfigured
+      ? pkgDetails.filter((s) => !isMissingSpec(s.value))
+      : pkgDetails;
+    const packingRows: CellDef[][] = [];
+    for (let i = 0; i < filteredPkgDetails.length; i += NUM_COLS) {
+      packingRows.push(
+        filteredPkgDetails.slice(i, i + NUM_COLS).map((s) => ({
+          label: s.characteristicName,
+          value: s.value || "NA",
+          uom: s.uom || undefined,
+          colSpan: 1,
+          className: s.className,
+          characteristicName: s.characteristicName,
+        }))
+      );
+    }
+    sections.push({
+      id: "packing",
+      sectionNumber: secNum++,
+      title: "Packing Details",
+      countBadge: `${pkgDetails.length} SPECS`,
+      totalSpecs: pkgDetails.length,
+      configuredSpecs: pkgDetails.filter((s) => !isMissingSpec(s.value)).length,
+      rows: packingRows,
     });
   }
 
@@ -502,9 +529,11 @@ export function buildDocketSections(
       rows.push(
         filteredSpecs.slice(i, i + NUM_COLS).map((s) => ({
           label: s.characteristicName,
-          value: s.value ? (s.uom ? `${s.value} ${s.uom}` : s.value) : "NA",
+          value: s.value || "NA",
           uom: s.uom || undefined,
           colSpan: 1,
+          className: s.className,
+          characteristicName: s.characteristicName,
         }))
       );
     }
@@ -518,29 +547,6 @@ export function buildDocketSections(
       rows,
     });
   }
-
-  // 8. SPECIAL INSTRUCTION / PRINT NOTE
-  sections.push({
-    id: "notes",
-    sectionNumber: secNum++,
-    title: "Special Instruction / Print Note",
-    countBadge: "1 SPEC",
-    totalSpecs: 1,
-    configuredSpecs: 1,
-    rows: [
-      [
-        {
-          label: "Manufacturing & Prepress Standards",
-          value:
-            (product as any).specialInstruction ||
-            (product as any).printNote ||
-            (product as any).remarks ||
-            "Follow standard export manufacturing tolerance and certified prepress color targets.",
-          colSpan: 6,
-        },
-      ],
-    ],
-  });
 
   return sections;
 }
@@ -679,22 +685,48 @@ export function printProductDocketView(product: ProductSearchResult, elementId: 
 
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = "297mm";
+  iframe.style.height = "210mm";
   iframe.style.border = "none";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
   document.body.appendChild(iframe);
 
   const doc = iframe.contentWindow?.document;
-  if (!doc) return;
+  if (!doc) {
+    iframe.remove();
+    return;
+  }
 
-  const contentHtml = element ? element.outerHTML : "<div>No docket content available</div>";
+  const printClone = element?.cloneNode(true) as HTMLElement | undefined;
+  printClone?.querySelectorAll<HTMLElement>("[data-docket-print-body][hidden]").forEach((sectionBody) => {
+    sectionBody.removeAttribute("hidden");
+  });
+  const contentHtml = printClone ? printClone.outerHTML : "<div>No docket content available</div>";
 
   const styles = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
     .map((node) => node.outerHTML)
     .join("\n");
 
+  let printStarted = false;
+  const printWhenReady = () => {
+    if (printStarted) return;
+    printStarted = true;
+    void Promise.race([
+      doc.fonts.ready,
+      new Promise<void>((resolve) => window.setTimeout(resolve, 1800)),
+    ])
+      .catch(() => undefined)
+      .then(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        window.setTimeout(() => iframe.remove(), 1000);
+      });
+  };
+
+  doc.addEventListener("load", printWhenReady, { once: true });
   doc.open();
   doc.write(`
     <!DOCTYPE html>
@@ -715,12 +747,40 @@ export function printProductDocketView(product: ProductSearchResult, elementId: 
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             margin: 0;
-            padding: 4mm;
+            padding: 0;
             background: #ffffff;
             color: #0f172a;
           }
           .docket-print-root {
             width: 100%;
+            max-width: none;
+            margin: 0;
+            padding: 0;
+            overflow: visible !important;
+          }
+          .docket-print-root > div {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            overflow: visible !important;
+          }
+          .docket-print-root section {
+            width: 100% !important;
+            max-width: none !important;
+            overflow: visible !important;
+            box-shadow: none !important;
+          }
+          .docket-print-root [class*="grid-cols-6"] {
+            width: 100% !important;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .docket-print-root .docket-screen-control,
+          .docket-print-root button {
+            display: none !important;
+          }
+          .docket-print-root .docket-print-value {
+            display: inline !important;
           }
           header input, header button, .no-print {
             display: none !important;
@@ -735,14 +795,7 @@ export function printProductDocketView(product: ProductSearchResult, elementId: 
     </html>
   `);
   doc.close();
-
-  iframe.contentWindow?.focus();
-  setTimeout(() => {
-    iframe.contentWindow?.print();
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 1000);
-  }, 300);
+  window.setTimeout(printWhenReady, 2200);
 }
 
 function escapeHtml(str: string | number | null | undefined): string {

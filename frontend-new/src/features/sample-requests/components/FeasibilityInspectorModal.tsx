@@ -189,6 +189,16 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
     closureData != null
   );
   const canEvaluateTechnical = !isClosed && sourceDesk === "samp";
+  const isSampClaimedByMe = Boolean(
+    activeRequest?.takenBySamp && (
+      activeRequest.takenBySampUserId != null && user?.id != null
+        ? String(activeRequest.takenBySampUserId) === String(user.id)
+        : Boolean(
+            user?.name &&
+              activeRequest.takenBySamp.trim().toLowerCase() === user.name.trim().toLowerCase(),
+          )
+    )
+  );
   const canMakeCommercialDecision = !isClosed && isMarketingDesk;
   const isCreator = Boolean(
     activeRequest && (
@@ -707,7 +717,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                               <span className="truncate">
                                 {activeRequest.sampleRequiredDate ? formatOdooDate(activeRequest.sampleRequiredDate) : "—"}
                               </span>
-                              {canEvaluateTechnical && !activeRequest.samplingFeasibilityResponse && !activeRequest.sampCounterDate && activeRequest.takenBySamp && (
+                              {canEvaluateTechnical && isSampClaimedByMe && !activeRequest.samplingFeasibilityResponse && !activeRequest.sampCounterDate && activeRequest.takenBySamp && (
                                 <button
                                   type="button"
                                   onClick={() => setIsCounterDateModalOpen(true)}
@@ -958,7 +968,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
           isOpen={isCounterDateModalOpen}
           onClose={() => setIsCounterDateModalOpen(false)}
           originalDate={activeRequest.sampleRequiredDate || ""}
-          isEligible={Boolean(canEvaluateTechnical && activeRequest.takenBySamp && !activeRequest.sampCounterDate && !activeRequest.samplingFeasibilityResponse)}
+          isEligible={Boolean(canEvaluateTechnical && isSampClaimedByMe && activeRequest.takenBySamp && !activeRequest.sampCounterDate && !activeRequest.samplingFeasibilityResponse)}
           statusLabel={
             !activeRequest.takenBySamp
               ? "Claim task first"

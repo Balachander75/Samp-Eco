@@ -10,7 +10,7 @@ import {
   recordMarketingDesignDecisionApi,
   requestPostDesignDeliverablesApi,
   claimDesignRequestApi,
-  releaseDesignRequestClaimApi,
+  claimSamplingDesignRequestApi,
   proposeDesignCounterDateApi,
   decideDesignCounterDateApi,
   mapDesignRequestToSampleRequest,
@@ -24,7 +24,6 @@ import {
   checkCounterDateSla,
 } from "../utils/designWorkflowStorage";
 import {
-  DesignCounterDateModal,
   DesignBriefTab,
   DesignDeliverablesTab,
   DesignNextWorkTab,
@@ -32,7 +31,9 @@ import {
   ImageLightboxModal,
   DesignControlPanel,
   DesignSheetHeader,
+  MarketingCounterDateBanner,
 } from "./inspector";
+import { FeasibilityCounterDateModal } from "./feasibility";
 
 interface ChatterMessage {
   id: string;
@@ -140,6 +141,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     setSelectedFollowupDesigns({ mockup: [], sample: [] });
     setFollowupError(null);
     setMockupHandoffDialog(null);
+    setSelectedMarketingDesignNumbers([]);
     setLocalClosed(false);
     setClosureData((request as any)?.closure || null);
     requestUpdatedAtRef.current = request?.updatedAt;
@@ -155,7 +157,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   }, [request?.updatedAt]);
 
   useEffect(() => {
-    if (!isOpen || mode !== "creative") return;
+    if (!isOpen || (mode !== "creative" && mode !== "sampling")) return;
     setSlaClockNow(Date.now());
     const timer = window.setInterval(() => setSlaClockNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
@@ -193,17 +195,10 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     activeRequest?.claimedByUserId != null && currentUser?.id != null &&
     String(activeRequest.claimedByUserId) === String(currentUser.id)
   );
-  const isLegacyClaimForCurrentUser = Boolean(
-    activeRequest?.claimedBy && activeRequest.claimedByUserId == null &&
-    (activeRequest.claimedBy === currentUser?.name || activeRequest.claimedBy === currentUser?.userid)
+  const hasVerifiedSamplingClaimOwnership = Boolean(
+    activeRequest?.samplingClaimedByUserId != null && currentUser?.id != null &&
+    String(activeRequest.samplingClaimedByUserId) === String(currentUser.id)
   );
-  const isClaimedByCurrentUser = hasVerifiedClaimOwnership || isLegacyClaimForCurrentUser;
-  // Business rule: Once anyone claims any task, they cannot release themselves from that task.
-  // Only a global admin can perform administrative reassignment if needed.
-  const canReleaseClaim = Boolean(activeRequest?.claimedBy) &&
-    isGlobalAdmin &&
-    !isReadOnlyTeamHead(currentUser);
-
   // SLA Calculation for 48h Counter-Date Negotiation
   const slaStatus = useMemo(() => {
     if (!activeRequest) return { isEligible: false, hoursRemaining: 0, label: "Expired", deadlineIso: "" };
@@ -223,7 +218,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
         deadlineIso: "",
       };
     }
-    const stage = String(activeRequest.status || "").toLowerCase();
+    const stage = String(activeRequest.designRequestStatus || activeRequest.status || "").toLowerCase();
     if (!stage.includes("creative") && !stage.includes("target date counter proposed")) {
       return {
         isEligible: false,
@@ -237,6 +232,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
   // Marketing Decision State
   const [isDeciding, setIsDeciding] = useState(false);
+  const marketingDecisionInFlightRef = useRef(false);
+  const [selectedMarketingDesignNumbers, setSelectedMarketingDesignNumbers] = useState<string[]>([]);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [selectedFollowups, setSelectedFollowups] = useState<DesignFollowupScope[]>([]);
   const [selectedFollowupDesigns, setSelectedFollowupDesigns] = useState<Record<DesignFollowupScope, string[]>>({
@@ -248,7 +245,6 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const [mockupHandoffDialog, setMockupHandoffDialog] = useState<"missing_stock" | "product_required" | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
-  const [isReleasingClaim, setIsReleasingClaim] = useState(false);
 
   // Chatter State
   const [internalNotes, setInternalNotes] = useState<ChatterMessage[]>([]);
@@ -380,7 +376,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   }, [requestedCount, deliveredCount]);
 
   const availableDesigns: DesignFollowupArtwork[] = useMemo(() => {
-    return (submissions || []).flatMap((batch: any) =>
+    const submittedDesigns = (submissions || []).flatMap((batch: any) =>
       (Array.isArray(batch?.rows) ? batch.rows : []).map((row: any, index: number) => ({
         designNumber: String(row.designNumber || `D${index + 1}`),
         description: String(row.description || ""),
@@ -390,7 +386,11 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
         submittedAt: String(batch.submittedAt || ""),
       }))
     );
-  }, [submissions]);
+    const acceptedNumbers = activeRequest?.acceptedDesignNumbers || [];
+    return activeRequest?.marketingDesignDecision === "accepted" && acceptedNumbers.length
+      ? submittedDesigns.filter((design) => acceptedNumbers.includes(design.designNumber))
+      : submittedDesigns;
+  }, [submissions, activeRequest?.acceptedDesignNumbers, activeRequest?.marketingDesignDecision]);
 
   useEffect(() => {
     setShowSubmitForm(false);
@@ -741,25 +741,33 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
 
   const isCreativeUser = Boolean(
-    currentUser && (isGlobalAdmin || hasWorkflowTeam(currentUser, "creative_studio"))
+    currentUser && (isGlobalAdmin || hasWorkflowTeam(currentUser, "creative"))
+  );
+  const isSamplingUser = Boolean(
+    currentUser && (isGlobalAdmin || hasWorkflowTeam(currentUser, "samp"))
   );
   const isMarketingUser = Boolean(
     currentUser && hasWorkflowTeam(currentUser, "marketing") && !isGlobalAdmin
   );
   const requestStageLabel = String(activeRequest?.designRequestStatus || activeRequest?.status || "").toLowerCase();
   const isCreativeWorkStage = activeStage === 1 || requestStageLabel.includes("target date counter proposed");
+  const isOpenDesignWork = requestStageLabel.includes("creative") || requestStageLabel.includes("target date counter proposed");
 
   // Business rule: Marketing users cannot claim tasks or start working on creative deliverables.
-  // Only Creative Studio team members in Creative mode can claim an unclaimed task.
+  // Creative owns the artwork claim; Sampling has a separate review claim so the two teams do not overwrite each other.
   const canClaim = Boolean(
     !isClosed &&
-    mode === "creative" &&
-    isCreativeUser &&
-    !isMarketingUser &&
-    !activeRequest?.claimedBy &&
     !isReadOnlyTeamHead(currentUser) &&
-    isCreativeWorkStage &&
-    slaStatus.isEligible
+    ((mode === "creative" && isCreativeUser && !isMarketingUser && !activeRequest?.claimedBy && isCreativeWorkStage) ||
+      (mode === "sampling" && isSamplingUser && !activeRequest?.samplingClaimedBy && isOpenDesignWork))
+  );
+
+  const canProposeCounterDate = Boolean(
+    !isClosed &&
+    !(activeRequest?.isCounterDateActive || activeRequest?.counterDateDecision === "pending") &&
+    slaStatus.isEligible &&
+    ((mode === "creative" && hasVerifiedClaimOwnership) ||
+      (mode === "sampling" && hasVerifiedSamplingClaimOwnership))
   );
 
   const handleClaim = async () => {
@@ -768,7 +776,9 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     setIsClaiming(true);
     setWorkflowError(null);
     try {
-      const saved = await claimDesignRequestApi(effectiveDesignId, name);
+      const saved = mode === "sampling"
+        ? await claimSamplingDesignRequestApi(effectiveDesignId)
+        : await claimDesignRequestApi(effectiveDesignId, name);
       applyWorkflowResponse(saved);
       if (showToast) showToast("Task successfully claimed!");
       if (onRefresh) await onRefresh();
@@ -786,26 +796,17 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     }
   };
 
-  const handleReleaseClaim = async () => {
-    if (!activeRequest || !effectiveDesignId || !canReleaseClaim || isReleasingClaim) return;
-    setIsReleasingClaim(true);
-    setWorkflowError(null);
-    try {
-      const saved = await releaseDesignRequestClaimApi(effectiveDesignId);
-      applyWorkflowResponse(saved);
-      if (showToast) showToast("Creative claim released. The task is available to the team.");
-      if (onRefresh) await onRefresh();
-    } catch (error: any) {
-      setWorkflowError(error?.message || "Could not release this Creative claim.");
-    } finally {
-      setIsReleasingClaim(false);
-    }
-  };
-
   const handleProposeCounterDate = async (proposedDate: string, reason: string) => {
     if (!activeRequest || !effectiveDesignId) throw new Error("Design request reference ID could not be resolved.");
-    if (!hasVerifiedClaimOwnership) throw new Error("Confirm the assigned claim before proposing a counter date.");
-    const saved = await proposeDesignCounterDateApi(effectiveDesignId, proposedDate, reason, activeRequest.claimedBy || undefined);
+    const ownsCounterDateClaim = mode === "sampling" ? hasVerifiedSamplingClaimOwnership : hasVerifiedClaimOwnership;
+    if (!ownsCounterDateClaim) throw new Error("Claim this task before proposing a counter date.");
+    const saved = await proposeDesignCounterDateApi(
+      effectiveDesignId,
+      proposedDate,
+      reason,
+      (mode === "sampling" ? activeRequest.samplingClaimedBy : activeRequest.claimedBy) || undefined,
+      mode === "sampling" ? "sampling" : "creative",
+    );
     applyWorkflowResponse(saved);
     if (showToast) showToast("Counter target date proposed to Marketing!");
     if (onRefresh) {
@@ -911,22 +912,28 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     }
   };
 
-  const handleMarketingDecision = async (decision: "accept" | "request_remaining") => {
-    if (!activeRequest) return;
+  const handleMarketingDecision = async (decision: "accept" | "request_remaining", designNumbers?: string[]) => {
+    if (!activeRequest || marketingDecisionInFlightRef.current) return;
+    if (decision === "accept" && !designNumbers?.length) {
+      setDecisionError("Select at least one design to accept.");
+      return;
+    }
     if (!effectiveDesignId) {
       setDecisionError("Design request reference ID could not be resolved.");
       return;
     }
+    marketingDecisionInFlightRef.current = true;
     setIsDeciding(true);
     setDecisionError(null);
     try {
-      const saved = await recordMarketingDesignDecisionApi(effectiveDesignId, decision);
+      const saved = await recordMarketingDesignDecisionApi(effectiveDesignId, decision, designNumbers);
       applyWorkflowResponse(saved);
+      setSelectedMarketingDesignNumbers([]);
 
       if (showToast) {
         showToast(
           decision === "accept"
-            ? "Artwork accepted. Choose Mockup or Sampling from the Next Work stage."
+            ? `${designNumbers?.length || 0} selected design${designNumbers?.length === 1 ? "" : "s"} accepted. Choose Mockup or Sampling from Next Work.`
             : `Creative can now submit the ${remainingCount} remaining design(s) in as many batches as needed.`
         );
       }
@@ -936,6 +943,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       console.error("Marketing decision failed:", err);
       setDecisionError(err?.message || "Could not record design decision. Please try again.");
     } finally {
+      marketingDecisionInFlightRef.current = false;
       setIsDeciding(false);
     }
   };
@@ -1070,6 +1078,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     activeRequest?.marketingDesignDecision === "awaiting_marketing_review" ||
     activeStage === 2;
   const isAcceptedByMarketing = mode === "marketing" && activeRequest?.marketingDesignDecision === "accepted";
+  const acceptedDesignCount = activeRequest?.acceptedDesignNumbers?.length ||
+    (activeRequest?.marketingDesignDecision === "accepted" ? deliveredCount : 0);
   const canSubmitCreativeOutput = Boolean(
     mode === "creative" &&
     isCreativeUser &&
@@ -1085,6 +1095,13 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const isCounterDatePending = Boolean(
     activeRequest?.isCounterDateActive || activeRequest?.counterDateDecision === "pending"
   );
+  const isCounterDateVisible = Boolean(
+    activeRequest?.proposedTargetDate &&
+      (isCounterDatePending || ["accepted", "rejected", "auto_accepted"].includes(String(activeRequest?.counterDateDecision || "")))
+  );
+  const counterDateProposerTitle = activeRequest?.workflowEvents?.find(
+    (event: any) => event.action === "COUNTER_DATE_PROPOSED"
+  )?.actorDepartment === "Sampling PMT" ? "Sampling Team" : "Creative Studio";
   const isCreator = Boolean(
     (activeRequest?.createdByUserId && currentUser?.id && Number(activeRequest.createdByUserId) === Number(currentUser.id)) ||
     (activeRequest?.createdBy && (
@@ -1137,7 +1154,6 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
           isAwaitingReview={isAwaitingReview}
           isClosed={isClosed}
           isAcceptedByMarketing={isAcceptedByMarketing}
-          isCounterDatePending={isCounterDatePending}
           closureRequests={designRequestId > 0 ? [{ type: "design", id: designRequestId }] : []}
           canCloseRequest={canCloseDesignRequest}
           onRequestClosed={onRefresh}
@@ -1212,6 +1228,21 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         Review Pending
                       </span>
                     )}
+                    {isCounterDateVisible && (
+                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
+                        activeRequest.counterDateDecision === "rejected"
+                          ? "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200"
+                          : activeRequest.counterDateDecision === "accepted" || activeRequest.counterDateDecision === "auto_accepted"
+                          ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
+                          : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200"
+                      }`}>
+                        {activeRequest.counterDateDecision === "rejected"
+                          ? "Date Declined"
+                          : activeRequest.counterDateDecision === "accepted" || activeRequest.counterDateDecision === "auto_accepted"
+                          ? "Date Accepted"
+                          : "Date Proposal"}
+                      </span>
+                    )}
                     {isRemainingRequested && (
                       <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
                         Revisions
@@ -1261,70 +1292,119 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                 mode={mode}
                 currentUserName={currentUser?.name}
                 currentUserId={currentUser?.id}
-                isClaimed={Boolean(activeRequest.claimedBy)}
-                claimedBy={activeRequest.claimedBy || undefined}
-                isClaimedByCurrentUser={isClaimedByCurrentUser}
+                isClaimed={Boolean(mode === "sampling" ? activeRequest.samplingClaimedBy : activeRequest.claimedBy)}
+                claimedBy={(mode === "sampling" ? activeRequest.samplingClaimedBy : activeRequest.claimedBy) || undefined}
                 canClaim={canClaim}
                 isClaiming={isClaiming}
                 onClaim={() => handleClaim()}
-                canReleaseClaim={canReleaseClaim}
-                isReleasingClaim={isReleasingClaim}
-                onReleaseClaim={handleReleaseClaim}
-                isCounterDatePending={isCounterDatePending}
-                onCounterDateDecision={handleCounterDateDecision}
-                onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
-                onSelectTab={setActiveTab}
               />
 
               {/* ── 3. ACTIVE TAB CONTENT ── */}
               <div className="px-6 sm:px-8 pb-6 pt-2">
                 {/* ── TAB 1: SCOPE & DESIGN BRIEF ── */}
                 {activeTab === "specs" && (
-                  <DesignBriefTab
-                    activeRequest={activeRequest}
-                    references={references}
-                    onPreviewImage={setLightboxImage}
-                  />
+                  <div className="py-4">
+                    <DesignBriefTab
+                      activeRequest={activeRequest}
+                      references={references}
+                      onPreviewImage={setLightboxImage}
+                      mode={mode}
+                    />
+                  </div>
                 )}
 
                 {/* ── TAB 2: DELIVERABLES & REVIEW ── */}
                 {activeTab === "deliverables" && (
-                  <DesignDeliverablesTab
-                    activeRequest={activeRequest}
-                    mode={mode}
-                    deliveredCount={deliveredCount}
-                    requestedCount={requestedCount}
-                    remainingCount={remainingCount}
-                    isAwaitingReview={isAwaitingReview}
-                    isRemainingRequested={isRemainingRequested}
-                    canSubmitCreativeOutput={canSubmitCreativeOutput}
-                    showSubmitForm={showSubmitForm}
-                    onToggleSubmitForm={() => {
-                      setSubmitError(null);
-                      setShowSubmitForm((visible) => !visible);
-                    }}
-                    designFileUrl={designFileUrl}
-                    onChangeDesignFileUrl={setDesignFileUrl}
-                    outputCount={outputCount}
-                    onChangeOutputCount={handleOutputCountChange}
-                    outputRows={outputRows}
-                    onChangeOutputRows={setOutputRows}
-                    isSubmittingOutput={isSubmittingOutput}
-                    submitError={submitError}
-                    onSubmitBatch={handleSubmitOutput}
-                    onCancelSubmit={() => {
-                      setShowSubmitForm(false);
-                      setSubmitError(null);
-                    }}
-                    isDeciding={isDeciding}
-                    decisionError={decisionError}
-                    onMarketingDecision={handleMarketingDecision}
-                    isAcceptedByMarketing={isAcceptedByMarketing}
-                    onOpenNextWork={() => setActiveTab("next_work")}
-                    submissions={submissions}
-                    copiedArtworkPath={copiedArtworkPath}
-                    onCopyArtworkPath={handleCopyArtworkPath}
-                  />
+                  <div className="space-y-4 py-4">
+                    {canProposeCounterDate && (mode === "creative" || mode === "sampling") && (
+                      <section
+                        aria-label="Counter-date proposal"
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/20"
+                      >
+                        <div className="flex min-w-0 items-start gap-2.5">
+                          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-amber-950 dark:text-amber-200">Need a revised target date?</p>
+                            <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300">
+                              Send a counter-date proposal to Marketing while the 48-hour window is open.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsCounterDateModalOpen(true)}
+                          className="shrink-0 rounded-lg bg-[var(--accent-primary)] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[var(--accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/30"
+                        >
+                          Propose date
+                        </button>
+                      </section>
+                    )}
+                    {isCounterDateVisible && activeRequest.proposedTargetDate && (
+                      <MarketingCounterDateBanner
+                        originalDate={formatDate(
+                          activeRequest.counterDateOriginalTargetDate ||
+                          activeRequest.workflowState?.counterDateOriginalTargetDate ||
+                          (activeRequest.counterDateDecision === "accepted" || activeRequest.counterDateDecision === "auto_accepted"
+                            ? ""
+                            : activeRequest.targetArtworkDateCreative || activeRequest.sampleRequiredDate)
+                        )}
+                        proposedDate={formatDate(activeRequest.proposedTargetDate)}
+                        reason={activeRequest.counterDateReason}
+                        claimedBy={activeRequest.counterDateRequestedBy}
+                        requestedAt={activeRequest.counterDateRequestedAt}
+                        isMarketingMode={mode === "marketing"}
+                        proposerTitle={counterDateProposerTitle}
+                        decision={activeRequest.counterDateDecision || "pending"}
+                        decisionNotes={activeRequest.counterDateDecisionNotes}
+                        decisionAt={activeRequest.counterDateDecisionAt}
+                        onAccept={() => handleCounterDateDecision("accepted")}
+                        onReject={(notes) => handleCounterDateDecision("rejected", notes)}
+                      />
+                    )}
+                    <DesignDeliverablesTab
+                      activeRequest={activeRequest}
+                      mode={mode}
+                      deliveredCount={deliveredCount}
+                      requestedCount={requestedCount}
+                      remainingCount={remainingCount}
+                      isAwaitingReview={isAwaitingReview}
+                      isRemainingRequested={isRemainingRequested}
+                      canSubmitCreativeOutput={canSubmitCreativeOutput}
+                      showSubmitForm={showSubmitForm}
+                      onToggleSubmitForm={() => {
+                        setSubmitError(null);
+                        setShowSubmitForm((visible) => !visible);
+                      }}
+                      designFileUrl={designFileUrl}
+                      onChangeDesignFileUrl={setDesignFileUrl}
+                      outputCount={outputCount}
+                      onChangeOutputCount={handleOutputCountChange}
+                      outputRows={outputRows}
+                      onChangeOutputRows={setOutputRows}
+                      isSubmittingOutput={isSubmittingOutput}
+                      submitError={submitError}
+                      onSubmitBatch={handleSubmitOutput}
+                      onCancelSubmit={() => {
+                        setShowSubmitForm(false);
+                        setSubmitError(null);
+                      }}
+                      isDeciding={isDeciding}
+                      decisionError={decisionError}
+                      onMarketingDecision={handleMarketingDecision}
+                      selectedMarketingDesignNumbers={selectedMarketingDesignNumbers}
+                      onToggleMarketingDesign={(designNumber) => {
+                        setDecisionError(null);
+                        setSelectedMarketingDesignNumbers((current) => current.includes(designNumber)
+                          ? current.filter((number) => number !== designNumber)
+                          : [...current, designNumber]);
+                      }}
+                      isAcceptedByMarketing={isAcceptedByMarketing}
+                      onOpenNextWork={() => setActiveTab("next_work")}
+                      submissions={submissions}
+                      copiedArtworkPath={copiedArtworkPath}
+                      onCopyArtworkPath={handleCopyArtworkPath}
+                    />
+                  </div>
                 )}
 
                 {/* ── TAB 3: COMMERCIAL SIGN-OFF ── */}
@@ -1338,7 +1418,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                             Design Request Approved &amp; Signed Off
                           </h4>
                           <p className="text-xs text-[var(--on-surface-muted)] mt-1 max-w-md mx-auto">
-                            Marketing approved the artwork deliverables ({deliveredCount} of {requestedCount} completed). This design cycle is completed.
+                            Marketing approved {acceptedDesignCount} selected design{acceptedDesignCount === 1 ? "" : "s"}. This design cycle is completed.
                           </p>
                         </div>
                         {mode === "marketing" && (
@@ -1366,7 +1446,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                           </span>
                         </div>
                         <p className="text-xs text-[var(--on-surface-muted)] leading-relaxed">
-                          Creative Studio has submitted deliverables for review. You can record commercial sign-off to finalize this request and proceed with Mockup or Sampling conversion.
+                          Select the client-approved design(s) in Creative Deliverables before signing off. You can approve a design already delivered while Creative is still working on the remaining request.
                         </p>
                         {decisionError && (
                           <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs font-semibold text-rose-600 dark:text-rose-400">
@@ -1376,14 +1456,13 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                         <div className="flex flex-wrap items-center gap-2 pt-1">
                           <button
                             type="button"
-                            disabled={isDeciding}
-                            onClick={() => handleMarketingDecision("accept")}
+                            onClick={() => setActiveTab("deliverables")}
                             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold shadow-xs transition cursor-pointer active:scale-95"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{isDeciding ? "Processing..." : "Accept Artwork & Sign Off"}</span>
+                            <span>Select Designs to Accept</span>
                           </button>
-                          {remainingCount > 0 && (
+                          {remainingCount > 0 && !isRemainingRequested && (
                             <button
                               type="button"
                               disabled={isDeciding}
@@ -1393,13 +1472,6 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                               <span>Request Remaining ({remainingCount})</span>
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab("deliverables")}
-                            className="text-xs text-[var(--accent-primary)] hover:underline font-semibold ml-2 cursor-pointer"
-                          >
-                            View Deliverables Details →
-                          </button>
                         </div>
                       </div>
                     ) : (
@@ -1448,12 +1520,12 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
       {/* Counter Target Date Proposal Modal */}
       {isCounterDateModalOpen && (
-        <DesignCounterDateModal
+        <FeasibilityCounterDateModal
           isOpen={isCounterDateModalOpen}
           onClose={() => setIsCounterDateModalOpen(false)}
           originalDate={activeRequest.targetArtworkDateCreative || activeRequest.sampleRequiredDate || ""}
-          isSlaEligible={slaStatus.isEligible}
-          slaLabel={slaStatus.label}
+          isEligible={canProposeCounterDate}
+          statusLabel={slaStatus.label}
           onSubmitCounterDate={handleProposeCounterDate}
         />
       )}

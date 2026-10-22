@@ -50,13 +50,16 @@ import { formatOdooDate } from "../utils/dateUtils";
 import { ImageLightboxModal } from "./inspector/ImageLightboxModal";
 import { fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
 import { isMockupCreativeCharacteristic } from "./staging/mockupCreativeFields";
+import { isDirectPlantResampleRequest } from "../utils/sampleRouting";
 import { MockupControlPanel, MockupSheetHeader } from "./mockup";
 import { RequestClosedStamp } from "./common/RequestClosedWatermark";
 import type { RequestClosureTarget } from "./common/RequestClosureControl";
 import { ProductDocketView, isMissingSpec } from "./staging/ProductDocketView";
 import { DocketSkeleton } from "@/components/ui/loading";
+import { TaskClaimBanner } from "@/components/ui/TaskClaimBanner";
 import type { ProductSearchResult } from "../types";
 import { getPrimaryRequestCode } from "../sampling/utils/requestTypeUtils";
+import { MockupScopeSpecificationsPanel } from "./MockupScopeSpecificationsPanel";
 
 const getDisplayedRequestCode = getPrimaryRequestCode;
 
@@ -140,7 +143,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   const [localOverride, setLocalOverride] = useState<SampleRequestItem | null>(null);
   const activeRequest = localOverride || request;
 
-  // Active Tab: defaulted intelligently based on user role
+  // Mockup inspectors always open on Scope; other request types retain role-based defaults.
   const currentUser = useMemo(() => {
     const sessionUser = readAuthUser<UserProfile>();
     if (sessionUser) return sessionUser;
@@ -156,13 +159,19 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     return null;
   }, [actorName, actorUserId, role]);
 
+  const opensMockupScope = Boolean(
+    activeRequest?.requestTypes?.includes("mockup") ||
+    String(activeRequest?.mockupRequired || "").toLowerCase() === "yes"
+  );
+
   const initialTab = useMemo<InspectorTab>(() => {
+    if (opensMockupScope) return "scope";
     if (role === "creative") return "creative";
     if (role === "studio") return "studio";
-    if (role === "sampling") return "sampling";
+    if (role === "sampling") return "scope";
     if (role === "plant") return "plant";
     return "specs";
-  }, [role]);
+  }, [opensMockupScope, role]);
 
   const [activeTab, setActiveTab] = useState<InspectorTab>(initialTab);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -216,6 +225,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   // Reset and synchronize on request id change
   useEffect(() => {
+    if (!isOpen) return;
     setLocalOverride(null);
     setCreativeFeedback(null);
     setStudioFeedback(null);
@@ -225,7 +235,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     setCharFilter("docket");
     setCopiedCode(false);
     setScopeReferenceImages({});
-  }, [request?.id, initialTab]);
+  }, [isOpen, request?.id, initialTab]);
 
   // Load internal notes from localStorage
   useEffect(() => {
@@ -252,7 +262,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     setIsLoadingDetails(true);
     setScopeReferenceImages(activeRequest.scopeReferenceImages || {});
 
-    fetchProductDetailsApi(numericId, false)
+    fetchProductDetailsApi(numericId, false, true)
       .then((details: any[]) => {
         if (cancelled) return;
         setProductDetails(details);
@@ -371,6 +381,17 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     return Array.from(map.entries());
   }, [productDetails, charSearchQuery, charFilter]);
 
+  const creativeCharacteristics = useMemo(
+    () => productDetails.filter((detail) => isMockupCreativeCharacteristic(detail.className, detail.characteristicName)),
+    [productDetails]
+  );
+
+  const updateCreativeCharacteristic = (field: ProductDetailItem, value: string) => {
+    setProductDetails((current) => current.map((detail) =>
+      detail.id === field.id ? { ...detail, value } : detail
+    ));
+  };
+
   const sampleDocketProduct = useMemo<ProductSearchResult & { brand?: string; brandName?: string }>(() => {
     if (!activeRequest) return {} as any;
     return {
@@ -392,16 +413,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   // Workflow Gates & Status Flags
   const ws: Partial<MockupWorkflowState> = activeRequest?.mockupWorkflowState || {};
   const isDirectCatalogSample = useMemo(() => {
-    if (!activeRequest) return false;
-    const scopes = activeRequest.requestTypes || [];
-    const isMockup = scopes.includes("mockup");
-    const isDesign = scopes.includes("design");
-    const hasCreative = (activeRequest as any).hasCreativeChanges ||
-      (activeRequest as any).creativeCharacteristicsCleared ||
-      ws.creativeChangesRequired ||
-      ws.samplingRouting?.creativeChangesRequired;
-    return !isMockup && !isDesign && !hasCreative;
-  }, [activeRequest, ws]);
+    return activeRequest ? isDirectPlantResampleRequest(activeRequest) : false;
+  }, [activeRequest]);
 
   const requestTypes = activeRequest?.requestTypes || [];
   const isMockupRequest = requestTypes.includes("mockup") || String(activeRequest?.mockupRequired || "").toLowerCase() === "yes";
@@ -444,9 +457,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   );
   const visibleClosureRequests = canCloseRequest ? closureRequests : [];
   const isMockupOnly = isMockupRequest && !hasSampleScope;
-  const isSamplingCreativeTask = hasSampleScope && !isMockupRequest
-    && ws.samplingRouting?.creativeChangesRequired === true;
-  const isCreativeBypassed = isMockupRequest && ws.designNeeded === false;
+  const isSamplingCreativeTask = hasSampleScope && !isMockupRequest && !isDirectCatalogSample;
+  const isCreativeBypassed = isMockupRequest && (ws.designNeeded === false || ws.creativeBypassed === true);
 
   const isCreativeDone = useMemo(() => {
     if (!activeRequest) return false;
@@ -483,22 +495,17 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     return s.includes("released to plant") || Boolean(ws?.plantReleasedAt);
   }, [activeRequest, ws]);
   const isPlantSampleTask = hasSampleScope && isReleasedToPlant;
-  const isResample = Boolean(
-    (activeRequest as any)?.isResample ||
-    ws?.isResample ||
-    ws?.samplingRouting?.isResample ||
-    activeRequest?.creationMode === "resample"
-  );
+  const isResample = activeRequest ? isDirectPlantResampleRequest(activeRequest) : false;
 
   const visibleTabs = useMemo(() => {
     const tabs: Array<{ id: InspectorTab; label: string; icon: LucideIcon; badge?: string; count?: number }> = [
       { id: "scope", label: "1. Specifications & Scope", icon: FileText },
-      { id: "specs", label: "2. Product Classes & Specifications", icon: Layers, count: productDetails.length },
+      { id: "specs", label: "2. Product Classes & Characteristics", icon: Layers, count: productDetails.length },
     ];
     if (!isCreativeBypassed) {
-      tabs.push({ id: "creative", label: "Creative Studio", icon: Palette, badge: isCreativeDone ? "Done" : "Pending" });
+      tabs.push({ id: "creative", label: "Creative", icon: Palette, badge: isCreativeDone ? "Done" : "Pending" });
     }
-    tabs.push({ id: "studio", label: "Studio Prepress & CAD", icon: Box, badge: isStudioDone ? "CAD Ready" : "Pending" });
+    tabs.push({ id: "studio", label: "Studio", icon: Box, badge: isStudioDone ? "Output Ready" : "Pending" });
     if (!isMockupOnly) {
       tabs.push({ id: "sampling", label: isResample ? "Plant Resample Route" : "Sampling Team Review", icon: Beaker, badge: isReleasedToPlant ? "Released" : "Review" });
       tabs.push({ id: "plant", label: "Plant Execution", icon: Factory, badge: "Open" });
@@ -585,8 +592,15 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   // - Studio can enter the prepress CAD URL once claimed when stage is studio.
   const canCreativeEdit = !isClosed && (role === "creative" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "creative";
   const canStudioEdit = !isClosed && (role === "studio" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "studio";
-  const isSamplingStage = !isClosed && (ws.stage === "sampling_review" || ws.stage === "sampling" || String(activeRequest?.status || "").toLowerCase().includes("sampling") || (!isReleasedToPlant && (activeRequest?.requestTypes || []).includes("sample")));
-  const canSamplingReleaseVariant = !isClosed && (role === "sampling" || isAdmin) && !readOnly && (!isTaskClaimedForActiveStage || isClaimedByMe) && isSamplingStage && !isReleasedToPlant;
+  const explicitWorkflowStage = String(ws.stage || "").trim().toLowerCase();
+  const isSamplingStage = !isClosed && (
+    explicitWorkflowStage
+      ? ["sampling_review", "sampling", "plant"].includes(explicitWorkflowStage)
+      : ["sampling", "released to plant"].some((stage) =>
+          String(activeRequest?.status || "").toLowerCase().includes(stage)
+        )
+  );
+  const canSamplingReleaseVariant = !isClosed && (role === "sampling" || isAdmin) && !readOnly && isClaimedByMe && isSamplingStage && !isReleasedToPlant;
   const canCreativeApproveSampleArtwork = !isClosed && (role === "creative" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "creative_approval";
   const creativeDueAt = ws.samplingRouting?.creativeDueAt ? new Date(ws.samplingRouting.creativeDueAt) : null;
   const creativeIsLate = Boolean(!isClosed && ws.stage === "creative" && creativeDueAt && Date.now() > creativeDueAt.getTime());
@@ -640,7 +654,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
       events.push({
         id: "event-creative-submitted",
         actorName: ws.claimedBy || "Creative Lead",
-        actorDepartment: "Creative Studio",
+        actorDepartment: "Creative",
         action: "CREATIVE_RELEASED",
         title: "Creative Specs Released to Studio",
         body: `Shutterstock Ref: ${ws.creativeShutterstockNo || "None"} | Notes: ${ws.creativeRemark || "Artwork details confirmed"}`,
@@ -652,7 +666,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
       events.push({
         id: "event-studio-artwork",
         actorName: "Studio Prepress Engineer",
-        actorDepartment: "Studio CAD",
+        actorDepartment: "Studio",
         action: "STUDIO_COMPLETED",
         title: "CAD & Artwork Released",
         body: `Dieline and production artwork delivered: ${ws.mockupUrl}`,
@@ -733,7 +747,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     }
   };
 
-  // 1. Creative Save & Release to Studio CAD
+  // 1. Creative Save & Release to Studio
   const handleCreativeRelease = async () => {
     if (!activeRequest) return;
     if (isSamplingCreativeTask && (!creativeShutterstockNo.trim() || !creativeRemark.trim())) {
@@ -747,7 +761,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     setIsSavingCreative(true);
     setCreativeFeedback(null);
     try {
-      if (isSamplingCreativeTask) {
+      if (isSamplingCreativeTask || isMockupRequest) {
         const savedDetails = await saveProductDetailsApi(Number(activeRequest.id), productDetails.map((detail) => ({
           className: detail.className,
           characteristicName: detail.characteristicName,
@@ -765,7 +779,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
       setLocalOverride(updated);
       setCreativeFeedback(isSamplingCreativeTask
         ? "Creative specifications completed and sent to Studio for artwork."
-        : "Creative specifications submitted and released to Studio CAD.");
+        : "Creative specifications submitted and released to Studio.");
       if (onRefresh) void onRefresh();
     } catch (err: any) {
       setCreativeFeedback(err?.message || "Failed to release specifications. Please retry.");
@@ -939,6 +953,15 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
 
         {/* ── 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + CHATTER) ── */}
+        {isTaskClaimedForActiveStage && (
+          <TaskClaimBanner
+            claimedBy={claimedBy}
+            claimedAt={ws.claimedAt}
+            isClaimedByCurrentUser={isClaimedByMe}
+            compact
+            className="mx-4 mt-3 shrink-0 sm:mx-6"
+          />
+        )}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           
           {/* ── LEFT: FORM SHEET (DOCUMENT BODY) ── */}
@@ -1006,7 +1029,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
               )}
 
               {/* ── SAMPLING PMT ACTION & PLANT DISPATCH CONSOLE ── */}
-              {(role === "sampling" || isAdmin) && !isMockupOnly && (
+              {(role === "sampling" || isAdmin) && !isMockupOnly && isSamplingStage && (
                 <div className="px-4 sm:px-8 pt-3">
                   {isResample ? (
                     <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/25 flex items-start justify-between gap-4">
@@ -1050,7 +1073,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         </div>
                       </div>
                     </div>
-                  ) : (
+    ) : (
                     <div className="p-4 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/60 dark:bg-teal-950/20 space-y-3">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -1177,14 +1200,48 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                       </section>
                     )}
                     {/* ── Section 1: Specification & Scope ── */}
-                    <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+                    {isMockupRequest && (
+                      <MockupScopeSpecificationsPanel
+                        description={activeRequest.productDescription}
+                        metrics={[
+                          {
+                            label: "Customer / Brand",
+                            value: activeRequest.customer || "Commercial Account",
+                            detail: activeRequest.brandName ? `Brand: ${activeRequest.brandName}` : undefined,
+                          },
+                          {
+                            label: "Required Date",
+                            value: formatOdooDate(ws.requiredDate) || "Immediate",
+                          },
+                          {
+                            label: "Deliverable Quantity",
+                            value: `Mockup: ${activeRequest.qtyForMockup || ws.qtyForMockup || "—"} pcs`,
+                          },
+                          {
+                            label: "Material / Category",
+                            value: activeRequest.materialCode || "Custom Staged Material",
+                            detail: [activeRequest.productCategory, activeRequest.productSubCategory].filter(Boolean).join(" · ") || "Paper Stationery",
+                          },
+                        ]}
+                        notes={[
+                          { label: "Marketing Brief", value: ws.marketingRemark || "" },
+                          ...(!isCreativeBypassed ? [{ label: "Creative Instructions", value: ws.creativeRemark || "" }] : []),
+                          { label: "Revision Note", value: ws.marketingRevisionRemark || "", tone: "warning" as const },
+                          { label: "Marketing Reference", value: ws.marketingShutterstockNo || "" },
+                          ...(!isCreativeBypassed ? [{ label: "Creative Reference", value: ws.creativeShutterstockNo || "" }] : []),
+                        ].filter((note) => note.value.trim())}
+                        images={scopeReferenceImages.mockup || []}
+                        onPreview={setSelectedPreviewImage}
+                      />
+                    )}
+                    <div className={`${isMockupRequest ? "hidden" : ""} flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2`}>
                       <FileText className="w-4 h-4 text-[var(--accent-primary)]" />
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
                         1. Specification & Scope
                       </h3>
                     </div>
                     {/* Key Technical Information Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className={`${isMockupRequest ? "hidden" : ""} grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4`}>
                       <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Customer / Brand</span>
                         <p className="text-xs font-semibold text-[var(--on-surface)]">{activeRequest.customer || "Commercial Account"}</p>
@@ -1237,7 +1294,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                     </div>
 
                     {(["sample", "mockup", "costing"] as const).some((scope) => (scopeReferenceImages[scope] || []).length > 0) && (
-                      <section aria-label="Request reference images" className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5">
+                      <section aria-label="Request reference images" className={`${isMockupRequest ? "hidden" : ""} mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5`}>
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <h3 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Request Reference Images</h3>
                           <span className="text-[10px] text-[var(--on-surface-muted)]">Compressed attachments</span>
@@ -1272,16 +1329,22 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                 {/* ═════════ TAB 2: PRODUCT CLASSES & SPECIFICATIONS ═════════ */}
                 {activeTab === "specs" && (
                   <div className="space-y-6">
-                    {/* ── Section 2: Product Classes & Specifications ── */}
+                    {/* ── Section 2: Product Classes & Characteristics ── */}
                     <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2 pt-2">
                       <Layers className="w-4 h-4 text-teal-600" />
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
-                        2. Product Classes & Specifications
+                        2. Product Classes & Characteristics
                       </h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
                         {productDetails.length} Specs
                       </span>
                     </div>
+                    <section aria-label="Product description" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-4 space-y-1.5">
+                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">Product Description</h4>
+                      <p className="whitespace-pre-wrap text-xs sm:text-[13px] leading-relaxed text-[var(--on-surface)]">
+                        {activeRequest.productDescription || <span className="italic text-[var(--on-surface-subtle)]">No product description provided.</span>}
+                      </p>
+                    </section>
                     {/* Characteristics Explorer (Creative can edit all fields when claimed) */}
                     <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-3">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1300,7 +1363,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                           </div>
                           <p className="text-[11px] text-[var(--on-surface-muted)]">
                             {canCreativeEdit
-                              ? "As claimed Creative lead, you have permission to feed and modify any technical specifications below."
+                              ? "Update the Creative-owned characteristics below, then release the work to Studio."
                               : "Technical specifications staged from Master Catalog & Binding."}
                           </p>
                         </div>
@@ -1440,6 +1503,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                             classGroups={groupedCharacteristics}
                             searchQuery={charSearchQuery}
                             containerId={`sample-request-docket-${activeRequest.id}`}
+                            creativeFields={(isMockupRequest || isSamplingCreativeTask) && role === "creative" ? creativeCharacteristics : undefined}
+                            onCreativeFieldChange={canCreativeEdit ? updateCreativeCharacteristic : undefined}
                           />
                         </div>
                         <div className="hidden">
@@ -1491,22 +1556,9 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                                           <span>{it.characteristicName}</span>
                                         </td>
                                         <td className="px-3.5 py-2">
-                                          {isSamplingCreativeTask && canCreativeEdit && isMockupCreativeCharacteristic(it.className, it.characteristicName) ? (
-                                            <input
-                                              aria-label={`${it.className} ${it.characteristicName}`}
-                                              value={currentVal}
-                                              onChange={(event) => setProductDetails((current) => current.map((detail) =>
-                                                detail.className === it.className && detail.characteristicName === it.characteristicName
-                                                  ? { ...detail, value: event.target.value }
-                                                  : detail))}
-                                              className="w-full min-w-32 rounded-md border border-[var(--accent-primary)]/40 bg-[var(--surface-lowest)] px-2 py-1 font-mono text-xs text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30"
-                                              placeholder="Creative value required"
-                                            />
-                                          ) : (
                                           <span className="font-mono text-[var(--on-surface)]">
                                             {currentVal || <span className="text-[var(--on-surface-subtle)] italic">—</span>}
                                           </span>
-                                          )}
                                         </td>
                                         <td className="px-3.5 py-2 text-[var(--on-surface-muted)] font-mono text-[11px]">
                                           {it.uom || "—"}
@@ -1524,7 +1576,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                   </div>
                 )}
 
-                {/* ═════════ TAB 2: CREATIVE STUDIO ═════════ */}
+                {/* ═════════ TAB 2: CREATIVE ═════════ */}
                 {!isCreativeBypassed && activeTab === "creative" && (
                   <div className="space-y-5">
                     {ws.designNeeded === false ? (
@@ -1536,19 +1588,19 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                           </h3>
                         </div>
                         <p className="text-xs text-emerald-800/90 dark:text-emerald-300/90">
-                          Marketing chose <strong>"No new design needed"</strong> during mockup configuration. The Creative team was eliminated from this request and the work routed directly to Studio CAD.
+                          Marketing chose <strong>"No new design needed"</strong> during mockup configuration. Creative was bypassed and the work routed directly to Studio.
                         </p>
                         <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                           <div>
                             <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">Marketing Shutterstock Ref</span>
                             <p className="font-mono font-semibold text-emerald-950 dark:text-emerald-100 mt-0.5">
-                              {ws.creativeShutterstockNo || ws.marketingShutterstockNo || "None specified"}
+                              {ws.marketingShutterstockNo || "None specified"}
                             </p>
                           </div>
                           <div>
                             <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">Marketing Styling Remark</span>
                             <p className="font-medium text-emerald-950 dark:text-emerald-100 mt-0.5">
-                              {ws.creativeRemark || ws.marketingRemark || "None specified"}
+                              {ws.marketingRemark || "None specified"}
                             </p>
                           </div>
                         </div>
@@ -1576,7 +1628,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         <div className="flex items-center gap-2.5">
                           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                           <h3 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
-                            {isSamplingCreativeTask ? "Variant Specifications Sent to Studio" : "Creative Specifications Released to Studio CAD"}
+                            {isSamplingCreativeTask ? "Variant Specifications Sent to Studio" : "Creative Specifications Released to Studio"}
                           </h3>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
@@ -1601,7 +1653,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                           <p className="mt-1 text-xs text-[var(--on-surface-muted)]">
                             {isSamplingCreativeTask
                               ? "Complete the blank Creative-owned characteristics in Specifications, add the Shutterstock reference and remark, then send the variant to Studio for artwork."
-                              : "Provide a Shutterstock asset reference number or styling guidelines. At least one is mandatory before releasing to Studio CAD."}
+                              : "Provide a Shutterstock asset reference number or styling guidelines. At least one is mandatory before releasing to Studio."}
                           </p>
                         </div>
 
@@ -1684,7 +1736,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
                             >
                               <Send className="w-3.5 h-3.5" />
-                              <span>{isSavingCreative ? "Sending..." : isSamplingCreativeTask ? "Complete & Send to Studio" : "Release to Studio CAD"}</span>
+                              <span>{isSavingCreative ? "Sending..." : isSamplingCreativeTask ? "Complete & Send to Studio" : "Release to Studio"}</span>
                             </button>
                           </div>
                         </div>
@@ -1693,23 +1745,25 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                   </div>
                 )}
 
-                {/* ═════════ TAB 3: STUDIO CAD & PREPRESS ═════════ */}
+                {/* ═════════ TAB 3: STUDIO ═════════ */}
                 {activeTab === "studio" && (
                   <div className="space-y-5">
                     {/* Handoff Context (Read-Only Context for Studio) */}
                     <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-2">
                       <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
-                        {ws.designNeeded === false ? "Design Reference from Marketing (Creative Bypassed)" : "Handoff Received from Creative Studio"}
+                        {ws.designNeeded === false ? "Design Reference from Marketing (Creative Bypassed)" : "Handoff Received from Creative"}
                       </span>
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold text-[var(--on-surface)]">Asset Reference:</span>
                         <span className="font-mono text-[var(--accent-primary-strong)] font-bold">
-                          {ws.creativeShutterstockNo || ws.marketingShutterstockNo || "Direct catalog reference"}
+                          {isCreativeBypassed
+                            ? ws.marketingShutterstockNo || "Direct catalog reference"
+                            : ws.creativeShutterstockNo || ws.marketingShutterstockNo || "Direct catalog reference"}
                         </span>
                       </div>
-                      {(ws.creativeRemark || ws.marketingRemark) && (
+                      {(isCreativeBypassed ? ws.marketingRemark : ws.creativeRemark || ws.marketingRemark) && (
                         <p className="text-xs italic text-[var(--on-surface-muted)] bg-[var(--surface-low)] p-2.5 rounded-lg border border-[var(--border-subtle)]">
-                          "{ws.creativeRemark || ws.marketingRemark}"
+                          "{isCreativeBypassed ? ws.marketingRemark : ws.creativeRemark || ws.marketingRemark}"
                         </p>
                       )}
                       {(ws.samplingRouting?.studioRevisionRemark || ws.marketingRevisionRemark) && (
@@ -1727,7 +1781,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <label className="block text-xs font-bold text-[var(--on-surface)] uppercase tracking-wider font-mono">
-                            Studio CAD Dieline / Artwork Output Link
+                            Studio Dieline / Artwork Output Link
                           </label>
                           {!canStudioEdit && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--on-surface-subtle)]">

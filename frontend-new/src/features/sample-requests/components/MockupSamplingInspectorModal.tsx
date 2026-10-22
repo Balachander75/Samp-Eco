@@ -38,6 +38,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { ScopeReferenceImagesGallery } from "@/features/sample-requests/components/staging/ScopeReferenceImagesGallery";
 import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
 import { RequestClosedStamp } from "./common/RequestClosedWatermark";
+import { MockupScopeSpecificationsPanel } from "./MockupScopeSpecificationsPanel";
 import type { ProductSearchResult, SampleRequestItem } from "../types";
 
 interface MockupSamplingInspectorModalProps {
@@ -52,7 +53,7 @@ type MockupTab = "scope" | "specs" | "output" | "review" | "history";
 const stageSequence = [
   { key: "marketing", label: "1. Intake" },
   { key: "creative", label: "2. Creative" },
-  { key: "studio", label: "3. Studio CAD" },
+  { key: "studio", label: "3. Studio" },
   { key: "creative_approval", label: "4. Creative QA" },
   { key: "sampling_review", label: "5. Sampling Review" },
   { key: "awaiting_marketing_acceptance", label: "6. Marketing Final" },
@@ -62,7 +63,7 @@ const stageSequence = [
 const stageLabels: Record<string, string> = {
   marketing: "Marketing intake",
   creative: "Creative review",
-  studio: "Studio CAD mockup",
+  studio: "Studio mockup",
   creative_approval: "Creative QA review",
   sampling_review: "Sampling review (PMT)",
   awaiting_marketing_acceptance: "Marketing final acceptance",
@@ -141,6 +142,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
   const dialogRef = useRef<HTMLElement>(null);
   const data = (record.workflow_data || {}) as Record<string, any>;
   const requestData = (record.request_data || {}) as Record<string, any>;
+  const isCreativeBypassed = data.designNeeded === false || data.creativeBypassed === true;
 
   const selectedMockupDesigns = Array.isArray(data.designFollowups?.mockup?.designs)
     ? (data.designFollowups.mockup.designs as Array<Record<string, string>>)
@@ -489,7 +491,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-500/20">
                     <Boxes className="w-3 h-3 text-indigo-600" />
-                    <span>Studio CAD &amp; Dieline</span>
+                    <span>Studio Mockup &amp; Dieline</span>
                   </span>
                   <StatusPill status={record.status} size="md" />
                 </div>
@@ -585,7 +587,9 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                       <span>Creative Reference</span>
                     </div>
                     <p className="text-xs font-mono font-bold text-[var(--on-surface)] truncate">
-                      {display(data.creativeShutterstockNo || data.marketingShutterstockNo || "Direct Catalog")}
+                      {display(isCreativeBypassed
+                        ? data.marketingShutterstockNo || "Direct Catalog"
+                        : data.creativeShutterstockNo || data.marketingShutterstockNo || "Direct Catalog")}
                     </p>
                     <p className="text-[10px] text-[var(--on-surface-subtle)] truncate">Asset specification ref</p>
                   </div>
@@ -755,7 +759,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                     )}
 
                     {/* Studio Revision Notes or Marketing Requests */}
-                    {(data.creativeRemark || data.marketingRemark || data.marketingRevisionRemark) && (
+                    {((!isCreativeBypassed && data.creativeRemark) || data.marketingRemark || data.marketingRevisionRemark) && (
                       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-4 space-y-2">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
                           Handoff Instructions &amp; Brief History
@@ -766,7 +770,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                             {data.marketingRemark}
                           </p>
                         )}
-                        {data.creativeRemark && (
+                        {!isCreativeBypassed && data.creativeRemark && (
                           <p className="text-xs text-[var(--on-surface)]">
                             <strong className="text-[var(--on-surface-muted)]">Creative Instructions: </strong>
                             {data.creativeRemark}
@@ -819,8 +823,40 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
               {/* ═════════ TAB 1: SPECIFICATIONS & SCOPE ═════════ */}
               {activeTab === "scope" && (
                 <div className="space-y-6">
+                  <MockupScopeSpecificationsPanel
+                    description={String(record.product_description || requestData.product_description || data.productDescription || "")}
+                    metrics={[
+                      {
+                        label: "Customer / Brand",
+                        value: record.customer || "Commercial Account",
+                        detail: record.brand_name ? `Brand: ${record.brand_name}` : undefined,
+                      },
+                      {
+                        label: "Required Date",
+                        value: formatDate(String(record.due_date || data.requiredDate || requestData.due_date || "")) || "Immediate",
+                      },
+                      {
+                        label: "Deliverable Quantity",
+                        value: `Mockup: ${String(requestData.qty_for_mockup || data.qty_for_mockup || 1)} pcs`,
+                      },
+                      {
+                        label: "Material / Category",
+                        value: String(record.material_code || requestData.material_code || "Custom Mockup"),
+                        detail: [record.product_category, requestData.product_sub_category].filter(Boolean).join(" · ") || "Paper Stationery",
+                      },
+                    ]}
+                    notes={[
+                      { label: "Marketing Brief", value: String(data.marketingRemark || "") },
+                      ...(!isCreativeBypassed ? [{ label: "Creative Instructions", value: String(data.creativeRemark || "") }] : []),
+                      { label: "Revision Note", value: String(data.marketingRevisionRemark || ""), tone: "warning" as const },
+                      { label: "Marketing Reference", value: String(data.marketingShutterstockNo || "") },
+                      ...(!isCreativeBypassed ? [{ label: "Creative Reference", value: String(data.creativeShutterstockNo || "") }] : []),
+                    ].filter((note) => note.value.trim())}
+                    images={scopeReferenceImages.mockup || []}
+                    onPreview={setLightboxUrl}
+                  />
                   {/* ── Section 1: Specification & Scope ── */}
-                  <section className="space-y-3">
+                  <section className="hidden">
                     <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
                       <FileText className="w-4 h-4 text-[var(--accent-primary)]" />
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
@@ -858,11 +894,11 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                       </div>
                     </div>
 
-                    {(data.creativeRemark || data.marketingRemark || data.marketingRevisionRemark) && (
+                    {((!isCreativeBypassed && data.creativeRemark) || data.marketingRemark || data.marketingRevisionRemark) && (
                       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5 space-y-2">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Brief & Instructions</span>
                         {data.marketingRemark && <p className="text-xs text-[var(--on-surface)]"><strong>Marketing Brief:</strong> {data.marketingRemark}</p>}
-                        {data.creativeRemark && <p className="text-xs text-[var(--on-surface)]"><strong>Creative Instructions:</strong> {data.creativeRemark}</p>}
+                        {!isCreativeBypassed && data.creativeRemark && <p className="text-xs text-[var(--on-surface)]"><strong>Creative Instructions:</strong> {data.creativeRemark}</p>}
                         {data.marketingRevisionRemark && <p className="text-xs text-amber-800 dark:text-amber-300"><strong>Revision Note:</strong> {data.marketingRevisionRemark}</p>}
                       </div>
                     )}

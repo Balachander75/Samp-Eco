@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle2, AlertCircle, X } from "lucide-react";
+import { CheckCircle2, AlertCircle, X, Loader2 } from "lucide-react";
 import { UserProfile } from "@/features/auth";
 import {
   searchProductsByMaterialApi,
@@ -194,6 +194,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Sync stagedProducts to sessionStorage whenever updated
   useEffect(() => {
+    if (isReleasedRef.current) return;
     sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(stagedProducts));
   }, [stagedProducts, stagedProductsStorageKey]);
 
@@ -287,6 +288,9 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   const [, setCatalogProductDescription] = useState("");
   const [qtyDesignCosting, setQtyDesignCosting] = useState("");
   const [qtyForSampling, setQtyForSampling] = useState("1");
+  const [sampleRequiredDate, setSampleRequiredDate] = useState(
+    feasibilityHandoff ? programContext.feasibilityRequiredDate || "" : "",
+  );
   const [qtyForMockup, setQtyForMockup] = useState("1");
   const [mockupRequiredDate, setMockupRequiredDate] = useState(
     feasibilityHandoff && programContext.feasibilityRequestType === "mockup" ? programContext.feasibilityRequiredDate || "" : "",
@@ -315,6 +319,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Auto-save refs to guarantee zero data loss if user navigates away or switches tabs
   const hasAutoSavedRef = useRef(false);
+  const isReleasedRef = useRef(false);
   const stagedProductsRef = useRef(stagedProducts);
   const stagedProductUpdateQueueRef = useRef<Promise<void>>(Promise.resolve());
   stagedProductsRef.current = stagedProducts;
@@ -328,6 +333,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
 
   // Sync to sessionStorage
   useEffect(() => {
+    if (isReleasedRef.current) return;
     sessionStorage.setItem(programContextStorageKey, JSON.stringify(programContext));
   }, [programContext, programContextStorageKey]);
 
@@ -336,6 +342,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     return () => {
       if (
         !hasAutoSavedRef.current &&
+        !isReleasedRef.current &&
         stagedProductsRef.current.length > 0 &&
         !programContextRef.current.feasibilityRequestId
       ) {
@@ -414,6 +421,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     setCatalogProductDescription("");
     setQtyDesignCosting("");
     setQtyForSampling("1");
+    setSampleRequiredDate(feasibilityHandoff ? programContext.feasibilityRequiredDate || "" : "");
     setQtyForMockup("1");
     setMockupRequiredDate("");
     setCustomerProductCode("");
@@ -1120,6 +1128,17 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       }
     }
 
+    if (selectedScopes.includes("sample")) {
+      if (!qtyForSampling.trim() || !Number.isInteger(Number(qtyForSampling)) || Number(qtyForSampling) < 1) {
+        setModalError("Enter a whole-number sample quantity (minimum 1).");
+        return;
+      }
+      if (!(sampleRequiredDate.trim() || programContext.feasibilityRequiredDate || editingProduct?.sampleRequiredDate)) {
+        setModalError("Choose a required date for the Sampling request.");
+        return;
+      }
+    }
+
     if ((selectedScopes.includes("sample") || selectedScopes.includes("costing")) && unitPcPack === "Pack" && (!Number.isInteger(Number(qtyPerPack)) || Number(qtyPerPack) < 1)) {
       setModalError("Enter how many pieces are in one pack.");
       return;
@@ -1134,7 +1153,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         setModalError("Select an existing Material Code or Binding product before creating these Mockup requests.");
         return;
       }
-      if (!designMockupHandoff && (!Number.isInteger(Number(qtyForMockup)) || Number(qtyForMockup) < 1)) {
+      if (!qtyForMockup.trim() || !Number.isInteger(Number(qtyForMockup)) || Number(qtyForMockup) < 1) {
         setModalError("Enter a whole-number Mockup quantity (minimum 1).");
         return;
       }
@@ -1249,8 +1268,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         unitPcPack,
         qtyPerPack: unitPcPack === "Pack" ? qtyPerPack.trim() : "1",
         ...(selectedScopes.includes("sample") && {
-          qtyForSampling: qtyForSampling.trim() || "1",
-          sampleRequiredDate: programContext.feasibilityRequiredDate || editingProduct.sampleRequiredDate,
+          qtyForSampling: qtyForSampling.trim(),
+          sampleRequiredDate: sampleRequiredDate.trim() || programContext.feasibilityRequiredDate || editingProduct.sampleRequiredDate,
         }),
         ...(selectedScopes.includes("mockup") && {
           qtyForMockup: qtyForMockup.trim() || "1",
@@ -1345,8 +1364,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         unitPcPack,
         qtyPerPack: unitPcPack === "Pack" ? qtyPerPack.trim() : "1",
         ...(selectedScopes.includes("sample") && {
-          qtyForSampling: qtyForSampling.trim() || "1",
-          sampleRequiredDate: programContext.feasibilityRequiredDate || undefined,
+          qtyForSampling: qtyForSampling.trim(),
+          sampleRequiredDate: sampleRequiredDate.trim() || programContext.feasibilityRequiredDate || undefined,
         }),
         ...(selectedScopes.includes("mockup") && {
           qtyForMockup: qtyForMockup.trim() || "1",
@@ -1469,12 +1488,20 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           { mockup: designMockupHandoff.designs.map((design) => design.designNumber) },
           { mockupRequiredDate: mockupRequiredDate.trim(), mockupRequestIds: saved.savedIds },
         );
+        isReleasedRef.current = true;
+        hasAutoSavedRef.current = true;
         sessionStorage.removeItem(stagedProductsStorageKey);
         sessionStorage.removeItem(programContextStorageKey);
         stagedProductsRef.current = [];
-        setStagedProducts([]);
         setIsAddModalOpen(false);
-        navigate("/sample-requests", { state: { refresh: Date.now(), stage: "studio" } });
+        navigate("/sample-requests", {
+          replace: true,
+          state: {
+            refresh: Date.now(),
+            stage: "studio",
+            toastMessage: `${saved.savedIds.length} Mockup request(s) sent directly to Studio.`,
+          },
+        });
         window.dispatchEvent(new CustomEvent("app:show-toast", {
           detail: { message: saved.savedIds.length + " Mockup request(s) sent directly to Studio.", tone: "success" },
         }));
@@ -1576,7 +1603,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     if (isSamplingVariant && !customDetails?.length) {
       const sourceId = item.savedRequestId || item.sourceSampleRequestId || item.samplingMetadata?.sourceSampleId;
       if (sourceId) {
-        const details = await fetchProductDetailsApi(sourceId, false);
+        const details = await fetchProductDetailsApi(sourceId, false, false, true);
         customDetails = details.map((detail) => ({
           className: detail.className,
           characteristicName: detail.characteristicName,
@@ -1724,9 +1751,36 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     }
   };
 
+  const getStagedRequirementsError = (items: StagedProductItem[]) => {
+    const isValidQuantity = (value: unknown) => {
+      const quantity = String(value ?? "").trim();
+      return Boolean(quantity) && Number.isInteger(Number(quantity)) && Number(quantity) >= 1;
+    };
+    const incomplete = items.find((item) => {
+      const missingDesign = item.scopes.includes("design")
+        && (!item.designMetadata?.designRequiredDate?.trim() || !isValidQuantity(item.designMetadata?.numberOfDesigns));
+      const missingMockup = item.scopes.includes("mockup")
+        && (!(item.mockupMetadata?.requiredDate || item.mockupRequiredDate || "").trim()
+          || !isValidQuantity(item.qtyForMockup ?? item.mockupMetadata?.qtyForMockup));
+      const missingSample = item.scopes.includes("sample")
+        && (!(item.sampleRequiredDate || "").trim() || !isValidQuantity(item.qtyForSampling));
+      const missingCosting = item.scopes.includes("costing")
+        && (!(item.costingRequiredDate || "").trim() || !isValidQuantity(item.qtyDesignCosting));
+      return missingDesign || missingMockup || missingSample || missingCosting;
+    });
+    return incomplete
+      ? `Add a required date and quantity for ${incomplete.productDescription || incomplete.materialCode} before continuing.`
+      : "";
+  };
+
   // Submit all staged products into Sample Requests & Design pipelines
   const handleSubmitBatch = async () => {
     if (stagedProducts.length === 0) return;
+    const requirementsError = getStagedRequirementsError(stagedProducts);
+    if (requirementsError) {
+      showToast(requirementsError, "error");
+      return;
+    }
     if (!programContext.customer) {
       showToast("A customer is required before saving products.", "error");
       return;
@@ -1737,13 +1791,21 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     try {
       const res = await autoSaveStagedProductsToDraft(stagedProducts, programContext, user);
       if (res.success) {
+        isReleasedRef.current = true;
+        hasAutoSavedRef.current = true;
+        stagedProductsRef.current = [];
         sessionStorage.removeItem(programContextStorageKey);
         sessionStorage.removeItem(stagedProductsStorageKey);
-        setStagedProducts([]);
-      showToast(`Successfully saved ${res.count} product(s) to ${programContext.parentSrNumber || "the request"}. Returning to desk...`);
-        setTimeout(() => {
-          navigate("/sample-requests", { state: { refresh: Date.now(), stage: "draft" } });
-        }, 700);
+        const msg = `Successfully saved ${res.count} product(s) to ${programContext.parentSrNumber || "the request"}.`;
+        window.dispatchEvent(
+          new CustomEvent("app:show-toast", {
+            detail: { message: msg, tone: "success" },
+          })
+        );
+        navigate("/sample-requests", {
+          replace: true,
+          state: { refresh: Date.now(), stage: "draft", toastMessage: msg },
+        });
       } else {
         hasAutoSavedRef.current = false;
         showToast(res.error || "Draft save failed. Your staged products are still here; retry the save.", "error");
@@ -1752,7 +1814,9 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       hasAutoSavedRef.current = false;
       showToast("The staged request(s) could not be saved. Your staged products are still here; retry the save.", "error");
     } finally {
-      setIsSubmittingAll(false);
+      if (!isReleasedRef.current) {
+        setIsSubmittingAll(false);
+      }
     }
   };
 
@@ -1771,6 +1835,11 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     }
     if (feasibilityHandoff && stagedProducts.length !== 1) {
       showToast("Stage one product for this feasibility request before releasing.", "error");
+      return;
+    }
+    const requirementsError = getStagedRequirementsError(stagedProducts);
+    if (requirementsError) {
+      showToast(requirementsError, "error");
       return;
     }
 
@@ -1819,9 +1888,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           : isSamplingOnly
             ? sampleRoute.isResample
               ? "Released to Plant"
-              : sampleRoute.creativeChangesRequired
-                ? "Creative"
-                : "Sampling Review (PMT)"
+              : "Creative"
             : "Creative";
         itemsByStatus.set(status, [...(itemsByStatus.get(status) || []), item]);
       }
@@ -1849,11 +1916,11 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       const newStatus = destinations.join(" and ") || "Creative";
 
       // 4. Clear staging session storage, in-memory list and refs
+      isReleasedRef.current = true;
+      hasAutoSavedRef.current = true;
+      stagedProductsRef.current = [];
       sessionStorage.removeItem(programContextStorageKey);
       sessionStorage.removeItem(stagedProductsStorageKey);
-      stagedProductsRef.current = [];
-      hasAutoSavedRef.current = true;
-      setStagedProducts([]);
 
       const label = targetSrNumber ? `Request ${targetSrNumber}` : "Draft request";
       const creativeFirstCount = releaseProducts.filter((item) => item.scopes.includes("costing") && item.costingCreativeInputNeeded === true).length;
@@ -1861,36 +1928,42 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       const mockupStudioCount = releaseProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === false).length;
       const mockupCreativeCount = releaseProducts.filter((item) => item.scopes.includes("mockup") && item.mockupMetadata?.designNeeded === true).length;
       const samplingResampleDirectPlantCount = releaseProducts.filter((item) => item.scopes.length === 1 && getAutomaticSampleRoute(item).isResample).length;
-      const samplingReviewCount = releaseProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample")
-        && !getAutomaticSampleRoute(item).isResample && !getAutomaticSampleRoute(item).creativeChangesRequired).length;
-      const samplingCreativeCount = releaseProducts.filter((item) => item.scopes.length === 1 && getAutomaticSampleRoute(item).creativeChangesRequired).length;
+      const samplingCreativeCount = releaseProducts.filter((item) => item.scopes.length === 1 && item.scopes.includes("sample") && !getAutomaticSampleRoute(item).isResample).length;
       const otherScopeCount = releaseProducts.filter((item) => item.scopes.some((scope) => scope !== "costing" && scope !== "mockup" && scope !== "sample")).length;
       const routes = [
         creativeFirstCount ? `${creativeFirstCount} Costing request(s) to Creative first` : "",
         directCostingCount ? `${directCostingCount} directly to Costing` : "",
         mockupStudioCount ? `${mockupStudioCount} Mockup request(s) directly to Studio` : "",
         mockupCreativeCount ? `${mockupCreativeCount} Mockup request(s) to Creative` : "",
-        samplingReviewCount ? `${samplingReviewCount} Sampling request(s) to Sampling Team review` : "",
         samplingResampleDirectPlantCount ? `${samplingResampleDirectPlantCount} Resample(s) directly to Plant` : "",
-        samplingCreativeCount ? `${samplingCreativeCount} new/changed Sampling request(s) through Creative, Studio, Creative approval, Sampling review, then Plant` : "",
+        samplingCreativeCount ? `${samplingCreativeCount} Sampling request(s) through Creative, Studio, Creative approval, Sampling review, then Plant` : "",
         otherScopeCount ? "other selected scopes to their workflows" : "",
       ].filter(Boolean).join("; ");
-      showToast(`✓ ${label} released${routes ? `: ${routes}` : ` into ${newStatus}`}!`);
+      const releaseToastMessage = `✓ ${label} released${routes ? `: ${routes}` : ` into ${newStatus}`}!`;
+
+      window.dispatchEvent(
+        new CustomEvent("app:show-toast", {
+          detail: { message: releaseToastMessage, tone: "success" },
+        })
+      );
 
       const isStudio = destinations.includes("Studio") || mockupStudioCount > 0;
       const isPlant = destinations.includes("Released to Plant") || samplingResampleDirectPlantCount > 0;
       const isDesign = mockupCreativeCount > 0 || creativeFirstCount > 0
         || (destinations.includes("Creative") && mockupStudioCount === 0);
 
-      setTimeout(() => {
-        navigate("/sample-requests", {
-          state: {
-            refresh: Date.now(),
-            stage: isDesign ? "creative" : isStudio ? "studio" : isPlant ? "plant" : "pmt",
-          },
-        });
-      }, 700);
+      navigate("/sample-requests", {
+        replace: true,
+        state: {
+          refresh: Date.now(),
+          stage: isDesign ? "creative" : isStudio ? "studio" : isPlant ? "plant" : "pmt",
+          toastMessage: releaseToastMessage,
+        },
+      });
     } catch (err) {
+      isReleasedRef.current = false;
+      releaseInProgressRef.current = false;
+      setIsReleasing(false);
       console.error("Failed to release request from staging:", err);
       if (releaseProducts.some((product) => product.savedRequestId !== undefined && product.savedRequestId !== null)) {
         cacheReleaseProducts(releaseProducts);
@@ -1899,8 +1972,10 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       hasAutoSavedRef.current = allDraftsSaved;
       showToast(err instanceof Error ? err.message : "Could not release the draft request.", "error");
     } finally {
-      releaseInProgressRef.current = false;
-      setIsReleasing(false);
+      if (!isReleasedRef.current) {
+        releaseInProgressRef.current = false;
+        setIsReleasing(false);
+      }
     }
   };
 
@@ -2022,6 +2097,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                 productDescription={samplingDescription}
                 qtyForSampling={qtyForSampling}
               onSetQtyForSampling={setQtyForSampling}
+                sampleRequiredDate={sampleRequiredDate}
               qtyDesignCosting={qtyDesignCosting}
                 customerProductCode={customerProductCode}
                 barcode={costingBarcode}
@@ -2074,6 +2150,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
                 onSetMarketingShutterstockNo={setMarketingShutterstockNo}
                 onSetMarketingMockupRemark={setMarketingMockupRemark}
                 onSetProductDescription={setSamplingDescription}
+                onSetSampleRequiredDate={setSampleRequiredDate}
                 onSetQtyForMockup={setQtyForMockup}
                 onSetMockupRequiredDate={setMockupRequiredDate}
                 onSetQtyDesignCosting={setQtyDesignCosting}
@@ -2177,6 +2254,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       <React.Suspense fallback={null}>
         <StagedProductDrawer
           inspectingProduct={inspectingProduct}
+          isFeasibilityHandoff={feasibilityHandoff}
           programYear={programContext.programYear}
           programContext={programContext}
           onClose={() => setInspectingProduct(null)}
@@ -2211,6 +2289,19 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           onClose={() => setInspectingCatalogProduct(null)}
         />
       </React.Suspense>
+
+      {/* 4. Release / Submit In-Progress Transition Overlay */}
+      {isReleasing && isReleasedRef.current && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/25 backdrop-blur-[2px]">
+          <div className="flex items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-6 py-4 shadow-2xl">
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--accent-primary)]" />
+            <div>
+              <p className="text-xs font-bold text-[var(--on-surface)]">Releasing to Operations…</p>
+              <p className="text-[11px] text-[var(--on-surface-muted)]">Routing requests to operational teams</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 5. Floating Bottom Popup Toast Notification */}
       {toastMsg && (

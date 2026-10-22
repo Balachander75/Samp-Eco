@@ -33,7 +33,8 @@ export function getAutomaticSampleRoute(item: Partial<StagedProductItem> & Pick<
     item.variantNumber
   );
   return {
-    isResample: hasExistingProduct && !creativeChangesRequired,
+    // Only a standalone, unchanged Sampling request can skip straight to Plant.
+    isResample: item.scopes.length === 1 && hasExistingProduct && !creativeChangesRequired,
     creativeChangesRequired,
     hasExistingProduct,
   };
@@ -44,11 +45,34 @@ export function isDirectPlantResampleRequest(request: Partial<SampleRequestItem>
   if (String(request.creationMode || (request as any).creation_mode || "").toLowerCase() === "new") {
     return false;
   }
+  const rawScopes = request.requestTypes || (request as any).request_types || (request as any).scopes;
+  const scopes = Array.isArray(rawScopes) ? rawScopes.map((scope) => String(scope).toLowerCase()) : [];
+  if (scopes.length && (scopes.length !== 1 || scopes[0] !== "sample")) return false;
+
   const state = {
     ...((request.workflowState || {}) as Record<string, any>),
     ...((request.mockupWorkflowState || {}) as Record<string, any>),
   };
   const routing = (state.samplingRouting || (request as any).samplingRouting || {}) as Record<string, any>;
+  const creativeChangesRequired = Boolean(
+    (request as any).hasCreativeChanges ||
+    (request as any).creativeCharacteristicsCleared ||
+    (request as any).creativePendingCharacteristicKeys?.length ||
+    state.creativeChangesRequired ||
+    state.hasCreativeChanges ||
+    state.creativeCharacteristicsCleared ||
+    state.creativePendingCharacteristicKeys?.length ||
+    state.isDesignVariant ||
+    state.variantNumber ||
+    routing.creativeChangesRequired ||
+    routing.hasCreativeChanges ||
+    routing.creativeCharacteristicsCleared ||
+    routing.isDesignVariant ||
+    routing.variantNumber ||
+    routing.creativePendingCharacteristicKeys?.length
+  );
+  if (creativeChangesRequired) return false;
+
   const explicitResample = Boolean(
     (request as any).isResample ||
     (request as any).is_resample ||
@@ -62,7 +86,7 @@ export function isDirectPlantResampleRequest(request: Partial<SampleRequestItem>
 
   const route = getAutomaticSampleRoute({
     ...request,
-    scopes: (request.requestTypes || ((request as any).request_types) || (request as any).scopes || ["sample"]) as any,
+    scopes: (scopes.length ? scopes : ["sample"]) as any,
   } as any);
   return route.isResample;
 }

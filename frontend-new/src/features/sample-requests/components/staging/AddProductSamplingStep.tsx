@@ -48,6 +48,7 @@ export interface AddProductSamplingStepProps {
   productDescription: string;
   qtyForSampling?: string;
   onSetQtyForSampling?: (val: string) => void;
+  sampleRequiredDate: string;
   qtyForMockup: string;
   mockupRequiredDate: string;
   qtyDesignCosting: string;
@@ -85,6 +86,7 @@ export interface AddProductSamplingStepProps {
   onSetMarketingShutterstockNo: (val: string) => void;
   onSetMarketingMockupRemark: (val: string) => void;
   onSetProductDescription: (val: string) => void;
+  onSetSampleRequiredDate: (val: string) => void;
   onSetQtyForMockup: (val: string) => void;
   onSetMockupRequiredDate: (val: string) => void;
   onSetQtyDesignCosting: (val: string) => void;
@@ -274,6 +276,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
   productDescription,
   qtyForSampling = "1",
   onSetQtyForSampling,
+  sampleRequiredDate,
   qtyForMockup,
   mockupRequiredDate,
   qtyDesignCosting,
@@ -311,6 +314,7 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
   onSetMarketingShutterstockNo,
   onSetMarketingMockupRemark,
   onSetProductDescription,
+  onSetSampleRequiredDate,
   onSetQtyForMockup,
   onSetMockupRequiredDate,
   onSetQtyDesignCosting,
@@ -714,13 +718,14 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
 
               {/* Sampling-only quantity and packaging */}
               {includesSample && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans mb-1">
                       Sample Quantity <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="number"
+                      required
                       min="1"
                       step="1"
                       value={qtyForSampling}
@@ -729,6 +734,15 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                       className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                     />
                   </div>
+
+                  <OperationalDatePicker
+                    label="Sample required date"
+                    required
+                    value={sampleRequiredDate}
+                    onChange={(value) => onSetSampleRequiredDate(value)}
+                    placeholder="Select required date..."
+                    calendarAlign="left"
+                  />
 
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-sans mb-1">
@@ -1433,16 +1447,16 @@ export const AddProductSamplingStep: React.FC<AddProductSamplingStepProps> = ({
                       <span>Marketing remark <span className="font-normal text-slate-500">(enter this or a stock number)</span></span>
                       <input maxLength={1000} value={marketingMockupRemark} onChange={(event) => { onSetMarketingMockupRemark(event.target.value); setMockupDetailsError(""); }} placeholder="Add reference notes for Studio" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
                     </label>
-                    <p className="sm:col-span-2 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Creative will be bypassed. Studio CAD will build the mockup directly using this reference.</p>
+                    <p className="sm:col-span-2 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Creative will be bypassed. Studio will build the mockup directly using this reference.</p>
                   </div>
                 )}
                 {designNeeded === true && (
                   <div className="space-y-2 border-t border-slate-100 pt-3 dark:border-zinc-800">
                     <label className="block space-y-1 text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
                       <span>Creative design brief / remarks <span className="font-normal text-slate-500">(optional)</span></span>
-                      <input maxLength={1000} value={marketingMockupRemark} onChange={(event) => { onSetMarketingMockupRemark(event.target.value); setMockupDetailsError(""); }} placeholder="Add design requirements for Creative Studio..." className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+                      <input maxLength={1000} value={marketingMockupRemark} onChange={(event) => { onSetMarketingMockupRemark(event.target.value); setMockupDetailsError(""); }} placeholder="Add design requirements for Creative..." className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
                     </label>
-                    <p className="text-[10px] text-[var(--accent-primary)] font-medium">This request will route to Creative Studio. Creative will specify the artwork reference before releasing to Studio CAD.</p>
+                    <p className="text-[10px] text-[var(--accent-primary)] font-medium">This request will route to Creative. Creative will specify the artwork reference before releasing to Studio.</p>
                   </div>
                 )}
               </fieldset>
