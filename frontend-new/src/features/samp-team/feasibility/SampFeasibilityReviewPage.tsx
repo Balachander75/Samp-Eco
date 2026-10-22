@@ -306,23 +306,28 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
       // Plant filter
       if (!matchesPlant(r.targetPlant)) return false;
 
+      const isClosed = Boolean(
+        r.is_closed ||
+        r.closure != null ||
+        String(r.status || "").toLowerCase().includes("closed")
+      );
       // Tab filter
-      if (filterTab === "awaiting_marketing" && r.counterDateDecision !== "pending") return false;
-      if (filterTab === "awaiting_claim" && (r.takenBySamp || r.samplingFeasibilityResponse)) {
+      if (filterTab === "awaiting_marketing" && (isClosed || r.counterDateDecision !== "pending")) return false;
+      if (filterTab === "awaiting_claim" && (isClosed || r.takenBySamp || r.samplingFeasibilityResponse)) {
         return false;
       }
-      if (filterTab === "in_review" && (!r.takenBySamp || r.samplingFeasibilityResponse)) {
+      if (filterTab === "in_review" && (isClosed || !r.takenBySamp || r.samplingFeasibilityResponse)) {
         return false;
       }
       if (filterTab === "my_claimed") {
-        if (!r.takenBySamp || r.samplingFeasibilityResponse) return false;
+        if (isClosed || !r.takenBySamp || r.samplingFeasibilityResponse) return false;
         const isMyClaim = Boolean(
           (r.takenBySampUserId != null && user?.id != null && r.takenBySampUserId === user.id) ||
           (currentUserName && (r.takenBySamp || "").toLowerCase() === currentUserName)
         );
         if (!isMyClaim) return false;
       }
-      if (filterTab === "completed" && !r.samplingFeasibilityResponse) return false;
+      if (filterTab === "completed" && !r.samplingFeasibilityResponse && !isClosed) return false;
 
       // Customer filter
       if (customerFilter !== "all" && r.customer !== customerFilter) return false;
@@ -541,6 +546,18 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
         header: "Assigned Reviewer",
         width: "w-[140px]",
         cell: (req) => {
+          const isClosed = Boolean(
+            req.is_closed ||
+            req.closure != null ||
+            String(req.status || "").toLowerCase().includes("closed")
+          );
+          if (isClosed) {
+            return (
+              <span className="text-[11px] font-semibold text-[var(--on-surface-subtle)]">
+                Closed
+              </span>
+            );
+          }
           if (req.takenBySamp) {
             return (
               <div
@@ -570,6 +587,12 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
         header: "Review Status",
         width: "w-[130px]",
         cell: (req) => {
+          const isClosed = Boolean(
+            req.is_closed ||
+            req.closure != null ||
+            String(req.status || "").toLowerCase().includes("closed")
+          );
+          if (isClosed) return <StatusPill status="Closed" tone="neutral" size="xs" />;
           const verdict = req.samplingFeasibilityResponse;
           if (verdict === "Yes") return <StatusPill status="Feasible" tone="success" size="xs" />;
           if (verdict === "No") return <StatusPill status="Not Feasible" tone="danger" size="xs" />;

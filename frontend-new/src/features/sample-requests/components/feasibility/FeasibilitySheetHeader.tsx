@@ -70,8 +70,13 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
     return operationalWorkdaysBetween(origKey, propKey);
   }, [activeRequest.sampleRequiredDate, activeRequest.sampCounterDate]);
 
+  const isClosed = Boolean(
+    activeRequest.is_closed ||
+    activeRequest.closure != null ||
+    String(activeRequest.status || "").toLowerCase().includes("closed")
+  );
   const isClaimed = Boolean(activeRequest.takenBySamp);
-  const canClaim = Boolean(canEvaluateTechnical && !activeRequest.takenBySamp && !activeRequest.samplingFeasibilityResponse);
+  const canClaim = Boolean(!isClosed && canEvaluateTechnical && !activeRequest.takenBySamp && !activeRequest.samplingFeasibilityResponse);
 
   return (
     <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] px-6 sm:px-8 py-3.5">
@@ -131,7 +136,11 @@ export const FeasibilitySheetHeader: React.FC<FeasibilitySheetHeaderProps> = ({
           )}
 
           {/* Reviewer / Claim Pill */}
-          {isClaimed ? (
+          {isClosed ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs shadow-2xs font-bold">
+              <span>Request Closed</span>
+            </div>
+          ) : isClaimed ? (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface)] shadow-2xs">
               <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">Assigned:</span>
               <span className="font-bold text-xs truncate max-w-[150px]">{activeRequest.takenBySamp}</span>

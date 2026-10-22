@@ -2,7 +2,7 @@ from pathlib import Path
 from ipaddress import ip_network
 from urllib.parse import urlsplit
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 DEFAULT_DEV_SECRET = "navneet-samp-erp-super-secret-key-2026-production-level"
@@ -141,9 +141,10 @@ class Settings(BaseSettings):
             # in each API worker's startup path.
             self.AUTO_SCHEMA_MIGRATION = False
 
-    class Config:
-        env_file = Path(__file__).resolve().parents[1] / ".env"
-        extra = "allow"
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[1] / ".env",
+        extra="allow",
+    )
 
 settings = Settings()
 settings.validate_runtime_security()

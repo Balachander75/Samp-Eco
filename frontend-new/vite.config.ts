@@ -38,7 +38,7 @@ export default defineConfig(({ mode }) => ({
     setupFiles: ['./src/__tests__/setup.ts'],
   },
   esbuild: {
-    drop: mode === 'production' ? ['debugger'] : [],
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
   },
   build: {
     target: 'es2020',

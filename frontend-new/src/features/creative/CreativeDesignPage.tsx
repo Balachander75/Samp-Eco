@@ -135,7 +135,16 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       const s = String(merged.status || "").toLowerCase();
       const workflowStatus = String(merged.designRequestStatus || merged.status || "").toLowerCase();
 
-      if (s.includes("approved") || s.includes("released") || merged.marketingDesignDecision === "accepted") {
+      const isClosed = Boolean(
+        merged.is_closed ||
+        merged.closure != null ||
+        s.includes("closed") ||
+        workflowStatus.includes("closed")
+      );
+
+      if (isClosed) {
+        status = "Closed" as any;
+      } else if (s.includes("approved") || s.includes("released") || merged.marketingDesignDecision === "accepted") {
         status = "Prepress Approved";
       } else if (workflowStatus.includes("revisions") || merged.marketingDesignDecision === "remaining_requested") {
         status = "Revisions Requested";
@@ -166,6 +175,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
         createdDate: merged.dateRequestCreated || merged.createdAt || "",
         proofStatus: status,
         isBrief: false,
+        isClosed: isClosed,
         rawReq: merged,
       });
     });
@@ -454,12 +464,14 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
               </div>
               <span
                 className={`inline-flex rounded-md px-1.5 py-0.2 text-[9.5px] font-mono font-bold ${
-                  row.designer === "Unassigned"
+                  row.isClosed
+                    ? "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20"
+                    : row.designer === "Unassigned"
                     ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
                     : "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
                 }`}
               >
-                {row.designer === "Unassigned" ? "Needs Claim" : "Assigned"}
+                {row.isClosed ? "Closed" : row.designer === "Unassigned" ? "Needs Claim" : "Assigned"}
               </span>
             </div>
           </div>

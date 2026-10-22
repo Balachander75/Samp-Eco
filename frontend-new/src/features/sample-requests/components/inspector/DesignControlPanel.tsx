@@ -258,11 +258,13 @@ export const DesignControlPanel: React.FC<DesignControlPanelProps> = ({
             : "Marketing Desk"}
         </span>
 
-        <RequestClosureControl
-          requests={closureRequests}
-          canClose={canCloseRequest}
-          onClosed={onRequestClosed}
-        />
+        {mode === "marketing" && (
+          <RequestClosureControl
+            requests={closureRequests}
+            canClose={canCloseRequest}
+            onClosed={onRequestClosed}
+          />
+        )}
 
         {/* Modal Close [X] */}
         <button

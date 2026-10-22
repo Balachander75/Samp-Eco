@@ -35,6 +35,7 @@ import {
   FeasibilityCounterDateModal,
 } from "./feasibility";
 import { ImageLightboxModal } from "./inspector";
+import { RequestClosedStamp } from "./common/RequestClosedWatermark";
 
 // Domain Parsers & Types
 import {
@@ -160,16 +161,47 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
   // Operational desk persona permissions
   const isMarketingDesk = sourceDesk === "marketing";
-  const canEvaluateTechnical = sourceDesk === "samp";
-  const canMakeCommercialDecision = isMarketingDesk;
   const feasibilityRequestId = Number(String(activeRequest?.id || "").replace(/^feasibility-/, ""));
-  const canCloseFeasibilityRequest = Boolean(
-    !isReadOnlyTeamHead(user) && (
-      isAdmin ||
-      isAdminUser(user) ||
-      (sourceDesk === "marketing" && hasWorkflowTeam(user, "marketing")) ||
-      (sourceDesk === "samp" && hasWorkflowTeam(user, "samp"))
+  const [localClosed, setLocalClosed] = useState(false);
+  const [closureData, setClosureData] = useState<any>((activeRequest as any)?.closure || null);
+
+  useEffect(() => {
+    const handleClosed = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+      if (
+        detail &&
+        (String(detail.requestId) === String(activeRequest?.id) ||
+         String(detail.requestId) === String(feasibilityRequestId))
+      ) {
+        setLocalClosed(true);
+        if (detail.closure) setClosureData(detail.closure);
+      }
+    };
+    window.addEventListener("app:request-closed", handleClosed);
+    return () => window.removeEventListener("app:request-closed", handleClosed);
+  }, [activeRequest?.id, feasibilityRequestId]);
+
+  const isClosed = Boolean(
+    localClosed ||
+    activeRequest?.status === "Closed" ||
+    Boolean((activeRequest as any)?.is_closed) ||
+    closureData != null
+  );
+  const canEvaluateTechnical = !isClosed && sourceDesk === "samp";
+  const canMakeCommercialDecision = !isClosed && isMarketingDesk;
+  const isCreator = Boolean(
+    activeRequest && (
+      (activeRequest.createdByUserId && user?.id && Number(activeRequest.createdByUserId) === Number(user.id)) ||
+      (activeRequest.createdBy && (
+        (user?.userid && activeRequest.createdBy.toLowerCase() === user.userid.toLowerCase()) ||
+        (user?.name && activeRequest.createdBy.toLowerCase() === user.name.toLowerCase())
+      ))
     )
+  );
+  // STRICT RULE: Close request is ONLY available to the Marketing user who raised the request (or admin)
+  const canCloseFeasibilityRequest = Boolean(
+    !isReadOnlyTeamHead(user) && (isAdmin || isAdminUser(user) || (hasWorkflowTeam(user, "marketing") && isCreator))
   );
 
   // Parse feasibility technical data
@@ -495,6 +527,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
         className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
+        {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
         {/* 1. TOP CONTROL PANEL */}
         <FeasibilityControlPanel
           activeRequest={activeRequest}
@@ -508,6 +541,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
           canCloseRequest={canCloseFeasibilityRequest}
           onRequestClosed={onRefresh}
         />
+
+
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG) */}
         <div className="flex-1 flex overflow-hidden">
@@ -878,7 +913,8 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     onCounterDateReasonChange={setCounterDateReason}
                     onProposeCounterDate={handleProposeCounterDate}
                     onProposeCounterDateDirect={handleProposeCounterDateSubmit}
-                    onNavigateToDecision={() => setActiveTab("decision")}
+                    canMakeCommercialDecision={canMakeCommercialDecision}
+                    onNavigateToDecision={canMakeCommercialDecision ? () => setActiveTab("decision") : undefined}
                     onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
                     currentUserId={user?.id}
                     currentUserName={user?.name}

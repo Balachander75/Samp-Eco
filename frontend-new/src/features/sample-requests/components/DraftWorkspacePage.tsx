@@ -13,6 +13,7 @@ import {
   Save,
   CheckSquare,
   Square,
+  Trash2,
 } from "lucide-react";
 import { UserProfile } from "@/features/auth";
 import { RequestType, SampleRequestItem } from "../types";
@@ -25,6 +26,7 @@ import {
   createSampleRequestApi,
   createDesignRequestApi,
   releaseDraftRequestsApi,
+  deleteSampleRequestApi,
   ProductDetailItem,
 } from "@/infrastructure/api";
 import type { UpdateSampleRequestPayload } from "@/infrastructure/api";
@@ -164,6 +166,7 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
         const s = String(r.status || "").toLowerCase();
         const isDraft = s.includes("draft") || s.includes("smt");
         if (!isDraft) return false;
+        if (!r.productDescription?.trim() && !r.materialCode?.trim()) return false;
         const c = normalizePackageValue(String(r.customer || ""));
         const p = normalizePackageValue(String(r.programName || r.programCampaignTitle || ""));
         const y = String(r.programYear || r.year || "").replace(/BTS/gi, "").trim();
@@ -490,6 +493,44 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
     }
   };
 
+  const [deletingItemId, setDeletingItemId] = useState<string | number | null>(null);
+
+  const handleDeleteItem = async (item: SampleRequestItem) => {
+    const code = item.requestCode || item.materialCode || item.srNumber || "Item";
+    const confirmed = window.confirm(`Are you sure you want to delete draft item "${item.productDescription || code}"?`);
+    if (!confirmed) return;
+
+    setDeletingItemId(item.id);
+    try {
+      const ok = await deleteSampleRequestApi(item.id);
+      if (ok) {
+        showToast(`Deleted draft item "${item.productDescription || code}".`, "success");
+        const remaining = packageItems.filter((p) => String(p.id) !== String(item.id));
+        setPackageItems(remaining);
+        if (remaining.length === 0) {
+          try {
+            sessionStorage.removeItem("samp_active_draft_group");
+          } catch {
+            // ignore
+          }
+          navigate("/sample-requests/sampling", {
+            state: { refresh: Date.now(), stage: "draft" },
+          });
+        } else {
+          await loadPackageData();
+        }
+      } else {
+        showToast("Failed to delete draft item.", "error");
+      }
+    } catch (err) {
+      console.error("Delete draft item error:", err);
+      showToast("Error deleting draft item.", "error");
+    } finally {
+      setDeletingItemId(null);
+    }
+  };
+
+
   if (!packageContext) {
     return (
       <div className="p-12 text-center">
@@ -780,6 +821,16 @@ export const DraftWorkspacePage: React.FC<DraftWorkspacePageProps> = () => {
                               aria-label={isStandaloneDesignItem(item) ? "Copy design brief" : "Copy product"}
                             >
                               <Copy className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItem(item)}
+                              disabled={deletingItemId === item.id}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50 cursor-pointer"
+                              title={isStandaloneDesignItem(item) ? "Delete design request" : "Delete product"}
+                              aria-label={`Delete ${requestCode}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </td>

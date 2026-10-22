@@ -1,4 +1,5 @@
 import { SampleRequestItem } from "../types";
+import { isDirectPlantResampleRequest } from "./sampleRouting";
 
 export type RequestTrackType = "marketing_request" | "feasibility_check" | "program_planning";
 
@@ -70,10 +71,10 @@ export function isDesignRequest(r?: Partial<SampleRequestItem> | null): boolean 
 
 /** Choose the first owner for a Marketing draft when it is released. */
 export function getDraftReleaseStatus(r: Partial<SampleRequestItem>): string {
-  const requestTypes = r.requestTypes || [];
+  const requestTypes = r.requestTypes || (r as any).request_types || (r as any).scopes || [];
   const state = ((r.mockupWorkflowState || {}) as Record<string, any>);
   const routing = ((state.samplingRouting || {}) as Record<string, any>);
-  const isResample = Boolean((r as any)?.isResample || state.isResample || routing.isResample);
+  const isResample = isDirectPlantResampleRequest(r);
 
   if (requestTypes.length === 1 && requestTypes[0] === "sample") {
     if (isResample) return "Released to Plant";

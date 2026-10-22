@@ -12,6 +12,7 @@ import {
   Calculator,
   ChevronRight,
   Send,
+  Loader2,
 } from "lucide-react";
 import { StagedProductItem } from "../../types/staging";
 
@@ -191,17 +192,21 @@ export const StagingWorkspaceHeader: React.FC<StagingWorkspaceHeaderProps> = ({
             <button
               type="button"
               onClick={onReleaseRequest}
-              disabled={isBusy || (stagedProducts.length === 0 && !programContext.parentRequestId)}
+              disabled={isBusy || stagedProducts.length === 0}
               data-action="release"
               data-keep-color="true"
-              className="release-cta-button inline-flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold text-white transition-all cursor-pointer shadow-xs active:scale-95 disabled:cursor-not-allowed"
+              className="release-cta-button inline-flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold text-white transition-all cursor-pointer shadow-xs active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               title={isFeasibilityHandoff
                 ? "Save and release this feasibility product to its selected workflows"
                 : stagedProducts.length === 0
                 ? "Add at least 1 product to release"
                 : `Release ${stagedProducts.length} staged product(s) to operations`}
             >
-              <Send className="h-3.5 w-3.5 stroke-[2.5]" />
+              {isReleasing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Send className="h-3.5 w-3.5 stroke-[2.5]" />
+              )}
               <span>
                 {isReleasing
                   ? "Releasing…"

@@ -51,8 +51,9 @@ import { ImageLightboxModal } from "./inspector/ImageLightboxModal";
 import { fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
 import { isMockupCreativeCharacteristic } from "./staging/mockupCreativeFields";
 import { MockupControlPanel, MockupSheetHeader } from "./mockup";
+import { RequestClosedStamp } from "./common/RequestClosedWatermark";
 import type { RequestClosureTarget } from "./common/RequestClosureControl";
-import { ProductDocketView } from "./staging/ProductDocketView";
+import { ProductDocketView, isMissingSpec } from "./staging/ProductDocketView";
 import { DocketSkeleton } from "@/components/ui/loading";
 import type { ProductSearchResult } from "../types";
 import { getPrimaryRequestCode } from "../sampling/utils/requestTypeUtils";
@@ -110,7 +111,7 @@ export interface SampleRequestInspectorProps {
   onRefresh?: () => Promise<void> | void;
 }
 
-type InspectorTab = "specs" | "creative" | "studio" | "sampling" | "plant";
+type InspectorTab = "scope" | "specs" | "creative" | "studio" | "sampling" | "plant";
 
 const KHANIWADE_PLANT_TARGET = "1505 - Khaniwade";
 
@@ -342,6 +343,10 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   };
 
   // Group characteristics by class
+  const configuredCount = useMemo(() => {
+    return productDetails.filter((it) => !isMissingSpec(it.value)).length;
+  }, [productDetails]);
+
   const groupedCharacteristics = useMemo(() => {
     const map = new Map<string, ProductDetailItem[]>();
     const query = charSearchQuery.toLowerCase().trim();
@@ -418,24 +423,26 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
       if (!closureRequests.length) closureRequests.push({ type: "sample", id: activeRequest.id });
     }
   }
-  const visibleClosureRequests = closureRequests.filter(({ type }) => {
-    if (isAdmin) return true;
-    if (role === "marketing") return true;
-    if (role === "creative" || role === "studio") return ["design", "mockup", "costing"].includes(type);
-    if (role === "sampling") return ["mockup", "sample", "feasibility"].includes(type);
-    if (role === "plant") return type === "sample";
-    return false;
-  });
-  const canCloseRequest = Boolean(
-    isAdmin ||
-    (activeRequest && !readOnly && !currentUser?.is_team_head && visibleClosureRequests.some(({ type }) => {
-      if (role === "marketing") return true;
-      if (role === "creative" || role === "studio") return ["design", "mockup", "costing"].includes(type);
-      if (role === "sampling") return ["mockup", "sample", "feasibility"].includes(type);
-      if (role === "plant") return type === "sample";
-      return false;
-    }))
+  const isMarketingUser = role === "marketing" || String(currentUser?.team || "").toLowerCase().includes("marketing");
+  const isRequestCreator = Boolean(
+    (activeRequest?.createdByUserId && currentUser?.id && Number(activeRequest.createdByUserId) === Number(currentUser.id)) ||
+    (activeRequest?.createdBy && (
+      (currentUser?.userid && activeRequest.createdBy.toLowerCase() === currentUser.userid.toLowerCase()) ||
+      (currentUser?.name && activeRequest.createdBy.toLowerCase() === currentUser.name.toLowerCase())
+    )) ||
+    (activeRequest?.requestCreatedBy && (
+      (currentUser?.userid && activeRequest.requestCreatedBy.toLowerCase() === currentUser.userid.toLowerCase()) ||
+      (currentUser?.name && activeRequest.requestCreatedBy.toLowerCase() === currentUser.name.toLowerCase())
+    ))
   );
+  // STRICT RULE: Close request is ONLY available to the Marketing user who raised the request (or admin)
+  const canCloseRequest = Boolean(
+    activeRequest &&
+    !readOnly &&
+    !currentUser?.is_team_head &&
+    (isAdmin || (isMarketingUser && isRequestCreator))
+  );
+  const visibleClosureRequests = canCloseRequest ? closureRequests : [];
   const isMockupOnly = isMockupRequest && !hasSampleScope;
   const isSamplingCreativeTask = hasSampleScope && !isMockupRequest
     && ws.samplingRouting?.creativeChangesRequired === true;
@@ -485,7 +492,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   const visibleTabs = useMemo(() => {
     const tabs: Array<{ id: InspectorTab; label: string; icon: LucideIcon; badge?: string; count?: number }> = [
-      { id: "specs", label: "Specifications & Scope", icon: FileText, count: productDetails.length },
+      { id: "scope", label: "1. Specifications & Scope", icon: FileText },
+      { id: "specs", label: "2. Product Classes & Specifications", icon: Layers, count: productDetails.length },
     ];
     if (!isCreativeBypassed) {
       tabs.push({ id: "creative", label: "Creative Studio", icon: Palette, badge: isCreativeDone ? "Done" : "Pending" });
@@ -522,28 +530,78 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     isTaskClaimed && (ws.claimedStage ? ws.claimedStage === activeWorkflowStage : true)
   );
 
+  const [localClosed, setLocalClosed] = useState(false);
+  const [closureDetail, setClosureDetail] = useState<any>(
+    activeRequest?.closure || (activeRequest as any)?.mockup_workflow_state?.closure || null
+  );
+
+  useEffect(() => {
+    const handleClosed = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+      if (
+        detail &&
+        activeRequest &&
+        String(detail.requestId) === String(activeRequest.id)
+      ) {
+        setLocalClosed(true);
+        if (detail.closure) setClosureDetail(detail.closure);
+        setLocalOverride((prev: SampleRequestItem | null) => {
+          const base = prev || activeRequest;
+          return base
+            ? {
+                ...base,
+                is_closed: true,
+                status: "Closed",
+                closure: detail.closure,
+                mockup_workflow_state: {
+                  ...(base as any).mockup_workflow_state,
+                  is_closed: true,
+                  stage: "done",
+                  status: "Approved / Closed",
+                },
+              }
+            : null;
+        });
+      }
+    };
+    window.addEventListener("app:request-closed", handleClosed);
+    return () => window.removeEventListener("app:request-closed", handleClosed);
+  }, [activeRequest?.id]);
+
+  const isClosed = Boolean(
+    localClosed ||
+    activeRequest?.is_closed ||
+    (activeRequest as any)?.mockup_workflow_state?.is_closed ||
+    String(activeRequest?.status || "").trim().toLowerCase() === "closed" ||
+    String(activeRequest?.status || "").trim().toLowerCase() === "approved / closed" ||
+    activeRequest?.closure != null ||
+    closureDetail != null ||
+    ws.stage === "done"
+  );
+
   // Field Editing Permissions:
   // - Creative can enter Shutterstock No / Remarks once claimed when stage is creative.
   // - Studio can enter the prepress CAD URL once claimed when stage is studio.
-  const canCreativeEdit = (role === "creative" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "creative";
-  const canStudioEdit = (role === "studio" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "studio";
-  const isSamplingStage = ws.stage === "sampling_review" || ws.stage === "sampling" || String(activeRequest?.status || "").toLowerCase().includes("sampling") || (!isReleasedToPlant && (activeRequest?.requestTypes || []).includes("sample"));
-  const canSamplingReleaseVariant = (role === "sampling" || isAdmin) && !readOnly && (!isTaskClaimedForActiveStage || isClaimedByMe) && isSamplingStage && !isReleasedToPlant;
-  const canCreativeApproveSampleArtwork = (role === "creative" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "creative_approval";
+  const canCreativeEdit = !isClosed && (role === "creative" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "creative";
+  const canStudioEdit = !isClosed && (role === "studio" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "studio";
+  const isSamplingStage = !isClosed && (ws.stage === "sampling_review" || ws.stage === "sampling" || String(activeRequest?.status || "").toLowerCase().includes("sampling") || (!isReleasedToPlant && (activeRequest?.requestTypes || []).includes("sample")));
+  const canSamplingReleaseVariant = !isClosed && (role === "sampling" || isAdmin) && !readOnly && (!isTaskClaimedForActiveStage || isClaimedByMe) && isSamplingStage && !isReleasedToPlant;
+  const canCreativeApproveSampleArtwork = !isClosed && (role === "creative" || isAdmin) && !readOnly && isClaimedByMe && ws.stage === "creative_approval";
   const creativeDueAt = ws.samplingRouting?.creativeDueAt ? new Date(ws.samplingRouting.creativeDueAt) : null;
-  const creativeIsLate = Boolean(ws.stage === "creative" && creativeDueAt && Date.now() > creativeDueAt.getTime());
-  const isMarketingDecisionStage = ws.stage === "awaiting_marketing_acceptance" || ws.stage === "awaiting_marketing_direction";
+  const creativeIsLate = Boolean(!isClosed && ws.stage === "creative" && creativeDueAt && Date.now() > creativeDueAt.getTime());
+  const isMarketingDecisionStage = !isClosed && (ws.stage === "awaiting_marketing_acceptance" || ws.stage === "awaiting_marketing_direction");
   // Marketing owns the decision stage directly; claims are reserved for shared operational queues.
-  const canMarketingDecide = (role === "marketing" || isAdmin) && !readOnly && isMarketingDecisionStage;
-  const claimableStage = ["creative", "creative_approval", "studio", "sampling_review", "plant"].includes(String(activeWorkflowStage));
-  const roleOwnsClaimableStage = role !== "marketing" && (
+  const canMarketingDecide = !isClosed && (role === "marketing" || isAdmin) && !readOnly && isMarketingDecisionStage;
+  const claimableStage = !isClosed && ["creative", "creative_approval", "studio", "sampling_review", "plant"].includes(String(activeWorkflowStage));
+  const roleOwnsClaimableStage = !isClosed && role !== "marketing" && (
     isAdmin ||
     (role === "creative" && ["creative", "creative_approval"].includes(String(activeWorkflowStage))) ||
     (role === "studio" && activeWorkflowStage === "studio") ||
     (role === "sampling" && activeWorkflowStage === "sampling_review") ||
     (role === "plant" && activeWorkflowStage === "plant")
   );
-  const hasMockupClaimTask = (isMockupRequest || isSamplingCreativeTask || isPlantSampleTask) && claimableStage && roleOwnsClaimableStage;
+  const hasMockupClaimTask = !isClosed && (isMockupRequest || isSamplingCreativeTask || isPlantSampleTask) && claimableStage && roleOwnsClaimableStage;
   const studioPreviewHref = /^https?:\/\//i.test(studioMockupUrl.trim()) ? studioMockupUrl.trim() : "";
 
   // Dynamic Chatter Stream Compilation
@@ -860,6 +918,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
         className="relative flex h-[92vh] max-h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] select-text xl:max-w-7xl animate-smooth-modal font-sans"
         onClick={(e) => e.stopPropagation()}
       >
+        {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
         {/* ── 1. TOP CONTROL PANEL (EXACT FEASIBILITY CHECK STYLE) ── */}
         <MockupControlPanel
           activeRequest={activeRequest}
@@ -877,13 +936,15 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
           onRequestClosed={onRefresh}
         />
 
+
+
         {/* ── 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + CHATTER) ── */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           
           {/* ── LEFT: FORM SHEET (DOCUMENT BODY) ── */}
           <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto bg-[var(--bg-app)] p-4 md:p-6">
             <div className={`mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-300 ${
-              activeTab === "specs" && charFilter === "docket" ? "max-w-[98%]" : "max-w-4xl"
+              "max-w-6xl"
             }`}>
               
               {/* ── 1. PRIMARY SECTION TABS (TOP - EXACT FEASIBILITY CHECK STYLE) ── */}
@@ -1073,7 +1134,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
               <div className="p-4 sm:p-8 space-y-6">
 
                 {/* ═════════ TAB 1: SPECIFICATIONS & SCOPE ═════════ */}
-                {activeTab === "specs" && (
+                {activeTab === "scope" && (
                   <div className="space-y-6">
                     {(role === "marketing" || isAdmin) && isMarketingDecisionStage && (
                       <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 shadow-sm space-y-4">
@@ -1115,6 +1176,13 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         {hasSampleScope && ws.stage === "awaiting_marketing_acceptance" && <p className="text-[11px] text-[var(--on-surface-subtle)]">Sampling remains open after the mockup is accepted.</p>}
                       </section>
                     )}
+                    {/* ── Section 1: Specification & Scope ── */}
+                    <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+                      <FileText className="w-4 h-4 text-[var(--accent-primary)]" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
+                        1. Specification & Scope
+                      </h3>
+                    </div>
                     {/* Key Technical Information Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
@@ -1198,6 +1266,22 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                       </section>
                     )}
 
+                                      </div>
+                )}
+
+                {/* ═════════ TAB 2: PRODUCT CLASSES & SPECIFICATIONS ═════════ */}
+                {activeTab === "specs" && (
+                  <div className="space-y-6">
+                    {/* ── Section 2: Product Classes & Specifications ── */}
+                    <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2 pt-2">
+                      <Layers className="w-4 h-4 text-teal-600" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
+                        2. Product Classes & Specifications
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                        {productDetails.length} Specs
+                      </span>
+                    </div>
                     {/* Characteristics Explorer (Creative can edit all fields when claimed) */}
                     <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-3">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1275,14 +1359,14 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                                   }
                                 }}
                                 className="inline-flex h-6 items-center gap-1 rounded-md border border-emerald-300/60 bg-emerald-50 px-2 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer disabled:opacity-50"
-                                title="Export Docket Specifications to CSV (Excel Ready)"
+                                title="Export Structured Docket to Excel / CSV (UI Styled)"
                               >
                                 {isExportingDocketCsv ? (
                                   <Loader2 className="h-3 w-3 animate-spin text-emerald-600" />
                                 ) : (
                                   <FileSpreadsheet className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                                 )}
-                                <span>{isExportingDocketCsv ? "CSV..." : "CSV"}</span>
+                                <span>{isExportingDocketCsv ? "Exporting..." : "Excel / CSV"}</span>
                               </button>
                               <button
                                 type="button"
@@ -1306,30 +1390,37 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                             <button
                               type="button"
                               onClick={() => setCharFilter("all")}
-                              className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                                charFilter === "all" ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs" : "text-[var(--on-surface-subtle)]"
+                              className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
+                                charFilter === "all" ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs" : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
                               }`}
                             >
-                              All
+                              <span>All</span>
+                              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-[var(--surface-base)] text-[var(--on-surface-muted)]">
+                                {productDetails.length}
+                              </span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setCharFilter("configured")}
-                              className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                                charFilter === "configured" ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs" : "text-[var(--on-surface-subtle)]"
+                              className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
+                                charFilter === "configured" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shadow-2xs" : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
                               }`}
                             >
-                              Configured
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Configured</span>
+                              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
+                                {configuredCount}
+                              </span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setCharFilter("docket")}
                               aria-pressed={charFilter === "docket"}
-                              className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                                charFilter === "docket" ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs" : "text-[var(--on-surface-subtle)]"
+                              className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
+                                charFilter === "docket" ? "bg-[var(--surface-lowest)] text-[var(--on-surface)] font-bold shadow-2xs" : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
                               }`}
                             >
-                              Docket
+                              <span>Official Docket</span>
                             </button>
                           </div>
                         </div>
@@ -1343,15 +1434,13 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         </div>
                       ) : charFilter === "docket" ? (
                         <>
-                        <div className="overflow-x-auto rounded-xl border border-slate-300 bg-slate-50/50 p-2 dark:border-zinc-800 dark:bg-zinc-950 sm:p-3">
-                          <div className="min-w-[960px]">
-                            <ProductDocketView
-                              product={sampleDocketProduct}
-                              classGroups={groupedCharacteristics}
-                              searchQuery={charSearchQuery}
-                              containerId={`sample-request-docket-${activeRequest.id}`}
-                            />
-                          </div>
+                        <div className="w-full max-w-full overflow-hidden">
+                          <ProductDocketView
+                            product={sampleDocketProduct}
+                            classGroups={groupedCharacteristics}
+                            searchQuery={charSearchQuery}
+                            containerId={`sample-request-docket-${activeRequest.id}`}
+                          />
                         </div>
                         <div className="hidden">
                           <table className="w-full min-w-[640px] text-left text-xs">

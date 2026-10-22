@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -12,7 +13,8 @@ from app.auth.security import get_current_user
 from app.database import get_db
 from app.models.feasibility import FeasibilityRequest
 from app.models.request_closure import RequestClosure
-from app.models.request_workflows import CostingWorkflow, MockupWorkflow
+from app.models.request_workflows import CostingWorkflow, CostingWorkflowLog, MockupWorkflow, MockupWorkflowLog
+from sqlalchemy.orm.attributes import flag_modified
 from app.models.sample_request import CreateSampleRequest, DesignRequest
 
 router = APIRouter(prefix="/api/v1/request-closures", tags=["Request Closures"])
@@ -89,11 +91,30 @@ def _load_target(
 
 
 def _require_closure_access(request_type: str, target: Any, user: Any) -> None:
-    require_any_team(user, TYPE_TEAMS[request_type])
-    if user_has_team(user, "marketing") and not is_admin(user) and not is_team_head(user):
+    if is_admin(user):
+        return
+    # ONLY the Marketing user who raised this request can close it
+    if not user_has_team(user, "marketing"):
+        raise HTTPException(
+            status_code=403,
+            detail="Only Marketing users who raised the request can close it",
+        )
+    if not is_team_head(user):
         creator_id = getattr(target, "created_by_user_id", None)
-        if creator_id != user.id:
-            raise _closure_error()
+        if creator_id is not None and creator_id != user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the Marketing user who raised this request can close it",
+            )
+        creator_name = str(getattr(target, "created_by", "") or "").strip().lower()
+        user_userid = str(getattr(user, "userid", "") or "").strip().lower()
+        user_name = str(getattr(user, "name", "") or "").strip().lower()
+        if creator_id is None and creator_name:
+            if creator_name not in {user_userid, user_name}:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only the Marketing user who raised this request can close it",
+                )
 
 
 def _serialize_closure(closure: Optional[RequestClosure]) -> Optional[Dict[str, Any]]:
@@ -117,6 +138,56 @@ def _has_closure(db: Session, request_type: str, request_id: int) -> bool:
         RequestClosure.request_type == request_type,
         RequestClosure.request_id == request_id,
     ).first() is not None
+
+
+def _is_scope_closed(db: Session, request_type: str, request_id: int) -> bool:
+    if _has_closure(db, request_type, request_id):
+        return True
+    if request_type == "mockup":
+        mw_closed = db.query(MockupWorkflow.id).filter(
+            MockupWorkflow.sample_request_id == request_id,
+            or_(
+                MockupWorkflow.closed_at.isnot(None),
+                MockupWorkflow.current_stage == "done",
+                MockupWorkflow.status.in_(("Approved / Closed", "Closed")),
+            ),
+        ).first() is not None
+        if mw_closed:
+            return True
+        sample_req = db.query(CreateSampleRequest).filter(CreateSampleRequest.id == request_id).first()
+        if sample_req:
+            if (sample_req.status or "").strip().lower() == "closed":
+                return True
+            state = sample_req.mockup_workflow_state if isinstance(sample_req.mockup_workflow_state, dict) else {}
+            if state.get("is_closed") or state.get("stage") == "done" or str(state.get("status") or "").lower() in {"approved / closed", "closed"}:
+                return True
+    elif request_type == "costing":
+        cw_closed = db.query(CostingWorkflow.id).filter(
+            CostingWorkflow.sample_request_id == request_id,
+            or_(
+                CostingWorkflow.closed_at.isnot(None),
+                CostingWorkflow.current_stage == "done",
+                CostingWorkflow.status.in_(("Approved / Closed", "Closed")),
+            ),
+        ).first() is not None
+        if cw_closed:
+            return True
+        sample_req = db.query(CreateSampleRequest).filter(CreateSampleRequest.id == request_id).first()
+        if sample_req and (sample_req.status or "").strip().lower() == "closed":
+            return True
+    elif request_type == "sample":
+        sample_req = db.query(CreateSampleRequest).filter(CreateSampleRequest.id == request_id).first()
+        if sample_req and (sample_req.status or "").strip().lower() == "closed":
+            return True
+    elif request_type == "design":
+        dr = db.query(DesignRequest).filter(DesignRequest.id == request_id).first()
+        if dr and (dr.status or "").strip().lower() == "closed":
+            return True
+    elif request_type == "feasibility":
+        fr = db.query(FeasibilityRequest).filter(FeasibilityRequest.id == request_id).first()
+        if fr and (fr.status or "").strip().lower() == "closed":
+            return True
+    return False
 
 
 def _lock_request_row(db: Session, request_type: str, request_id: int) -> None:
@@ -144,7 +215,7 @@ def reject_closed_workflow_write(
         if request_type in SUPPORTED_TYPES and raw_id.isdigit():
             request_id = int(raw_id)
             _lock_request_row(db, request_type, request_id)
-            if _has_closure(db, request_type, request_id):
+            if _is_scope_closed(db, request_type, request_id):
                 raise HTTPException(status_code=409, detail="This request has been closed and can no longer be changed")
         return
 
@@ -169,7 +240,7 @@ def reject_closed_workflow_write(
     action = parts[4] if len(parts) > 4 else ""
     _lock_request_row(db, "sample", sample_id)
     if action in {"mockup", "studio-output"}:
-        closed = _has_closure(db, "mockup", sample_id)
+        closed = _is_scope_closed(db, "mockup", sample_id)
     elif action in {"sampling", "release-to-plant", "sampling-feedback"}:
         closed = _has_closure(db, "sample", sample_id)
     elif action == "design-brief":
@@ -195,7 +266,7 @@ def get_request_closure(
     current_user=Depends(get_current_user),
 ):
     target, _ = _load_target(db, request_type, request_id)
-    _require_closure_access(request_type, target, current_user)
+    require_any_team(current_user, ("marketing", "creative_studio", "samp", "costing", "plant"))
     closure = db.query(RequestClosure).filter(
         RequestClosure.request_type == request_type,
         RequestClosure.request_id == request_id,
@@ -247,6 +318,137 @@ def close_request(
         closed_at=datetime.now(timezone.utc),
     )
     db.add(closure)
+    now_utc = datetime.now(timezone.utc)
+    actor_name = getattr(current_user, "name", None) or getattr(current_user, "userid", None) or "SMPS User"
+    actor_team = getattr(current_user, "team", None) or "Marketing"
+
+    if request_type == "mockup":
+        state = dict(target.mockup_workflow_state or {})
+        prev_stage = state.get("stage")
+        prev_status = state.get("status")
+        state["stage"] = "done"
+        state["status"] = "Approved / Closed"
+        state["is_closed"] = True
+        state["closed_at"] = now_utc.isoformat()
+        state["closed_by"] = actor_name
+        state["closed_by_team"] = actor_team
+        state["closure_reason"] = reason or None
+        for k in ("claimedBy", "claimedByUserId", "claimedAt", "claimedStage"):
+            state.pop(k, None)
+        target.mockup_workflow_state = state
+        flag_modified(target, "mockup_workflow_state")
+        target.status = "Approved / Closed"
+
+        mw = db.query(MockupWorkflow).filter(MockupWorkflow.sample_request_id == request_id).first()
+        if mw:
+            mw_prev_stage = mw.current_stage
+            mw_prev_status = mw.status
+            mw.current_stage = "done"
+            mw.status = "Approved / Closed"
+            mw.closed_at = now_utc
+            mw.claimed_by = None
+            mw.claimed_by_user_id = None
+            mw.claimed_at = None
+            db.add(MockupWorkflowLog(
+                workflow_id=mw.id,
+                sample_request_id=target.id,
+                sr_number=target.sr_number,
+                actor_user_id=current_user.id,
+                actor_name=actor_name,
+                actor_team=actor_team,
+                action="MOCKUP_REQUEST_CLOSED",
+                from_stage=mw_prev_stage,
+                to_stage="done",
+                from_status=mw_prev_status,
+                to_status="Approved / Closed",
+                details={"reason": reason or None, "terminal": True},
+            ))
+        cw = db.query(CostingWorkflow).filter(CostingWorkflow.sample_request_id == request_id).first()
+        if cw:
+            cw.current_stage = "done"
+            cw.status = "Approved / Closed"
+            cw.closed_at = now_utc
+            cw.claimed_by = None
+            cw.claimed_by_user_id = None
+            cw.claimed_at = None
+    elif request_type == "costing":
+        target.status = "Closed"
+        state = dict(target.mockup_workflow_state or {})
+        state["is_closed"] = True
+        target.mockup_workflow_state = state
+        flag_modified(target, "mockup_workflow_state")
+
+        cw = db.query(CostingWorkflow).filter(CostingWorkflow.sample_request_id == request_id).first()
+        if cw:
+            cw_prev_stage = cw.current_stage
+            cw_prev_status = cw.status
+            cw.current_stage = "done"
+            cw.status = "Approved / Closed"
+            cw.closed_at = now_utc
+            cw.claimed_by = None
+            cw.claimed_by_user_id = None
+            cw.claimed_at = None
+            db.add(CostingWorkflowLog(
+                workflow_id=cw.id,
+                sample_request_id=target.id,
+                sr_number=target.sr_number,
+                actor_user_id=current_user.id,
+                actor_name=actor_name,
+                actor_team=actor_team,
+                action="COSTING_REQUEST_CLOSED",
+                from_stage=cw_prev_stage,
+                to_stage="done",
+                from_status=cw_prev_status,
+                to_status="Approved / Closed",
+                details={"reason": reason or None, "terminal": True},
+            ))
+    elif request_type == "sample":
+        target.status = "Closed"
+        state = dict(target.mockup_workflow_state or {})
+        state["stage"] = "done"
+        state["status"] = "Closed"
+        state["is_closed"] = True
+        state["closed_at"] = now_utc.isoformat()
+        state["closed_by"] = actor_name
+        state["closed_by_team"] = actor_team
+        state["closure_reason"] = reason or None
+        for k in ("claimedBy", "claimedByUserId", "claimedAt", "claimedStage"):
+            state.pop(k, None)
+        target.mockup_workflow_state = state
+        flag_modified(target, "mockup_workflow_state")
+
+        mw = db.query(MockupWorkflow).filter(MockupWorkflow.sample_request_id == request_id).first()
+        if mw:
+            mw.current_stage = "done"
+            mw.status = "Closed"
+            mw.closed_at = now_utc
+            mw.claimed_by = None
+            mw.claimed_by_user_id = None
+            mw.claimed_at = None
+        cw = db.query(CostingWorkflow).filter(CostingWorkflow.sample_request_id == request_id).first()
+        if cw:
+            cw.current_stage = "done"
+            cw.status = "Closed"
+            cw.closed_at = now_utc
+            cw.claimed_by = None
+            cw.claimed_by_user_id = None
+            cw.claimed_at = None
+    elif request_type == "design":
+        target.status = "Closed"
+        target.claimed_by = None
+        target.claimed_by_user_id = None
+        target.claimed_at = None
+        if getattr(target, "sample_request_id", None):
+            linked_sr = db.query(CreateSampleRequest).filter(CreateSampleRequest.id == target.sample_request_id).first()
+            if linked_sr and ((linked_sr.request_types or []) == ["design"] or not linked_sr.request_types):
+                linked_sr.status = "Closed"
+    elif request_type == "feasibility":
+        target.status = "Closed"
+        target.feasibility_closed_at = now_utc
+        target.feasibility_closed_by = actor_name
+        target.taken_by_samp = None
+        target.taken_by_samp_user_id = None
+        target.taken_at_samp = None
     try:
         db.commit()
     except IntegrityError:

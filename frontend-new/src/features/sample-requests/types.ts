@@ -233,6 +233,8 @@ export interface SampleRequestItem {
   costingOutputPath?: string | null;
   status?: SampleStatus | string;
   isActive?: boolean;
+  is_closed?: boolean;
+  closure?: any;
   creationMode?: string;
   programYear?: string;
   programName?: string;

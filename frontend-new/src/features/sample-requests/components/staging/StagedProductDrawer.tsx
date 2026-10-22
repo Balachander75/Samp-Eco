@@ -216,7 +216,17 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
     setDetailsError("");
     try {
       const isSampleRequest = inspectingProduct.scopes.includes("sample");
-      const hasExistingSampleSource = Boolean(sourceProductId);
+      const isExplicitlyNew = inspectingProduct.creationMode === "new" || inspectingProduct.samplingMetadata?.searchMode === "new";
+      const matCode = String(inspectingProduct.materialCode || "").trim().toUpperCase();
+      const hasExistingSampleSource = !isExplicitlyNew && Boolean(
+        sourceProductId ||
+        inspectingProduct.sourceSampleCode ||
+        inspectingProduct.catalogMetadata?.sourceMaterialCode ||
+        inspectingProduct.samplingMetadata?.selectedMaterialCode ||
+        (inspectingProduct.creationMode && inspectingProduct.creationMode !== "new") ||
+        (inspectingProduct.samplingMetadata?.searchMode && inspectingProduct.samplingMetadata?.searchMode !== "new") ||
+        (matCode && !matCode.startsWith("TMP-") && !matCode.startsWith("NEW-"))
+      );
       const anyChangedFromCurrent = characteristics.some((detail) => {
         const key = `${detail.className}::${detail.characteristicName}`;
         const original = (initialValues[key] || "").trim();
@@ -230,10 +240,10 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
         return sourceValue.trim() !== current;
       });
       const anyChanged = isSampleRequest
-        ? !hasExistingSampleSource || anyChangedFromSource
+        ? (hasExistingSampleSource ? anyChangedFromSource : anyChangedFromCurrent)
         : anyChangedFromCurrent;
 
-      const creativePendingCharacteristicKeys = anyChanged
+      const creativePendingCharacteristicKeys = (hasExistingSampleSource && anyChangedFromSource)
         ? characteristics
             .filter((detail) =>
               isMockupCreativeCharacteristic(detail.className, detail.characteristicName) &&
@@ -243,10 +253,11 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
             .map((detail) => ({ className: detail.className, characteristicName: detail.characteristicName }))
         : isSampleRequest ? [] : inspectingProduct.creativePendingCharacteristicKeys || [];
 
-      // If user changed specifications, blank the creative highlighted fields for Creative to fill
+      // If user changed specifications of an existing product, blank the creative highlighted fields for Creative to fill
+      const shouldBlankCreative = hasExistingSampleSource && anyChangedFromSource;
       const details = characteristics.map((detail) => {
         const isCreative = isMockupCreativeCharacteristic(detail.className, detail.characteristicName);
-        if (anyChanged && isCreative) {
+        if (shouldBlankCreative && isCreative) {
           return {
             className: detail.className,
             characteristicName: detail.characteristicName,

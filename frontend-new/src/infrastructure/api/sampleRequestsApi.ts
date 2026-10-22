@@ -1140,3 +1140,19 @@ export async function batchUpdateStatusApi(
     throw err;
   }
 }
+
+export async function deleteSampleRequestApi(id: string | number): Promise<boolean> {
+  try {
+    const rawId = String(id);
+    const endpoint = rawId.startsWith("design-")
+      ? `/api/v1/design-requests/${rawId.replace("design-", "")}`
+      : `/api/v1/sample-requests/${rawId}`;
+    const data = await apiFetch<{ success?: boolean }>(endpoint, {
+      method: "DELETE",
+    });
+    return Boolean(data?.success);
+  } catch (err) {
+    console.error(`Error deleting sample/design request ${id}:`, err);
+    return false;
+  }
+}

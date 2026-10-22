@@ -1,4 +1,5 @@
 import { UniversalChatterFeed, UniversalChatterEvent } from "./common/UniversalChatterFeed";
+import { RequestClosedStamp } from "./common/RequestClosedWatermark";
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -704,6 +705,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   // Business rule: Marketing users cannot claim tasks or start working on creative deliverables.
   // Only Creative Studio team members in Creative mode can claim an unclaimed task.
   const canClaim = Boolean(
+    !isClosed &&
     mode === "creative" &&
     isCreativeUser &&
     !isMarketingUser &&
@@ -1019,10 +1021,40 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
   if (!isOpen || !activeRequest) return null;
 
+  const designRequestId = Number(
+    activeRequest.designRequestId || String(activeRequest.id).replace(/^design-/, "")
+  );
+  const [localClosed, setLocalClosed] = useState(false);
+  const [closureData, setClosureData] = useState<any>((activeRequest as any)?.closure || null);
+
+  useEffect(() => {
+    const handleClosed = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+      if (
+        detail &&
+        (String(detail.requestId) === String(activeRequest.id) ||
+         String(detail.requestId) === String(activeRequest.designRequestId) ||
+         String(detail.requestId) === String(designRequestId))
+      ) {
+        setLocalClosed(true);
+        if (detail.closure) setClosureData(detail.closure);
+      }
+    };
+    window.addEventListener("app:request-closed", handleClosed);
+    return () => window.removeEventListener("app:request-closed", handleClosed);
+  }, [activeRequest.id, activeRequest.designRequestId, designRequestId]);
+
   const isAwaitingReview =
     activeRequest.marketingDesignDecision === "awaiting_marketing_review" ||
     activeStage === 2;
-  const isClosed = activeStage === 3;
+  const isClosed = Boolean(
+    localClosed ||
+    activeStage === 3 ||
+    activeRequest.status === "Closed" ||
+    Boolean((activeRequest as any)?.is_closed) ||
+    closureData != null
+  );
   const isAcceptedByMarketing = mode === "marketing" && activeRequest.marketingDesignDecision === "accepted";
   const canSubmitCreativeOutput = Boolean(
     mode === "creative" &&
@@ -1049,15 +1081,16 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
   const isCounterDatePending = Boolean(
     activeRequest.isCounterDateActive || activeRequest.counterDateDecision === "pending"
   );
-  const designRequestId = Number(
-    activeRequest.designRequestId || String(activeRequest.id).replace(/^design-/, "")
+  const isCreator = Boolean(
+    (activeRequest.createdByUserId && currentUser?.id && Number(activeRequest.createdByUserId) === Number(currentUser.id)) ||
+    (activeRequest.createdBy && (
+      (currentUser?.userid && activeRequest.createdBy.toLowerCase() === currentUser.userid.toLowerCase()) ||
+      (currentUser?.name && activeRequest.createdBy.toLowerCase() === currentUser.name.toLowerCase())
+    ))
   );
+  // STRICT RULE: Close request is ONLY available to the Marketing user who raised the request (or admin)
   const canCloseDesignRequest = Boolean(
-    !isReadOnlyTeamHead(currentUser) && (
-      isGlobalAdmin ||
-      (mode === "marketing" && isMarketingUser) ||
-      (mode === "creative" && currentUser && hasWorkflowTeam(currentUser, "creative_studio"))
-    )
+    !isReadOnlyTeamHead(currentUser) && (isGlobalAdmin || (isMarketingUser && isCreator))
   );
   const canCloseInspector = !isSubmittingOutput && !isDeciding && !isAddingFollowups;
 
@@ -1075,6 +1108,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
         className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
+        {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
         {/* 1. TOP CONTROL PANEL */}
         <DesignControlPanel
           activeRequest={activeRequest}
@@ -1096,6 +1130,8 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
           canCloseRequest={canCloseDesignRequest}
           onRequestClosed={onRefresh}
         />
+
+
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG) */}
         <div className="flex-1 flex overflow-hidden">

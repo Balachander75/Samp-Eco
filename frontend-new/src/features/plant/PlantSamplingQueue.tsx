@@ -43,11 +43,25 @@ function stageSource(request: SampleRequestItem): string {
 }
 
 export function isReleasedToPlant(r: SampleRequestItem): boolean {
+  const isClosed = Boolean(
+    r.is_closed ||
+    r.mockupWorkflowState?.is_closed ||
+    r.closure != null ||
+    String(r.status || "").toLowerCase().includes("closed")
+  );
+  if (isClosed) return false;
   const s = String(r.status || "").toLowerCase();
   return s.includes("released to plant") || s === "released" || s === "plant";
 }
 
 export function isUpcoming(r: SampleRequestItem): boolean {
+  const isClosed = Boolean(
+    r.is_closed ||
+    r.mockupWorkflowState?.is_closed ||
+    r.closure != null ||
+    String(r.status || "").toLowerCase().includes("closed")
+  );
+  if (isClosed) return false;
   const s = String(r.status || "").toLowerCase();
   if (["delivered", "completed", "cancelled", "rejected", "dispatched", "dispatched / closed"].includes(s)) {
     return false;
@@ -65,6 +79,21 @@ export function getUpcomingPhaseInfo(r: SampleRequestItem): {
   const mockupStage = String(r.mockupWorkflowState?.stage || "").toLowerCase();
   const feasibilityStatus = String((r as any).feasibilityStatus || "").toLowerCase();
   const costingStatus = String((r as any).costingStatus || "").toLowerCase();
+
+  const isClosed = Boolean(
+    r.is_closed ||
+    r.mockupWorkflowState?.is_closed ||
+    r.closure != null ||
+    statusLower.includes("closed")
+  );
+  if (isClosed) {
+    return {
+      phase: "Request Closed",
+      badgeColor: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20",
+      dotColor: "bg-rose-500",
+      description: "Request closed by marketing",
+    };
+  }
 
   // 1. Released to Plant
   if (isReleasedToPlant(r)) {
@@ -554,6 +583,19 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
         header: "Task Owner",
         width: "w-[135px]",
         cell: (r) => {
+          const isClosed = Boolean(
+            r.is_closed ||
+            r.mockupWorkflowState?.is_closed ||
+            r.closure != null ||
+            String(r.status || "").toLowerCase().includes("closed")
+          );
+          if (isClosed) {
+            return (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
+                Closed
+              </span>
+            );
+          }
           const upcoming = isUpcoming(r);
           const claimedBy = r.mockupWorkflowState?.claimedBy;
           if (upcoming) {

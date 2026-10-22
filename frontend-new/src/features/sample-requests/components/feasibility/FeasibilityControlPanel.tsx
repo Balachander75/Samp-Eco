@@ -248,11 +248,13 @@ export const FeasibilityControlPanel: React.FC<FeasibilityControlPanelProps> = (
           )}
         </span>
 
-        <RequestClosureControl
-          requests={closureRequests}
-          canClose={canCloseRequest}
-          onClosed={onRequestClosed}
-        />
+        {mode === "marketing" && (
+          <RequestClosureControl
+            requests={closureRequests}
+            canClose={canCloseRequest}
+            onClosed={onRequestClosed}
+          />
+        )}
 
         {/* Modal Close [X] */}
         <button

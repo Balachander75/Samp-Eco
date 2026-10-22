@@ -194,6 +194,10 @@ export const DesignSheetHeader: React.FC<DesignSheetHeaderProps> = ({
             >
               <span>{isClaiming ? "Claiming…" : "Claim Task"}</span>
             </button>
+          ) : (activeRequest.is_closed || activeRequest.closure != null || String(activeRequest.designRequestStatus || activeRequest.status || "").toLowerCase().includes("closed")) ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs shadow-2xs font-bold">
+              <span>Request Closed</span>
+            </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-xs shadow-2xs font-medium">
               <span>Pending Designer Claim</span>
@@ -202,7 +206,7 @@ export const DesignSheetHeader: React.FC<DesignSheetHeaderProps> = ({
 
           {/* Status Pill */}
           <StatusPill
-            status={activeRequest.designRequestStatus || activeRequest.status || "Creative"}
+            status={(activeRequest.is_closed || activeRequest.closure != null || String(activeRequest.designRequestStatus || activeRequest.status || "").toLowerCase().includes("closed")) ? "Closed" : (activeRequest.designRequestStatus || activeRequest.status || "Creative")}
             size="md"
           />
         </div>

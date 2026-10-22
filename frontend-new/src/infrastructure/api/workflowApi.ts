@@ -29,6 +29,8 @@ export interface RequestWorkflowRecord {
   created_at: string;
   updated_at: string;
   closed_at?: string | null;
+  created_by?: string | null;
+  created_by_user_id?: number | null;
   request_data?: Record<string, unknown>;
   costing_creative_input_needed?: boolean;
   costing_creative_input_remark?: string | null;
@@ -46,6 +48,8 @@ export interface RequestWorkflowRecord {
   is_claimed?: boolean;
   is_claimed_by_me?: boolean;
   marketing_decision?: string | null;
+  is_closed?: boolean;
+  closure?: any;
   logs: RequestWorkflowLog[];
 }
 

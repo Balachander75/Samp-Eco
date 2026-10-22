@@ -28,6 +28,8 @@ database_dumps/
 *.dump
 db/*.dump
 db/backup_*.sql
+*.xls
+*.xlsx
 
 # OS files
 .DS_Store

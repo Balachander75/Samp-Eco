@@ -37,7 +37,7 @@ import { formatWorkflowAction } from "./workflowPresentation";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ScopeReferenceImagesGallery } from "@/features/sample-requests/components/staging/ScopeReferenceImagesGallery";
 import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
-import { RequestClosureControl } from "./common/RequestClosureControl";
+import { RequestClosedStamp } from "./common/RequestClosedWatermark";
 import type { ProductSearchResult, SampleRequestItem } from "../types";
 
 interface MockupSamplingInspectorModalProps {
@@ -47,7 +47,7 @@ interface MockupSamplingInspectorModalProps {
   onSaved: () => Promise<void> | void;
 }
 
-type MockupTab = "output" | "specs" | "review" | "history";
+type MockupTab = "scope" | "specs" | "output" | "review" | "history";
 
 const stageSequence = [
   { key: "marketing", label: "1. Intake" },
@@ -122,7 +122,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
   onClose,
   onSaved,
 }) => {
-  const [activeTab, setActiveTab] = useState<MockupTab>("output");
+  const [activeTab, setActiveTab] = useState<MockupTab>("scope");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -150,16 +150,37 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
   const isClaimedByMe = Boolean(claim && user?.id != null && claim === String(user.id));
   const isClaimed = Boolean(data.claimedBy || claim);
   const isReadOnly = readOnlyTeamHead(user);
-  const canCloseMockupRequest = Boolean(
-    !isReadOnly && (
-      isAdminUser(user) ||
-      hasWorkflowTeam(user, "marketing") ||
-      hasWorkflowTeam(user, "samp") ||
-      hasWorkflowTeam(user, "creative_studio")
-    )
+  const [localClosed, setLocalClosed] = useState(false);
+  const [closureData, setClosureData] = useState<any>(record.closure || null);
+
+  useEffect(() => {
+    const handleClosed = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+      if (
+        detail &&
+        (String(detail.requestId) === String(record.sample_request_id) ||
+         String(detail.requestId) === String(record.workflow_id))
+      ) {
+        setLocalClosed(true);
+        if (detail.closure) setClosureData(detail.closure);
+      }
+    };
+    window.addEventListener("app:request-closed", handleClosed);
+    return () => window.removeEventListener("app:request-closed", handleClosed);
+  }, [record.sample_request_id, record.workflow_id]);
+
+  const isClosed = Boolean(
+    localClosed ||
+    record.is_closed ||
+    record.closure != null ||
+    closureData != null ||
+    record.current_stage === "done" ||
+    record.status === "Approved / Closed" ||
+    record.status === "Closed" ||
+    record.closed_at != null
   );
-  const canReview = record.current_stage === "sampling_review" && !isReadOnly && isClaimedByMe;
-  const isClosed = record.current_stage === "done";
+  const canReview = record.current_stage === "sampling_review" && !isReadOnly && isClaimedByMe && !isClosed;
   const isSamplingReview = record.current_stage === "sampling_review";
 
   const outputPath = typeof data.mockupUrl === "string" ? data.mockupUrl.trim() : "";
@@ -363,6 +384,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
         className="relative flex h-[92vh] max-h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs shadow-2xl xl:max-w-7xl animate-smooth-modal font-sans"
         onClick={(e) => e.stopPropagation()}
       >
+        {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
         {/* ── 1. ERP TOP CONTROL PANEL ── */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-4 py-2.5 shadow-2xs sm:px-6">
           <div className="flex flex-wrap items-center gap-2">
@@ -400,11 +422,6 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
               {copiedCode ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
 
-            <RequestClosureControl
-              requests={[{ type: "mockup", id: record.sample_request_id }]}
-              canClose={canCloseMockupRequest}
-              onClosed={onSaved}
-            />
 
             <button
               type="button"
@@ -416,6 +433,8 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
             </button>
           </div>
         </div>
+
+
 
         {/* ── 2. STAGE PROGRESSION RAIL ── */}
         <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-low)]/50 px-4 py-2.5 sm:px-6 overflow-x-auto">
@@ -453,7 +472,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
 
         {/* ── 3. MAIN WORKSPACE VIEWPORT ── */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] p-4 md:p-6 space-y-4">
-          <div className={`mx-auto w-full rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-200 ${activeTab === "specs" && specViewMode === "docket" ? "max-w-[98%]" : "max-w-6xl"}`}>
+          <div className={`mx-auto w-full rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-200 ${"max-w-6xl"}`}>
             {/* Dossier Header & Ribbon */}
             <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-base)]">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-2.5 sm:px-8">
@@ -504,6 +523,10 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-300 text-xs font-semibold">
                         <ShieldAlert className="w-4 h-4 text-amber-600" />
                         <span>Claimed by {data.claimedBy || "another teammate"}</span>
+                      </span>
+                    ) : isClosed ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 border border-rose-300 text-xs font-bold">
+                        <span>Request Closed</span>
                       </span>
                     ) : (
                       <button
@@ -793,14 +816,80 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                 </div>
               )}
 
-              {/* ═════════ TAB 2: TECHNICAL SPECIFICATIONS & BOM ═════════ */}
-              {activeTab === "specs" && (
-                <div className="space-y-5">
-                  <ScopeReferenceImagesGallery
-                    images={scopeReferenceImages}
-                    scopes={["mockup"]}
-                    onPreview={setLightboxUrl}
-                  />
+              {/* ═════════ TAB 1: SPECIFICATIONS & SCOPE ═════════ */}
+              {activeTab === "scope" && (
+                <div className="space-y-6">
+                  {/* ── Section 1: Specification & Scope ── */}
+                  <section className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+                      <FileText className="w-4 h-4 text-[var(--accent-primary)]" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
+                        1. Specification & Scope
+                      </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Customer / Brand</span>
+                        <p className="text-xs font-semibold text-[var(--on-surface)]">{record.customer || "Commercial Account"}</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Required Due Date</span>
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--on-surface)]">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>{formatDate(record.due_date || data.requiredDate || requestData.due_date) || "Immediate"}</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Deliverable Quantity</span>
+                        <p className="text-xs font-semibold text-[var(--on-surface)]">Mockup: <strong className="font-mono text-[var(--accent-primary)] font-bold">{requestData.qty_for_mockup || data.qty_for_mockup || 1}</strong> pcs</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Material / Reference</span>
+                        <p className="text-xs font-mono font-bold text-[var(--on-surface)]">{record.material_code || requestData.material_code || "Custom Mockup"}</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Category Taxonomy</span>
+                        <p className="text-xs font-semibold text-[var(--on-surface)]">{record.product_category || "Paper Stationery"}</p>
+                      </div>
+                    </div>
+
+                    {(data.creativeRemark || data.marketingRemark || data.marketingRevisionRemark) && (
+                      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5 space-y-2">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Brief & Instructions</span>
+                        {data.marketingRemark && <p className="text-xs text-[var(--on-surface)]"><strong>Marketing Brief:</strong> {data.marketingRemark}</p>}
+                        {data.creativeRemark && <p className="text-xs text-[var(--on-surface)]"><strong>Creative Instructions:</strong> {data.creativeRemark}</p>}
+                        {data.marketingRevisionRemark && <p className="text-xs text-amber-800 dark:text-amber-300"><strong>Revision Note:</strong> {data.marketingRevisionRemark}</p>}
+                      </div>
+                    )}
+
+                    <ScopeReferenceImagesGallery
+                      images={scopeReferenceImages}
+                      scopes={["mockup"]}
+                      onPreview={setLightboxUrl}
+                    />
+                  </section>
+
+                                    </div>
+                )}
+
+                {/* ═════════ TAB 2: PRODUCT CLASSES & SPECIFICATIONS ═════════ */}
+                {activeTab === "specs" && (
+                  <div className="space-y-5">
+                    {/* ── Section 2: Product Classes & Specifications ── */}
+                  <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2 pt-2">
+                    <Layers className="w-4 h-4 text-teal-600" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
+                      2. Product Classes & Specifications
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                      {productSpecifications.length} Specs
+                    </span>
+                  </div>
                   {/* Search Bar and View Mode Filters for Specs */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="relative flex-1 max-w-md">
@@ -843,9 +932,9 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                               }
                             }}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 cursor-pointer"
-                            title="Export Structured Specifications to CSV (Excel Compatible)"
+                            title="Export Structured Docket to Excel / CSV (UI Styled)"
                           >
-                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" /> CSV
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" /> Excel / CSV
                           </button>
                           <button
                             type="button"
@@ -936,9 +1025,9 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                               }
                             }}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-300/60 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer"
-                            title="Export Docket Specifications to CSV (Excel Ready)"
+                            title="Export Structured Docket to Excel / CSV (UI Styled)"
                           >
-                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> CSV
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Excel / CSV
                           </button>
                           <button
                             type="button"
@@ -965,15 +1054,13 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                       Loading product specifications…
                     </div>
                   ) : specViewMode === "docket" ? (
-                    <div className="overflow-x-auto rounded-xl border border-slate-300 bg-slate-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
-                      <div className="min-w-[960px]">
-                        <ProductDocketView
-                          product={docketProduct}
-                          classGroups={docketClassGroups}
-                          searchQuery={specSearchQuery}
-                          containerId={`mockup-docket-${record.sample_request_id}`}
-                        />
-                      </div>
+                    <div className="w-full max-w-full overflow-hidden">
+                      <ProductDocketView
+                        product={docketProduct}
+                        classGroups={docketClassGroups}
+                        searchQuery={specSearchQuery}
+                        containerId={`mockup-docket-${record.sample_request_id}`}
+                      />
                     </div>
                   ) : specificationGroups.length > 0 ? (
                     <div className="space-y-4">
@@ -1170,7 +1257,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
               <>
                 <button
                   type="button"
-                  disabled={saving || !note.trim()}
+                  disabled={saving || !isClaimedByMe || !note.trim()}
                   onClick={() => submitDecision("return")}
                   className="min-h-9 rounded-xl border border-amber-300 bg-amber-50/60 hover:bg-amber-100 px-4 text-xs font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200 disabled:opacity-50 transition cursor-pointer"
                 >
@@ -1178,7 +1265,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                 </button>
                 <button
                   type="button"
-                  disabled={saving || !canApprove}
+                  disabled={saving || !isClaimedByMe || !canApprove}
                   onClick={() => submitDecision("approve")}
                   className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 text-xs font-bold text-white shadow-xs disabled:opacity-50 transition cursor-pointer"
                 >

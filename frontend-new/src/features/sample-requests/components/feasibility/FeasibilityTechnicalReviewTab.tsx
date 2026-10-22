@@ -51,6 +51,7 @@ export interface FeasibilityTechnicalReviewTabProps {
   onProposeCounterDate?: () => void;
   onProposeCounterDateDirect?: (newDate: string, reason: string) => Promise<void> | void;
   onOpenCounterDateModal?: () => void;
+  canMakeCommercialDecision?: boolean;
   onNavigateToDecision?: () => void;
 }
 
@@ -83,6 +84,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
   onProposeCounterDate,
   onProposeCounterDateDirect,
   onOpenCounterDateModal: _onOpenCounterDateModal,
+  canMakeCommercialDecision = false,
   onNavigateToDecision,
 }) => {
   // Local state for inline counter-date composer
@@ -442,7 +444,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
             </div>
           )}
 
-          {onNavigateToDecision && (
+          {canMakeCommercialDecision && onNavigateToDecision && (
             <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-end">
               <button
                 type="button"
@@ -704,6 +706,15 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
             </div>
           </div>
         )
+      ) : (activeRequest.is_closed || activeRequest.closure != null || String(activeRequest.status || "").toLowerCase().includes("closed")) ? (
+        <div className="p-8 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 text-center space-y-2 shadow-2xs">
+          <h3 className="text-sm font-display font-bold text-rose-800 dark:text-rose-200">
+            Request Closed
+          </h3>
+          <p className="text-xs text-rose-600 dark:text-rose-400 max-w-md mx-auto leading-relaxed">
+            This request was officially closed. All further inputs and task claims are permanently locked.
+          </p>
+        </div>
       ) : (
         /* ── MARKETING VIEW: AWAITING SAMPLING TEAM EVALUATION ── */
         <div className="p-8 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] text-center space-y-3 shadow-2xs">

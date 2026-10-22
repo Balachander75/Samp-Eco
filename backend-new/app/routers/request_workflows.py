@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth.permissions import can_view_costing_claims, is_admin, is_team_head, require_any_team, require_team, user_has_team
 from app.auth.security import get_current_user
 from app.database import get_db
+from app.models.request_closure import RequestClosure
 from app.models.request_workflows import (
     CostingWorkflow,
     CostingWorkflowLog,
@@ -43,6 +44,8 @@ def _actor(user) -> str:
 
 
 def _require_claim(state: Dict[str, Any], user, expected_stage: str) -> None:
+    if is_admin(user):
+        return
     if str(state.get("claimedStage") or "") != expected_stage or state.get("claimedByUserId") is None:
         raise HTTPException(status_code=409, detail="Claim this task before continuing")
     if str(state.get("claimedByUserId")) != str(getattr(user, "id", None)):
@@ -98,8 +101,8 @@ def _validate_mockup_intake(request: CreateSampleRequest) -> None:
         design_needed = True if normalized in {"yes", "true", "1"} else False if normalized in {"no", "false", "0"} else None
     if not isinstance(design_needed, bool):
         raise HTTPException(status_code=422, detail="Choose whether a new design is needed")
-    if design_needed and not str(state.get("marketingShutterstockNo") or "").strip() and not str(state.get("marketingRemark") or "").strip():
-        raise HTTPException(status_code=422, detail="Enter a Shutterstock number or remark when design is needed")
+    if not design_needed and not str(state.get("marketingShutterstockNo") or "").strip() and not str(state.get("marketingRemark") or "").strip():
+        raise HTTPException(status_code=422, detail="Enter a Shutterstock number or remark when no new design is needed")
 
 
 def _normalized_spec_name(value: Any) -> str:
@@ -206,6 +209,35 @@ def _serialize_workflow(db, workflow, request, kind: str, log_model, logs=None, 
     if logs is None:
         logs = db.query(log_model).filter(log_model.workflow_id == workflow.id).order_by(log_model.id.asc()).all()
     can_view_claims = can_view_costing_claims(viewer)
+    closure_record = db.query(RequestClosure).filter(
+        RequestClosure.request_type == kind,
+        RequestClosure.request_id == request.id,
+    ).first()
+    is_closed = (
+        closure_record is not None
+        or workflow.closed_at is not None
+        or str(workflow.current_stage or "").lower() == "done"
+        or str(workflow.status or "").lower() in {"approved / closed", "closed"}
+        or str(request.status or "").lower() == "closed"
+    )
+    closure_dict = {
+        "id": closure_record.id,
+        "request_type": closure_record.request_type,
+        "request_id": closure_record.request_id,
+        "request_code": closure_record.request_code,
+        "closed_by_user_id": closure_record.closed_by_user_id,
+        "closed_by": closure_record.closed_by,
+        "closed_by_team": closure_record.closed_by_team,
+        "reason": closure_record.reason,
+        "closed_at": closure_record.closed_at.isoformat() if closure_record.closed_at else None,
+    } if closure_record else (
+        {
+            "closed_by": "System / Closed",
+            "closed_by_team": None,
+            "closed_at": workflow.closed_at.isoformat() if workflow.closed_at else None,
+            "reason": "Request completed or closed",
+        } if is_closed else None
+    )
     data = {
         "workflow_type": kind,
         "workflow_id": workflow.id,
@@ -222,6 +254,10 @@ def _serialize_workflow(db, workflow, request, kind: str, log_model, logs=None, 
         "created_at": workflow.created_at.isoformat() if workflow.created_at else None,
         "updated_at": workflow.updated_at.isoformat() if workflow.updated_at else None,
         "closed_at": workflow.closed_at.isoformat() if workflow.closed_at else None,
+        "created_by_user_id": getattr(request, "created_by_user_id", None),
+        "created_by": getattr(request, "created_by", None),
+        "is_closed": is_closed,
+        "closure": closure_dict,
         "costing_creative_input_needed": bool(request.costing_creative_input_needed),
         "costing_creative_input_remark": request.costing_creative_input_remark,
         "logs": [{
@@ -601,7 +637,7 @@ def _list_sample_requests_for_sampling(db, year, limit):
     for req in rows:
         state = dict(req.mockup_workflow_state or {})
         routing = dict(state.get("samplingRouting") or {})
-        is_resample = bool(
+        is_resample = False if str(req.creation_mode or "").lower() == "new" else bool(
             state.get("isResample") or state.get("is_resample")
             or routing.get("isResample") or routing.get("is_resample")
             or req.creation_mode == "resample"
@@ -700,6 +736,18 @@ def list_sampling_workflow_reviews(year: Optional[str] = None,
     require_any_team(current_user, ("samp", "admin"))
     mockups = _list_workflows(db, MockupWorkflow, MockupWorkflowLog, "mockup", year, None, limit)
     costings = _list_workflows(db, CostingWorkflow, CostingWorkflowLog, "costing", year, None, limit)
+    mockups = [
+        item for item in mockups
+        if item.get("current_stage") == "sampling_review"
+        or item.get("reviewer_status") not in {"not_started", None}
+        or item.get("reviewed_at") is not None
+    ]
+    costings = [
+        item for item in costings
+        if item.get("current_stage") == "sampling_review"
+        or item.get("reviewer_status") not in {"not_started", None}
+        or item.get("reviewed_at") is not None
+    ]
     samples = _list_sample_requests_for_sampling(db, year, limit)
     designs = _list_design_requests_for_sampling(db, year, limit)
     return samples + designs + mockups + costings

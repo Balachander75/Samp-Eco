@@ -15,6 +15,7 @@ import type { SampleRequestItem } from "../types";
 import { getRequestTrackType, getStageIdForRequest } from "../utils/trackTypes";
 import { formatOdooDate } from "../utils/dateUtils";
 import { getPrimaryRequestCode, getRequestTypes } from "../sampling/utils/requestTypeUtils";
+import type { StagedProductItem, DeliverableScopeId } from "../types/staging";
 
 export interface DraftPackageContext {
   id: string;
@@ -44,6 +45,48 @@ export interface DraftPackagesViewProps {
 
 const packageKeyPart = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
 
+function mapDraftItemToStagedProduct(item: SampleRequestItem): StagedProductItem {
+  const scopes: DeliverableScopeId[] = (
+    item.requestTypes && item.requestTypes.length > 0
+      ? (item.requestTypes.filter((s): s is DeliverableScopeId => ["design", "mockup", "sample", "costing"].includes(s)))
+      : item.requestKind === "design" ? ["design"] : ["sample"]
+  );
+
+  return {
+    id: `draft-staged-${item.id}`,
+    materialCode: item.materialCode || "",
+    productDescription: item.productDescription || "",
+    scopes,
+    timestamp: item.createdAt || new Date().toISOString(),
+    stagedDate: item.createdAt || new Date().toISOString(),
+    creationMode: (item.creationMode as any) || "material_code",
+    savedRequestId: item.id,
+    savedSrNumber: getPrimaryRequestCode(item),
+    isDraftSaved: true,
+    sourceSampleRequestId: item.sourceSampleRequestId,
+    sourceSampleCode: item.sourceSampleCode,
+    sourceRequestCode: (item as any).sourceRequestCode || (item.sourceRequestId ? String(item.sourceRequestId) : undefined),
+    customBinding1: (item as any).customBinding1 || (item as any).bindingType1,
+    customBinding2: (item as any).customBinding2 || (item as any).bindingType2,
+    customDetails: item.customDetails,
+    plant: item.targetPlant,
+    unitPcPack: item.unitPcPack != null ? String(item.unitPcPack) : undefined,
+    qtyForSampling: item.qtyForSampling != null ? String(item.qtyForSampling) : undefined,
+    qtyDesignCosting: item.qtyDesignCosting != null ? String(item.qtyDesignCosting) : undefined,
+    qtyPerPack: item.qtyPerPack != null ? String(item.qtyPerPack) : undefined,
+    brandName: item.brandName,
+    productType: item.productType,
+    productCategory: item.productCategory,
+    productSubCategory: item.productSubCategory,
+    productThirdCategory: item.productThirdCategory,
+    customerProductCode: item.customerProductCode,
+    barcode: item.barcode,
+    sampleRequiredDate: item.sampleRequiredDate || undefined,
+    costingRequiredDate: item.costingRequiredDate || undefined,
+  };
+}
+
+
 function getInitials(name?: string | null): string {
   if (!name || !name.trim()) return "MK";
   const parts = name.trim().split(/\s+/);
@@ -67,6 +110,9 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
 
     for (const item of requests) {
       if (getRequestTrackType(item) !== "marketing_request" || getStageIdForRequest(item) !== "draft") {
+        continue;
+      }
+      if (!item.productDescription?.trim() && !item.materialCode?.trim()) {
         continue;
       }
 
@@ -132,6 +178,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
   const handleOpenStaging = useCallback((group: DraftPackageGroup, e: React.MouseEvent) => {
     e.stopPropagation();
     const first = group.items[0];
+    const stagedList: StagedProductItem[] = group.items.map(mapDraftItemToStagedProduct);
     const stagingContext = {
       customer: group.customer || "",
       programName: group.programName || "",
@@ -143,8 +190,14 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       parentRequestTypes: first?.requestTypes || [],
       parentMockupWorkflowState: first?.mockupWorkflowState,
       parentCreationMode: first?.creationMode,
+      openedFromDraft: true,
     };
-    sessionStorage.setItem("samp_active_program_form", JSON.stringify(stagingContext));
+    try {
+      sessionStorage.setItem("samp_active_staged_products", JSON.stringify(stagedList));
+      sessionStorage.setItem("samp_active_program_form", JSON.stringify(stagingContext));
+    } catch {
+      // ignore
+    }
     navigate("/sample-requests/product-staging", { state: stagingContext });
   }, [navigate]);
 

@@ -93,13 +93,28 @@ function getCharValue(
   return { value: val, isNa: false, uom: spec.uom || undefined };
 }
 
-interface CellDef {
+export interface CellDef {
   label: string;
   value: string;
-  colSpan?: number;
+  uom?: string;
+  colSpan?: 1 | 2 | 3 | 4 | 5 | 6;
 }
 
-export function buildCompleteDocketPdf(product: ProductSearchResult, groups: DocketClass[]): Uint8Array {
+export interface DocketSectionDef {
+  id: string;
+  title: string;
+  sectionNumber: number | string;
+  countBadge?: string;
+  totalSpecs?: number;
+  configuredSpecs?: number;
+  rows: CellDef[][];
+}
+
+export function buildDocketSections(
+  product: ProductSearchResult,
+  groups: DocketClass[],
+  onlyConfigured: boolean = false
+): DocketSectionDef[] {
   const groupsMap = new Map<string, ProductDetailItem[]>();
   for (const [name, specs] of groups) {
     groupsMap.set(name.toUpperCase(), specs);
@@ -109,11 +124,8 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
   const formattedToday = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
 
   // Build all sections dynamically
-  const sections: Array<{
-    title: string;
-    countBadge?: string;
-    rows: CellDef[][];
-  }> = [];
+  const sections: DocketSectionDef[] = [];
+  let secNum = 1;
 
   // 1. PRODUCT DETAILS
   const productSpecs = groupsMap.get("PRODUCT_CLASS") || [];
@@ -124,35 +136,35 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
   const productRows: CellDef[][] = [
     // Row 1
     [
-      { label: "Export ID & Date", value: `${product.sr_number || product.material_code || "SR-26-002824"}  ${formattedToday}` },
-      { label: "Customer Name", value: product.customer || "—" },
-      { label: "Product Code", value: product.material_code || "—" },
-      { label: "Type of Barcode", value: "EAN-13" },
-      { label: "Barcode / Customer Product Code / VSN", value: product.source_sample_code || "639277134851 222507" },
-      { label: "Brand", value: (product as any).brand || (product as any).brandName || "JOT" },
+      { label: "Export ID & Date", value: `${product.sr_number || product.material_code || "SR-26-002824"}  ${formattedToday}`, colSpan: 1 },
+      { label: "Customer Name", value: product.customer || "—", colSpan: 1 },
+      { label: "Product Code", value: product.material_code || "—", colSpan: 1 },
+      { label: "Type of Barcode", value: "EAN-13", colSpan: 1 },
+      { label: "Barcode / Customer Product Code / VSN", value: product.source_sample_code || (product as any).barcode || (product as any).vsn || "—", colSpan: 1 },
+      { label: "Brand", value: (product as any).brand || (product as any).brandName || "—", colSpan: 1 },
     ],
     // Row 2
     [
       { label: "Product Description", value: product.product_description || "Commercial Product Sample", colSpan: 2 },
-      { label: "Product Close size (CM)", value: closeSize },
-      { label: "Inside size (CM)", value: closeSize },
-      { label: "Size After Perforation", value: getCharValue(productSpecs, "SIZEAFTERPERFORATION", "NA - NA").value },
-      { label: "Claim Applicable", value: getCharValue(productSpecs, "CLAIMAPPLICABLETOPRODUCT").value },
+      { label: "Product Close size (CM)", value: closeSize, colSpan: 1 },
+      { label: "Inside size (CM)", value: closeSize, colSpan: 1 },
+      { label: "Size After Perforation", value: getCharValue(productSpecs, "SIZEAFTERPERFORATION", "NA - NA").value, colSpan: 1 },
+      { label: "Claim Applicable", value: getCharValue(productSpecs, "CLAIMAPPLICABLETOPRODUCT").value, colSpan: 1 },
     ],
     // Row 3
     [
-      { label: "No of Enhance Licence (Shutterstock)", value: "0" },
-      { label: "Product Artwork Nos", value: getCharValue(productSpecs, "PRODUCTARTWORKNOS", "1").value },
-      { label: "Packing Artwork Nos", value: getCharValue(productSpecs, "PACKINGARTWORKNOS", "1").value },
-      { label: "Product Artwork Applicable", value: formattedToday },
-      { label: "Packaging Artwork Applicable", value: formattedToday },
-      { label: "Design From", value: "Customer Design" },
+      { label: "No of Enhance Licence (Shutterstock)", value: "0", colSpan: 1 },
+      { label: "Product Artwork Nos", value: getCharValue(productSpecs, "PRODUCTARTWORKNOS", "1").value, colSpan: 1 },
+      { label: "Packing Artwork Nos", value: getCharValue(productSpecs, "PACKINGARTWORKNOS", "1").value, colSpan: 1 },
+      { label: "Product Artwork Applicable", value: formattedToday, colSpan: 1 },
+      { label: "Packaging Artwork Applicable", value: formattedToday, colSpan: 1 },
+      { label: "Design From", value: "Customer Design", colSpan: 1 },
     ],
     // Row 4
     [
       { label: "Shutterstock License Nos", value: "0", colSpan: 2 },
-      { label: "Master Packing Type", value: "PDQ" },
-      { label: "PDQ Artwork Applicable", value: formattedToday },
+      { label: "Master Packing Type", value: "PDQ", colSpan: 1 },
+      { label: "PDQ Artwork Applicable", value: formattedToday, colSpan: 1 },
       { label: "Carton Marking Applicable", value: formattedToday, colSpan: 2 },
     ],
   ];
@@ -162,22 +174,29 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     const norm = item.characteristicName.toUpperCase();
     return norm !== "PRODUCTCLOSESIZELENGTH" && norm !== "PRODUCTCLOSESIZEWIDTH" && norm !== "CLAIMAPPLICABLETOPRODUCT";
   });
-  if (extraProductSpecs.length > 0) {
-    const chunked: CellDef[][] = [];
-    for (let i = 0; i < extraProductSpecs.length; i += NUM_COLS) {
-      chunked.push(
-        extraProductSpecs.slice(i, i + NUM_COLS).map((item) => ({
+  const filteredExtraProduct = onlyConfigured
+    ? extraProductSpecs.filter((s) => !isMissingSpec(s.value))
+    : extraProductSpecs;
+  if (filteredExtraProduct.length > 0) {
+    for (let i = 0; i < filteredExtraProduct.length; i += NUM_COLS) {
+      productRows.push(
+        filteredExtraProduct.slice(i, i + NUM_COLS).map((item) => ({
           label: item.characteristicName,
           value: item.value ? (item.uom ? `${item.value} ${item.uom}` : item.value) : "NA",
+          uom: item.uom || undefined,
+          colSpan: 1,
         }))
       );
     }
-    productRows.push(...chunked);
   }
 
   sections.push({
+    id: "product",
+    sectionNumber: secNum++,
     title: "Product Details",
     countBadge: `${productSpecs.length} SPECS`,
+    totalSpecs: productSpecs.length,
+    configuredSpecs: productSpecs.filter((s) => !isMissingSpec(s.value)).length,
     rows: productRows,
   });
 
@@ -195,20 +214,20 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
 
     const bindingRows: CellDef[][] = [
       [
-        { label: "Binding Side", value: bSide },
-        { label: "Binding Type", value: bType },
-        { label: "No of Sheets", value: bSheets },
-        { label: "Drill Holes", value: bDrill },
-        { label: "Corner Rounding", value: bCorner },
-        { label: "Edge Finish", value: bEdge },
+        { label: "Binding Side", value: bSide, colSpan: 1 },
+        { label: "Binding Type", value: bType, colSpan: 1 },
+        { label: "No of Sheets", value: bSheets, colSpan: 1 },
+        { label: "Drill Holes", value: bDrill, colSpan: 1 },
+        { label: "Corner Rounding", value: bCorner, colSpan: 1 },
+        { label: "Edge Finish", value: bEdge, colSpan: 1 },
       ],
       [
-        { label: "Opening of Product", value: getCharValue(bindingSpecs, "OPENINGOFPRODUCT").value },
-        { label: "Binding Material", value: getCharValue(bindingSpecs, "BINDINGMATERIAL").value },
-        { label: "Binding Color / Style", value: getCharValue(bindingSpecs, "BINDINGCOLOR_STYLE").value },
-        { label: "Special Binding", value: getCharValue(bindingSpecs, "SPECIALBINDING").value },
-        { label: "Additional Process On Binding", value: getCharValue(bindingSpecs, "ADDITIONALPROCESSONBINDING").value },
-        { label: "Spiral / Wiro Hole Punch", value: getCharValue(bindingSpecs, "SPIRAL-WIROBINDINGHOLEPUNCH").value },
+        { label: "Opening of Product", value: getCharValue(bindingSpecs, "OPENINGOFPRODUCT").value, colSpan: 1 },
+        { label: "Binding Material", value: getCharValue(bindingSpecs, "BINDINGMATERIAL").value, colSpan: 1 },
+        { label: "Binding Color / Style", value: getCharValue(bindingSpecs, "BINDINGCOLOR_STYLE").value, colSpan: 1 },
+        { label: "Special Binding", value: getCharValue(bindingSpecs, "SPECIALBINDING").value, colSpan: 1 },
+        { label: "Additional Process On Binding", value: getCharValue(bindingSpecs, "ADDITIONALPROCESSONBINDING").value, colSpan: 1 },
+        { label: "Spiral / Wiro Hole Punch", value: getCharValue(bindingSpecs, "SPIRAL-WIROBINDINGHOLEPUNCH").value, colSpan: 1 },
       ],
     ];
 
@@ -219,18 +238,27 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
       "BINDINGCOLOR_STYLE", "SPECIALBINDING", "ADDITIONALPROCESSONBINDING", "SPIRAL-WIROBINDINGHOLEPUNCH"
     ]);
     const extraBinding = bindingSpecs.filter((s) => !handledBinding.has(s.characteristicName.toUpperCase()));
-    for (let i = 0; i < extraBinding.length; i += NUM_COLS) {
+    const filteredExtraBinding = onlyConfigured
+      ? extraBinding.filter((s) => !isMissingSpec(s.value))
+      : extraBinding;
+    for (let i = 0; i < filteredExtraBinding.length; i += NUM_COLS) {
       bindingRows.push(
-        extraBinding.slice(i, i + NUM_COLS).map((s) => ({
+        filteredExtraBinding.slice(i, i + NUM_COLS).map((s) => ({
           label: s.characteristicName,
           value: s.value ? (s.uom ? `${s.value} ${s.uom}` : s.value) : "NA",
+          uom: s.uom || undefined,
+          colSpan: 1,
         }))
       );
     }
 
     sections.push({
+      id: "binding",
+      sectionNumber: secNum++,
       title: "Binding Details",
       countBadge: `${bindingSpecs.length} SPECS`,
+      totalSpecs: bindingSpecs.length,
+      configuredSpecs: bindingSpecs.filter((s) => !isMissingSpec(s.value)).length,
       rows: bindingRows,
     });
   }
@@ -266,18 +294,21 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
         {
           label: `Component ${cIdx} Name & Size in CM`,
           value: `${!cName.isNa ? cName.value : cIdx === 1 ? "COVER (SPREAD)" : "NA"} (${sizeStr})`,
+          colSpan: 1,
         },
-        { label: "Material", value: cMat.value },
+        { label: "Material", value: cMat.value, colSpan: 1 },
         {
           label: "Printing - No & Name of Colors",
           value: `${!cPrt.isNa ? cPrt.value : "OFFSET COMMON"} ${!cCol.isNa ? cCol.value : "4/1 CMYK"}`,
+          colSpan: 1,
         },
         {
           label: "GSM / Caliper",
           value: !cGsm.isNa ? `${cGsm.value} ${cGsmUom !== "NA" ? cGsmUom : "GSM"}` : "515 GSM",
+          colSpan: 1,
         },
-        { label: "Finish", value: !cFin.isNa ? cFin.value : "AQUA VARNISH" },
-        { label: "Finish Details", value: cFinNote.value },
+        { label: "Finish", value: !cFin.isNa ? cFin.value : "AQUA VARNISH", colSpan: 1 },
+        { label: "Finish Details", value: cFinNote.value, colSpan: 1 },
       ],
     ];
 
@@ -288,18 +319,27 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
       `C${cIdx}MATERIALUNIT`, `C${cIdx}FINISHING`, `C${cIdx}FINISHINGNOTE`
     ]);
     const extraComp = compSpecs.filter((s) => !handledComp.has(s.characteristicName.toUpperCase()));
-    for (let i = 0; i < extraComp.length; i += NUM_COLS) {
+    const filteredExtraComp = onlyConfigured
+      ? extraComp.filter((s) => !isMissingSpec(s.value))
+      : extraComp;
+    for (let i = 0; i < filteredExtraComp.length; i += NUM_COLS) {
       compRows.push(
-        extraComp.slice(i, i + NUM_COLS).map((s) => ({
+        filteredExtraComp.slice(i, i + NUM_COLS).map((s) => ({
           label: s.characteristicName,
           value: s.value ? (s.uom ? `${s.value} ${s.uom}` : s.value) : "NA",
+          uom: s.uom || undefined,
+          colSpan: 1,
         }))
       );
     }
 
     sections.push({
+      id: `comp-${cIdx}`,
+      sectionNumber: secNum++,
       title: compTitle,
       countBadge: `${compSpecs.length} SPECS`,
+      totalSpecs: compSpecs.length,
+      configuredSpecs: compSpecs.filter((s) => !isMissingSpec(s.value)).length,
       rows: compRows,
     });
   }
@@ -309,20 +349,20 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
   if (rulingSpecs && isClassPresent(rulingSpecs)) {
     const rulingRows: CellDef[][] = [
       [
-        { label: "Inside Paper GSM", value: getCharValue(rulingSpecs, "INSIDE_PAPER_GSM", "52").value },
-        { label: "Ruling Type", value: getCharValue(rulingSpecs, "SPECIAL_RULING", "WIDE RULED").value },
-        { label: "Ruling Distance (MM)", value: getCharValue(rulingSpecs, "RULLING_DISTANCE", "8.73 MM").value },
-        { label: "Ruling Shade", value: getCharValue(rulingSpecs, "RULLING_SHADE", "AMERICAN BLUE&RED").value },
-        { label: "Top Margin (MM)", value: getCharValue(rulingSpecs, "TOP_MARGIN", "27").value },
-        { label: "Top Margin Color", value: getCharValue(rulingSpecs, "TOP_MARGIN_COLOR", "AMERICAN BLUE").value },
+        { label: "Inside Paper GSM", value: getCharValue(rulingSpecs, "INSIDE_PAPER_GSM", "52").value, colSpan: 1 },
+        { label: "Ruling Type", value: getCharValue(rulingSpecs, "SPECIAL_RULING", "WIDE RULED").value, colSpan: 1 },
+        { label: "Ruling Distance (MM)", value: getCharValue(rulingSpecs, "RULLING_DISTANCE", "8.73 MM").value, colSpan: 1 },
+        { label: "Ruling Shade", value: getCharValue(rulingSpecs, "RULLING_SHADE", "AMERICAN BLUE&RED").value, colSpan: 1 },
+        { label: "Top Margin (MM)", value: getCharValue(rulingSpecs, "TOP_MARGIN", "27").value, colSpan: 1 },
+        { label: "Top Margin Color", value: getCharValue(rulingSpecs, "TOP_MARGIN_COLOR", "AMERICAN BLUE").value, colSpan: 1 },
       ],
       [
-        { label: "Bottom Margin (MM)", value: getCharValue(rulingSpecs, "BOTTOM_MARGIN", "12").value },
-        { label: "Bottom Margin Color", value: getCharValue(rulingSpecs, "BOTTOM_MARGIN_COLOR", "AMERICAN BLUE").value },
-        { label: "Left Margin (MM)", value: getCharValue(rulingSpecs, "LEFT_MARGIN", "26").value },
-        { label: "Left Margin Color", value: getCharValue(rulingSpecs, "LEFT_MARGIN_COLOR", "RED").value },
-        { label: "Right Margin (MM)", value: getCharValue(rulingSpecs, "RIGHT_MARGIN").value },
-        { label: "Right Margin Color", value: getCharValue(rulingSpecs, "RIGHT_MARGIN_COLOR").value },
+        { label: "Bottom Margin (MM)", value: getCharValue(rulingSpecs, "BOTTOM_MARGIN", "12").value, colSpan: 1 },
+        { label: "Bottom Margin Color", value: getCharValue(rulingSpecs, "BOTTOM_MARGIN_COLOR", "AMERICAN BLUE").value, colSpan: 1 },
+        { label: "Left Margin (MM)", value: getCharValue(rulingSpecs, "LEFT_MARGIN", "26").value, colSpan: 1 },
+        { label: "Left Margin Color", value: getCharValue(rulingSpecs, "LEFT_MARGIN_COLOR", "RED").value, colSpan: 1 },
+        { label: "Right Margin (MM)", value: getCharValue(rulingSpecs, "RIGHT_MARGIN").value, colSpan: 1 },
+        { label: "Right Margin Color", value: getCharValue(rulingSpecs, "RIGHT_MARGIN_COLOR").value, colSpan: 1 },
       ],
       [
         {
@@ -339,8 +379,12 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     ];
 
     sections.push({
+      id: "ruling",
+      sectionNumber: secNum++,
       title: "Inside Details",
       countBadge: `${rulingSpecs.length} SPECS`,
+      totalSpecs: rulingSpecs.length,
+      configuredSpecs: rulingSpecs.filter((s) => !isMissingSpec(s.value)).length,
       rows: rulingRows,
     });
   }
@@ -353,35 +397,43 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
         {
           label: "Divider Type 1 & Size",
           value: `${getCharValue(dividerSpecs, "DIVIDERSTYPE1").value} (${getCharValue(dividerSpecs, "DIVIDER1SIZEINCLTABLENGTH").value})`,
+          colSpan: 1,
         },
-        { label: "Divider Material", value: getCharValue(dividerSpecs, "DIVIDERMATERIALTYPE1").value },
+        { label: "Divider Material", value: getCharValue(dividerSpecs, "DIVIDERMATERIALTYPE1").value, colSpan: 1 },
         {
           label: "Divider Printing, No & Name of Colors",
           value: `${getCharValue(dividerSpecs, "D1PRINTINGTYPE").value} ${getCharValue(dividerSpecs, "D1NAMEOFCOLORSF_B").value}`,
+          colSpan: 1,
         },
-        { label: "Divider GSM", value: getCharValue(dividerSpecs, "D1DIVIDERCALIPER_WEIGHT").value },
-        { label: "Divider 1 Tab Style", value: getCharValue(dividerSpecs, "TABSTYLEOF1STDIVIDERS").value },
-        { label: "Finish Details", value: getCharValue(dividerSpecs, "D1PRINTFINISHING").value },
+        { label: "Divider GSM", value: getCharValue(dividerSpecs, "D1DIVIDERCALIPER_WEIGHT").value, colSpan: 1 },
+        { label: "Divider 1 Tab Style", value: getCharValue(dividerSpecs, "TABSTYLEOF1STDIVIDERS").value, colSpan: 1 },
+        { label: "Finish Details", value: getCharValue(dividerSpecs, "D1PRINTFINISHING").value, colSpan: 1 },
       ],
       [
         {
           label: "Divider Type 2 & Size",
           value: `${getCharValue(dividerSpecs, "DIVIDERSTYPE2").value} (${getCharValue(dividerSpecs, "DIVIDERSIZEINCLTABLENGTH").value})`,
+          colSpan: 1,
         },
-        { label: "Divider Material", value: getCharValue(dividerSpecs, "DIVIDERMATERIALTYPE2").value },
+        { label: "Divider Material", value: getCharValue(dividerSpecs, "DIVIDERMATERIALTYPE2").value, colSpan: 1 },
         {
           label: "Divider Printing, No & Name of Colors",
           value: `${getCharValue(dividerSpecs, "D2PRINTINGTYPE").value} ${getCharValue(dividerSpecs, "D2NAMEOFCOLORSF_B").value}`,
+          colSpan: 1,
         },
-        { label: "Divider GSM", value: getCharValue(dividerSpecs, "D2DIVIDERCALIPER_WEIGHT").value },
-        { label: "Divider 2 Tab Style", value: getCharValue(dividerSpecs, "TABSTYLEOF2NDDIVIDERS").value },
-        { label: "Finish Details", value: getCharValue(dividerSpecs, "D2PRINTFINISHING").value },
+        { label: "Divider GSM", value: getCharValue(dividerSpecs, "D2DIVIDERCALIPER_WEIGHT").value, colSpan: 1 },
+        { label: "Divider 2 Tab Style", value: getCharValue(dividerSpecs, "TABSTYLEOF2NDDIVIDERS").value, colSpan: 1 },
+        { label: "Finish Details", value: getCharValue(dividerSpecs, "D2PRINTFINISHING").value, colSpan: 1 },
       ],
     ];
 
     sections.push({
+      id: "dividers",
+      sectionNumber: secNum++,
       title: "Inside Accessories Details",
       countBadge: `${dividerSpecs.length} SPECS`,
+      totalSpecs: dividerSpecs.length,
+      configuredSpecs: dividerSpecs.filter((s) => !isMissingSpec(s.value)).length,
       rows: dividerRows,
     });
   }
@@ -393,27 +445,41 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     const pkgRows: CellDef[][] = [];
     if (pkgSpecs1 && isClassPresent(pkgSpecs1)) {
       pkgRows.push([
-        { label: "Packaging 1 Name", value: getCharValue(pkgSpecs1, "PACKAGING1NAME").value },
-        { label: "Material", value: getCharValue(pkgSpecs1, "PACKAGING1MATERIAL").value },
-        { label: "Printing - No & Name of Colors", value: getCharValue(pkgSpecs1, "PACKAGING1PRINTING").value },
-        { label: "GSM", value: getCharValue(pkgSpecs1, "PACKAGING1GSM").value },
-        { label: "Size (CM)", value: getCharValue(pkgSpecs1, "PACKAGING1SIZE").value },
-        { label: "Finish Details", value: getCharValue(pkgSpecs1, "PACKAGING1FINISH").value },
+        { label: "Packaging 1 Name", value: getCharValue(pkgSpecs1, "PACKAGING1NAME").value, colSpan: 1 },
+        { label: "Material", value: getCharValue(pkgSpecs1, "PACKAGING1MATERIAL").value, colSpan: 1 },
+        { label: "Printing - No & Name of Colors", value: getCharValue(pkgSpecs1, "PACKAGING1PRINTING").value, colSpan: 1 },
+        { label: "GSM", value: getCharValue(pkgSpecs1, "PACKAGING1GSM").value, colSpan: 1 },
+        { label: "Size (CM)", value: getCharValue(pkgSpecs1, "PACKAGING1SIZE").value, colSpan: 1 },
+        { label: "Finish Details", value: getCharValue(pkgSpecs1, "PACKAGING1FINISH").value, colSpan: 1 },
       ]);
     }
     if (pkgDetails && isClassPresent(pkgDetails)) {
-      for (let i = 0; i < pkgDetails.length; i += NUM_COLS) {
+      const filteredPkg = onlyConfigured
+        ? pkgDetails.filter((s) => !isMissingSpec(s.value))
+        : pkgDetails;
+      for (let i = 0; i < filteredPkg.length; i += NUM_COLS) {
         pkgRows.push(
-          pkgDetails.slice(i, i + NUM_COLS).map((s) => ({
+          filteredPkg.slice(i, i + NUM_COLS).map((s) => ({
             label: s.characteristicName,
             value: s.value ? (s.uom ? `${s.value} ${s.uom}` : s.value) : "NA",
+            uom: s.uom || undefined,
+            colSpan: 1,
           }))
         );
       }
     }
+    const totalPkgSpecs = (pkgSpecs1?.length || 0) + (pkgDetails?.length || 0);
+    const configuredPkgSpecs =
+      (pkgSpecs1 ? pkgSpecs1.filter((s) => !isMissingSpec(s.value)).length : 0) +
+      (pkgDetails ? pkgDetails.filter((s) => !isMissingSpec(s.value)).length : 0);
+
     sections.push({
+      id: "packaging",
+      sectionNumber: secNum++,
       title: "Packaging Details",
-      countBadge: `${(pkgSpecs1?.length || 0) + (pkgDetails?.length || 0)} SPECS`,
+      countBadge: `${totalPkgSpecs} SPECS`,
+      totalSpecs: totalPkgSpecs,
+      configuredSpecs: configuredPkgSpecs,
       rows: pkgRows,
     });
   }
@@ -429,24 +495,38 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
     .filter(([, specs]) => isClassPresent(specs));
   for (const [name, specs] of otherGroups) {
     const rows: CellDef[][] = [];
-    for (let i = 0; i < specs.length; i += NUM_COLS) {
+    const filteredSpecs = onlyConfigured
+      ? specs.filter((s) => !isMissingSpec(s.value))
+      : specs;
+    for (let i = 0; i < filteredSpecs.length; i += NUM_COLS) {
       rows.push(
-        specs.slice(i, i + NUM_COLS).map((s) => ({
+        filteredSpecs.slice(i, i + NUM_COLS).map((s) => ({
           label: s.characteristicName,
           value: s.value ? (s.uom ? `${s.value} ${s.uom}` : s.value) : "NA",
+          uom: s.uom || undefined,
+          colSpan: 1,
         }))
       );
     }
     sections.push({
+      id: `custom-${name}`,
+      sectionNumber: secNum++,
       title: productDocketSectionTitle(name),
       countBadge: `${specs.length} SPECS`,
+      totalSpecs: specs.length,
+      configuredSpecs: specs.filter((s) => !isMissingSpec(s.value)).length,
       rows,
     });
   }
 
   // 8. SPECIAL INSTRUCTION / PRINT NOTE
   sections.push({
+    id: "notes",
+    sectionNumber: secNum++,
     title: "Special Instruction / Print Note",
+    countBadge: "1 SPEC",
+    totalSpecs: 1,
+    configuredSpecs: 1,
     rows: [
       [
         {
@@ -461,6 +541,12 @@ export function buildCompleteDocketPdf(product: ProductSearchResult, groups: Doc
       ],
     ],
   });
+
+  return sections;
+}
+
+export function buildCompleteDocketPdf(product: ProductSearchResult, groups: DocketClass[]): Uint8Array {
+  const sections = buildDocketSections(product, groups, false);
 
   // Calculate dynamic page height so 100% of the docket fits without any clipping
   const BANNER_H = 15;
@@ -659,67 +745,304 @@ export function printProductDocketView(product: ProductSearchResult, elementId: 
   }, 300);
 }
 
+function escapeHtml(str: string | number | null | undefined): string {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /**
- * Export product docket specifications to Excel-compatible CSV with UTF-8 BOM.
+ * Export product docket specifications to Excel-ready spreadsheet (.xls / .csv)
+ * mirroring the exact UI Docket structure (Cyan banners, sky-blue cell labels, white values, 6-col grid).
  */
 export function downloadProductDocketCsv(
   product: ProductSearchResult,
-  groups: DocketClass[]
+  groups: DocketClass[],
+  format: "excel" | "csv" = "excel"
 ): void {
   const d = new Date();
   const formattedToday = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
-  const filename = `${product.material_code || product.sr_number || "Product"}_Docket_Specifications_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.csv`;
+  const dateSuffix = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const baseFilename = `${product.material_code || product.sr_number || "Product"}_Docket_Specifications_${dateSuffix}`;
 
-  const rows: (string | number | null | undefined)[][] = [
-    ["OFFICIAL TECHNICAL SPECIFICATION DOCKET (SAP BOM)"],
-    ["Generated Date", formattedToday],
-    ["Material Code", product.material_code || "—"],
-    ["Sample Request No", product.sr_number || "—"],
-    ["Product Description", product.product_description || "—"],
-    ["Customer", product.customer || "—"],
-    ["Target Plant", product.target_plant || "—"],
-    ["Barcode / VSN", product.source_sample_code || (product as any).barcode || "—"],
-    [],
-    ["Section", "Section Title", "Classification Class", "Characteristic Code", "Value", "UOM", "Status"],
-  ];
+  const sections = buildDocketSections(product, groups, false);
 
-  let secIdx = 1;
-  for (const [className, specs] of groups) {
-    if (!isClassPresent(specs)) continue;
-    const title = productDocketSectionTitle(className);
-    for (const spec of specs) {
-      const isConfigured = !isMissingSpec(spec.value);
-      rows.push([
-        `Section ${secIdx}`,
-        title,
-        className,
-        spec.characteristicName,
-        spec.value ? String(spec.value).trim() : "NA",
-        spec.uom || "",
-        isConfigured ? "Configured" : "Unconfigured",
-      ]);
+  if (format === "csv") {
+    // Pure CSV format structured according to Docket UI sections
+    const rows: (string | number | null | undefined)[][] = [
+      ["OFFICIAL TECHNICAL SPECIFICATION DOCKET (SAP BOM)"],
+      ["Material Code", product.material_code || "—", "SR Number", product.sr_number || "—", "Generated Date", formattedToday],
+      ["Product Description", product.product_description || "—", "Customer", product.customer || "—", "Target Plant", product.target_plant || "—"],
+      [],
+    ];
+
+    for (const sec of sections) {
+      rows.push([`SEC ${sec.sectionNumber}: ${sec.title.toUpperCase()}`]);
+      for (const row of sec.rows) {
+        const labelRow: string[] = [];
+        const valueRow: string[] = [];
+        for (const cell of row) {
+          const span = cell.colSpan || 1;
+          labelRow.push(cell.label);
+          for (let s = 1; s < span; s++) labelRow.push("");
+          const isNa = isMissingSpec(cell.value) || cell.value === "NA" || cell.value === "—" || !cell.value;
+          const valStr = isNa ? "—" : cell.uom ? `${cell.value} ${cell.uom}` : String(cell.value);
+          valueRow.push(valStr);
+          for (let s = 1; s < span; s++) valueRow.push("");
+        }
+        rows.push(labelRow);
+        rows.push(valueRow);
+      }
+      rows.push([]);
     }
-    secIdx++;
+
+    const csvContent = rows
+      .map((row) =>
+        row
+          .map((val) => {
+            if (val === null || val === undefined) return '""';
+            const str = String(val);
+            return `"${str.replace(/"/g, '""')}"`;
+          })
+          .join(",")
+      )
+      .join("\r\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${baseFilename}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return;
   }
 
-  // Sanitize CSV cells according to RFC-4180
-  const csvContent = rows
-    .map((row) =>
-      row
-        .map((val) => {
-          if (val === null || val === undefined) return '""';
-          const str = String(val);
-          return `"${str.replace(/"/g, '""')}"`;
-        })
-        .join(",")
-    )
-    .join("\r\n");
+  // Primary: Excel-ready HTML spreadsheet (.xls) with exact UI styling matching PDF / UI
+  let tableHtml = `
+    <!-- Top Docket Header -->
+    <tr>
+      <th colspan="6" class="header-banner">
+        OFFICIAL TECHNICAL SPECIFICATION DOCKET
+      </th>
+    </tr>
+    <tr>
+      <td class="meta-label">Material Code:</td>
+      <td class="meta-val">${escapeHtml(product.material_code || "—")}</td>
+      <td class="meta-label">Sample Request No:</td>
+      <td class="meta-val">${escapeHtml(product.sr_number || "—")}</td>
+      <td class="meta-label">Generated Date:</td>
+      <td class="meta-val">${formattedToday}</td>
+    </tr>
+    <tr>
+      <td class="meta-label">Product Description:</td>
+      <td colspan="2" class="meta-val">${escapeHtml(product.product_description || "—")}</td>
+      <td class="meta-label">Customer / Plant:</td>
+      <td colspan="2" class="meta-val">${escapeHtml(product.customer || "—")} &nbsp;|&nbsp; Plant ${escapeHtml(product.target_plant || "—")}</td>
+    </tr>
+    <tr class="spacer-row"><td colspan="6"></td></tr>
+  `;
 
-  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  for (const sec of sections) {
+    tableHtml += `
+      <tr>
+        <th colspan="6" class="sec-banner">
+          SEC ${sec.sectionNumber}: ${escapeHtml(sec.title.toUpperCase())}
+          ${sec.countBadge ? ` &nbsp; <span class="sec-badge">(${escapeHtml(sec.countBadge)})</span>` : ""}
+        </th>
+      </tr>
+    `;
+
+    for (const row of sec.rows) {
+      const totalCols = row.reduce((acc, c) => acc + (c.colSpan || 1), 0);
+      const remCols = 6 - (totalCols % 6 || 6);
+
+      // Label row
+      tableHtml += `<tr style="height: 28px;">`;
+      for (const cell of row) {
+        const span = cell.colSpan || 1;
+        tableHtml += `<td colspan="${span}" class="docket-label">${escapeHtml(cell.label)}</td>`;
+      }
+      if (remCols > 0) {
+        tableHtml += `<td colspan="${remCols}" class="docket-empty"></td>`;
+      }
+      tableHtml += `</tr>`;
+
+      // Value row
+      tableHtml += `<tr style="height: 32px;">`;
+      for (const cell of row) {
+        const span = cell.colSpan || 1;
+        const isNa = isMissingSpec(cell.value) || cell.value === "NA" || cell.value === "—" || !cell.value;
+        if (isNa) {
+          tableHtml += `<td colspan="${span}" class="docket-value"><span class="docket-na">—</span></td>`;
+        } else {
+          const uomHtml = cell.uom ? ` <span class="docket-uom">${escapeHtml(cell.uom)}</span>` : "";
+          tableHtml += `<td colspan="${span}" class="docket-value"><span>${escapeHtml(cell.value)}</span>${uomHtml}</td>`;
+        }
+      }
+      if (remCols > 0) {
+        tableHtml += `<td colspan="${remCols}" class="docket-empty"><span class="docket-na">—</span></td>`;
+      }
+      tableHtml += `</tr>`;
+    }
+
+    // Spacer row between sections
+    tableHtml += `<tr class="spacer-row"><td colspan="6"></td></tr>`;
+  }
+
+  const excelHtml = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <!--[if gte mso 9]>
+      <xml>
+        <x:ExcelWorkbook>
+          <x:ExcelWorksheets>
+            <x:ExcelWorksheet>
+              <x:Name>Docket Specifications</x:Name>
+              <x:WorksheetOptions>
+                <x:DisplayGridlines/>
+                <x:Print>
+                  <x:ValidPrinterInfo/>
+                  <x:Orientation>Landscape</x:Orientation>
+                </x:Print>
+              </x:WorksheetOptions>
+            </x:ExcelWorksheet>
+          </x:ExcelWorksheets>
+        </x:ExcelWorksheet>
+      </xml>
+      <![endif]-->
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+      <style>
+        body, table {
+          font-family: 'Segoe UI', Calibri, Arial, sans-serif;
+          font-size: 10pt;
+        }
+        table {
+          border-collapse: collapse;
+          table-layout: fixed;
+          width: 100%;
+        }
+        .header-banner {
+          background-color: #0f172a;
+          color: #ffffff;
+          font-size: 12pt;
+          font-weight: bold;
+          text-align: center;
+          padding: 8px 12px;
+          border: 1pt solid #0f172a;
+        }
+        .meta-label {
+          background-color: #f1f5f9;
+          color: #475569;
+          font-size: 9pt;
+          font-weight: bold;
+          padding: 5px 8px;
+          border: 1pt solid #cbd5e1;
+        }
+        .meta-val {
+          background-color: #ffffff;
+          color: #0f172a;
+          font-size: 10pt;
+          font-weight: bold;
+          padding: 5px 8px;
+          border: 1pt solid #cbd5e1;
+        }
+        .sec-banner {
+          background-color: #00a2e8;
+          color: #ffffff;
+          font-size: 11pt;
+          font-weight: bold;
+          text-align: left;
+          padding: 7px 10px;
+          border: 1pt solid #0087c2;
+          text-transform: uppercase;
+        }
+        .sec-badge {
+          font-size: 8.5pt;
+          font-weight: normal;
+          color: #e0f2fe;
+        }
+        .docket-label {
+          background-color: #f0f9ff;
+          color: #384759;
+          font-size: 8.5pt;
+          font-weight: bold;
+          text-transform: uppercase;
+          padding: 5px 8px;
+          border: 1pt solid #bde0fa;
+          vertical-align: middle;
+          word-break: break-word;
+        }
+        .docket-value {
+          background-color: #ffffff;
+          color: #141f2e;
+          font-family: 'Consolas', 'Segoe UI', monospace;
+          font-size: 9.5pt;
+          font-weight: bold;
+          padding: 6px 8px;
+          border: 1pt solid #bde0fa;
+          vertical-align: middle;
+          word-break: break-word;
+        }
+        .docket-empty {
+          background-color: #f8fafc;
+          border: 1pt solid #bde0fa;
+          text-align: center;
+          color: #cbd5e1;
+        }
+        .docket-na {
+          color: #94a3b8;
+          font-style: italic;
+          font-weight: normal;
+        }
+        .docket-uom {
+          font-size: 8pt;
+          color: #64748b;
+          font-weight: normal;
+          font-family: 'Segoe UI', Arial, sans-serif;
+          margin-left: 3px;
+        }
+        .spacer-row td {
+          border: none !important;
+          background-color: #ffffff !important;
+          height: 10px;
+        }
+      </style>
+    </head>
+    <body>
+      <table>
+        <colgroup>
+          <col style="width: 16.666%;">
+          <col style="width: 16.666%;">
+          <col style="width: 16.666%;">
+          <col style="width: 16.666%;">
+          <col style="width: 16.666%;">
+          <col style="width: 16.666%;">
+        </colgroup>
+        <tbody>
+          ${tableHtml}
+        </tbody>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob(["\uFEFF" + excelHtml], {
+    type: "application/vnd.ms-excel;charset=utf-8;",
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
-  link.setAttribute("download", filename);
+  link.setAttribute("download", `${baseFilename}.xls`);
   link.style.visibility = "hidden";
   document.body.appendChild(link);
   link.click();

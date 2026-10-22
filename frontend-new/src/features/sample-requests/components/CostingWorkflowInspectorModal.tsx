@@ -42,10 +42,10 @@ import { ScopeReferenceImagesGallery } from "@/features/sample-requests/componen
 import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
 import type { ProductSearchResult, SampleRequestItem } from "@/features/sample-requests/types";
 import { formatWorkflowAction } from "./workflowPresentation";
-import { RequestClosureControl } from "./common/RequestClosureControl";
+import { RequestClosedStamp } from "./common/RequestClosedWatermark";
 
 export type InspectorMode = "creative" | "costing" | "sampling";
-export type CostingTab = "output" | "specs" | "commercial" | "review";
+export type CostingTab = "scope" | "specs" | "output" | "commercial" | "review";
 
 export interface CostingWorkflowInspectorModalProps {
   record: RequestWorkflowRecord;
@@ -117,9 +117,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   onClose,
   onSaved,
 }) => {
-  const [activeTab, setActiveTab] = useState<CostingTab>(
-    mode === "costing" ? "output" : mode === "sampling" ? "review" : "specs"
-  );
+  const [activeTab, setActiveTab] = useState<CostingTab>("scope");
   const [outputPath, setOutputPath] = useState(record.costing_output_path || "");
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -141,29 +139,48 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   const readOnly = isReadOnlyTeamHead(user);
   const requestData = record.request_data || {};
 
+  const [localClosed, setLocalClosed] = useState(false);
+  const [closureData, setClosureData] = useState<any>(record.closure || null);
+
+  useEffect(() => {
+    const handleClosed = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+      if (
+        detail &&
+        (String(detail.requestId) === String(record.sample_request_id) ||
+         String(detail.requestId) === String(record.workflow_id))
+      ) {
+        setLocalClosed(true);
+        if (detail.closure) setClosureData(detail.closure);
+      }
+    };
+    window.addEventListener("app:request-closed", handleClosed);
+    return () => window.removeEventListener("app:request-closed", handleClosed);
+  }, [record.sample_request_id, record.workflow_id]);
+
   const isCreativeReview = record.current_stage === "creative";
   const isCostingWork = record.current_stage === "costing";
   const isSamplingReview = record.current_stage === "sampling_review";
-  const isClosed = record.current_stage === "done";
+  const isClosed = Boolean(
+    localClosed ||
+    record.is_closed ||
+    record.closure != null ||
+    closureData != null ||
+    record.current_stage === "done" ||
+    record.status === "Approved / Closed" ||
+    record.status === "Closed" ||
+    record.closed_at != null
+  );
   const isReturned = record.reviewer_status === "returned";
 
   const isGlobalAdmin = ["admin", "administrator"].includes(String(user?.role || "").toLowerCase());
   const isClaimedByMe = Boolean(record.is_claimed_by_me) || locallyClaimedRequestId === record.sample_request_id;
   const isClaimed = Boolean(record.is_claimed || record.claimed_by || isClaimedByMe);
-  const canClaimCosting = mode === "costing" && isCostingWork && !readOnly;
-  const canSubmitCosting = mode === "costing" && isCostingWork && !readOnly && (isClaimedByMe || isGlobalAdmin);
-  const canReview = (mode === "sampling" || isSamplingReview) && !readOnly;
-  const canReleaseToCosting = (mode === "creative" || isCreativeReview) && !readOnly;
-  const closureRequestId = record.workflow_type === "design" ? record.workflow_id : record.sample_request_id;
-  const canCloseWorkflowRequest = Boolean(
-    !readOnly && (
-      isGlobalAdmin ||
-      hasWorkflowTeam(user, "marketing") ||
-      (record.workflow_type === "costing" && (hasWorkflowTeam(user, "costing") || hasWorkflowTeam(user, "creative_studio") || hasWorkflowTeam(user, "samp"))) ||
-      (record.workflow_type === "sample" && hasWorkflowTeam(user, "samp")) ||
-      (record.workflow_type === "mockup" && (hasWorkflowTeam(user, "samp") || hasWorkflowTeam(user, "creative_studio")))
-    )
-  );
+  const canClaimCosting = !isClosed && mode === "costing" && isCostingWork && !readOnly;
+  const canSubmitCosting = !isClosed && mode === "costing" && isCostingWork && !readOnly && (isClaimedByMe || isGlobalAdmin);
+  const canReview = !isClosed && (mode === "sampling" || isSamplingReview) && !readOnly;
+  const canReleaseToCosting = !isClosed && (mode === "creative" || isCreativeReview) && !readOnly;
 
   const creativeDeadline = record.creative_due_at ? new Date(record.creative_due_at) : null;
   const creativeDeadlineLabel =
@@ -466,6 +483,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
         className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
+        {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
         {/* ── 1. TOP CONTROL PANEL WITH STEPPER ── */}
         <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)] px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
           {/* Left Action Buttons */}
@@ -495,13 +513,6 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
               )}
               <span className="font-mono">{copiedCode ? "Copied" : code}</span>
             </button>
-            {closureRequestId > 0 && ["design", "mockup", "sample", "costing"].includes(record.workflow_type) && (
-              <RequestClosureControl
-                requests={[{ type: record.workflow_type, id: closureRequestId }]}
-                canClose={canCloseWorkflowRequest}
-                onClosed={onSaved}
-              />
-            )}
             {mode === "costing" && isCostingWork && (
               <div role="status" aria-live="polite" className="ml-1 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-low)] px-2.5 py-1.5">
                 <span className="text-[11px] font-medium text-[var(--on-surface-muted)]">
@@ -509,11 +520,13 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     ? "Claimed by you"
                     : record.claimed_by
                       ? `Claimed by ${record.claimed_by}`
-                      : isClaimed
-                        ? "Claimed by another Costing member"
-                        : "Available to claim"}
+                      : isClosed
+                        ? "Request Closed"
+                        : isClaimed
+                          ? "Claimed by another Costing member"
+                          : "Available to claim"}
                 </span>
-                {canClaimCosting && (!isClaimed || isGlobalAdmin) && !isClaimedByMe && (
+                {!isClosed && canClaimCosting && (!isClaimed || isGlobalAdmin) && !isClaimedByMe && (
                   <button
                     type="button"
                     disabled={isClaiming || isSaving}
@@ -581,12 +594,14 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
           </div>
         </div>
 
+
+
         {/* ── 2. MAIN SPLIT VIEW (LEFT: DOCUMENT SHEET + RIGHT: TIME LOG CHATTER) ── */}
         <div className="flex-1 flex overflow-hidden">
           {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
             <div className={`mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-300 ${
-              activeTab === "specs" && specViewMode === "docket" ? "max-w-[98%]" : "max-w-5xl"
+              "max-w-6xl"
             }`}>
               {/* ── Dossier Header ── */}
               <div className="bg-[var(--surface-lowest)] border-b border-[var(--border-subtle)]">
@@ -977,15 +992,67 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                 )}
 
                 {/* ════════════════════════════════════════════════════════════════════
-                     TAB 2: TECHNICAL BOM & SPECIFICATIONS DOCKET
+                     TAB 1: SPECIFICATIONS & SCOPE
                    ════════════════════════════════════════════════════════════════════ */}
-                {activeTab === "specs" && (
-                  <div className="space-y-4">
-                    <ScopeReferenceImagesGallery
-                      images={scopeReferenceImages}
-                      scopes={["costing"]}
-                      onPreview={(url) => window.open(url, "_blank", "noopener,noreferrer")}
-                    />
+                {activeTab === "scope" && (
+                  <div className="space-y-6">
+                    {/* ── Section 1: Specification & Scope ── */}
+                    <section className="space-y-3">
+                      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+                        <FileText className="w-4 h-4 text-[var(--accent-primary)]" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
+                          1. Specification & Scope
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Customer Account</span>
+                          <p className="text-xs font-semibold text-[var(--on-surface)]">{record.customer || "Commercial Account"}</p>
+                          {requestData.customer_product_code && (
+                            <p className="text-[11px] text-[var(--on-surface-muted)]">SKU: {requestData.customer_product_code}</p>
+                          )}
+                        </div>
+
+                        <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Target Quotation Due</span>
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--on-surface)]">
+                            <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>{formatDate(record.due_date || requestData.due_date) || "Immediate"}</span>
+                          </div>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Target Substrate / Material</span>
+                          <p className="text-xs font-mono font-bold text-[var(--on-surface)]">{record.material_code || requestData.material_code || "Custom Substrate"}</p>
+                        </div>
+                      </div>
+
+                      <ScopeReferenceImagesGallery
+                        images={scopeReferenceImages}
+                        scopes={["costing"]}
+                        onPreview={(url) => window.open(url, "_blank", "noopener,noreferrer")}
+                      />
+                    </section>
+
+                                        </div>
+                  )}
+
+                  {/* ═════════ TAB 2: PRODUCT CLASSES & SPECIFICATIONS ═════════ */}
+                  {activeTab === "specs" && (
+                    <div className="space-y-4">
+                      {/* ── Section 2: Product Classes & Specifications ── */}
+                    <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2 pt-2">
+                      <Layers className="w-4 h-4 text-teal-600" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
+                        2. Product Classes & Specifications
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                        {specViewMode === "configured"
+                          ? `${configuredCount} Configured`
+                          : `${productSpecifications.length} Specs`}
+                      </span>
+                    </div>
                     {mode === "creative" && (
                       <div className="rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3 text-xs text-violet-950 dark:border-violet-900/50 dark:bg-violet-950/20 dark:text-violet-100">
                         Review each product class and characteristic. You can edit any value here;
@@ -1097,9 +1164,9 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                               }
                             }}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-300/60 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer"
-                            title="Export Docket Specifications to CSV (Excel Ready)"
+                            title="Export Structured Docket to Excel / CSV (UI Styled)"
                           >
-                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> CSV
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Excel / CSV
                           </button>
                           <button
                             type="button"
@@ -1145,14 +1212,12 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                       </div>
                     ) : specViewMode === "docket" && mode !== "creative" ? (
                       /* Official Docket View */
-                      <div className="overflow-x-auto rounded-xl border border-slate-300 bg-slate-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
-                        <div className="min-w-[960px]">
-                          <ProductDocketView
-                            product={costingDocketProduct}
-                            classGroups={specificationGroups}
-                            containerId={`costing-docket-${record.sample_request_id}`}
-                          />
-                        </div>
+                      <div className="w-full max-w-full overflow-hidden">
+                        <ProductDocketView
+                          product={costingDocketProduct}
+                          classGroups={specificationGroups}
+                          containerId={`costing-docket-${record.sample_request_id}`}
+                        />
                       </div>
                     ) : (
                       /* Clean Structured Class Cards & Table View (All Specs or Configured Only) */

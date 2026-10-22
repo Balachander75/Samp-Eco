@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.repositories.sample_request_repo import SampleRequestRepository
+from app.models.request_closure import RequestClosure
 from app.models.sample_request import (
     CreateSampleRequest,
     ProductCharacteristic,
@@ -147,6 +148,46 @@ class SampleRequestService:
                 elif norm_char == "DESIGNREMARKS":
                     remarks_val = d.value
 
+        closure_record = (
+            self.db.query(RequestClosure)
+            .filter(
+                RequestClosure.request_id == r.id,
+                RequestClosure.request_type.in_(("sample", "mockup", "costing")),
+            )
+            .order_by(RequestClosure.id.desc())
+            .first()
+        )
+        is_closed = (
+            closure_record is not None
+            or str(r.status or "").strip().lower() == "closed"
+            or bool(mockup_workflow_state.get("is_closed"))
+            or str(mockup_workflow_state.get("status") or "").lower() == "approved / closed"
+            or str(mockup_workflow_state.get("stage") or "").lower() == "done"
+        )
+        closure_dict = {
+            "id": closure_record.id,
+            "request_type": closure_record.request_type,
+            "request_id": closure_record.request_id,
+            "request_code": closure_record.request_code,
+            "closed_by_user_id": closure_record.closed_by_user_id,
+            "closed_by": closure_record.closed_by,
+            "closed_by_team": closure_record.closed_by_team,
+            "reason": closure_record.reason,
+            "closed_at": closure_record.closed_at.isoformat() if closure_record.closed_at else None,
+        } if closure_record else (
+            {
+                "closed_by": "System / Closed",
+                "closed_by_team": None,
+                "closed_at": r.updated_at.isoformat() if r.updated_at else None,
+                "reason": "Request marked as closed",
+            } if is_closed else None
+        )
+        if is_closed and isinstance(mockup_workflow_state, dict):
+            mockup_workflow_state = dict(mockup_workflow_state)
+            mockup_workflow_state["is_closed"] = True
+            if closure_dict:
+                mockup_workflow_state["closure"] = closure_dict
+
         return {
             "id": r.id,
             "sr_number": r.sr_number if "sample" in request_types else None,
@@ -198,6 +239,8 @@ class SampleRequestService:
             "target_artwork_date_creative": r.target_artwork_date_creative,
             "target_artwork_date_studio": r.target_artwork_date_studio,
             "status": r.status or "Draft (Pre-SMT)",
+            "is_closed": is_closed,
+            "closure": closure_dict,
             "creation_mode": r.creation_mode or "material_code",
             "request_types": request_types,
             "mockup_workflow_state": mockup_workflow_state,
@@ -585,22 +628,34 @@ class SampleRequestService:
             except (ValueError, TypeError):
                 sample_req_date = None
 
+        incoming_material_code = str(payload.get("material_code") or payload.get("materialCode") or "").strip()
+        incoming_source_code = str(payload.get("source_sample_code") or payload.get("sourceSampleCode") or "").strip()
+        creation_mode_val = str(payload.get("creation_mode") or payload.get("creationMode") or "material_code").strip().lower()
+        is_explicitly_new = creation_mode_val == "new"
+
+        final_material_code = source_request_code or incoming_material_code or ""
+        final_source_sample_code = (
+            incoming_source_code
+            or (incoming_material_code if not is_explicitly_new and not incoming_material_code.upper().startswith(("TMP-", "NEW-")) else None)
+            or None
+        )
+
         req = CreateSampleRequest(
             sr_number=None,
             client_draft_key=(str(payload.get("client_draft_key") or "").strip() or None),
             year=item_year,
             program_year=prog_year,
             program_name=payload.get("program_name") or None,
-            product_description=payload.get("product_description") or "",
+            product_description=str(payload.get("product_description") or payload.get("productDescription") or "").strip(),
             customer=payload.get("customer") or "",
             target_plant=target_plant,
             date_request_created=created_date_str,
             created_by=payload.get("created_by") or "",
             created_by_user_id=payload.get("created_by_user_id"),
-            material_code=source_request_code if "sample" in request_types else "",
+            material_code=final_material_code if "sample" in request_types else "",
             barcode=payload.get("barcode") or None,
             customer_product_code=payload.get("customer_product_code") or None,
-            source_sample_code=payload.get("source_sample_code") or None,
+            source_sample_code=final_source_sample_code,
             sample_required_date=sample_req_date,
             product_type=payload.get("product_type") or None,
             product_type_navneet=payload.get("product_type_navneet") or None,
@@ -645,16 +700,29 @@ class SampleRequestService:
             updated_at=datetime.now(timezone.utc),
         )
 
+        is_explicitly_new = str(payload.get("creation_mode") or payload.get("creationMode") or req.creation_mode or "").strip().lower() == "new"
         source_id = payload.get("source_sample_request_id") or payload.get("sourceSampleRequestId")
-        if not source_id and payload.get("source_sample_code"):
-            src_code = str(payload.get("source_sample_code")).strip()
-            src_match = self.repo.get_by_sr_number(src_code)
-            if not src_match:
-                matches = self.repo.search_materials(src_code, limit=1)
-                if matches:
-                    src_match = matches[0]
-            if src_match:
-                source_id = src_match.id
+        if not source_id and not is_explicitly_new:
+            src_code = str(
+                payload.get("source_sample_code")
+                or payload.get("sourceSampleCode")
+                or payload.get("material_code")
+                or payload.get("materialCode")
+                or payload.get("selected_material_code")
+                or payload.get("selectedMaterialCode")
+                or req.source_sample_code
+                or ""
+            ).strip()
+            if src_code and not src_code.upper().startswith(("TMP-", "NEW-")):
+                src_match = self.repo.get_by_sr_number(src_code)
+                if not src_match:
+                    matches = self.repo.search_materials(src_code, limit=1)
+                    if matches:
+                        src_match = matches[0]
+                if src_match:
+                    source_id = src_match.id
+                    if not req.source_sample_code:
+                        req.source_sample_code = getattr(src_match, "sr_number", None) or getattr(src_match, "material_code", None) or src_code
 
         if source_id:
             try:
@@ -833,6 +901,9 @@ class SampleRequestService:
 
     def create(self, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
         """Create single sample request entity."""
+        desc = str(payload.get("product_description") or payload.get("productDescription") or "").strip()
+        if not desc:
+            raise ValueError("Product description cannot be empty")
         try:
             draft_key = str(payload.get("client_draft_key") or "").strip() or None
             existing = self._find_by_draft_key(draft_key)
@@ -884,6 +955,10 @@ class SampleRequestService:
         """Atomically create each staged product payload supplied by the batch endpoint."""
         if not items:
             return []
+
+        for item in items:
+            if not str(item.get("product_description") or item.get("productDescription") or "").strip():
+                raise ValueError("Product description cannot be empty")
 
         for attempt in range(2):
             created_records = []

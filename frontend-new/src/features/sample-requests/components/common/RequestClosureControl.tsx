@@ -126,14 +126,14 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isDialogOpen, isSaving]);
 
-  if (!targets.length) return null;
+  if (!targets.length || !canClose) return null;
 
   const closedCount = targets.filter((target) => Boolean(closures[target.key])).length;
   const areAllClosed = closedCount === targets.length;
   const selectedTarget = targets.find((target) => target.key === selectedKey) || targets[0];
   const selectedClosure = selectedTarget ? closures[selectedTarget.key] : null;
   const statusError = selectedTarget ? statusErrors[selectedTarget.key] || null : null;
-  const showAction = canClose || closedCount > 0;
+  const showAction = canClose;
 
   const handleCloseRequest = async () => {
     if (!selectedTarget || selectedClosure || isSaving) return;
@@ -146,6 +146,17 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
     try {
       const closure = await closeRequestApi(selectedTarget.type, selectedTarget.id, reason.trim());
       setClosures((current) => ({ ...current, [selectedTarget.key]: closure }));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("app:request-closed", {
+            detail: {
+              requestType: selectedTarget.type,
+              requestId: selectedTarget.id,
+              closure,
+            },
+          })
+        );
+      }
       setReason("");
       await onClosed?.();
     } catch (error) {

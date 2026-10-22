@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle2, AlertCircle, X, Send, Plus, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertCircle, X } from "lucide-react";
 import { UserProfile } from "@/features/auth";
 import {
   searchProductsByMaterialApi,
@@ -8,6 +8,7 @@ import {
   fetchBindingHierarchyApi,
   fetchProductCategoriesApi,
   updateSampleRequestApi,
+  deleteSampleRequestApi,
   releaseSampleRequestIdsApi,
   fetchProductDetailsApi,
 } from "@/infrastructure/api";
@@ -197,7 +198,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
   }, [stagedProducts, stagedProductsStorageKey]);
 
   // Add Product Modal & Flow State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(Boolean(designMockupHandoff || feasibilityHandoff));
+  const isAddProductPath = typeof window !== "undefined" && window.location.pathname.includes("/sample-requests/add-product");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(Boolean(designMockupHandoff || feasibilityHandoff || isAddProductPath));
   const [addModalStep, setAddModalStep] = useState<
     "scopes" | "design_brief" | "sampling_config" | "product_search"
   >(designMockupHandoff || feasibilityHandoff ? "sampling_config" : "scopes");
@@ -1190,7 +1192,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     const sampleSourceId = isNewProduct
       ? undefined
       : selectedDbSample?.id || editingProduct?.sourceSampleRequestId || editingProduct?.catalogMetadata?.sourceProductId || editingProduct?.samplingMetadata?.sourceSampleId;
-    const isBrandNewSample = selectedScopes.includes("sample") && !sampleSourceId;
+    const isBrandNewSample = selectedScopes.includes("sample") && isNewProduct;
     const stagedCustomDetails = isBrandNewSample
       ? newProductCustomDetails.map((detail) => {
           const className = detail.className || detail.class_name || "Product";
@@ -1511,7 +1513,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       });
   };
 
-  const handleRemoveStagedItem = (id: string) => {
+  const handleRemoveStagedItem = async (id: string) => {
     const item = stagedProducts.find((staged) => staged.id === id);
     if (feasibilityHandoff && item?.savedRequestId) {
       showToast("This feasibility product is already prepared for release. Update its details and retry Release instead of removing it.", "error");
@@ -1521,30 +1523,43 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     setStagedProducts(nextProducts);
     stagedProductsRef.current = nextProducts;
     try {
-      sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
+      if (nextProducts.length === 0) {
+        sessionStorage.removeItem(stagedProductsStorageKey);
+        sessionStorage.removeItem(programContextStorageKey);
+      } else {
+        sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
+      }
     } catch {
       // ignore
     }
-    showToast(
-      item?.savedRequestId
-        ? `Removed "${item.productDescription || "Product"}" from staging. Its saved request remains available in Drafts.`
-        : `Removed "${item?.productDescription || "Product"}" from staging.`
-    );
+    if (item?.savedRequestId) {
+      try {
+        await deleteSampleRequestApi(item.savedRequestId);
+      } catch (err) {
+        console.error("Failed to delete draft on remove:", err);
+      }
+    }
+    showToast(`Removed "${item?.productDescription || "Product"}" from staging.`);
   };
 
-  const handleClearStaging = () => {
+  const handleClearStaging = async () => {
     if (feasibilityHandoff && stagedProducts.some((item) => item.savedRequestId)) {
       showToast("This feasibility product is already prepared for release. Update its details and retry Release instead of clearing it.", "error");
       return;
     }
+    const savedItems = stagedProducts.filter((item) => item.savedRequestId);
     setStagedProducts([]);
     stagedProductsRef.current = [];
     try {
       sessionStorage.removeItem(stagedProductsStorageKey);
+      sessionStorage.removeItem(programContextStorageKey);
     } catch {
       // ignore
     }
-    showToast("Cleared staging. Any saved request drafts remain available in Drafts.");
+    if (savedItems.length > 0) {
+      await Promise.allSettled(savedItems.map((item) => deleteSampleRequestApi(item.savedRequestId!)));
+    }
+    showToast("Cleared staging and removed draft records.");
   };
 
   const handleDuplicateStagedItem = async (item: StagedProductItem) => {
@@ -1677,10 +1692,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       });
       return;
     }
-    if (designMockupHandoff) {
-      sessionStorage.removeItem(stagedProductsStorageKey);
-      sessionStorage.removeItem(programContextStorageKey);
-    }
+    sessionStorage.removeItem(stagedProductsStorageKey);
+    sessionStorage.removeItem(programContextStorageKey);
     navigate("/sample-requests");
   };
 
@@ -1800,11 +1813,15 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           && item.scopes.includes("mockup")
           && item.mockupMetadata?.designNeeded === false;
         const isSamplingOnly = item.scopes.length === 1 && item.scopes.includes("sample");
-        const hasSamplingCreativeChanges = Boolean(item.hasCreativeChanges || item.creativeCharacteristicsCleared || item.creativePendingCharacteristicKeys?.length || item.variantNumber);
+        const sampleRoute = getAutomaticSampleRoute(item);
         const status = isDirectStudioMockup
           ? "Studio"
           : isSamplingOnly
-            ? hasSamplingCreativeChanges ? "Creative" : "Released to Plant"
+            ? sampleRoute.isResample
+              ? "Released to Plant"
+              : sampleRoute.creativeChangesRequired
+                ? "Creative"
+                : "Sampling Review (PMT)"
             : "Creative";
         itemsByStatus.set(status, [...(itemsByStatus.get(status) || []), item]);
       }
@@ -1887,11 +1904,6 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     }
   };
 
-  const stagedDesignCount = stagedProducts.filter((product) => product.scopes.includes("design")).length;
-  const stagedMockupCount = stagedProducts.filter((product) => product.scopes.includes("mockup")).length;
-  const stagedSamplingCount = stagedProducts.filter((product) => product.scopes.includes("sample")).length;
-  const stagedCostingCount = stagedProducts.filter((product) => product.scopes.includes("costing")).length;
-
   return (
     <div className="flex-1 flex min-h-0 flex-col overflow-y-auto bg-[var(--surface-base)] text-[var(--on-surface)] font-sans select-text">
       {/* Main Container */}
@@ -1920,85 +1932,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           onUpdateProduct={handleUpdateStagedProduct}
           onDuplicateProduct={handleDuplicateStagedItem}
           onRemoveProduct={handleRemoveStagedItem}
-          onReleaseRequest={handleReleaseRequest}
-          isReleasing={isReleasing}
         />
-
-        {/* 3. Sticky Bottom Action Dock (Guarantees Release button is always prominently visible) */}
-        {stagedProducts.length > 0 && (
-          <div className="sticky bottom-4 z-30 mt-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)]/95 p-3.5 sm:p-4 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-md transition-all animate-smooth-modal">
-            <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" />
-                  <span className="text-xs font-bold text-[var(--on-surface)]">
-                    Ready to Release
-                  </span>
-                </div>
-                <span className="text-[var(--border-strong)]">|</span>
-                <span className="font-mono text-xs font-bold text-[var(--accent-primary)]">
-                  {stagedProducts.length} Product{stagedProducts.length !== 1 ? "s" : ""} Staged
-                </span>
-                <div className="hidden sm:flex items-center gap-1.5 pl-2 border-l border-[var(--border-subtle)] text-[10.5px] font-mono">
-                  {stagedSamplingCount > 0 && (
-                    <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 font-semibold border border-teal-200 dark:border-teal-800/50">
-                      {stagedSamplingCount} Sample
-                    </span>
-                  )}
-                  {stagedMockupCount > 0 && (
-                    <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800/50">
-                      {stagedMockupCount} Mockup
-                    </span>
-                  )}
-                  {stagedDesignCount > 0 && (
-                    <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800/50">
-                      {stagedDesignCount} Design
-                    </span>
-                  )}
-                  {stagedCostingCount > 0 && (
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-800/50">
-                      {stagedCostingCount} Costing
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5 sm:gap-3 ml-auto">
-                <button
-                  type="button"
-                  onClick={handleOpenAddProduct}
-                  disabled={isSubmittingAll || isSavingDetails || isReleasing}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] hover:bg-[var(--surface-lowest)] px-3 text-xs font-semibold text-[var(--on-surface)] transition-all cursor-pointer shadow-2xs active:scale-95"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Add Another Product</span>
-                  <span className="sm:hidden">Add</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleReleaseRequest}
-                  disabled={isReleasing || isSubmittingAll || isSavingDetails || stagedProducts.length === 0}
-                  data-action="release"
-                  data-keep-color="true"
-                  className="release-cta-button inline-flex h-10 items-center gap-2 rounded-xl px-5 sm:px-6 text-xs font-bold uppercase tracking-wider shadow-lg shadow-emerald-600/30 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                >
-                  {isReleasing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin text-white" />
-                      <span>Releasing to Teams...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 stroke-[2.5]" />
-                      <span>Release Request ({stagedProducts.length} {stagedProducts.length === 1 ? "Item" : "Items"})</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* 3. Add Product Modal Flow (Steps 1, 2, 3) */}

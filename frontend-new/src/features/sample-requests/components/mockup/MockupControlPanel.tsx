@@ -9,6 +9,7 @@ import {
   ChevronRight,
   AlertCircle,
   Clock,
+  CircleSlash,
 } from "lucide-react";
 
 export interface MockupControlPanelProps {
@@ -58,6 +59,14 @@ export const MockupControlPanel: React.FC<MockupControlPanelProps> = ({
     String(activeRequest.status || "").toLowerCase().includes("approved");
   const isMarketingReviewReady =
     ws.stage === "awaiting_marketing_acceptance" || ws.stage === "awaiting_marketing_direction";
+  const isClosed = Boolean(
+    activeRequest.is_closed ||
+    ws.is_closed ||
+    String(activeRequest.status || "").toLowerCase() === "closed" ||
+    String(activeRequest.status || "").toLowerCase() === "approved / closed" ||
+    activeRequest.closure != null ||
+    ws.stage === "done"
+  );
 
   const steps = [
     {
@@ -148,6 +157,14 @@ export const MockupControlPanel: React.FC<MockupControlPanelProps> = ({
   };
 
   const getRoleStatusIndicator = () => {
+    if (isClosed) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
+          <CircleSlash className="w-3 h-3" />
+          Request Closed
+        </span>
+      );
+    }
     if (role === "marketing") {
       if (isMarketingAccepted) {
         return (
@@ -296,11 +313,13 @@ export const MockupControlPanel: React.FC<MockupControlPanelProps> = ({
           <span>{deskBadge.label}</span>
         </span>
 
-        <RequestClosureControl
-          requests={closureRequests}
-          canClose={canCloseRequest}
-          onClosed={onRequestClosed}
-        />
+        {role === "marketing" && (
+          <RequestClosureControl
+            requests={closureRequests}
+            canClose={canCloseRequest}
+            onClosed={onRequestClosed}
+          />
+        )}
 
         {/* Modal Close [X] */}
         <button

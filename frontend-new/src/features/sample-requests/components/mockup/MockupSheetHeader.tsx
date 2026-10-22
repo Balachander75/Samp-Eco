@@ -125,7 +125,11 @@ export const MockupSheetHeader: React.FC<MockupSheetHeaderProps> = ({
           )}
 
           {/* Reviewer / Claim Pill */}
-          {isClaimed && claimedBy ? (
+          {(activeRequest.is_closed || activeRequest.closure != null || String(activeRequest.status || "").toLowerCase().includes("closed")) ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs shadow-2xs font-bold">
+              <span>Request Closed</span>
+            </div>
+          ) : isClaimed && claimedBy ? (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface)] shadow-2xs">
               <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">Assigned:</span>
               <span className="font-bold text-xs truncate max-w-[150px]">{claimedBy}</span>
@@ -146,7 +150,7 @@ export const MockupSheetHeader: React.FC<MockupSheetHeaderProps> = ({
           ) : null}
 
           {/* Status Pill */}
-          <StatusPill status={activeRequest.status || "Brief Intake"} size="md" />
+          <StatusPill status={(activeRequest.is_closed || activeRequest.closure != null || String(activeRequest.status || "").toLowerCase().includes("closed")) ? "Closed" : (activeRequest.status || "Brief Intake")} size="md" />
         </div>
       </div>
     </div>

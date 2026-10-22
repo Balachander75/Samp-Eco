@@ -202,6 +202,9 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
 
       const designState = String(r.designRequestStatus || r.status || "").toLowerCase();
       if (
+        r.is_closed ||
+        r.closure != null ||
+        designState.includes("closed") ||
         r.marketingDesignDecision === "awaiting_marketing_review" ||
         r.marketingDesignDecision === "accepted" ||
         designState.includes("approved / closed")
@@ -230,6 +233,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
         return false;
       }
       const s = String(r.status || "").toLowerCase();
+      if (r.is_closed || r.closure != null || s.includes("closed") || s.includes("approved / closed")) return false;
       // Exclude unreleased drafts
       if (s.includes("draft") || s.includes("smt") || s.includes("pending allocation")) return false;
 

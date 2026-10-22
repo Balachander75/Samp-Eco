@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Copy, Eye, Layers, Plus, Send, X } from "lucide-react";
+import { Copy, Eye, Layers, Plus, X } from "lucide-react";
 import { OperationalDatePicker } from "@/components/erp";
 import { StagedProductItem, DELIVERABLES } from "../../types/staging";
 
@@ -246,8 +246,6 @@ export interface StagingProductListProps {
   onUpdateProduct?: (item: StagedProductItem, updates: Partial<StagedProductItem>) => Promise<boolean | void> | boolean | void;
   onDuplicateProduct: (item: StagedProductItem) => void;
   onRemoveProduct: (id: string) => void;
-  onReleaseRequest?: () => void;
-  isReleasing?: boolean;
 }
 
 export const StagingProductList: React.FC<StagingProductListProps> = ({
@@ -258,8 +256,6 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
   onUpdateProduct,
   onDuplicateProduct,
   onRemoveProduct,
-  onReleaseRequest,
-  isReleasing = false,
 }) => {
   const editable = Boolean(onUpdateProduct);
   const updateField = async (item: StagedProductItem, field: EditableField, value: string) => {
@@ -396,20 +392,6 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
               ? "Release starts the selected workflows for this feasibility"
               : "Direct Material & Scope Allocation · Auto-Persisted"}
           </span>
-          {onReleaseRequest && (
-            <button
-              type="button"
-              onClick={onReleaseRequest}
-              disabled={isReleasing || stagedProducts.length === 0}
-              data-action="release"
-              data-keep-color="true"
-              className="release-cta-button inline-flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold text-white shadow-xs cursor-pointer active:scale-95 disabled:cursor-not-allowed"
-              title="Release staged products to operational team queues"
-            >
-              <Send className="h-3.5 w-3.5 stroke-[2.5]" />
-              <span>{isReleasing ? "Releasing…" : `Release (${stagedProducts.length})`}</span>
-            </button>
-          )}
         </div>
       </div>
 

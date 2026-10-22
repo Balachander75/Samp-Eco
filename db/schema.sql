@@ -110,7 +110,8 @@ ALTER SEQUENCE public.costing_workflow_logs_id_seq OWNED BY public.costing_workf
 CREATE TABLE public.costing_workflows (
     id integer NOT NULL,
     sample_request_id integer NOT NULL,
-    sr_number character varying(50) NOT NULL,
+    request_code character varying(50),
+    sr_number character varying(50),
     status character varying(64) DEFAULT 'In Progress'::character varying NOT NULL,
     current_stage character varying(32) DEFAULT 'creative'::character varying NOT NULL,
     request_data jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -121,6 +122,9 @@ CREATE TABLE public.costing_workflows (
     reviewer_user_id integer,
     reviewer_name character varying(255),
     reviewed_at timestamp with time zone,
+    claimed_by_user_id integer,
+    claimed_by character varying(255),
+    claimed_at timestamp with time zone,
     created_by_user_id integer,
     started_at timestamp with time zone DEFAULT now() NOT NULL,
     closed_at timestamp with time zone,
@@ -295,6 +299,7 @@ ALTER SEQUENCE public.customers_id_seq OWNED BY public.customers.id;
 
 CREATE TABLE public.design_requests (
     id integer NOT NULL,
+    sample_request_id integer,
     request_code character varying(50) NOT NULL,
     sr_number character varying(50),
     customer_name character varying(150) NOT NULL,
@@ -573,7 +578,8 @@ ALTER SEQUENCE public.mockup_workflow_logs_id_seq OWNED BY public.mockup_workflo
 CREATE TABLE public.mockup_workflows (
     id integer NOT NULL,
     sample_request_id integer NOT NULL,
-    sr_number character varying(50) NOT NULL,
+    request_code character varying(50),
+    sr_number character varying(50),
     status character varying(64) DEFAULT 'In Progress'::character varying NOT NULL,
     current_stage character varying(32) DEFAULT 'creative'::character varying NOT NULL,
     workflow_data jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -1023,6 +1029,7 @@ CREATE TABLE public.users (
     is_team_head boolean NOT NULL,
     plant_code character varying(50),
     theme_id character varying(20) DEFAULT 'emerald'::character varying NOT NULL,
+    is_costing_admin boolean DEFAULT false NOT NULL,
     is_active boolean NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone,
@@ -1477,6 +1484,20 @@ CREATE INDEX ix_costing_workflows_status_updated ON public.costing_workflows USI
 
 
 --
+-- Name: ix_costing_workflows_request_code; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ix_costing_workflows_request_code ON public.costing_workflows USING btree (request_code) WHERE (request_code IS NOT NULL);
+
+
+--
+-- Name: ix_costing_workflows_claimed_by_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_costing_workflows_claimed_by_user_id ON public.costing_workflows USING btree (claimed_by_user_id);
+
+
+--
 -- Name: ix_create_sample_requests_client_draft_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1778,6 +1799,13 @@ CREATE INDEX ix_design_requests_year_id ON public.design_requests USING btree (p
 
 
 --
+-- Name: ix_design_requests_sample_request_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_design_requests_sample_request_id ON public.design_requests USING btree (sample_request_id);
+
+
+--
 -- Name: ix_feasibility_activity_request_code_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1999,6 +2027,13 @@ CREATE INDEX ix_mockup_workflows_stage_updated ON public.mockup_workflows USING 
 --
 
 CREATE INDEX ix_mockup_workflows_status_updated ON public.mockup_workflows USING btree (status, updated_at);
+
+
+--
+-- Name: ix_mockup_workflows_request_code; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ix_mockup_workflows_request_code ON public.mockup_workflows USING btree (request_code) WHERE (request_code IS NOT NULL);
 
 
 --
@@ -2539,6 +2574,14 @@ ALTER TABLE ONLY public.create_sample_requests
 
 ALTER TABLE ONLY public.design_requests
     ADD CONSTRAINT design_requests_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: design_requests fk_design_requests_sample_request; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.design_requests
+    ADD CONSTRAINT fk_design_requests_sample_request FOREIGN KEY (sample_request_id) REFERENCES public.create_sample_requests(id) ON DELETE SET NULL;
 
 
 --

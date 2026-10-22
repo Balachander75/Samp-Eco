@@ -5,7 +5,7 @@ and /api/auth/audit-logs with full production-level JWT auth, sliding-window
 brute-force rate limiting, refresh token rotation, and security telemetry.
 """
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional, Literal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -74,8 +74,8 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 
 class LoginResponse(BaseModel):
@@ -126,8 +126,8 @@ class AuditLogOut(BaseModel):
     failure_reason: Optional[str] = None
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 
 class ErrorDetail(BaseModel):

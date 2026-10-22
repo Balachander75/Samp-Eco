@@ -72,7 +72,8 @@ export async function autoSaveStagedProductsToDraft(
   programContext?: ProgramContextData | null,
   user?: UserProfile | null
 ): Promise<AutoSaveResult> {
-  if (!items || items.length === 0) {
+  const validItems = (items || []).filter((item) => Boolean(item.productDescription && item.productDescription.trim()));
+  if (validItems.length === 0) {
     return { success: false, count: 0, customer: "", programName: "" };
   }
 
@@ -98,7 +99,7 @@ export async function autoSaveStagedProductsToDraft(
         target_plant: targetPlant,
         created_by: createdBy,
         date_request_created: dateStr,
-        items: items.map((prod) => ({
+        items: validItems.map((prod) => ({
           product_description: prod.productDescription,
           material_code: prod.materialCode,
           source_request_code: prod.sourceRequestCode || null,
@@ -112,7 +113,7 @@ export async function autoSaveStagedProductsToDraft(
             prod.samplingMetadata?.sourceSrNumber ||
             prod.samplingMetadata?.selectedMaterialCode ||
             prod.catalogMetadata?.sourceMaterialCode ||
-            null,
+            (prod.creationMode !== "new" && prod.materialCode && !prod.materialCode.startsWith("TMP-") && !prod.materialCode.startsWith("NEW-") ? prod.materialCode : null),
           creation_mode:
             prod.creationMode ||
             (prod.samplingMetadata?.searchMode === "binding" ? "binding" : "material_code"),
@@ -226,7 +227,7 @@ export async function autoSaveStagedProductsToDraft(
         try {
           const data = await res.json();
           const resultsList = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : null;
-          if (resultsList && resultsList.length === items.length) {
+          if (resultsList && resultsList.length === validItems.length) {
             resultsList.forEach((saved: any, index: number) => {
               const id = saved?.id;
               const sr = saved?.sr_number || saved?.srNumber;
@@ -236,7 +237,7 @@ export async function autoSaveStagedProductsToDraft(
                   firstSr = sr;
                 }
                 savedIds.push(id);
-                if (items[index]) {
+                if (validItems[index]) {
                   items[index].savedRequestId = id;
                   items[index].savedSrNumber = sr;
                   items[index].isDraftSaved = true;
@@ -247,13 +248,13 @@ export async function autoSaveStagedProductsToDraft(
         } catch {
           // ignore
         }
-        if (firstId !== undefined && savedIds.length === items.length && items.every((item) => item.savedRequestId !== undefined)) {
+        if (firstId !== undefined && savedIds.length === validItems.length && validItems.every((item) => item.savedRequestId !== undefined)) {
           try {
-            await linkStagedFeasibilityRequest(items, programContext);
+            await linkStagedFeasibilityRequest(validItems, programContext);
           } catch (err) {
             return {
               success: false,
-              count: items.length,
+              count: validItems.length,
               customer,
               programName,
               requestId: firstId,
@@ -262,7 +263,7 @@ export async function autoSaveStagedProductsToDraft(
               error: `Draft saved, but it could not be linked to feasibility: ${err instanceof Error ? err.message : "Please retry."}`,
             };
           }
-          return { success: true, count: items.length, customer, programName, requestId: firstId, srNumber: firstSr, savedIds };
+          return { success: true, count: validItems.length, customer, programName, requestId: firstId, srNumber: firstSr, savedIds };
         }
       } else if (res.status >= 400 && res.status < 500 && res.status !== 404 && res.status !== 405) {
         let message = "The draft details were rejected. Check the required fields and try again.";
@@ -285,7 +286,7 @@ export async function autoSaveStagedProductsToDraft(
   let firstSavedId: string | number | undefined = programContext?.parentRequestId;
   let firstSavedSr: string | undefined = programContext?.parentSrNumber;
 
-  for (const [index, prod] of items.entries()) {
+  for (const [index, prod] of validItems.entries()) {
     const payload: CreateSampleRequestForm = {
       customer,
       programName,
@@ -324,9 +325,11 @@ export async function autoSaveStagedProductsToDraft(
       numberOfDesigns: prod.designMetadata?.numberOfDesigns || 1,
       designRemarks: prod.designMetadata?.remarks || undefined,
       sourceSampleCode:
+        prod.sourceSampleCode ||
         prod.samplingMetadata?.sourceSrNumber ||
         prod.samplingMetadata?.selectedMaterialCode ||
-        prod.catalogMetadata?.sourceMaterialCode,
+        prod.catalogMetadata?.sourceMaterialCode ||
+        (prod.creationMode !== "new" && prod.materialCode && !prod.materialCode.startsWith("TMP-") && !prod.materialCode.startsWith("NEW-") ? prod.materialCode : undefined),
       sourceSampleRequestId:
         prod.sourceSampleRequestId || prod.catalogMetadata?.sourceProductId || prod.samplingMetadata?.sourceSampleId,
       requestTypeSelectedAt: prod.requestTypeTimestamps,
@@ -422,11 +425,11 @@ export async function autoSaveStagedProductsToDraft(
     }
   }
 
-  const savedIds = items.map((i) => i.savedRequestId).filter((id): id is string | number => id !== undefined && id !== null);
+  const savedIds = validItems.map((i) => i.savedRequestId).filter((id): id is string | number => id !== undefined && id !== null);
 
-  if (savedCount === items.length) {
+  if (savedCount === validItems.length) {
     try {
-      await linkStagedFeasibilityRequest(items, programContext);
+      await linkStagedFeasibilityRequest(validItems, programContext);
     } catch (err) {
       return {
         success: false,
@@ -442,13 +445,13 @@ export async function autoSaveStagedProductsToDraft(
   }
 
   return {
-    success: savedCount === items.length,
+    success: savedCount === validItems.length,
     count: savedCount,
     customer,
     programName,
     requestId: firstSavedId,
     srNumber: firstSavedSr,
     savedIds,
-    error: savedCount === items.length ? undefined : `Saved ${savedCount} of ${items.length} products. Your staged data is still available; retry to finish saving the rest.`,
+    error: savedCount === validItems.length ? undefined : `Saved ${savedCount} of ${validItems.length} products. Your staged data is still available; retry to finish saving the rest.`,
   };
 }
