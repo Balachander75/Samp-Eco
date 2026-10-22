@@ -28,11 +28,11 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/samp_enterprise_db
-      APP_ENV: production
+      APP_ENV: development
       DEBUG: "false"
       PORT: 8002
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-navneet-samp-erp-production-secret-key-at-least-32-chars}
-      ALLOWED_HOSTS: '["*"]'
+      ALLOWED_HOSTS: '["localhost","127.0.0.1"]'
       CORS_ORIGINS: '[]'
       AUTO_SCHEMA_MIGRATION: "true"
     ports:
@@ -47,7 +47,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "80:80"
+      - "5176:80"
 
 volumes:
   postgres_data:
