@@ -1,14 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
-  Beaker,
-  Boxes,
-  Calculator,
-  Eye,
-  Factory,
   FileSpreadsheet,
   Image,
-  Palette,
   RefreshCw,
   Search,
 } from "lucide-react";
@@ -22,6 +17,12 @@ import {
   fetchSamplingWorkflowReviewsApi,
   type RequestWorkflowRecord,
 } from "@/infrastructure/api";
+import {
+  createSamplingWorkflowColumns,
+  sortSamplingWorkflowRecords,
+  WorkflowReviewBadge,
+  type SamplingWorkflowSortField,
+} from "./samplingWorkflowColumns";
 
 const CostingWorkflowInspectorModal = React.lazy(() =>
   import("./CostingWorkflowInspectorModal").then((m) => ({ default: m.CostingWorkflowInspectorModal }))
@@ -56,8 +57,10 @@ const stageLabels: Record<string, string> = {
   sampling_review: "Sampling review",
   awaiting_marketing_acceptance: "Marketing acceptance",
   design_review: "Design review",
+  awaiting_design_acceptance: "Design acceptance",
   plant: "Plant execution",
   done: "Done",
+  awaiting_marketing_direction: "Marketing direction",
 };
 
 function formatDate(value?: string | null) {
@@ -97,6 +100,7 @@ function isReadOnlyTeamHead(user?: UserProfile | null) {
 
 export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ mode, user }) => {
   const { selectedYear } = useBusinessYear();
+  const [searchParams, setSearchParams] = useSearchParams();
   const canViewCostingClaims = mode === "costing" && (
     isAdminUser(user) || (Boolean(user?.is_costing_admin) && hasWorkflowTeam(user, "costing"))
   );
@@ -105,6 +109,8 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState(mode === "costing" ? "costing" : "all");
   const [deliverableFilter, setDeliverableFilter] = useState<"all" | "sample" | "design" | "mockup" | "costing" | "resample">("all");
+  const [sortField, setSortField] = useState<SamplingWorkflowSortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,6 +140,15 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
 
   useEffect(() => { void load(); }, [load]);
 
+  const requestedRecordKey = searchParams.get("request");
+  useEffect(() => {
+    if (!requestedRecordKey || !records.some((record) => `${record.workflow_type}:${record.sample_request_id}` === requestedRecordKey)) return;
+    setSelectedKey(requestedRecordKey);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("request");
+    setSearchParams(nextParams, { replace: true });
+  }, [records, requestedRecordKey, searchParams, setSearchParams]);
+
   const sampleCount = useMemo(
     () => records.filter((r) => r.workflow_type === "sample" && !r.request_data?.is_resample && !r.workflow_data?.isResample).length,
     [records]
@@ -159,7 +174,11 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
     [records]
   );
   const inReviewCount = useMemo(
-    () => records.filter((record) => record.current_stage === "sampling_review").length,
+    () => records.filter((record) => record.current_stage === "sampling_review" && !record.is_closed).length,
+    [records]
+  );
+  const otherTeamWorkCount = useMemo(
+    () => records.filter((record) => !record.is_closed && !["sampling_review", "done"].includes(record.current_stage)).length,
     [records]
   );
   const needsAttentionCount = useMemo(
@@ -167,7 +186,7 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
     [records]
   );
   const doneCount = useMemo(
-    () => records.filter((record) => record.current_stage === "done").length,
+    () => records.filter((record) => record.current_stage === "done" || record.is_closed).length,
     [records]
   );
   const returnedCount = useMemo(
@@ -207,6 +226,8 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
           : stageFilter === "delayed" ? record.workflow_type === "costing" && Boolean(record.delay_count)
             : stageFilter === "needs_attention" ? needsCostingAttention(record)
             : stageFilter === "my_work" ? record.current_stage === "costing" && Boolean(record.is_claimed_by_me)
+              : stageFilter === "other_work" ? !record.is_closed && !["sampling_review", "done"].includes(record.current_stage)
+                : stageFilter === "done" ? record.current_stage === "done" || record.is_closed
               : record.current_stage === stageFilter);
       if (!matchesStage) return false;
 
@@ -226,6 +247,21 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
       ].some((value) => String(value || "").toLocaleLowerCase().includes(query));
     });
   }, [records, search, stageFilter, deliverableFilter, mode]);
+
+  const handleWorkflowSort = useCallback((field: string) => {
+    const nextField = field as SamplingWorkflowSortField;
+    if (sortField === nextField) {
+      setSortDirection((current) => current === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(nextField);
+      setSortDirection("asc");
+    }
+  }, [sortField]);
+
+  const sortedVisibleRecords = useMemo(
+    () => sortSamplingWorkflowRecords(visibleRecords, sortField, sortDirection),
+    [visibleRecords, sortField, sortDirection]
+  );
 
   const selected = useMemo(() => {
     return records.find((record) => `${record.workflow_type}:${record.sample_request_id}` === selectedKey) || null;
@@ -278,12 +314,17 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
   }, [selected, mode]);
 
   const filterOptions = useMemo(() => {
-    const stageOrder = ["marketing", "creative", "costing", "studio", "creative_approval", "sampling_review", "awaiting_marketing_acceptance", "done"];
+    const stageOrder = ["marketing", "creative", "costing", "studio", "creative_approval", "awaiting_design_acceptance", "design_review", "sampling_review", "plant", "awaiting_marketing_acceptance", "awaiting_marketing_direction", "done"];
     const stages = [...new Set(records.map((record) => record.current_stage))]
-      .sort((a, b) => stageOrder.indexOf(a) - stageOrder.indexOf(b));
+      .sort((a, b) => {
+        const aOrder = stageOrder.indexOf(a);
+        const bOrder = stageOrder.indexOf(b);
+        return (aOrder < 0 ? stageOrder.length : aOrder) - (bOrder < 0 ? stageOrder.length : bOrder);
+      });
     return [
       { value: "all", label: "All requests" },
       ...stages.map((stage) => ({ value: stage, label: stageLabels[stage] || stage })),
+      ...(mode === "sampling" ? [{ value: "other_work", label: "Other teams' work" }] : []),
       ...(mode === "costing" ? [{ value: "my_work", label: "My claimed work" }] : []),
       ...(mode === "costing" ? [{ value: "needs_attention", label: "Needs attention" }] : []),
       ...(teamDelayCount ? [{ value: "delayed", label: `Team delays (${teamDelayCount})` }] : []),
@@ -292,35 +333,6 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
   }, [records, returnedCount, mode, teamDelayCount]);
 
   const columns = useMemo<ColumnDef<RequestWorkflowRecord>[]>(() => {
-    const inspectColumn: ColumnDef<RequestWorkflowRecord> = {
-      id: "inspect",
-      header: "Action",
-      width: "w-[104px]",
-      align: "right",
-      cell: (record) => {
-        const isDirectPlantResample = mode === "sampling"
-          && record.workflow_type === "sample"
-          && record.current_stage === "plant"
-          && Boolean(record.request_data?.is_resample || record.workflow_data?.isResample);
-        const actionLabel = isDirectPlantResample ? "View" : "Review";
-
-        return (
-          <button
-            type="button"
-            aria-label={`${actionLabel} ${record.request_code || record.sr_number || "request"}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              setSelectedKey(`${record.workflow_type}:${record.sample_request_id}`);
-            }}
-            className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 text-[11px] font-semibold text-[var(--on-surface)] hover:bg-[var(--surface-low)] cursor-pointer"
-          >
-            <Eye className="h-3.5 w-3.5" />
-            {actionLabel}
-          </button>
-        );
-      },
-    };
-
     if (mode === "costing") {
       const widths = canViewCostingClaims
         ? { request: "w-[11%]", product: "w-[19%]", material: "w-[8%]", quantity: "w-[10%]", required: "w-[11%]", output: "w-[10%]", stage: "w-[13%]", claimed: "w-[8%]", updated: "w-[10%]" }
@@ -404,11 +416,11 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
           cell: (record) => (
             <div className="flex min-w-0 flex-col items-start gap-0.5">
               <span className="max-w-full whitespace-normal break-words rounded-full bg-[var(--surface-low)] px-2 py-0.5 text-[10px] font-semibold leading-tight text-[var(--on-surface-muted)]">{stageLabels[record.current_stage] || record.current_stage}</span>
-              {record.reviewer_status === "bypassed" && <span className="max-w-full text-[9px] leading-tight font-semibold text-blue-700 dark:text-blue-300">SAMP approval bypassed · sent directly to Plant</span>}
-              {record.reviewer_status === "returned" && <span className="text-[9px] leading-tight font-semibold text-amber-700 dark:text-amber-300">Returned for revision</span>}
-              {record.is_delayed && <span className="text-[9px] leading-tight font-semibold text-rose-700 dark:text-rose-300">Delayed for {record.delay_team || "team"}</span>}
-              {!record.is_delayed && record.claim_overdue && <span className="text-[9px] leading-tight font-semibold text-amber-700 dark:text-amber-300">Claim window passed</span>}
-              {!record.is_delayed && !record.claim_overdue && record.reviewer_status !== "returned" && needsCostingAttention(record) && <span className="text-[9px] leading-tight font-semibold text-rose-700 dark:text-rose-300">Past due</span>}
+              {record.reviewer_status === "bypassed" && <span className="max-w-full text-[9px] leading-tight font-semibold text-blue-700 ">SAMP approval bypassed · sent directly to Plant</span>}
+              {record.reviewer_status === "returned" && <span className="text-[9px] leading-tight font-semibold text-amber-700 ">Returned for revision</span>}
+              {record.is_delayed && <span className="text-[9px] leading-tight font-semibold text-rose-700 ">Delayed for {record.delay_team || "team"}</span>}
+              {!record.is_delayed && record.claim_overdue && <span className="text-[9px] leading-tight font-semibold text-amber-700 ">Claim window passed</span>}
+              {!record.is_delayed && !record.claim_overdue && record.reviewer_status !== "returned" && needsCostingAttention(record) && <span className="text-[9px] leading-tight font-semibold text-rose-700 ">Past due</span>}
             </div>
           ),
         },
@@ -428,182 +440,13 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
       return costingColumns;
     }
 
-    // Sampling mode columns: Deliverable-rich columns
-    return [
-      {
-        id: "request",
-        header: "Request",
-        width: "w-[170px]",
-        sortable: true,
-        cell: (record) => {
-          const isResample = Boolean(record.request_data?.is_resample || record.workflow_data?.isResample);
-          return (
-            <div>
-              <div className="font-bold text-[var(--on-surface)]">{record.request_code || record.sr_number || "Request"}</div>
-              {record.workflow_type === "sample" && (
-                isResample ? (
-                  <span className="mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-500/20">
-                    <Factory className="w-2.5 h-2.5 text-blue-600" />
-                    Resample → Plant
-                  </span>
-                ) : (
-                  <span className="mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-500/20">
-                    <Beaker className="w-2.5 h-2.5 text-teal-600" />
-                    Sample Request
-                  </span>
-                )
-              )}
-              {record.workflow_type === "design" && (
-                <span className="mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-500/20">
-                  <Palette className="w-2.5 h-2.5 text-purple-600" />
-                  Design Brief
-                </span>
-              )}
-              {record.workflow_type === "mockup" && (
-                <span className="mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-500/20">
-                  <Boxes className="w-2.5 h-2.5 text-indigo-600" />
-                  Studio Mockup
-                </span>
-              )}
-              {record.workflow_type === "costing" && (
-                <span className="mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-500/20">
-                  <Calculator className="w-2.5 h-2.5 text-amber-600" />
-                  Costing BOM
-                </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        id: "product",
-        header: "Product / Customer",
-        cell: (record) => (
-          <div className="min-w-0">
-            <div className="truncate font-semibold text-[var(--on-surface)]">{record.product_description || "Product request"}</div>
-            <div className="truncate text-[11px] text-[var(--on-surface-muted)]">
-              {record.customer}{record.brand_name ? ` · ${record.brand_name}` : ""}
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "material",
-        header: "Material",
-        width: "w-[130px]",
-        cell: (record) => <span className="font-mono text-xs">{record.material_code || "—"}</span>,
-      },
-      {
-        id: "scope",
-        header: "Review Scope",
-        width: "w-[210px]",
-        cell: (record) => {
-          const isResample = Boolean(record.request_data?.is_resample || record.workflow_data?.isResample);
-          if (record.workflow_type === "sample") {
-            return (
-              <div>
-                <span className="text-[11px] font-semibold text-[var(--on-surface)]">
-                  {isResample ? "Repeat sample direct to Plant" : "Technical review & release to Plant"}
-                </span>
-                <span className="mt-0.5 block text-[10px] text-[var(--on-surface-subtle)]">
-                  {isResample ? "Direct manufacturing dispatch" : "Sampling PMT verification"}
-                </span>
-              </div>
-            );
-          }
-          if (record.workflow_type === "design") {
-            return (
-              <div>
-                <span className="text-[11px] font-semibold text-[var(--on-surface)]">Design brief &amp; reference images</span>
-                <span className="mt-0.5 block text-[10px] text-[var(--on-surface-subtle)]">Creative specifications</span>
-              </div>
-            );
-          }
-          if (record.workflow_type === "mockup") {
-            return (
-              <div>
-                <span className="text-[11px] font-semibold text-[var(--on-surface)]">Physical CAD / 3D mockup</span>
-                <span className="mt-0.5 block text-[10px] text-[var(--on-surface-subtle)]">Studio technical structure</span>
-              </div>
-            );
-          }
-          return (
-            <div>
-              <span className="text-[11px] font-semibold text-[var(--on-surface)]">Costing BOM estimation</span>
-              <span className="mt-0.5 block text-[10px] text-[var(--on-surface-subtle)]">Technical output review</span>
-            </div>
-          );
-        },
-      },
-      {
-        id: "stage",
-        header: "Current Stage",
-        width: "w-[180px]",
-        cell: (record) => {
-          const isReleased = record.status === "Released to Plant";
-          const isAwaitingSampling = record.status === "Sampling Review (PMT)" || record.current_stage === "sampling_review";
-          return (
-            <div>
-              {isReleased ? (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-500/20">
-                  Released to Plant
-                </span>
-              ) : isAwaitingSampling ? (
-                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-500/20">
-                  Awaiting Sampling Release
-                </span>
-              ) : (
-                <span className="rounded-full bg-[var(--surface-low)] px-2.5 py-1 text-[11px] font-semibold text-[var(--on-surface-muted)]">
-                  {record.status || stageLabels[record.current_stage] || record.current_stage}
-                </span>
-              )}
-              {record.reviewer_status === "returned" && (
-                <span className="mt-1 block text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                  Returned for revision
-                </span>
-              )}
-              {record.is_delayed && (
-                <span className="mt-1 block text-[10px] font-semibold text-rose-700 dark:text-rose-300">
-                  Delayed for {record.delay_team || "team"}
-                </span>
-              )}
-              {!record.is_delayed && record.claim_overdue && (
-                <span className="mt-1 block text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                  Claim window passed
-                </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        id: "plant",
-        header: "Target Plant",
-        width: "w-[130px]",
-        cell: (record) => {
-          const plant = record.request_data?.target_plant || record.workflow_data?.plantReleaseTarget || "Khaniwade";
-          return (
-            <div className="flex items-center gap-1.5 text-xs text-[var(--on-surface)]">
-              <Factory className="h-3.5 w-3.5 text-teal-600" />
-              <span>{String(plant)}</span>
-            </div>
-          );
-        },
-      },
-      {
-        id: "updated",
-        header: "Last Activity",
-        width: "w-[125px]",
-        cell: (record) => <span className="text-[11px] tabular-nums text-[var(--on-surface-muted)]">{formatDate(record.updated_at)}</span>,
-      },
-      inspectColumn,
-    ];
+    return createSamplingWorkflowColumns((record) => setSelectedKey(`${record.workflow_type}:${record.sample_request_id}`));
   }, [mode, canViewCostingClaims]);
 
-  const title = mode === "costing" ? "Costing Workspace" : "Sampling Team Review & Operations Desk";
+  const title = mode === "costing" ? "Costing Workspace" : "Sampling Review";
   const subtitle = mode === "costing"
     ? "Claim Costing work, review the product brief and inputs, then submit the workbook for Sampling review."
-    : "Review all Sampling deliverables: Standard Sample Requests, Design Briefs, Studio Mockups, Costing handoffs, and Direct Plant Resamples.";
+    : "Inspect work across Marketing, Creative, Studio, Costing, and Plant. Accept or return work for revision at Sampling review; release approved samples to Plant.";
 
   const kpis = mode === "costing"
     ? [
@@ -616,60 +459,47 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
     ]
     : [
       {
-        label: "Queue Items",
+        label: "All Requests",
         value: records.length,
-        detail: "Sampling work & direct Plant resamples",
+        detail: "Across deliverables and teams",
         color: "bg-emerald-600",
-        isActive: deliverableFilter === "all",
-        onClick: () => setDeliverableFilter("all"),
+        isActive: stageFilter === "all" && deliverableFilter === "all",
+        onClick: () => { setStageFilter("all"); setDeliverableFilter("all"); },
       },
       {
-        label: "Sampling Requests",
-        value: sampleCount,
-        detail: "Needs Sampling release to Plant",
+        label: "Ready for Review",
+        value: inReviewCount,
+        detail: "Waiting for SAMP decision",
         color: "bg-teal-600",
-        isActive: deliverableFilter === "sample",
-        onClick: () => setDeliverableFilter((c) => c === "sample" ? "all" : "sample"),
+        isActive: stageFilter === "sampling_review",
+        onClick: () => { setStageFilter((c) => c === "sampling_review" ? "all" : "sampling_review"); setDeliverableFilter("all"); },
       },
       {
-        label: "Design Briefs",
-        value: designCount,
-        detail: "Design specs & references",
-        color: "bg-purple-600",
-        isActive: deliverableFilter === "design",
-        onClick: () => setDeliverableFilter((c) => c === "design" ? "all" : "design"),
-      },
-      {
-        label: "Mockups",
-        value: mockupCount,
-        detail: "Studio 3D & artwork review",
+        label: "Other Teams' Work",
+        value: otherTeamWorkCount,
+        detail: "Inspect current team handoffs",
         color: "bg-indigo-600",
-        isActive: deliverableFilter === "mockup",
-        onClick: () => setDeliverableFilter((c) => c === "mockup" ? "all" : "mockup"),
+        isActive: stageFilter === "other_work",
+        onClick: () => { setStageFilter((c) => c === "other_work" ? "all" : "other_work"); setDeliverableFilter("all"); },
       },
       {
-        label: "Costing",
-        value: costingCount,
-        detail: "BOM sheets & rate cards",
-        color: "bg-amber-600",
-        isActive: deliverableFilter === "costing",
-        onClick: () => setDeliverableFilter((c) => c === "costing" ? "all" : "costing"),
-      },
-      {
-        label: "Team Delays",
-        value: teamDelayCount,
-        detail: teamDelayDetail,
-        color: "bg-rose-700",
-        isActive: stageFilter === "delayed",
-        onClick: () => setStageFilter((current) => current === "delayed" ? "all" : "delayed"),
-      },
-      {
-        label: "Direct Resamples",
+        label: "Resamples",
         value: resampleCount,
-        detail: "Direct to Plant (Repeat orders)",
+        detail: "Repeat orders routed to Plant",
         color: "bg-blue-600",
         isActive: deliverableFilter === "resample",
-        onClick: () => setDeliverableFilter((c) => c === "resample" ? "all" : "resample"),
+        onClick: () => {
+          setStageFilter("all");
+          setDeliverableFilter((c) => c === "resample" ? "all" : "resample");
+        },
+      },
+      {
+        label: "Completed",
+        value: doneCount,
+        detail: "Closed or finished requests",
+        color: "bg-slate-600",
+        isActive: stageFilter === "done",
+        onClick: () => { setStageFilter((c) => c === "done" ? "all" : "done"); setDeliverableFilter("all"); },
       },
     ];
 
@@ -679,30 +509,45 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
       subtitle={subtitle}
       businessYear={selectedYear}
       totalCount={records.length}
-      totalLabel={mode === "costing" ? "Costing requests" : "queue items"}
+      totalLabel={mode === "costing" ? "Costing requests" : "requests"}
       onRefresh={load}
       isRefreshing={isLoading}
       kpiItems={kpis}
-      kpiGridCols={mode === "sampling" ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"}
+      kpiGridCols={mode === "sampling" ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"}
       search={{ value: search, onChange: setSearch, placeholder: "Search SR, customer, material, deliverable…" }}
       filterControls={
         mode === "sampling" ? (
-          <label className="flex h-8 items-center gap-2 rounded-lg bg-[var(--surface-low)] px-2.5 text-[11px] font-semibold text-[var(--on-surface-muted)]">
-            <span className="whitespace-nowrap">Deliverable</span>
-            <select
-              aria-label="Filter sampling reviews by deliverable type"
-              value={deliverableFilter}
-              onChange={(e) => setDeliverableFilter(e.target.value as any)}
-              className="bg-transparent text-xs text-[var(--on-surface)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] cursor-pointer"
-            >
-              <option value="all">All Deliverables ({records.length})</option>
-              <option value="sample">Sampling Requests ({sampleCount})</option>
-              <option value="design">Design Briefs ({designCount})</option>
-              <option value="mockup">Mockup Reviews ({mockupCount})</option>
-              <option value="costing">Costing Reviews ({costingCount})</option>
-              <option value="resample">Direct Resamples ({resampleCount})</option>
-            </select>
-          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex h-8 items-center gap-2 rounded-lg bg-[var(--surface-low)] px-2.5 text-[11px] font-semibold text-[var(--on-surface-muted)]">
+              <span className="whitespace-nowrap">Current team</span>
+              <select
+                aria-label="Filter requests by current team or stage"
+                value={stageFilter}
+                onChange={(e) => setStageFilter(e.target.value)}
+                className="max-w-[190px] bg-transparent text-xs text-[var(--on-surface)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] cursor-pointer"
+              >
+                {filterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex h-8 items-center gap-2 rounded-lg bg-[var(--surface-low)] px-2.5 text-[11px] font-semibold text-[var(--on-surface-muted)]">
+              <span className="whitespace-nowrap">Deliverable</span>
+              <select
+                aria-label="Filter sampling reviews by deliverable type"
+                value={deliverableFilter}
+                onChange={(e) => setDeliverableFilter(e.target.value as any)}
+                className="max-w-[180px] bg-transparent text-xs text-[var(--on-surface)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] cursor-pointer"
+              >
+                <option value="all">All deliverables ({records.length})</option>
+                <option value="sample">Sampling requests ({sampleCount})</option>
+                <option value="design">Design briefs ({designCount})</option>
+                <option value="mockup">Mockup reviews ({mockupCount})</option>
+                <option value="costing">Costing reviews ({costingCount})</option>
+                <option value="resample">Resamples ({resampleCount})</option>
+              </select>
+            </label>
+          </div>
         ) : mode === "costing" ? (
           <label className="flex h-8 items-center gap-2 rounded-lg bg-[var(--surface-low)] px-2.5 text-[11px] font-semibold text-[var(--on-surface-muted)]">
             <span className="whitespace-nowrap">Stage</span>
@@ -728,29 +573,63 @@ export const WorkflowOperationsDesk: React.FC<WorkflowOperationsDeskProps> = ({ 
     >
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-3 sm:p-5">
         {error && (
-          <div role="alert" className="flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
+          <div role="alert" className="flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-800  ">
             <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
         )}
         {!error && (isLoading || visibleRecords.length > 0) && (
-          <section className={mode === "costing"
-            ? "hidden xl:flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl bg-[var(--surface-lowest)]"
-            : "min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl bg-[var(--surface-lowest)]"}>
+          <section className="hidden xl:flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl bg-[var(--surface-lowest)]">
             <DataTable
-              data={visibleRecords}
+              data={mode === "sampling" ? sortedVisibleRecords : visibleRecords}
               columns={columns}
-              tableClassName={mode === "costing" ? "w-full table-fixed min-w-0" : undefined}
-              containerClassName={mode === "costing" ? "overflow-x-hidden overflow-y-auto" : undefined}
+              tableClassName={mode === "sampling" ? "w-full min-w-[1300px] table-fixed" : "w-full table-fixed min-w-0"}
+              containerClassName={mode === "sampling" ? "overflow-auto overscroll-contain" : "overflow-x-hidden overflow-y-auto"}
               density={mode === "costing" ? "compact" : "normal"}
               keyExtractor={(record) => `${record.workflow_type}:${record.sample_request_id}`}
               isLoading={isLoading}
               selectedRowId={selectedKey}
               onRowClick={(record) => setSelectedKey(`${record.workflow_type}:${record.sample_request_id}`)}
+              sortField={mode === "sampling" ? sortField : undefined}
+              sortDirection={sortDirection}
+              onSortChange={mode === "sampling" ? handleWorkflowSort : undefined}
               emptyMessage="No matching workflow records."
               pageSize={30}
             />
           </section>
+        )}
+        {mode === "sampling" && !error && (isLoading || visibleRecords.length > 0) && (
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain xl:hidden">
+            {isLoading ? Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="h-32 shrink-0 animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)]" />
+            )) : sortedVisibleRecords.map((record) => {
+              const selectedRecord = selectedKey === `${record.workflow_type}:${record.sample_request_id}`;
+              return (
+                <button
+                  key={`${record.workflow_type}:${record.sample_request_id}`}
+                  type="button"
+                  aria-label={`Inspect ${record.request_code || record.sr_number || "request"}`}
+                  aria-pressed={selectedRecord}
+                  onClick={() => setSelectedKey(`${record.workflow_type}:${record.sample_request_id}`)}
+                  className={`w-full shrink-0 rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${selectedRecord ? "border-[var(--accent-primary)] bg-[var(--accent-primary-subtle)]" : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)]"}`}
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-[var(--on-surface)]">{record.request_code || record.sr_number || "Request"}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-[var(--on-surface-muted)]">{record.customer || "Customer not set"} · {record.program_name || "No program linked"}</p>
+                    </div>
+                    <span className="max-w-[42%] shrink-0 rounded-full bg-[var(--surface-low)] px-2 py-1 text-[10px] font-semibold leading-tight text-[var(--on-surface-muted)]">{stageLabels[record.current_stage] || record.current_stage}</span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-[11px] text-[var(--on-surface-muted)]">{record.product_description || "No description"}</p>
+                  <div className="mt-2 grid grid-cols-3 gap-2 border-t border-[var(--border-subtle)] pt-2">
+                    <div className="min-w-0"><span className="mb-1 block text-[9px] font-semibold uppercase tracking-wide text-[var(--on-surface-subtle)]">Creative</span><WorkflowReviewBadge record={record} step="creative" /></div>
+                    <div className="min-w-0"><span className="mb-1 block text-[9px] font-semibold uppercase tracking-wide text-[var(--on-surface-subtle)]">Studio</span><WorkflowReviewBadge record={record} step="studio" /></div>
+                    <div className="min-w-0"><span className="mb-1 block text-[9px] font-semibold uppercase tracking-wide text-[var(--on-surface-subtle)]">Sampling</span><WorkflowReviewBadge record={record} step="sampling" /></div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         )}
         {mode === "costing" && !error && (isLoading || visibleRecords.length > 0) && (
           <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto xl:hidden">

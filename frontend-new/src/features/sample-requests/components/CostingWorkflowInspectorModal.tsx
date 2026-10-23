@@ -43,6 +43,7 @@ import { ProductDocketView } from "@/features/sample-requests/components/staging
 import type { ProductSearchResult, SampleRequestItem } from "@/features/sample-requests/types";
 import { formatWorkflowAction } from "./workflowPresentation";
 import { RequestClosedStamp } from "./common/RequestClosedWatermark";
+import { SamplingResponsePanel } from "./common/SamplingResponsePanel";
 import { TaskClaimBanner } from "@/components/ui/TaskClaimBanner";
 
 export type InspectorMode = "creative" | "costing" | "sampling";
@@ -118,7 +119,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   onClose,
   onSaved,
 }) => {
-  const [activeTab, setActiveTab] = useState<CostingTab>("scope");
+  const [activeTab, setActiveTab] = useState<CostingTab>(mode === "creative" ? "creative" : "scope");
   const [outputPath, setOutputPath] = useState(record.costing_output_path || "");
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -145,13 +146,19 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   const [closureData, setClosureData] = useState<any>(record.closure || null);
 
   useEffect(() => {
+    setLocalClosed(false);
+    setClosureData(record.closure || null);
+  }, [record.sample_request_id, record.workflow_id, record.closure]);
+
+  useEffect(() => {
     const handleClosed = (event: Event) => {
       const customEvent = event as CustomEvent;
       const detail = customEvent.detail;
+      const requestType = String(detail?.requestType || "");
       if (
         detail &&
-        (String(detail.requestId) === String(record.sample_request_id) ||
-         String(detail.requestId) === String(record.workflow_id))
+        ["costing", "mockup", "sample"].includes(requestType) &&
+        String(detail.requestId) === String(record.sample_request_id)
       ) {
         setLocalClosed(true);
         if (detail.closure) setClosureData(detail.closure);
@@ -186,7 +193,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
   const canSubmitCosting = !isClosed && mode === "costing" && isCostingWork && !readOnly && isClaimedByMe;
   const canReview = !isClosed && mode === "sampling" && isSamplingReview && !readOnly && isClaimedByMe;
   const canReleaseToCosting = !isClosed && mode === "creative" && isCreativeReview && !readOnly && isClaimedByMe;
-  const hasCreativeHandoff = Boolean(record.costing_creative_input_needed || mode === "creative" || isCreativeReview);
+  const hasCreativeHandoff = Boolean(record.costing_creative_input_needed);
   const costingStep = hasCreativeHandoff ? 4 : 3;
   const samplingStep = costingStep + 1;
   const samplingTeamStep = samplingStep + 1;
@@ -251,6 +258,12 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
       setSpecViewMode("all");
     }
   }, [mode]);
+
+  useEffect(() => {
+    if (!record.costing_creative_input_needed && activeTab === "creative") {
+      setActiveTab("scope");
+    }
+  }, [activeTab, record.costing_creative_input_needed]);
 
 
   const creativeFields = useMemo(
@@ -486,7 +499,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 select-text"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-[var(--overlay-backdrop)] select-text"
       onClick={onClose}
     >
       <section
@@ -515,7 +528,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
               onClick={onClose}
               aria-label="Close inspector"
               title="Close inspector"
-              className="order-last grid h-8 w-8 place-items-center rounded-lg bg-rose-50 text-rose-700 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/70"
+              className="order-last grid h-8 w-8 place-items-center rounded-lg bg-rose-50 text-rose-700 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50   "
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -545,10 +558,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     Claim within 48 hours{record.claim_due_at ? ` · due ${formatDateTime(record.claim_due_at)}` : ""}
                   </span>
                   {record.claim_overdue && (
-                    <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">Claim window passed</span>
+                    <span className="text-[10px] font-semibold text-amber-700 ">Claim window passed</span>
                   )}
                   {record.is_delayed && (
-                    <span className="text-[10px] font-semibold text-rose-700 dark:text-rose-300">Delayed for {record.delay_team || "this team"}</span>
+                    <span className="text-[10px] font-semibold text-rose-700 ">Delayed for {record.delay_team || "this team"}</span>
                   )}
                 </div>
                 <label className="flex items-center gap-1.5 text-[10px] font-medium text-[var(--on-surface-muted)]">
@@ -615,10 +628,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition select-none whitespace-nowrap ${
                       isCurrent
                         ? st.isAmber
-                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold shadow-2xs"
+                          ? "bg-amber-500/15 text-amber-700  font-bold shadow-2xs"
                           : "bg-[var(--surface-lowest)] text-[var(--accent-primary)] font-bold shadow-2xs"
                         : st.status === "done"
-                        ? "text-emerald-700 dark:text-emerald-400 font-semibold"
+                        ? "text-emerald-700  font-semibold"
                         : "text-[var(--on-surface-subtle)]"
                     }`}
                   >
@@ -634,7 +647,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                       <span
                         className={`text-[9px] font-mono px-1.5 py-0.2 rounded-md ${
                           st.isAmber
-                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200 font-bold"
+                            ? "bg-amber-100 text-amber-800   font-bold"
                             : isCurrent
                             ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
                             : "bg-[var(--surface-lowest)] text-[var(--on-surface-subtle)]"
@@ -676,10 +689,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                 </div>
                 <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold ${
                   isReturned
-                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                    ? "bg-amber-100 text-amber-800  "
                     : isClosed
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
-                    : "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
+                    ? "bg-emerald-100 text-emerald-800  "
+                    : "bg-sky-100 text-sky-800  "
                 }`}>
                   {isClosed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
                   {record.status}
@@ -707,7 +720,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
 
                   {/* Operational Status Badges */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold bg-sky-500/10 text-sky-700  border border-sky-500/20">
                       <FileSpreadsheet className="w-3 h-3 text-sky-600" />
                       <span>Costing Run</span>
                     </span>
@@ -715,11 +728,11 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     <span
                       className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-display font-bold border ${
                         isReturned
-                          ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300"
+                          ? "bg-amber-50 text-amber-700 border-amber-300  "
                           : isClosed
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-300  "
                           : isCostingWork
-                          ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300"
+                          ? "bg-indigo-50 text-indigo-700 border-indigo-200  "
                           : "bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] border-[var(--border-subtle)]"
                       }`}
                     >
@@ -860,7 +873,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     <Palette className="w-3.5 h-3.5" />
                     <span>3. Creative Input</span>
                     {record.costing_creative_input_needed && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-violet-500/10 text-violet-700 dark:text-violet-300 font-bold">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-violet-500/10 text-violet-700  font-bold">
                         Requested
                       </span>
                     )}
@@ -879,11 +892,11 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     <FileSpreadsheet className="w-3.5 h-3.5" />
                     <span>{costingStep}. Costing Work &amp; Submission</span>
                     {record.costing_output_path ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200/50">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700   font-bold border border-emerald-200/50">
                         ✓ Attached
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold border border-amber-200/50">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 text-amber-700   font-bold border border-amber-200/50">
                         Pending
                       </span>
                     )}
@@ -903,11 +916,11 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>{samplingStep}. Sampling Sign-Off</span>
                     {isClosed ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700   font-bold">
                         ✓ Approved
                       </span>
                     ) : isReturned ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 text-amber-700   font-bold">
                         Returned
                       </span>
                     ) : (
@@ -942,7 +955,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                 {error && (
                   <div
                     role="alert"
-                    className="flex items-start gap-2.5 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200"
+                    className="flex items-start gap-2.5 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-800   "
                   >
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
                     <span>{error}</span>
@@ -956,20 +969,20 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                   <div className="space-y-6">
                     {/* Prompt banner for Returned Revision */}
                     {isReturned && (
-                      <div className="rounded-2xl border border-amber-300 bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/30 p-5 space-y-2.5">
+                      <div className="rounded-2xl border border-amber-300 bg-amber-50/70   p-5 space-y-2.5">
                         <div className="flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 font-mono">
+                          <AlertTriangle className="w-4 h-4 text-amber-600  shrink-0" />
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800  font-mono">
                             Sampling Team Revision Requested
                           </h3>
                         </div>
-                        <p className="text-xs font-semibold text-amber-950 dark:text-amber-100">
+                        <p className="text-xs font-semibold text-amber-950 ">
                           Reviewer Remark:{" "}
                           <span className="font-normal italic">
                             "{record.reviewer_notes || "Please revise the calculation sheet."}"
                           </span>
                         </p>
-                        <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                        <p className="text-[11px] text-amber-800/80 ">
                           Please update the costing sheet link or adjust handoff assumptions below,
                           then resubmit for Sampling review.
                         </p>
@@ -980,7 +993,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 space-y-4 shadow-sm">
                       <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                          <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/10 text-emerald-700 ">
                             <FileSpreadsheet className="h-5 w-5" />
                           </div>
                           <div>
@@ -1197,7 +1210,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                       {record.product_description || "No product description provided."}
                     </p>
                     {mode === "creative" && (
-                      <div className="rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3 text-xs text-violet-950 dark:border-violet-900/50 dark:bg-violet-950/20 dark:text-violet-100">
+                      <div className="rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3 text-xs text-violet-950   ">
                         Review each product class and characteristic. You can edit any value here;
                         changes are saved when you send the request to Costing. Purple “Creative input”
                         fields are required for release.
@@ -1256,13 +1269,13 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                           onClick={() => setSpecViewMode("configured")}
                           className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
                             specViewMode === "configured"
-                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shadow-2xs"
+                              ? "bg-emerald-500/15 text-emerald-700  font-bold shadow-2xs"
                               : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
                           }`}
                         >
                           <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                           <span>Configured</span>
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-300/40">
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-50 text-emerald-700   font-bold border border-emerald-300/40">
                             {configuredCount}
                           </span>
                         </button>
@@ -1306,10 +1319,10 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                                 console.error("Failed to download CSV:", err);
                               }
                             }}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-300/60 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-300/60 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100     cursor-pointer"
                             title="Export Structured Docket to Excel / CSV (UI Styled)"
                           >
-                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Excel / CSV
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 " /> Excel / CSV
                           </button>
                           <button
                             type="button"
@@ -1321,7 +1334,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                                 console.error("Failed to print docket:", err);
                               }
                             }}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100     cursor-pointer"
                             title="Print or Save Complete Docket as PDF"
                           >
                             <Printer className="h-3.5 w-3.5" /> Print / Save PDF
@@ -1332,7 +1345,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
 
                     {/* Creative Missing Fields Warning if Creative Mode */}
                     {mode === "creative" && missingCreativeFields.length > 0 && (
-                      <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-3.5 text-xs text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100 flex items-center justify-between gap-2">
+                      <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-3.5 text-xs text-amber-950    flex items-center justify-between gap-2">
                         <span>
                           {missingCreativeFields.length} Creative specification field(s) require
                           values before this request can be released to Costing.
@@ -1346,11 +1359,11 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         Loading product classes and specifications…
                       </div>
                     ) : specificationsLoadError ? (
-                      <div className="rounded-xl bg-rose-500/10 p-4 text-xs text-rose-800 dark:text-rose-200">
+                      <div className="rounded-xl bg-rose-500/10 p-4 text-xs text-rose-800 ">
                         {specificationsLoadError}
                       </div>
                     ) : productSpecifications.length === 0 ? (
-                      <div className="rounded-xl bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-200">
+                      <div className="rounded-xl bg-amber-500/10 p-4 text-xs text-amber-800 ">
                         No product class or specification rows are attached yet.
                       </div>
                     ) : specViewMode === "docket" && mode !== "creative" ? (
@@ -1434,7 +1447,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                                     <Layers className="w-3.5 h-3.5 text-teal-600" />
                                     <span>{className}</span>
                                     {specViewMode === "configured" && (
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-50 text-emerald-700  ">
                                         Configured
                                       </span>
                                     )}
@@ -1463,7 +1476,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                                             {detail.characteristicName}
                                           </p>
                                           {isCreativeField && (
-                                            <span className="mt-0.5 inline-flex rounded-full bg-violet-500/10 px-2 py-0.5 text-[9px] font-semibold text-violet-700 dark:text-violet-300">
+                                            <span className="mt-0.5 inline-flex rounded-full bg-violet-500/10 px-2 py-0.5 text-[9px] font-semibold text-violet-700 ">
                                               Creative input
                                             </span>
                                           )}
@@ -1514,7 +1527,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                 {/* ════════════════════════════════════════════════════════════════════
                      TAB 3: CREATIVE INPUT
                    ════════════════════════════════════════════════════════════════════ */}
-                {activeTab === "creative" && (
+                {activeTab === "creative" && record.costing_creative_input_needed && (
                   <div className="space-y-5">
                     <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 space-y-4">
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-3">
@@ -1530,7 +1543,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                       </div>
                       <p className="text-xs font-semibold text-[var(--on-surface)]">
                         {isCreativeReview
-                          ? "Awaiting Creative review before Costing can begin."
+                          ? "Review this request and send Creative’s response before Costing can begin."
                           : "Creative review was requested before this Costing task."}
                       </p>
                       <div className="space-y-1.5">
@@ -1539,28 +1552,74 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                         </span>
                         <p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--on-surface-muted)] bg-[var(--surface-low)] p-3 rounded-xl">
                           {record.costing_creative_input_remark?.trim() ||
-                            "Marketing requested Creative Studio review without additional remarks."}
+                            "Marketing requested Creative review without additional remarks."}
                         </p>
                       </div>
+                      {mode === "creative" && isCreativeReview && (
+                        <label className="block space-y-1.5">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+                            Creative response to Costing <span className="font-sans font-normal normal-case tracking-normal">(optional)</span>
+                          </span>
+                          <textarea
+                            aria-label="Creative response to Costing"
+                            rows={4}
+                            maxLength={2000}
+                            disabled={!canReleaseToCosting || isSaving}
+                            value={notes}
+                            onChange={(event) => setNotes(event.target.value)}
+                            placeholder={canReleaseToCosting ? "Share the Creative input or handoff note for the Costing team…" : "Claim this task to write a response."}
+                            className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-3 py-2.5 text-xs leading-relaxed text-[var(--on-surface)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-lowest)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          />
+                          <span className="block text-[10px] text-[var(--on-surface-subtle)]">
+                            {canReleaseToCosting
+                              ? "This response is saved in the request activity when you send it to Costing."
+                              : isClaimed
+                              ? `This task is claimed by ${record.claimed_by || "another team member"}. Only the claimant can respond.`
+                              : readOnly
+                              ? "Team Heads have read-only access to workflow responses."
+                              : "Claim the task in the header to write and send a response."}
+                          </span>
+                        </label>
+                      )}
                     </section>
 
-                    {canReleaseToCosting && (
+                    {mode === "creative" && isCreativeReview && (
                       <div className="flex justify-end">
-                        <button
-                          type="button"
-                          disabled={
-                            isSaving ||
-                            isLoadingSpecifications ||
-                            Boolean(specificationsLoadError) ||
-                            productSpecifications.length === 0 ||
-                            missingCreativeFields.length > 0
-                          }
-                          onClick={() => void save()}
-                          className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition disabled:opacity-50 cursor-pointer"
-                        >
-                          <span>{isSaving ? "Releasing..." : "Send to Costing Desk"}</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
+                        {canReleaseToCosting ? (
+                          <button
+                            type="button"
+                            disabled={
+                              isSaving ||
+                              isLoadingSpecifications ||
+                              Boolean(specificationsLoadError) ||
+                              productSpecifications.length === 0 ||
+                              missingCreativeFields.length > 0
+                            }
+                            onClick={() => void save()}
+                            className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition disabled:opacity-50 cursor-pointer"
+                          >
+                            <span>{isSaving ? "Sending response…" : "Send response to Costing"}</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        ) : !readOnly && !isClaimed ? (
+                          <button
+                            type="button"
+                            disabled={isClaiming || isSaving}
+                            onClick={() => void claimTask()}
+                            className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <span>{isClaiming ? "Claiming…" : "Claim task to respond"}</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled
+                            className="rounded-xl bg-[var(--surface-low)] px-5 py-2.5 text-xs font-bold text-[var(--on-surface-subtle)]"
+                          >
+                            {readOnly ? "Read-only response" : `Claimed by ${record.claimed_by || "another team member"}`}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1586,7 +1645,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     {/* Review Decision Workspace */}
                     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 space-y-4 shadow-sm">
                       <div className="flex items-center gap-2.5 border-b border-[var(--border-subtle)] pb-3">
-                        <div className="grid h-9 w-9 place-items-center rounded-xl bg-sky-500/10 text-sky-700 dark:text-sky-300">
+                        <div className="grid h-9 w-9 place-items-center rounded-xl bg-sky-500/10 text-sky-700 ">
                           <CheckCircle2 className="h-5 w-5" />
                         </div>
                         <div>
@@ -1625,18 +1684,18 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                           )}
                         </div>
                       ) : (
-                        <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                        <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-900   ">
                           Costing team has not submitted an output sheet yet.
                         </div>
                       )}
 
                       {/* Approval Seal if Closed */}
                       {isClosed && (
-                        <div className="p-4 rounded-xl border border-emerald-300 bg-emerald-50/70 text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100 flex items-center gap-3">
+                        <div className="p-4 rounded-xl border border-emerald-300 bg-emerald-50/70 text-emerald-950    flex items-center gap-3">
                           <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
                           <div>
                             <p className="text-xs font-bold">Costing Dossier Approved &amp; Closed</p>
-                            <p className="text-[11px] text-emerald-800 dark:text-emerald-300 mt-0.5">
+                            <p className="text-[11px] text-emerald-800  mt-0.5">
                               Reviewed by {record.reviewer_name || "Sampling Specialist"} on{" "}
                               {formatDateTime(record.reviewed_at || record.closed_at)}.
                             </p>
@@ -1675,7 +1734,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                               type="button"
                               disabled={isSaving || !notes.trim()}
                               onClick={() => void save("return")}
-                              className="px-4 py-2 rounded-xl border border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                              className="px-4 py-2 rounded-xl border border-amber-300 text-amber-800 hover:bg-amber-50   text-xs font-semibold transition cursor-pointer disabled:opacity-50"
                             >
                               {isSaving ? "Saving..." : "Return to Costing Desk"}
                             </button>
@@ -1694,6 +1753,14 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                     </div>
                   </div>
                 )}
+
+                <SamplingResponsePanel
+                  className="mt-6"
+                  response={record.reviewer_notes}
+                  decision={record.reviewer_status}
+                  reviewer={record.reviewer_name}
+                  respondedAt={record.reviewed_at}
+                />
               </div>
           </div>
 

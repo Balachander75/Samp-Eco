@@ -158,10 +158,10 @@ export const DesignBriefTab: React.FC<DesignBriefTabProps> = React.memo(({
           {/* 3. Marketing Directives & Commercial Notes */}
           {activeRequest.designRemarks && (
             <div className="space-y-1.5">
-              <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+              <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 ">
                 Marketing Directives &amp; Commercial Notes
               </div>
-              <div className="p-3.5 rounded-xl border border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20 text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs whitespace-pre-wrap">
+              <div className="p-3.5 rounded-xl border border-amber-200/70 bg-amber-50/50   text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs whitespace-pre-wrap">
                 {activeRequest.designRemarks}
               </div>
             </div>
@@ -214,7 +214,7 @@ export const DesignBriefTab: React.FC<DesignBriefTabProps> = React.memo(({
             <div className="relative w-full h-[480px] sm:h-[520px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-low)]/50 overflow-hidden shadow-inner flex items-center justify-center p-4 sm:p-6 select-none group">
               {/* Studio Light-Table Grid Backdrop (blends seamlessly with active theme) */}
               <div
-                className="absolute inset-0 opacity-[0.35] dark:opacity-[0.18] pointer-events-none"
+                className="absolute inset-0 opacity-[0.35]  pointer-events-none"
                 style={{
                   backgroundImage: `radial-gradient(var(--border-strong) 1px, transparent 1px)`,
                   backgroundSize: "20px 20px",
@@ -243,7 +243,7 @@ export const DesignBriefTab: React.FC<DesignBriefTabProps> = React.memo(({
                   alt={currentImg.label || "Design reference image"}
                   onClick={() => onPreviewImage(currentImgUrl)}
                   onError={() => handleImageError(currentImgUrl)}
-                  className="max-w-full max-h-full object-contain rounded-xl transition duration-300 group-hover:scale-[1.015] cursor-zoom-in filter drop-shadow-[0_8px_20px_rgba(11,28,48,0.12)] dark:drop-shadow-[0_12px_28px_rgba(0,0,0,0.6)] z-[1]"
+                  className="max-w-full max-h-full object-contain rounded-xl transition duration-300 group-hover:scale-[1.015] cursor-zoom-in filter drop-shadow-[0_8px_20px_rgba(11,28,48,0.12)]  z-[1]"
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center gap-2 text-[var(--on-surface-subtle)] text-xs z-[1]">

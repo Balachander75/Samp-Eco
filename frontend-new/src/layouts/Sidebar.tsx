@@ -354,7 +354,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }`}
               >
                 {!compact ? (
-                  <span className="text-[11px] font-bold tracking-wider uppercase text-[var(--sidebar-text-subtle)]/75 font-sans truncate">
+                  <span className="text-[11px] font-bold tracking-wider uppercase text-[var(--sidebar-text-subtle)] font-sans truncate">
                     {group.groupTitle}
                   </span>
                 ) : (
@@ -617,7 +617,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onLogout}
                 title="Sign Out"
                 aria-label="Sign out"
-                className="rounded-lg p-1.5 text-[var(--sidebar-text-subtle)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shrink-0 focus-visible:outline-none"
+                className="rounded-lg p-1.5 text-[var(--sidebar-text-subtle)] hover:text-rose-600 hover:bg-rose-50  transition-colors cursor-pointer shrink-0 focus-visible:outline-none"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -650,7 +650,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Drawer */}
       {isMobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
-          <div className="fixed inset-0 bg-black/60" onClick={onCloseMobile} />
+          <div className="fixed inset-0 bg-[var(--overlay-backdrop)]" onClick={onCloseMobile} />
           <aside className="fixed inset-y-0 left-0 z-50 flex flex-col shadow-2xl h-screen" style={{ width: 244 }}>
             {renderNavContent(true)}
           </aside>

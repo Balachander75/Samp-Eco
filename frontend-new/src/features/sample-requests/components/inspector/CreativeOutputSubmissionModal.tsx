@@ -105,23 +105,23 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
   };
 
   return (
-    <div className="rounded-2xl border-2 border-purple-300 dark:border-purple-800/40 bg-white dark:bg-zinc-900 shadow-xl overflow-hidden animate-smooth-modal">
+    <div className="rounded-2xl border-2 border-purple-300  bg-white  shadow-xl overflow-hidden animate-smooth-modal">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-50/80 to-white dark:from-purple-950/30 dark:to-zinc-900 border-b border-purple-100 dark:border-white/[0.06]">
+      <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-50/80 to-white   border-b border-purple-100 ">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
             <FolderOpen className="w-4 h-4 stroke-[2.2]" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight font-display">
+              <h3 className="text-sm font-bold text-slate-900  tracking-tight font-display">
                 Submit Creative Artwork Output (Batch #{batchNumber})
               </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-100 text-purple-700   border border-purple-200 ">
                 OUTPUT MATRIX
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            <p className="text-xs text-slate-500  mt-0.5">
               Add the artwork file link and details for each completed design.
             </p>
           </div>
@@ -130,7 +130,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
         <button
           type="button"
           onClick={onClose}
-          className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-white transition cursor-pointer"
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100   transition cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -138,7 +138,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
 
       <form onSubmit={handleSubmit} className="p-6 space-y-5 text-xs">
         {error && (
-          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-rose-50  border border-rose-200  text-rose-700  text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -146,7 +146,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
 
         {/* Section 1: Design File Repository Link */}
         <div className="space-y-1.5">
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 font-sans">
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700  font-sans">
             1. Artwork folder or design file link/path <span className="text-rose-500">*</span>
           </label>
           <div className="flex items-center gap-2">
@@ -159,7 +159,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
                 value={designFileUrl}
                 onChange={(e) => setDesignFileUrl(e.target.value)}
                 placeholder="Paste a share link or file/folder path"
-                className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/15 transition font-mono"
+                className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200  bg-white  text-xs text-slate-900  placeholder:text-slate-400 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/15 transition font-mono"
               />
             </div>
             {isHttpLink(designFileUrl.trim()) && (
@@ -167,7 +167,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
                 href={designFileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="h-10 px-3.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-semibold flex items-center gap-1.5 shrink-0 transition"
+                className="h-10 px-3.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700   border border-purple-200  text-xs font-semibold flex items-center gap-1.5 shrink-0 transition"
                 title="Verify link"
               >
                 <span>Open</span>
@@ -175,34 +175,34 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
               </a>
             )}
           </div>
-          <p className="text-[10.5px] text-slate-400 dark:text-zinc-500">
+          <p className="text-[10.5px] text-slate-400 ">
             Paste any reference text that helps the team locate the artwork files. URLs and paths also work.
           </p>
         </div>
 
         {/* Section 2: Completed Artwork Count Selector */}
-        <div className="p-4 rounded-xl bg-slate-50 dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800 space-y-3">
+        <div className="p-4 rounded-xl bg-slate-50  border border-slate-200/80  space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 block font-sans">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700  block font-sans">
                 2. Artwork Deliverables Count in this Batch
               </span>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                Marketing requested <strong className="text-slate-800 dark:text-zinc-200">{totalRequested} designs</strong> total.{" "}
-                <span className="font-mono text-[var(--accent-primary)] dark:text-emerald-400 font-bold">
+              <p className="text-xs text-slate-500  mt-0.5">
+                Marketing requested <strong className="text-slate-800 ">{totalRequested} designs</strong> total.{" "}
+                <span className="font-mono text-[var(--accent-primary)]  font-bold">
                   {remainingCount} artwork(s) remaining.
                 </span>
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-600 dark:text-zinc-400">
+              <span className="text-xs font-semibold text-slate-600 ">
                 Number of Designs:
               </span>
               <Select
                 value={outputCount}
                 onChange={(e) => setOutputCount(Number(e.target.value))}
-                selectClassName="h-9 px-3 text-xs font-bold font-mono text-purple-700 dark:text-purple-300"
+                selectClassName="h-9 px-3 text-xs font-bold font-mono text-purple-700 "
               >
                 {Array.from({ length: Math.max(1, remainingCount) }, (_, i) => i + 1).map((num) => (
                   <option key={num} value={num}>
@@ -217,29 +217,29 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
         {/* Section 3: Artwork Matrix */}
         <div className="space-y-2">
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 font-sans">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700  font-sans">
               3. Artwork Variant Specifications ({outputRows.length} Rows Generated)
             </label>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-zinc-800 shadow-2xs">
+          <div className="overflow-hidden rounded-xl border border-slate-200  shadow-2xs">
             {/* Table Header: 3 Columns */}
-            <div className="grid grid-cols-[80px_minmax(0,1.5fr)_minmax(0,1fr)] gap-3 bg-slate-100/90 dark:bg-zinc-800/80 px-4 py-2.5 text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-zinc-300 border-b border-slate-200 dark:border-zinc-800">
+            <div className="grid grid-cols-[80px_minmax(0,1.5fr)_minmax(0,1fr)] gap-3 bg-slate-100/90  px-4 py-2.5 text-[11px] font-mono font-bold uppercase text-slate-600  border-b border-slate-200 ">
               <span>Code</span>
               <span>Shutterstock No. (optional)</span>
               <span>Creative Remark (optional)</span>
             </div>
 
             {/* Dynamic Rows */}
-            <div className="divide-y divide-slate-100 dark:divide-zinc-800/70 max-h-72 overflow-y-auto">
+            <div className="divide-y divide-slate-100  max-h-72 overflow-y-auto">
               {outputRows.map((row, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-[80px_minmax(0,1.5fr)_minmax(0,1fr)] gap-3 px-4 py-2.5 items-center bg-white dark:bg-zinc-900 hover:bg-slate-50/50 dark:hover:bg-zinc-850/40 transition"
+                  className="grid grid-cols-[80px_minmax(0,1.5fr)_minmax(0,1fr)] gap-3 px-4 py-2.5 items-center bg-white  hover:bg-slate-50/50  transition"
                 >
                   {/* Badge */}
                   <div>
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700   border border-purple-200/80 ">
                       {row.designNumber}
                     </span>
                   </div>
@@ -252,7 +252,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
                       value={row.shutterstockNo}
                       onChange={(e) => handleUpdateRow(idx, "shutterstockNo", e.target.value)}
                       placeholder="Shutterstock No. (optional)"
-                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20"
+                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200  bg-white  text-xs text-slate-900  outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20"
                     />
                   </div>
 
@@ -264,7 +264,7 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
                       onChange={(e) => handleUpdateRow(idx, "remarks", e.target.value)}
                       placeholder="Optional remark"
                       maxLength={1000}
-                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-900 dark:text-zinc-100 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20"
+                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200  bg-white  text-xs text-slate-900  outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20"
                     />
                   </div>
                 </div>
@@ -274,12 +274,12 @@ export const CreativeOutputSubmissionModal: React.FC<CreativeOutputSubmissionMod
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/[0.06]">
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100 ">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.06] text-slate-700 dark:text-zinc-300 text-xs font-semibold cursor-pointer transition"
+            className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200  text-slate-700  text-xs font-semibold cursor-pointer transition"
           >
             Cancel
           </button>

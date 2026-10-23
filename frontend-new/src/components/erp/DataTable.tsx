@@ -145,7 +145,7 @@ export function DataTable<T>({
                     <button
                       type="button"
                       onClick={() => onToggleSelectAll()}
-                      className="text-[10px] text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 font-mono underline cursor-pointer ml-0.5"
+                      className="text-[10px] text-zinc-400 hover:text-rose-600  font-mono underline cursor-pointer ml-0.5"
                     >
                       Deselect
                     </button>
@@ -179,7 +179,7 @@ export function DataTable<T>({
                       if (el) el.indeterminate = isSomeSelected;
                     }}
                     onChange={() => onToggleSelectAll && onToggleSelectAll()}
-                    className="h-3.5 w-3.5 rounded border-zinc-300 dark:border-zinc-700 accent-brand-600 cursor-pointer"
+                    className="h-3.5 w-3.5 rounded border-zinc-300  accent-brand-600 cursor-pointer"
                     aria-label="Select all rows"
                   />
                 </th>
@@ -205,7 +205,7 @@ export function DataTable<T>({
                       `whitespace-nowrap overflow-hidden ${density === "compact" ? "text-[10px]" : "text-[11px]"} font-semibold uppercase tracking-[0.045em] text-[var(--text-muted)]`,
                       col.width ?? "",
                       col.sortable
-                        ? "cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 group select-none transition-colors"
+                        ? "cursor-pointer hover:text-zinc-700  group select-none transition-colors"
                         : "",
                       isStickyLeft
                         ? "sticky left-0 z-25 bg-[var(--surface-low)] border-r border-[var(--border-subtle)]"
@@ -309,7 +309,7 @@ export function DataTable<T>({
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => onToggleSelectRow && onToggleSelectRow(rowKey)}
-                          className="h-3.5 w-3.5 rounded border-zinc-300 dark:border-zinc-700 accent-brand-600 cursor-pointer"
+                          className="h-3.5 w-3.5 rounded border-zinc-300  accent-brand-600 cursor-pointer"
                           aria-label={`Select row ${rowKey}`}
                         />
                       </td>

@@ -118,6 +118,7 @@ export function isDirectPlantResampleRequest(request: Partial<SampleRequestItem>
 export function getSampleTrack(item: Partial<StagedProductItem> | Partial<SampleRequestItem>): SampleTrack {
   const explicitTrack = (item as any).sampleTrack
     || (item as any).samplingMetadata?.sampleTrack
+    || (item as any).mockupWorkflowState?.samplingRouting?.sampleTrack
     || (item as any).workflowState?.sampleTrack
     || (item as any).mockupWorkflowState?.sampleTrack
     || (item as any).samplingRouting?.sampleTrack;
@@ -185,46 +186,47 @@ export function getSampleTrackInfo(item: Partial<StagedProductItem> | Partial<Sa
 
   const rawSampleType =
     (item as any).samplingMetadata?.sampleType ||
+    (item as any).mockupWorkflowState?.samplingRouting?.sampleType ||
     (item as any).sampleType ||
-    ((item as any).productType === "Partial Sample" ? "partial" : "full");
+    (String((item as any).productType || "").toLowerCase().includes("partial") ? "partial" : "full");
 
-  const isFullSample = rawSampleType !== "partial";
+  const isFullSample = !String(rawSampleType).toLowerCase().includes("partial");
 
   let label = "Resample";
   let badgeLabel = "✓ Resample";
-  let badgeClass = "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800/60";
-  let tagClass = "text-emerald-700 dark:text-emerald-300";
+  let badgeClass = "bg-emerald-50 text-emerald-800 border-emerald-300   ";
+  let tagClass = "text-emerald-700 ";
   let description = "Direct repeat order without specification changes. Released straight to Plant.";
 
   if (track === "design_change") {
     label = "Design Change";
     badgeLabel = "🎨 Design Change";
-    badgeClass = "bg-purple-50 text-purple-800 border-purple-300 dark:bg-purple-950/40 dark:text-purple-200 dark:border-purple-800/60";
-    tagClass = "text-purple-700 dark:text-purple-300";
+    badgeClass = "bg-purple-50 text-purple-800 border-purple-300   ";
+    tagClass = "text-purple-700 ";
     description = "Cloned product specifications. Creative artwork fields are cleared for new creative generation.";
   } else if (track === "new_sample") {
     label = "New Sample";
     badgeLabel = "✨ New Sample";
-    badgeClass = "bg-blue-50 text-blue-800 border-blue-300 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-800/60";
-    tagClass = "text-blue-700 dark:text-blue-300";
+    badgeClass = "bg-blue-50 text-blue-800 border-blue-300   ";
+    tagClass = "text-blue-700 ";
     description = "Completely new product specifications created from scratch.";
   } else if (track === "normal_sample") {
     label = "Normal Sample";
     badgeLabel = "⚙️ Normal Sample";
-    badgeClass = "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800/60";
-    tagClass = "text-amber-700 dark:text-amber-300";
+    badgeClass = "bg-amber-50 text-amber-800 border-amber-300   ";
+    tagClass = "text-amber-700 ";
     description = "Existing product with modified specifications. Creative artwork fields reset for revised design.";
   }
 
   const sampleTypeBadge = isFullSample
     ? {
         label: "● Full Sample",
-        badgeClass: "bg-teal-50 text-teal-800 border-teal-300 dark:bg-teal-950/40 dark:text-teal-200 dark:border-teal-800/60 font-bold",
+        badgeClass: "bg-teal-50 text-teal-800 border-teal-300    font-bold",
         icon: "●",
       }
     : {
         label: "◐ Partial Sample",
-        badgeClass: "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800/60 font-bold",
+        badgeClass: "bg-amber-50 text-amber-800 border-amber-300    font-bold",
         icon: "◐",
       };
 

@@ -151,7 +151,7 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
         {!readOnly && <button
           type="button"
           onClick={onClose}
-          className="bg-slate-100/70 hover:bg-slate-200/70 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/60 text-slate-700 dark:text-zinc-300 px-3.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer"
+          className="bg-slate-100/70 hover:bg-slate-200/70   text-slate-700  px-3.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer"
         >
           Discard
         </button>}
@@ -190,7 +190,7 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
             </button>
           )}
 
-        <div className="h-4 w-px bg-slate-200 dark:bg-zinc-800 mx-1" />
+        <div className="h-4 w-px bg-slate-200  mx-1" />
 
         <button
           type="button"
@@ -210,7 +210,7 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
 
       {/* Right: Modern Luminous Workflow Stepper (Replacing Old Polygon Chevrons) */}
       <div className="flex items-center gap-3">
-        <div className="hidden lg:flex items-center gap-1.5 p-1 bg-slate-100/60 dark:bg-white/5 rounded-xl">
+        <div className="hidden lg:flex items-center gap-1.5 p-1 bg-slate-100/60  rounded-xl">
           {steps.map((st, i) => (
             <React.Fragment key={i}>
               <div
@@ -218,8 +218,8 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
                   st.status === "done"
                     ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-bold"
                     : st.status === "active"
-                    ? "bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 font-bold shadow-xs ring-1 ring-[var(--accent-primary)]/40"
-                    : "text-slate-400 dark:text-zinc-500 font-medium"
+                    ? "bg-white  text-slate-900  font-bold shadow-xs ring-1 ring-[var(--accent-primary)]/40"
+                    : "text-slate-400  font-medium"
                 }`}
               >
                 {st.status === "done" ? (
@@ -227,12 +227,12 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
                 ) : st.status === "active" ? (
                   <span className="w-2 h-2 rounded-full bg-[var(--accent-primary)]" />
                 ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-zinc-700" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 " />
                 )}
                 <span>{st.label}</span>
               </div>
               {i < steps.length - 1 && (
-                <ChevronRight className="w-3 h-3 text-slate-300 dark:text-zinc-700 shrink-0" />
+                <ChevronRight className="w-3 h-3 text-slate-300  shrink-0" />
               )}
             </React.Fragment>
           ))}
@@ -242,7 +242,7 @@ export const InspectorControlPanel: React.FC<InspectorControlPanelProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800  hover:bg-slate-100  transition cursor-pointer"
           title="Close (Esc)"
         >
           <X className="w-4 h-4" />

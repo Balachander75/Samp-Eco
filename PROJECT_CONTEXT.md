@@ -260,14 +260,10 @@ The UI strictly adheres to `.agents/skills/samp-ui-design-system/SKILL.md`.
 - ❌ **No emojis or custom icon sets** in the UI.
 - ❌ **No custom HTML `<table>` elements** — Always use the shared `DataTable` (`components/erp/DataTable.tsx`).
 - ❌ **No ad-hoc status badges** — Always use `StatusPill` (`components/ui/StatusPill.tsx`).
-- ❌ **No dark mode on the Sidebar** — Sidebar is intentionally locked to a crisp, light executive presentation (`bg-white border-r border-slate-200`).
+- ✅ **Light-only surfaces** — Sidebar, shell, and workspaces use shared theme tokens for readable contrast in every supported palette.
 
-### 7.3 Multi-Theme Appearance System (`ThemeContext.tsx`)
-The app supports 13 curated enterprise palettes:
-- **Enterprise / Light**: *Jade Atelier* (`emerald` - Default), *Cobalt Office* (`ocean`), *Nordic Frost* (`nordic-frost`).
-- **Creative / Studio**: *Iris Paper* (`violet`), *Coral Studio* (`rose`), *Orchid Afterdark* (`nocturne`).
-- **Minimal / Editorial**: *Citrus & Ink* (`amber`), *Sahara Dune* (`terracotta`), *Neo Brutalism* (`neo-brutalism`).
-- **Dark / OLED**: *Obsidian Blue* (`midnight`), *Abyssal Teal* (`forest-night`), *Tokyo Neon* (`tokyo-neon`), *Stealth Titanium* (`titanium`).
+### 7.3 Light Theme System (`ThemeContext.tsx`)
+The app supports eight curated light palettes: *Jade Atelier* (`emerald` - Default), *Cobalt Office* (`ocean`), *Iris Paper* (`violet`), *Citrus & Ink* (`amber`), *Coral Studio* (`rose`), *Neo Brutalism* (`neo-brutalism`), *Nordic Frost* (`nordic-frost`), and *Sahara Dune* (`terracotta`). Each palette supplies the same surface, text, accent, status, border, sidebar, and shadow tokens.
 
 ---
 

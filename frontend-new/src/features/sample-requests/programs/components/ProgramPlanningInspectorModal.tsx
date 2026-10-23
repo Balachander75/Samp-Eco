@@ -22,6 +22,7 @@ import { ProgramPlanningMaterialMatrixTab } from "./ProgramPlanningMaterialMatri
 import { ProgramPlanningSampReviewTab } from "./ProgramPlanningSampReviewTab";
 import { ProgramPlanningPlantReviewTab } from "./ProgramPlanningPlantReviewTab";
 import { ProgramPlanningChatterFeed } from "./ProgramPlanningChatterFeed";
+import { SamplingResponsePanel } from "../../components/common/SamplingResponsePanel";
 
 export interface ProgramPlanningInspectorModalProps {
   request: SampleRequestItem | null;
@@ -260,7 +261,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm select-text animate-in fade-in duration-150"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-[var(--overlay-backdrop)] backdrop-blur-sm select-text animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -326,7 +327,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                     <ShieldCheck className="w-3.5 h-3.5" />
                     <span>2. Sampling Team Review</span>
                     {hasSampNote ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-500/10 text-emerald-700  border border-emerald-500/25">
                         ✓ Reviewed
                       </span>
                     ) : (
@@ -349,7 +350,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                     <Factory className="w-3.5 h-3.5" />
                     <span>3. Plant Production Review</span>
                     {hasPlantNote ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-teal-500/10 text-teal-700  border border-teal-500/25">
                         ✓ Confirmed
                       </span>
                     ) : (
@@ -415,7 +416,12 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                     currentUser={effectiveUser}
                   />
                 )}
-
+                <SamplingResponsePanel
+                  className="mt-6"
+                  response={activeRequest.samplingRemark}
+                  reviewer={activeRequest.samplingSignedBy}
+                  respondedAt={activeRequest.samplingSignedAt}
+                />
               </div>
             </div>
           </div>
@@ -433,17 +439,17 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
       {/* ── Confirm Dismantle Program Modal ── */}
       {isDismantleModalOpen && (
         <div
-          className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs select-text animate-in fade-in duration-150"
+          className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-[var(--overlay-backdrop)] backdrop-blur-xs select-text animate-in fade-in duration-150"
           onClick={() => !isDismantling && setIsDismantleModalOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md bg-[var(--surface-base)] border border-rose-300/70 dark:border-rose-900/70 rounded-2xl shadow-[0_24px_70px_-12px_rgba(225,29,72,0.25)] overflow-hidden p-5 sm:p-6 space-y-4"
+            className="relative w-full max-w-md bg-[var(--surface-base)] border border-rose-300/70  rounded-2xl shadow-[0_24px_70px_-12px_rgba(225,29,72,0.25)] overflow-hidden p-5 sm:p-6 space-y-4"
           >
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/20">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-600  flex items-center justify-center shrink-0 border border-rose-500/20">
                 <Ban className="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
@@ -457,7 +463,7 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
             </div>
 
             {dismantleError && (
-              <div className="p-2.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs font-semibold">
+              <div className="p-2.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-700  text-xs font-semibold">
                 {dismantleError}
               </div>
             )}

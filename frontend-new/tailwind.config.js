@@ -35,7 +35,7 @@ export default {
           strong: "var(--border-strong)",
           focus: "var(--border-focus)",
         },
-        // Dynamic Theme Accents (Adapts across all 13 Themes)
+        // Dynamic accents for the eight supported light themes
         accent: {
           DEFAULT: "var(--accent-primary)",
           primary: "var(--accent-primary)",
@@ -44,8 +44,47 @@ export default {
           subtle: "var(--accent-primary-subtle)",
           fillEnd: "var(--accent-primary-fill-end)",
           secondary: "var(--accent-teal)",
+          secondaryStrong: "var(--accent-teal-strong)",
           secondaryHover: "var(--accent-teal-hover)",
           secondarySubtle: "var(--accent-teal-subtle)",
+        },
+        status: {
+          success: {
+            DEFAULT: "var(--status-success)",
+            soft: "var(--status-success-soft)",
+            border: "var(--status-success-border)",
+            strong: "var(--status-success-strong)",
+          },
+          warning: {
+            DEFAULT: "var(--status-warning)",
+            soft: "var(--status-warning-soft)",
+            border: "var(--status-warning-border)",
+            strong: "var(--status-warning-strong)",
+          },
+          danger: {
+            DEFAULT: "var(--status-danger)",
+            soft: "var(--status-danger-soft)",
+            border: "var(--status-danger-border)",
+            strong: "var(--status-danger-strong)",
+          },
+          info: {
+            DEFAULT: "var(--status-info)",
+            soft: "var(--status-info-soft)",
+            border: "var(--status-info-border)",
+            strong: "var(--status-info-strong)",
+          },
+          purple: {
+            DEFAULT: "var(--status-purple)",
+            soft: "var(--status-purple-soft)",
+            border: "var(--status-purple-border)",
+            strong: "var(--status-purple-strong)",
+          },
+          neutral: {
+            DEFAULT: "var(--status-neutral)",
+            soft: "var(--status-neutral-soft)",
+            border: "var(--status-neutral-border)",
+            strong: "var(--status-neutral-strong)",
+          },
         },
         // Navigation & Sidebar Semantic Surfaces
         sidebar: {
@@ -68,15 +107,15 @@ export default {
         // High-Performance Flow Accents: Energy & Water
         luminous: {
           green: "rgb(var(--accent-primary-rgb) / <alpha-value>)",
-          greenDark: "rgb(var(--accent-primary-strong-rgb) / <alpha-value>)",
-          blue: "#0070ff",
-          blueDark: "#004bb5",
-          outline: "rgba(187, 203, 185, 0.25)",
+          greenStrong: "rgb(var(--accent-primary-strong-rgb) / <alpha-value>)",
+          blue: "rgb(var(--accent-teal-rgb) / <alpha-value>)",
+          blueStrong: "var(--accent-teal-strong)",
+          outline: "rgb(var(--accent-primary-rgb) / 0.25)",
         },
         'luminous-green': "rgb(var(--accent-primary-rgb) / <alpha-value>)",
-        'luminous-green-dark': "rgb(var(--accent-primary-strong-rgb) / <alpha-value>)",
-        'luminous-blue': "#0070ff",
-        'luminous-blue-dark': "#004bb5",
+        'luminous-green-strong': "rgb(var(--accent-primary-strong-rgb) / <alpha-value>)",
+        'luminous-blue': "rgb(var(--accent-teal-rgb) / <alpha-value>)",
+        'luminous-blue-strong': "var(--accent-teal-strong)",
         brand: {
           50: "#eff6ff",
           100: "#dbeafe",
@@ -97,13 +136,13 @@ export default {
         mono: ['"JetBrains Mono"', '"Geist Mono"', 'monospace'],
       },
       boxShadow: {
-        'ambient': '0 20px 40px -15px rgba(11, 28, 48, 0.05)',
-        'ambient-float': '0 30px 60px -12px rgba(11, 28, 48, 0.08)',
-        'glow-green': '0 0 25px -4px rgba(0, 209, 102, 0.4)',
-        'glow-blue': '0 0 25px -4px rgba(0, 112, 255, 0.4)',
-        'subtle-1': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-        'subtle-2': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)',
-        'panel': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+        'ambient': '0 20px 40px -15px rgb(var(--shadow-ink) / 0.06)',
+        'ambient-float': '0 30px 60px -12px rgb(var(--shadow-ink) / 0.10)',
+        'glow-green': '0 0 25px -4px rgb(var(--accent-primary-rgb) / 0.4)',
+        'glow-blue': '0 0 25px -4px rgb(var(--accent-teal-rgb) / 0.4)',
+        'subtle-1': '0 1px 2px 0 rgb(var(--shadow-ink) / 0.05)',
+        'subtle-2': '0 1px 3px 0 rgb(var(--shadow-ink) / 0.10), 0 1px 2px -1px rgb(var(--shadow-ink) / 0.10)',
+        'panel': '0 4px 6px -1px rgb(var(--shadow-ink) / 0.10), 0 2px 4px -2px rgb(var(--shadow-ink) / 0.10)',
       },
       borderRadius: {
         'xs': '3px',

@@ -270,7 +270,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
           </div>
 
           {submitError && (
-            <div role="alert" className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 p-3 text-xs font-medium text-rose-600 dark:text-rose-400">
+            <div role="alert" className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 p-3 text-xs font-medium text-rose-600 ">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span>{submitError}</span>
             </div>
@@ -298,7 +298,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
       )}
 
       {mode === "creative" && (isAwaitingReview || isRemainingRequested) && (
-        <div role="status" className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 text-xs text-amber-800 dark:text-amber-200">
+        <div role="status" className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 text-xs text-amber-800 ">
           {isRemainingRequested ? (
             <>
               <strong className="font-semibold">Marketing requested the remaining artwork.</strong>{" "}
@@ -328,7 +328,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
           </p>
 
           {decisionError && (
-            <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 p-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400">
+            <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 p-2.5 text-xs font-semibold text-rose-600 ">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{decisionError}</span>
             </div>
@@ -465,7 +465,7 @@ export const DesignDeliverablesTab: React.FC<DesignDeliverablesTabProps> = React
                               Accept
                             </label>
                           ) : isAcceptedByMarketing && (!acceptedDesignNumbers.length || acceptedDesignNumbers.includes(String(row.designNumber))) ? (
-                            <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Accepted</span>
+                            <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ">Accepted</span>
                           ) : null}
                         </td>
                       )}

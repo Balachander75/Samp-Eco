@@ -45,6 +45,8 @@ export interface StagedProductItem {
   creationMode?: "material_code" | "binding" | "custom" | "new";
   savedRequestId?: string | number;
   savedSrNumber?: string;
+  savedRequestCode?: string;
+  savedRequestCodes?: Record<string, string>;
   isDraftSaved?: boolean;
   sourceSampleRequestId?: number;
   sourceSampleCode?: string;

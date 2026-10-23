@@ -565,7 +565,7 @@ export const SampleRequestsDesk: React.FC<SampleRequestsDeskProps> = ({ user }) 
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-6 right-6 z-[100] max-w-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-[12px] font-semibold px-4 py-3 rounded-2xl shadow-2xl border border-zinc-700/50 dark:border-zinc-300 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-200"
+          className="fixed bottom-6 right-6 z-[100] max-w-md bg-zinc-900 text-white   text-[12px] font-semibold px-4 py-3 rounded-2xl shadow-2xl border border-zinc-700/50  flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-200"
         >
           <span>{toastMessage}</span>
         </div>

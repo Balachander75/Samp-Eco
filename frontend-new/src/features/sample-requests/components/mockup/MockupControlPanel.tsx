@@ -105,6 +105,7 @@ export const MockupControlPanel: React.FC<MockupControlPanelProps> = ({
           <RequestClosureControl
             requests={closureRequests}
             canClose={canCloseRequest}
+            reasonRequired={role === "marketing"}
             onClosed={onRequestClosed}
           />
         )}

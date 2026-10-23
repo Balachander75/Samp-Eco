@@ -144,7 +144,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
           {/* ── 1. Requested Deliverable Scopes Matrix ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-3.5 rounded-2xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
-              <span className="font-display text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-400 block mb-1">
+              <span className="font-display text-[10px] uppercase font-bold text-slate-400  block mb-1">
                 Creative Design
               </span>
               <div className="font-display font-bold text-xs text-[var(--on-surface)]">
@@ -162,7 +162,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
             </div>
 
             <div className="p-3.5 rounded-2xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
-              <span className="font-display text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-400 block mb-1">
+              <span className="font-display text-[10px] uppercase font-bold text-slate-400  block mb-1">
                 Studio CAD / Dieline
               </span>
               <div className="font-display font-bold text-xs text-[var(--on-surface)]">
@@ -174,7 +174,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
             </div>
 
             <div className="p-3.5 rounded-2xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
-              <span className="font-display text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-400 block mb-1">
+              <span className="font-display text-[10px] uppercase font-bold text-slate-400  block mb-1">
                 Physical Sampling
               </span>
               <div className="font-display font-bold text-xs text-[var(--on-surface)]">
@@ -186,7 +186,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
             </div>
 
             <div className="p-3.5 rounded-2xl bg-[var(--surface-low)] border border-[var(--border-subtle)]">
-              <span className="font-display text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-400 block mb-1">
+              <span className="font-display text-[10px] uppercase font-bold text-slate-400  block mb-1">
                 Commercial Costing
               </span>
               <div className="font-display font-bold text-xs text-[var(--on-surface)]">
@@ -201,10 +201,10 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
           {/* ── 2. Technical Scope & Specifications Card ── */}
           <div className="p-5 rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-4">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-2 font-display">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500  mb-2 font-display">
                 Technical Specification &amp; Product Description
               </div>
-              <div className="p-4 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-slate-800 dark:text-zinc-200 leading-relaxed font-sans whitespace-pre-wrap">
+              <div className="p-4 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-slate-800  leading-relaxed font-sans whitespace-pre-wrap">
                 {displayDescription || "No detailed technical description recorded for this item."}
               </div>
             </div>
@@ -212,10 +212,10 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
             {/* Marketing Remarks / Directives */}
             {displayRemark && (
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-1.5 font-display">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500  mb-1.5 font-display">
                   Marketing Directives &amp; Commercial Notes
                 </div>
-                <div className="p-3.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 text-xs text-amber-900 dark:text-amber-200 font-sans leading-relaxed italic">
+                <div className="p-3.5 rounded-xl bg-amber-50/50  border border-amber-200/60  text-xs text-amber-900  font-sans leading-relaxed italic">
                   "{displayRemark}"
                 </div>
               </div>
@@ -226,7 +226,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
               {activeRequest.materialCode && (
                 <div className="flex items-baseline py-1">
                   <span className="w-36 text-slate-400 font-medium shrink-0">Material Code</span>
-                  <span className="flex-1 font-mono font-bold text-slate-800 dark:text-zinc-200">
+                  <span className="flex-1 font-mono font-bold text-slate-800 ">
                     {activeRequest.materialCode}
                   </span>
                 </div>
@@ -234,7 +234,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
               {activeRequest.brandName && (
                 <div className="flex items-baseline py-1">
                   <span className="w-36 text-slate-400 font-medium shrink-0">Brand Name</span>
-                  <span className="flex-1 font-semibold text-slate-800 dark:text-zinc-200">
+                  <span className="flex-1 font-semibold text-slate-800 ">
                     {activeRequest.brandName}
                   </span>
                 </div>
@@ -242,7 +242,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
               {activeRequest.targetPlant && (
                 <div className="flex items-baseline py-1">
                   <span className="w-36 text-slate-400 font-medium shrink-0">Target Facility</span>
-                  <span className="flex-1 text-slate-800 dark:text-zinc-200">
+                  <span className="flex-1 text-slate-800 ">
                     Plant {activeRequest.targetPlant}
                   </span>
                 </div>
@@ -260,10 +260,10 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
 
           {/* ── 3. Reference URLs & Links ── */}
           {requestTypes.includes("costing") && (
-            <section className="space-y-4 rounded-2xl bg-teal-50/45 p-5 dark:bg-teal-950/15">
+            <section className="space-y-4 rounded-2xl bg-teal-50/45 p-5 ">
               <div>
-                <h3 className="text-sm font-bold text-slate-950 dark:text-white">Costing handoff details</h3>
-                <p className="mt-1 text-xs text-slate-600 dark:text-zinc-400">Costing schedule, customer identifiers, and submitted output for Marketing review.</p>
+                <h3 className="text-sm font-bold text-slate-950 ">Costing handoff details</h3>
+                <p className="mt-1 text-xs text-slate-600 ">Costing schedule, customer identifiers, and submitted output for Marketing review.</p>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
@@ -276,27 +276,27 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
                   ["Barcode", activeRequest.barcode],
                   ["Brand", activeRequest.brandName],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl bg-white/80 p-3 dark:bg-white/[0.04]">
-                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-teal-800/75 dark:text-teal-300/75">{label}</span>
+                  <div key={label} className="rounded-xl bg-white/80 p-3 ">
+                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-teal-800/75 ">{label}</span>
                     <span className="mt-1 block break-words text-xs font-semibold text-[var(--on-surface)]">{value || "—"}</span>
                   </div>
                 ))}
               </div>
               {activeRequest.costingOutputPath && (
-                <div className="rounded-xl bg-white/80 p-3 dark:bg-white/[0.04]">
-                  <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-teal-800/75 dark:text-teal-300/75">Completed costing output</span>
+                <div className="rounded-xl bg-white/80 p-3 ">
+                  <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-teal-800/75 ">Completed costing output</span>
                   {/^https?:\/\//i.test(activeRequest.costingOutputPath) ? (
-                    <a href={activeRequest.costingOutputPath} target="_blank" rel="noreferrer" className="break-all text-xs font-semibold text-teal-800 underline underline-offset-2 dark:text-teal-300">{activeRequest.costingOutputPath}</a>
+                    <a href={activeRequest.costingOutputPath} target="_blank" rel="noreferrer" className="break-all text-xs font-semibold text-teal-800 underline underline-offset-2 ">{activeRequest.costingOutputPath}</a>
                   ) : (
-                    <code className="break-all text-xs text-slate-800 dark:text-zinc-200">{activeRequest.costingOutputPath}</code>
+                    <code className="break-all text-xs text-slate-800 ">{activeRequest.costingOutputPath}</code>
                   )}
                 </div>
               )}
               {activeRequest.customDetails?.length ? (
-                <div className="overflow-hidden rounded-xl bg-white/80 dark:bg-white/[0.025]">
-                  <div className="grid grid-cols-[1fr_1.5fr_1.5fr_auto] gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-zinc-400"><span>Class</span><span>Characteristic</span><span>Value</span><span>Unit</span></div>
+                <div className="overflow-hidden rounded-xl bg-white/80 ">
+                  <div className="grid grid-cols-[1fr_1.5fr_1.5fr_auto] gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-500 "><span>Class</span><span>Characteristic</span><span>Value</span><span>Unit</span></div>
                   {activeRequest.customDetails.map((detail, index) => (
-                    <div key={detail.id ?? `${detail.className}-${detail.characteristicName}-${index}`} className="grid grid-cols-[1fr_1.5fr_1.5fr_auto] gap-3 border-t border-slate-200/70 px-4 py-2.5 text-xs dark:border-white/[0.06]">
+                    <div key={detail.id ?? `${detail.className}-${detail.characteristicName}-${index}`} className="grid grid-cols-[1fr_1.5fr_1.5fr_auto] gap-3 border-t border-slate-200/70 px-4 py-2.5 text-xs ">
                       <span className="break-words font-semibold">{detail.className || "—"}</span>
                       <span className="break-words">{detail.characteristicName || "—"}</span>
                       <span className="break-words font-medium">{detail.value || "—"}</span>
@@ -310,7 +310,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
 
           {feasibilityDetails.referenceLinks.length > 0 && (
             <div className="space-y-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 font-display">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500  font-display">
                 Client Reference URLs &amp; Benchmark Links ({feasibilityDetails.referenceLinks.length})
               </div>
               <div className="flex flex-wrap gap-2">
@@ -320,7 +320,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
                     href={url.startsWith("http") ? url : `https://${url}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/70 hover:bg-slate-200/70 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/60 text-xs font-mono text-slate-700 dark:text-zinc-300 transition group"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/70 hover:bg-slate-200/70   text-xs font-mono text-slate-700  transition group"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-[var(--accent-primary)]" />
                     <span className="truncate max-w-xs">{url.replace(/^https?:\/\//, "")}</span>
@@ -333,7 +333,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
           {/* ── 4. Attached Photos & Mockup Gallery ── */}
           {previewableImages.length > 0 && (
             <div className="space-y-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 font-display">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500  font-display">
                 Attached Reference Images &amp; Mockups ({previewableImages.length})
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -341,9 +341,9 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
                   <div
                     key={img.id}
                     onClick={() => img.url && onSelectPreviewImage(img.url)}
-                    className="group relative rounded-2xl bg-slate-100/60 dark:bg-zinc-900 border border-slate-200/60 dark:border-white/5 overflow-hidden cursor-pointer transition hover:shadow-md"
+                    className="group relative rounded-2xl bg-slate-100/60  border border-slate-200/60  overflow-hidden cursor-pointer transition hover:shadow-md"
                   >
-                    <div className="aspect-[4/3] w-full bg-slate-100 dark:bg-zinc-800 overflow-hidden relative">
+                    <div className="aspect-[4/3] w-full bg-slate-100  overflow-hidden relative">
                       <img
                         src={imageSourceFor(img.url)}
                         alt={img.name}
@@ -356,7 +356,7 @@ export const InspectorSpecsTab: React.FC<InspectorSpecsTabProps> = ({
                         </span>
                       </div>
                     </div>
-                    <div className="p-2 flex items-center justify-between text-[11px] text-slate-600 dark:text-zinc-400">
+                    <div className="p-2 flex items-center justify-between text-[11px] text-slate-600 ">
                       <span className="truncate font-medium">{img.name}</span>
                       <span className="font-mono text-[10px] text-slate-400">#{idx + 1}</span>
                     </div>

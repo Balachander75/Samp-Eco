@@ -1,594 +1,1505 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Navneet SAMP — Application Workflow Architecture</title>
-  
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700;800&family=Inter:wght@600;700;800&display=swap" rel="stylesheet">
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Marketing Application Flow — StarUML Studio</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #f8fafc;
-      color: #0f172a;
-      padding: 24px 16px;
-      line-height: 1.4;
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
-
-    .wrapper {
-      max-width: 1040px;
-      margin: 0 auto;
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden; /* ZERO SCROLLING REQUIRED */
+      background: #f8fafc;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
       display: flex;
       flex-direction: column;
-      gap: 32px;
     }
 
-    /* TOP STICKY BAR */
-    .top-bar {
+    /* Top Studio Navigation Bar */
+    .studio-bar {
+      height: 52px;
+      flex-shrink: 0;
       background: #ffffff;
-      border: 2px solid #0f172a;
-      border-radius: 10px;
-      padding: 12px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      position: sticky;
-      top: 12px;
-      z-index: 100;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-    }
-    .brand-title {
-      font-size: 16px;
-      font-weight: 800;
+      border-bottom: 1px solid #e2e8f0;
       display: flex;
       align-items: center;
-      gap: 8px;
-    }
-    .badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 4px;
-      background: #0f172a;
-      color: #fff;
-    }
-
-    /* NAV LINKS */
-    .nav-tabs {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .tab-btn {
-      background: #f1f5f9;
-      border: 1.5px solid #cbd5e1;
-      padding: 6px 14px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      text-decoration: none;
-      color: #334155;
-      transition: all 0.15s;
-    }
-    .tab-btn:hover {
-      background: #0f172a;
-      color: #ffffff;
-      border-color: #0f172a;
-    }
-
-    .print-btn {
-      background: #0f172a;
-      color: #ffffff;
-      border: none;
-      padding: 7px 14px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    /* CHART CARD */
-    .chart-card {
-      background: #ffffff;
-      border: 2px solid #0f172a;
-      border-radius: 12px;
-      padding: 24px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
-      overflow-x: auto;
-    }
-    .chart-header {
-      margin-bottom: 20px;
-      padding-bottom: 12px;
-      border-bottom: 2px solid #e2e8f0;
-      display: flex;
       justify-content: space-between;
-      align-items: flex-start;
-      flex-wrap: wrap;
+      padding: 0 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      user-select: none;
+      z-index: 50;
+    }
+    .studio-title-group {
+      display: flex;
+      align-items: center;
       gap: 10px;
     }
-    .chart-title {
-      font-size: 18px;
+    .star-logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: #0284c7;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: -0.2px;
-    }
-    .chart-desc {
       font-size: 13px;
-      color: #475569;
-      margin-top: 3px;
+      letter-spacing: -0.5px;
     }
-    .pill {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 800;
-      padding: 3px 8px;
+    .studio-title {
+      font-weight: 700;
+      font-size: 13.5px;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge-clean {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #15803d;
+      background: #dcfce7;
+      border: 1px solid #86efac;
+      padding: 2px 7px;
       border-radius: 4px;
-      border: 1.5px solid;
-    }
-    .pill-amber { background: #fffbeb; border-color: #d97706; color: #92400e; }
-    .pill-green { background: #f0fdf4; border-color: #059669; color: #065f46; }
-    .pill-purple { background: #faf5ff; border-color: #7c3aed; color: #5b21b6; }
-
-    /* SVG FLOWCHART STYLES */
-    svg.flow {
-      display: block;
-      margin: 0 auto;
-      max-width: 100%;
-      height: auto;
     }
 
-    .terminal {
-      fill: #ffffff;
-      stroke: #0f172a;
-      stroke-width: 2.2;
-      rx: 20;
-      ry: 20;
+    /* Slide Switcher Tabs */
+    .slide-tabs {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #e2e8f0;
+      padding: 3px;
+      border-radius: 7px;
     }
-    .terminal.start, .terminal.end {
-      fill: #f0fdf4;
-      stroke: #059669;
-    }
-    .terminal.close {
-      fill: #fef2f2;
-      stroke: #dc2626;
-    }
-
-    .box {
-      fill: #ffffff;
-      stroke: #0f172a;
-      stroke-width: 2;
-      rx: 5;
-      ry: 5;
-    }
-    .diamond {
-      fill: #ffffff;
-      stroke: #0f172a;
-      stroke-width: 2.2;
-    }
-
-    .line {
-      stroke: #0f172a;
-      stroke-width: 2;
-      fill: none;
-    }
-    .line-green {
-      stroke: #059669;
-      stroke-width: 2.2;
-      fill: none;
-    }
-    .line-red {
-      stroke: #dc2626;
-      stroke-width: 2;
-      fill: none;
-    }
-
-    .txt {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11.5px;
-      font-weight: 800;
-      fill: #0f172a;
-      text-anchor: middle;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-    .txt-sm {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      font-weight: 800;
-      fill: #0f172a;
-      text-anchor: middle;
-      text-transform: uppercase;
-    }
-
-    .badge-yes { fill: #ecfdf5; stroke: #059669; stroke-width: 1.5; rx: 3; ry: 3; }
-    .txt-yes { fill: #065f46; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; text-anchor: middle; }
-
-    .badge-no { fill: #fef2f2; stroke: #dc2626; stroke-width: 1.5; rx: 3; ry: 3; }
-    .txt-no { fill: #991b1b; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; text-anchor: middle; }
-
-    .badge-maybe { fill: #fffbeb; stroke: #d97706; stroke-width: 1.5; rx: 3; ry: 3; }
-    .txt-maybe { fill: #92400e; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; text-anchor: middle; }
-
-    /* STEP NOTES */
-    .note-box {
-      background: #f8fafc;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin-top: 20px;
+    .slide-tab {
+      padding: 5px 13px;
+      border: 0;
+      background: transparent;
+      border-radius: 5px;
       font-size: 12px;
-      line-height: 1.5;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
     }
-    .note-box strong { color: #0f172a; }
+    .slide-tab:hover {
+      color: #0f172a;
+      background: rgba(255,255,255,0.7);
+    }
+    .slide-tab.active {
+      background: #ffffff;
+      color: #0284c7;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .studio-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn {
+      padding: 5px 11px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+      color: #0f172a;
+    }
+    .btn.active-toggle {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0284c7;
+    }
+
+    /* Slide Viewport */
+    .viewport {
+      flex: 1;
+      width: 100vw;
+      height: calc(100vh - 52px);
+      overflow: hidden; /* Fits on single screen without scrolling! */
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+    }
+
+    /* In scroll mode, allow scrolling */
+    body.scroll-mode .viewport {
+      overflow-y: auto;
+      display: block;
+      padding: 20px 20px 60px;
+    }
+    body.scroll-mode .slide-view {
+      display: flex !important;
+      margin-bottom: 40px;
+      height: auto !important;
+      max-width: 1560px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Slide Containers */
+    .slide-view {
+      display: none;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.18s ease;
+    }
+    .slide-view.active {
+      display: flex;
+    }
+
+    svg.diagram-svg {
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+      user-select: none;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.995); }
+      to { opacity: 1; transform: scale(1); }
+    }
 
     @media print {
-      body { background: #fff; padding: 0; }
-      .top-bar, .no-print { display: none !important; }
-      .wrapper { max-width: 100%; gap: 16px; }
-      .chart-card { border: 1.5px solid #000; box-shadow: none; page-break-after: always; padding: 14px; }
+      .studio-bar { display: none !important; }
+      .viewport { padding: 0 !important; overflow: visible !important; }
+      .slide-view { display: none !important; }
+      .slide-view.active { display: flex !important; max-width: 100% !important; }
     }
   </style>
 </head>
 <body>
 
-  <div class="wrapper">
-
-    <!-- TOP STICKY BAR -->
-    <header class="top-bar no-print">
-      <div class="brand-title">
-        <span class="badge">SAMP-ECO</span>
-        <span>Marketing Workflow Flowcharts</span>
+  <!-- Top Studio Navigation Bar -->
+  <header class="studio-bar">
+    <div class="studio-title-group">
+      <div class="star-logo">S</div>
+      <div>
+        <div class="studio-title">
+          StarUML Architecture Flow — Navneet SAMP Operations
+          <span class="badge-clean">Single Page • Zero Overlap</span>
+        </div>
       </div>
+    </div>
 
-      <nav class="nav-tabs">
-        <a href="#flow-feasibility" class="tab-btn">1. Feasibility Flow</a>
-        <a href="#flow-sample" class="tab-btn">2. Sample Request Flow (4 Scopes)</a>
-        <a href="#flow-program" class="tab-btn">3. Program Planning Flow</a>
-      </nav>
+    <!-- 4 Slide Switcher Tabs -->
+    <nav class="slide-tabs" aria-label="Workflow Slide Navigation">
+      <button class="slide-tab active" data-slide="1" title="Shortcut: Press '1'">
+        1. Feasibility Flow
+      </button>
+      <button class="slide-tab" data-slide="2" title="Shortcut: Press '2'">
+        2. Program Planning Flow
+      </button>
+      <button class="slide-tab" data-slide="3" title="Shortcut: Press '3'">
+        3. Sampling (4 Scopes)
+      </button>
+      <button class="slide-tab" data-slide="4" title="Shortcut: Press '4'">
+        4. Merged Master Flow
+      </button>
+    </nav>
 
-      <button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
-    </header>
+    <!-- Slide Navigation & Export Buttons -->
+    <div class="studio-actions">
+      <button class="btn" id="btn-prev" title="Previous Slide (Left Arrow key)">◀ Prev</button>
+      <button class="btn" id="btn-next" title="Next Slide (Right Arrow key)">Next ▶</button>
+      <button class="btn" id="btn-toggle-fit" title="Toggle between Single-Screen (No Scroll) and All-Slides Continuous View">
+        🖥 Fit to Screen
+      </button>
+      <button class="btn" onclick="window.print()" title="Print Current Slide or Save as PDF">🖨 Print / PDF</button>
+      <button class="btn" id="btn-svg" title="Download SVG of Current Slide">⬇ Download SVG</button>
+    </div>
+  </header>
 
-    <!-- SHARED SVG ARROW DEFINITIONS -->
-    <svg width="0" height="0" style="position:absolute;">
+  <!-- Main Viewport (Zero Scroll, Fits Perfectly) -->
+  <main class="viewport">
+    <!-- Slide 1: Feasibility Flow -->
+    <div class="slide-view active" id="view-slide-1">
+      
+    <svg id="svg-slide-1" class="diagram-svg" viewBox="0 0 1500 820" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <marker id="arr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 1 L 8 5 L 0 9 z" fill="#0f172a" />
+        <filter id="staruml-shadow-1" x="-4%" y="-4%" width="110%" height="112%" filterUnits="userSpaceOnUse">
+          <feDropShadow dx="2.5" dy="2.5" stdDeviation="0" flood-color="#000000" flood-opacity="0.14" />
+        </filter>
+        <marker id="solid-arrow-1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M 1 1 L 8 5 L 1 9 Z" fill="#000000"/>
         </marker>
-        <marker id="arr-g" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 1 L 8 5 L 0 9 z" fill="#059669" />
-        </marker>
-        <marker id="arr-r" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 1 L 8 5 L 0 9 z" fill="#dc2626" />
+        <marker id="red-arrow-1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="#dc2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
         </marker>
       </defs>
+
+      <!-- Frame -->
+      <rect x="20" y="16" width="1460" height="788" fill="none" stroke="#000000" stroke-width="1.5"/>
+      <path d="M 20 16 L 380 16 L 400 40 L 400 48 L 20 48 Z" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+      <text x="34" y="38" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+        act [Slide 1] Feasibility_Check_Lifecycle
+      </text>
+
+      <!-- Top Row: Flow Initiation -->
+      <!-- Actor: Marketing -->
+      <circle cx="160" cy="85" r="14" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+      <line x1="160" y1="99" x2="160" y2="128" stroke="#000000" stroke-width="1.5"/>
+      <line x1="135" y1="108" x2="185" y2="108" stroke="#000000" stroke-width="1.5"/>
+      <line x1="160" y1="128" x2="142" y2="152" stroke="#000000" stroke-width="1.5"/>
+      <line x1="160" y1="128" x2="178" y2="152" stroke="#000000" stroke-width="1.5"/>
+      <text x="160" y="172" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+        «actor» Marketing Team
+      </text>
+
+      <!-- Arrow from Actor to Step 1 -->
+      <line x1="225" y1="110" x2="278" y2="110" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+
+      <!-- Step 1: Raise Feasibility Request -->
+      <g filter="url(#staruml-shadow-1)">
+        <rect x="280" y="70" width="370" height="80" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="465" y="91" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#475569">«action» Marketing</text>
+        <text x="465" y="110" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Raise Feasibility Check Request
+        </text>
+        <line x1="280" y1="120" x2="650" y2="120" stroke="#000000" stroke-width="1"/>
+        <text x="465" y="138" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Inputs: Customer, Target Plant, Packaging Category &amp; Due Date
+        </text>
+      </g>
+
+      <!-- Arrow from Step 1 to Step 2 -->
+      <line x1="650" y1="110" x2="708" y2="110" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+
+      <!-- Step 2: Sampling Team Claims Task -->
+      <g filter="url(#staruml-shadow-1)">
+        <rect x="710" y="70" width="380" height="80" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="900" y="91" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#475569">«action» Sampling Team</text>
+        <text x="900" y="110" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Claim Feasibility Task &amp; Assess Viability
+        </text>
+        <line x1="710" y1="120" x2="1090" y2="120" stroke="#000000" stroke-width="1"/>
+        <text x="900" y="138" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          SAMP reviewer claims work; evaluates plant tooling &amp; substrates
+        </text>
+      </g>
+
+      <!-- Arrow from Step 2 to Verdict Diamond -->
+      <line x1="1090" y1="110" x2="1158" y2="110" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+
+      <!-- Step 3: Verdict Diamond -->
+      <polygon points="1260,75 1370,110 1260,145 1150,110" fill="#ffffff" stroke="#000000" stroke-width="1.5" filter="url(#staruml-shadow-1)"/>
+      <text x="1260" y="106" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+        Sampling Verdict?
+      </text>
+      <text x="1260" y="122" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#475569">
+        (3 Outcome Branches)
+      </text>
+
+
+      <!-- ======================================================== -->
+      <!-- LEFT BRANCH: YES & MAYBE VERDICT                         -->
+      <!-- ======================================================== -->
+      <path d="M 1205 128 L 1205 195 L 465 195 L 465 238" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+      <rect x="730" y="184" width="280" height="22" fill="#ffffff" stroke="#15803d" stroke-width="1" rx="3"/>
+      <text x="870" y="199" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#15803d">
+        [Yes: Feasible  |  Maybe: Conditional]
+      </text>
+
+      <!-- Marketing Reviews Yes / Maybe Verdict -->
+      <g filter="url(#staruml-shadow-1)">
+        <rect x="280" y="240" width="370" height="82" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="465" y="261" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#475569">«decision gate» Marketing</text>
+        <text x="465" y="281" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Marketing Reviews Yes / Maybe Verdict
+        </text>
+        <line x1="280" y1="291" x2="650" y2="291" stroke="#000000" stroke-width="1"/>
+        <text x="465" y="310" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Marketing evaluates technical remarks &amp; condition requirements
+        </text>
+      </g>
+
+      <line x1="465" y1="322" x2="465" y2="368" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+
+      <!-- Decision Diamond for Yes/Maybe -->
+      <polygon points="465,370 555,405 465,440 375,405" fill="#ffffff" stroke="#000000" stroke-width="1.5" filter="url(#staruml-shadow-1)"/>
+      <text x="465" y="409" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12" fill="#000000">
+        Accept Decision?
+      </text>
+
+      <!-- Reject Branch for Yes/Maybe -->
+      <path d="M 375 405 L 160 405 L 160 478" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+      <rect x="235" y="394" width="60" height="20" fill="#ffffff" stroke="#b91c1c" stroke-width="1" rx="2"/>
+      <text x="265" y="408" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#b91c1c">
+        [Reject]
+      </text>
+
+      <g filter="url(#staruml-shadow-1)">
+        <rect x="75" y="480" width="170" height="70" fill="#ffffff" stroke="#b91c1c" stroke-width="1.5" rx="4"/>
+        <text x="160" y="504" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#b91c1c">
+          Request Closed
+        </text>
+        <line x1="75" y1="514" x2="245" y2="514" stroke="#b91c1c" stroke-width="1"/>
+        <text x="160" y="533" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#475569">
+          Rejected by Marketing
+        </text>
+      </g>
+      <line x1="160" y1="550" x2="160" y2="588" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+      <circle cx="160" cy="600" r="8" fill="#000000"/>
+      <circle cx="160" cy="600" r="13" fill="none" stroke="#000000" stroke-width="1.5"/>
+
+      <!-- Accept Branch -> Downstream Options -->
+      <line x1="465" y1="440" x2="465" y2="478" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+      <rect x="475" y="448" width="65" height="20" fill="#ffffff" stroke="#15803d" stroke-width="1" rx="2"/>
+      <text x="507" y="462" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#15803d">
+        [Accept]
+      </text>
+
+      <g filter="url(#staruml-shadow-1)">
+        <rect x="280" y="480" width="370" height="170" fill="#ffffff" stroke="#15803d" stroke-width="1.5" rx="4"/>
+        <text x="465" y="503" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11.5" fill="#15803d" font-weight="600">«future commercial options»</text>
+        <text x="465" y="523" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Accepted: Downstream Options Unlocked
+        </text>
+        <line x1="280" y1="533" x2="650" y2="533" stroke="#15803d" stroke-width="1"/>
+        <text x="300" y="555" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#0f172a">
+          Marketing can now choose any future request:
+        </text>
+        <text x="315" y="577" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="11.5" fill="#0284c7">
+          ✔ Option A: Sample Request
+        </text>
+        <text x="315" y="597" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="11.5" fill="#7c3aed">
+          ✔ Option B: Mockup Request
+        </text>
+        <text x="315" y="617" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="11.5" fill="#b45309">
+          ✔ Option C: Costing Request
+        </text>
+        <text x="300" y="639" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#475569">
+          (Future requests inherit validated feasibility specs)
+        </text>
+      </g>
+
+      <line x1="465" y1="650" x2="465" y2="688" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+      <circle cx="465" cy="700" r="8" fill="#000000"/>
+      <circle cx="465" cy="700" r="13" fill="none" stroke="#000000" stroke-width="1.5"/>
+      <text x="465" y="730" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12" fill="#15803d">
+        Eligible for Commercial Staging
+      </text>
+
+
+      <!-- ======================================================== -->
+      <!-- RIGHT BRANCH: NO VERDICT (NOT FEASIBLE)                  -->
+      <!-- ======================================================== -->
+      <path d="M 1315 128 L 1315 238" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+      <rect x="1325" y="175" width="130" height="22" fill="#ffffff" stroke="#b91c1c" stroke-width="1" rx="3"/>
+      <text x="1390" y="190" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#b91c1c">
+        [No: Not Feasible]
+      </text>
+
+      <g filter="url(#staruml-shadow-1)">
+        <rect x="1100" y="240" width="370" height="82" fill="#ffffff" stroke="#b91c1c" stroke-width="1.5" rx="4"/>
+        <text x="1285" y="261" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#b91c1c">«verdict: no» Marketing</text>
+        <text x="1285" y="281" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#b91c1c">
+          Marketing Reviews 'No' (Not Feasible)
+        </text>
+        <line x1="1100" y1="291" x2="1470" y2="291" stroke="#b91c1c" stroke-width="1"/>
+        <text x="1285" y="310" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Sampling confirmed production cannot proceed due to constraints
+        </text>
+      </g>
+
+      <line x1="1285" y1="322" x2="1285" y2="368" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+
+      <!-- Decision Diamond for 'No' -->
+      <polygon points="1285,370 1375,405 1285,440 1195,405" fill="#ffffff" stroke="#000000" stroke-width="1.5" filter="url(#staruml-shadow-1)"/>
+      <text x="1285" y="409" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12" fill="#000000">
+        Marketing Action?
+      </text>
+
+      <!-- Funneling into Mandatory Close -->
+      <path d="M 1195 405 L 1150 405 L 1150 478" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+      <rect x="1100" y="394" width="85" height="20" fill="#ffffff" stroke="#475569" stroke-width="1" rx="2"/>
+      <text x="1142" y="408" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="10.5" fill="#475569">
+        [Accept Reason]
+      </text>
+
+      <path d="M 1375 405 L 1420 405 L 1420 478" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+      <rect x="1390" y="394" width="60" height="20" fill="#ffffff" stroke="#b91c1c" stroke-width="1" rx="2"/>
+      <text x="1420" y="408" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10.5" fill="#b91c1c">
+        [Reject]
+      </text>
+
+      <!-- Mandatory Close Box -->
+      <g filter="url(#staruml-shadow-1)">
+        <rect x="1100" y="480" width="370" height="170" fill="#ffffff" stroke="#b91c1c" stroke-width="1.5" rx="4"/>
+        <text x="1285" y="503" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11.5" fill="#b91c1c" font-weight="600">«terminal closed»</text>
+        <text x="1285" y="523" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#b91c1c">
+          Request Closed: No Commercial Conversion
+        </text>
+        <line x1="1100" y1="533" x2="1470" y2="533" stroke="#b91c1c" stroke-width="1"/>
+        <text x="1285" y="555" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Even if Marketing accepts with an exception reason:
+        </text>
+        <text x="1285" y="577" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12" fill="#b91c1c">
+          ✖ CANNOT be converted into commercial staging!
+        </text>
+        <text x="1285" y="597" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Request is permanently closed and work stops here.
+        </text>
+        <text x="1285" y="617" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#475569">
+          (Prevents non-viable specifications entering production)
+        </text>
+      </g>
+
+      <line x1="1285" y1="650" x2="1285" y2="688" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-1)"/>
+      <circle cx="1285" cy="700" r="8" fill="#000000"/>
+      <circle cx="1285" cy="700" r="13" fill="none" stroke="#000000" stroke-width="1.5"/>
+      <text x="1285" y="730" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12" fill="#b91c1c">
+        Request Permanently Closed
+      </text>
+
+      <!-- Red Callout Annotations (Well inside frame) -->
+      <path d="M 68 85 Q 100 80 135 85" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-1)"/>
+      <text x="60" y="89" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        Actor: Marketing
+      </text>
+
+      <path d="M 1260 48 Q 1260 60 1260 70" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-1)"/>
+      <text x="1260" y="42" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        3-Way Viability Verdict
+      </text>
+
+      <path d="M 680 540 Q 665 540 655 540" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-1)"/>
+      <text x="690" y="544" text-anchor="start" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        Acceptance Unlocks Downstream Choices
+      </text>
+
+      <path d="M 1070 540 Q 1085 540 1095 540" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-1)"/>
+      <text x="1060" y="544" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        No Verdict = Mandatory Stop
+      </text>
     </svg>
 
-    <!-- ==================================================================== -->
-    <!-- 1. EXACT FEASIBILITY REQUEST FLOWCHART                               -->
-    <!-- ==================================================================== -->
-    <!-- ==================================================================== -->
-    <!-- 1. EXACT FEASIBILITY REQUEST FLOWCHART                               -->
-    <!-- ==================================================================== -->
-    <section id="feasibility-flow" class="chart-card">
-      <a id="flow-feasibility"></a>
-      <div class="chart-header">
-        <div>
-          <h2 class="chart-title">1. Feasibility Check Flowchart</h2>
-          <p class="chart-desc">Marketing raises request ➔ Sampling team responds (Yes / No / Maybe) ➔ Marketing accepts or rejects ➔ If accepted, unlocks Mockup, Sampling, or Costing</p>
-        </div>
-        <span class="pill pill-amber">Marketing ➔ Sampling Team</span>
-      </div>
-
-      <svg class="flow" width="900" height="790" viewBox="0 0 900 790">
-        <!-- 1. START -->
-        <rect x="370" y="15" width="160" height="36" class="terminal start" />
-        <text x="450" y="38" class="txt" style="fill:#065f46;">START</text>
-
-        <path d="M 450 51 L 450 78" class="line" marker-end="url(#arr)" />
-
-        <!-- 2. MARKETING RAISES FEASIBILITY -->
-        <rect x="250" y="78" width="400" height="42" class="box" style="stroke:#059669; fill:#f0fdf4;" />
-        <text x="450" y="104" class="txt" style="fill:#065f46;">1. MARKETING RAISES FEASIBILITY REQUEST</text>
-
-        <path d="M 450 120 L 450 155" class="line" marker-end="url(#arr)" />
-
-        <!-- 3. SAMPLING TEAM REVIEWS -->
-        <rect x="250" y="155" width="400" height="42" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
-        <text x="450" y="181" class="txt" style="fill:#0f766e;">2. SAMPLING TEAM REVIEWS PACKAGING SPECS</text>
-
-        <path d="M 450 197 L 450 230" class="line" marker-end="url(#arr)" />
-
-        <!-- 4. DECISION: SAMPLING TEAM VERDICT (YES / NO / MAYBE) -->
-        <polygon points="450,230 590,265 450,300 310,265" class="diamond" style="stroke:#0d9488;" />
-        <text x="450" y="269" class="txt">3. SAMPLING VERDICT?</text>
-
-        <!-- VERDICT 1: "NO" (LEFT -> DOWN TO MARKETING REVIEW) -->
-        <path d="M 310 265 L 100 265 L 100 377 L 242 377" class="line-red" marker-end="url(#arr-r)" />
-        <rect x="135" y="244" width="110" height="20" class="badge-no" />
-        <text x="190" y="258" class="txt-no">NO (UNFEASIBLE)</text>
-
-        <!-- VERDICT 2: "YES" (STRAIGHT DOWN TO MARKETING REVIEW) -->
-        <path d="M 450 300 L 450 353" class="line-green" marker-end="url(#arr-g)" />
-        <rect x="395" y="315" width="110" height="20" class="badge-yes" />
-        <text x="450" y="329" class="txt-yes">YES (FEASIBLE)</text>
-
-        <!-- VERDICT 3: "MAYBE" (RIGHT -> DOWN TO MARKETING REVIEW) -->
-        <path d="M 590 265 L 800 265 L 800 377 L 658 377" class="line" marker-end="url(#arr)" />
-        <rect x="655" y="244" width="125" height="20" class="badge-maybe" />
-        <text x="717.5" y="258" class="txt-maybe">MAYBE (CONDITIONAL)</text>
-
-        <!-- 5. MARKETING RECEIVES VERDICT -->
-        <rect x="250" y="355" width="400" height="44" class="box" style="stroke:#059669; fill:#f0fdf4;" />
-        <text x="450" y="378" class="txt" style="fill:#065f46;">4. MARKETING RECEIVES SAMPLING VERDICT</text>
-        <text x="450" y="392" class="txt-sm" style="fill:#64748b; font-size:9.5px;">(Reviews Remarks: YES, NO, or MAYBE)</text>
-
-        <path d="M 450 399 L 450 435" class="line" marker-end="url(#arr)" />
-
-        <!-- 6. DECISION: MARKETING DECISION (ACCEPT OR REJECT) -->
-        <polygon points="450,435 590,470 450,505 310,470" class="diamond" style="stroke:#059669;" />
-        <text x="450" y="474" class="txt">5. MARKETING DECISION?</text>
-
-        <!-- REJECT: GOES TO CLOSE -->
-        <path d="M 310 470 L 188 470" class="line-red" marker-end="url(#arr-r)" />
-        <rect x="205" y="445" width="85" height="18" class="badge-no" />
-        <text x="247.5" y="458" class="txt-no">REJECT / CLOSE</text>
-
-        <!-- CLOSE BOX -->
-        <rect x="30" y="452" width="150" height="36" class="terminal close" />
-        <text x="105" y="475" class="txt" style="fill:#dc2626; font-size:10.5px;">REQUEST CLOSED</text>
-
-        <!-- ACCEPT (ONLY FOR YES OR MAYBE) -->
-        <path d="M 450 505 L 450 548" class="line-green" marker-end="url(#arr-g)" />
-        <rect x="350" y="515" width="200" height="20" class="badge-yes" />
-        <text x="450" y="529" class="txt-yes">ACCEPT (YES / MAYBE ONLY)</text>
-
-        <!-- 7. FEASIBILITY ACCEPTED - UNLOCKS OPTIONS -->
-        <rect x="220" y="550" width="460" height="42" class="box" style="stroke:#059669; fill:#ecfdf5; stroke-width:2.2;" />
-        <text x="450" y="576" class="txt" style="fill:#065f46;">6. FEASIBILITY ACCEPTED ➔ OPTIONS UNLOCKED</text>
-
-        <!-- SPLIT TO 3 OPTIONS (MOCKUP, SAMPLING, COSTING) -->
-        <path d="M 450 592 L 450 618" class="line" />
-        <path d="M 150 618 L 750 618" class="line" />
-
-        <!-- OPTION 1: MOCKUP REQUEST -->
-        <path d="M 150 618 L 150 640" class="line" marker-end="url(#arr)" />
-        <rect x="60" y="640" width="180" height="46" class="box" style="stroke:#2563eb; fill:#eff6ff;" />
-        <text x="150" y="660" class="txt-sm" style="fill:#1e40af;">RAISE MOCKUP</text>
-        <text x="150" y="675" class="txt-sm" style="fill:#64748b; font-size:9px;">(Studio Team / CAD Dieline)</text>
-
-        <!-- OPTION 2: SAMPLING REQUEST -->
-        <path d="M 450 618 L 450 640" class="line" marker-end="url(#arr)" />
-        <rect x="360" y="640" width="180" height="46" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
-        <text x="450" y="660" class="txt-sm" style="fill:#115e59;">RAISE SAMPLING</text>
-        <text x="450" y="675" class="txt-sm" style="fill:#64748b; font-size:9px;">(Physical Lab Sample)</text>
-
-        <!-- OPTION 3: COSTING REQUEST -->
-        <path d="M 750 618 L 750 640" class="line" marker-end="url(#arr)" />
-        <rect x="660" y="640" width="180" height="46" class="box" style="stroke:#d97706; fill:#fffbeb;" />
-        <text x="750" y="660" class="txt-sm" style="fill:#92400e;">RAISE COSTING</text>
-        <text x="750" y="675" class="txt-sm" style="fill:#64748b; font-size:9px;">(Costing Desk / Price &amp; BOM)</text>
-
-        <!-- MERGE TO SAMPLE WORKFLOW -->
-        <path d="M 150 686 L 150 715 L 450 715" class="line-green" />
-        <path d="M 450 686 L 450 715" class="line-green" />
-        <path d="M 750 686 L 750 715 L 450 715" class="line-green" />
-
-        <path d="M 450 715 L 450 738" class="line-green" marker-end="url(#arr-g)" />
-
-        <rect x="270" y="738" width="360" height="34" class="terminal end" />
-        <text x="450" y="760" class="txt-sm" style="fill:#065f46;">➔ MOVES INTO SAMPLE REQUEST PIPELINE</text>
-      </svg>
-
-      <div class="note-box">
-        <strong>Exact Feasibility Workflow:</strong><br>
-        1. <strong>Marketing</strong> raises a Feasibility Check request ➔ Directly sent to <strong>Sampling Team</strong>.<br>
-        2. <strong>Sampling Team</strong> reviews packaging specs &amp; responds with: <strong>YES</strong> (Feasible), <strong>NO</strong> (Not Feasible), or <strong>MAYBE</strong> (Conditional).<br>
-        3. Sampling Team's response returns to <strong>Marketing</strong>.<br>
-        4. <strong>Marketing Decision:</strong>
-           • If Marketing chooses <strong>Reject</strong> (or Sampling said No) ➔ Request is closed.<br>
-           • If Sampling said <strong>Yes</strong> or <strong>Maybe</strong> AND Marketing chooses <strong>Accept</strong> ➔ Marketing unlocks options in the system to raise: <strong>Mockup</strong> (Studio), <strong>Sampling</strong> (Physical Sample), or <strong>Costing</strong> (Price/BOM)!
-      </div>
-    </section>
-
-
-    <!-- ==================================================================== -->
-    <!-- 2. SAMPLE REQUEST (SR) WITH THE 4 SCOPES & PLANT                     -->
-    <!-- ==================================================================== -->
-    <section id="flow-sample" class="chart-card">
-      <a id="sample-flow"></a>
-      <div class="chart-header">
-        <div>
-          <h2 class="chart-title">2. Sample Request Flowchart (4 Options & Plant Khaniwade)</h2>
-          <p class="chart-desc">Draft ➔ Released ➔ Dispatched to matching teams ➔ Client Approves ➔ Khaniwade Plant (1505) produces</p>
-        </div>
-        <span class="pill pill-green">Draft ➔ Release ➔ Khaniwade 1505</span>
-      </div>
-
-      <svg class="flow" width="940" height="740" viewBox="0 0 940 740">
-        <!-- 1. START -->
-        <rect x="380" y="15" width="160" height="36" class="terminal start" />
-        <text x="460" y="38" class="txt" style="fill:#065f46;">START</text>
-
-        <path d="M 460 51 L 460 78" class="line" marker-end="url(#arr)" />
-
-        <!-- 2. MARKETING DRAFT -->
-        <rect x="310" y="78" width="300" height="40" class="box" style="stroke:#059669; fill:#f0fdf4;" />
-        <text x="460" y="103" class="txt" style="fill:#065f46;">MARKETING CREATES DRAFT</text>
-
-        <path d="M 460 118 L 460 148" class="line" marker-end="url(#arr)" />
-
-        <!-- 3. DECISION: READY TO RELEASE? -->
-        <polygon points="460,148 580,178 460,208 340,178" class="diamond" style="stroke:#059669;" />
-        <text x="460" y="182" class="txt">READY TO RELEASE?</text>
-
-        <!-- NO: LOOP BACK -->
-        <path d="M 580 178 L 680 178 L 680 98 L 615 98" class="line-red" marker-end="url(#arr-r)" />
-        <rect x="605" y="165" width="36" height="18" class="badge-no" />
-        <text x="623" y="178" class="txt-no">NO</text>
-
-        <!-- YES: RELEASE REQUEST -->
-        <path d="M 460 208 L 460 245" class="line-green" marker-end="url(#arr-g)" />
-        <rect x="468" y="217" width="36" height="18" class="badge-yes" />
-        <text x="486" y="230" class="txt-yes">YES</text>
-
-        <!-- 4 OPTIONS BUS LINE -->
-        <path d="M 110 265 L 810 265" class="line" />
-        <path d="M 460 245 L 460 265" class="line" />
-
-        <!-- ================= SCOPE 1: DESIGN ================= -->
-        <path d="M 110 265 L 110 295" class="line" marker-end="url(#arr)" />
-        <rect x="20" y="295" width="180" height="42" class="box" style="stroke:#7c3aed; fill:#faf5ff;" />
-        <text x="110" y="316" class="txt-sm" style="fill:#5b21b6;">[✓] DESIGN</text>
-        <text x="110" y="329" class="txt-sm" style="fill:#64748b; font-size:9px;">CREATIVE TEAM MAKES PROOF</text>
-
-        <!-- Marketing Approves Art? -->
-        <path d="M 110 337 L 110 365" class="line" marker-end="url(#arr)" />
-        <polygon points="110,365 175,390 110,415 45,390" class="diamond" style="stroke:#7c3aed;" />
-        <text x="110" y="394" class="txt-sm" style="font-size:9px;">ART OK?</text>
-
-        <!-- No: Loop -->
-        <path d="M 45 390 L 10 390 L 10 316 L 18 316" class="line-red" marker-end="url(#arr-r)" />
-        <rect x="15" y="378" width="26" height="14" class="badge-no" />
-        <text x="28" y="389" class="txt-no" style="font-size:8px;">NO</text>
-
-        <!-- Yes -->
-        <path d="M 110 415 L 110 480" class="line-green" />
-        <rect x="118" y="425" width="28" height="16" class="badge-yes" />
-        <text x="132" y="437" class="txt-yes" style="font-size:9px;">YES</text>
-
-
-        <!-- ================= SCOPE 2: MOCKUP ================= -->
-        <path d="M 340 265 L 340 295" class="line" marker-end="url(#arr)" />
-        <rect x="250" y="295" width="180" height="42" class="box" style="stroke:#2563eb; fill:#eff6ff;" />
-        <text x="340" y="316" class="txt-sm" style="fill:#1e40af;">[✓] MOCKUP</text>
-        <text x="340" y="329" class="txt-sm" style="fill:#64748b; font-size:9px;">STUDIO MAKES CAD DIELINE</text>
-        <path d="M 340 337 L 340 480" class="line" />
-
-
-        <!-- ================= SCOPE 3: COSTING ================= -->
-        <path d="M 580 265 L 580 295" class="line" marker-end="url(#arr)" />
-        <rect x="490" y="295" width="180" height="42" class="box" style="stroke:#d97706; fill:#fffbeb;" />
-        <text x="580" y="316" class="txt-sm" style="fill:#92400e;">[✓] COSTING</text>
-        <text x="580" y="329" class="txt-sm" style="fill:#64748b; font-size:9px;">COSTING TEAM GIVES QUOTE</text>
-        <path d="M 580 337 L 580 480" class="line" />
-
-
-        <!-- ================= SCOPE 4: SAMPLING ================= -->
-        <path d="M 810 265 L 810 295" class="line" marker-end="url(#arr)" />
-        <rect x="720" y="295" width="180" height="42" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
-        <text x="810" y="316" class="txt-sm" style="fill:#115e59;">[✓] SAMPLING</text>
-        <text x="810" y="329" class="txt-sm" style="fill:#64748b; font-size:9px;">PHYSICAL LAB SAMPLE</text>
-        <path d="M 810 337 L 810 480" class="line" />
-
-
-        <!-- CONVERGE TO SAMPLING LAB -->
-        <path d="M 110 480 L 810 480" class="line" />
-        <path d="M 460 480 L 460 510" class="line" marker-end="url(#arr)" />
-
-        <rect x="290" y="510" width="340" height="42" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
-        <text x="460" y="531" class="txt-sm" style="fill:#115e59;">SAMPLING LAB MAKES PHYSICAL SAMPLE</text>
-        <text x="460" y="544" class="txt-sm" style="fill:#64748b; font-size:9px;">(Lab QA check pass ➔ Courier to Client)</text>
-
-        <path d="M 460 552 L 460 580" class="line" marker-end="url(#arr)" />
-
-        <!-- CLIENT APPROVES SAMPLE? -->
-        <polygon points="460,580 590,610 460,640 330,610" class="diamond" style="stroke:#059669;" />
-        <text x="460" y="614" class="txt">CLIENT APPROVES SAMPLE?</text>
-
-        <!-- NO: LOOP BACK -->
-        <path d="M 590 610 L 880 610 L 880 98 L 615 98" class="line-red" marker-end="url(#arr-r)" />
-        <rect x="615" y="597" width="55" height="18" class="badge-no" />
-        <text x="642.5" y="610" class="txt-no">REVISE</text>
-
-        <!-- YES: GOES TO PLANT KHANIWADE (1505) -->
-        <path d="M 460 640 L 460 675" class="line-green" marker-end="url(#arr-g)" />
-        <rect x="468" y="648" width="36" height="18" class="badge-yes" />
-        <text x="486" y="661" class="txt-yes">YES</text>
-
-        <!-- KHANIWADE PLANT PRODUCTION -->
-        <rect x="250" y="675" width="420" height="42" class="terminal end" style="fill:#f5f3ff; stroke:#4338ca; stroke-width:2.5;" />
-        <text x="460" y="701" class="txt" style="fill:#3730a3;">PLANT (1505 KHANIWADE): MASS PRODUCTION</text>
-      </svg>
-
-      <div class="note-box">
-        <strong>Important Routing & Plant Rule:</strong><br>
-        • If a client <em>only</em> wants Design, Mockup, or Costing, the request finishes at that team. <strong>Plant is skipped</strong>.<br>
-        • <strong>Khaniwade Plant (1505)</strong> ONLY gets involved when a <strong>physical sample / mass production</strong> is confirmed by the client!
-      </div>
-    </section>
-
-
-    <!-- ==================================================================== -->
-    <!-- 3. PROGRAM PLANNING (SEASONAL CAMPAIGNS)                             -->
-    <!-- ==================================================================== -->
-    <section id="flow-program" class="chart-card">
-      <a id="program-flow"></a>
-      <div class="chart-header">
-        <div>
-          <h2 class="chart-title">3. Seasonal Program Planning Flowchart</h2>
-          <p class="chart-desc">Dual Sign-Off: Sampling Team validates materials + Khaniwade Plant (1505) validates machine capacity</p>
-        </div>
-        <span class="pill pill-purple">Sampling + Plant (1505 Khaniwade)</span>
-      </div>
-
-      <svg class="flow" width="860" height="430" viewBox="0 0 860 430">
-        <!-- START -->
-        <rect x="350" y="15" width="160" height="36" class="terminal start" />
-        <text x="430" y="38" class="txt" style="fill:#065f46;">START</text>
-
-        <path d="M 430 51 L 430 78" class="line" marker-end="url(#arr)" />
-
-        <!-- MARKETING ENTERS CAMPAIGN -->
-        <rect x="250" y="78" width="360" height="40" class="box" style="stroke:#7c3aed; fill:#faf5ff;" />
-        <text x="430" y="103" class="txt" style="fill:#5b21b6;">MARKETING CREATES CAMPAIGN & MATERIAL MATRIX</text>
-
-        <!-- DUAL CHECKS SPLIT -->
-        <path d="M 430 118 L 430 145" class="line" />
-        <path d="M 230 145 L 630 145" class="line" />
-        <path d="M 230 145 L 230 170" class="line" marker-end="url(#arr)" />
-        <path d="M 630 145 L 630 170" class="line" marker-end="url(#arr)" />
-
-        <!-- CHECK 1: SAMPLING -->
-        <rect x="80" y="170" width="300" height="42" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
-        <text x="230" y="196" class="txt-sm" style="fill:#115e59;">SAMPLING TEAM: MATERIAL QUALITY CHECK</text>
-
-        <!-- CHECK 2: PLANT KHANIWADE 1505 -->
-        <rect x="480" y="170" width="300" height="42" class="box" style="stroke:#4338ca; fill:#f5f3ff;" />
-        <text x="630" y="196" class="txt-sm" style="fill:#3730a3;">PLANT (1505 KHANIWADE): CAPACITY CHECK</text>
-
-        <!-- BOTH MERGE DOWN -->
-        <path d="M 230 212 L 230 250 L 430 250" class="line-green" />
-        <path d="M 630 212 L 630 250 L 430 250" class="line-green" />
-        <path d="M 430 250 L 430 275" class="line-green" marker-end="url(#arr-g)" />
-
-        <!-- DUAL APPROVAL LOCKED -->
-        <rect x="270" y="275" width="320" height="42" class="box" style="stroke:#059669; stroke-width:2.5; fill:#ecfdf5;" />
-        <text x="430" y="301" class="txt" style="fill:#065f46;">BOTH TEAMS APPROVED (DUAL LOCK 🔒)</text>
-
-        <path d="M 430 317 L 430 350" class="line" marker-end="url(#arr)" />
-
-        <!-- PRODUCTION AT KHANIWADE -->
-        <rect x="230" y="350" width="400" height="42" class="terminal end" style="stroke:#4338ca; fill:#f5f3ff; stroke-width:2.5;" />
-        <text x="430" y="376" class="txt" style="fill:#3730a3;">PLANT (1505 KHANIWADE): MASS CAMPAIGN PRODUCTION</text>
-      </svg>
-
-      <div class="note-box">
-        <strong>Dual Sign-Off System:</strong><br>
-        Both <strong>Sampling Team</strong> (for paper quality) and <strong>Khaniwade Plant (1505)</strong> (for factory capacity) must sign off before mass production can begin.
-      </div>
-    </section>
-
-  </div>
-
+    </div>
+
+    <!-- Slide 2: Program Planning Flow -->
+    <div class="slide-view" id="view-slide-2">
+      
+    <svg id="svg-slide-2" class="diagram-svg" viewBox="0 0 1500 820" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="staruml-shadow-2" x="-4%" y="-4%" width="110%" height="112%" filterUnits="userSpaceOnUse">
+          <feDropShadow dx="2.5" dy="2.5" stdDeviation="0" flood-color="#000000" flood-opacity="0.14" />
+        </filter>
+        <marker id="solid-arrow-2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M 1 1 L 8 5 L 1 9 Z" fill="#000000"/>
+        </marker>
+        <marker id="red-arrow-2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="#dc2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <!-- Frame -->
+      <rect x="20" y="16" width="1460" height="788" fill="none" stroke="#000000" stroke-width="1.5"/>
+      <path d="M 20 16 L 390 16 L 410 40 L 410 48 L 20 48 Z" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+      <text x="34" y="38" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+        act [Slide 2] Program_Planning_Lifecycle
+      </text>
+
+      <!-- Top Actor: Marketing -->
+      <circle cx="750" cy="70" r="14" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+      <line x1="750" y1="84" x2="750" y2="113" stroke="#000000" stroke-width="1.5"/>
+      <line x1="725" y1="93" x2="775" y2="93" stroke="#000000" stroke-width="1.5"/>
+      <line x1="750" y1="113" x2="732" y2="137" stroke="#000000" stroke-width="1.5"/>
+      <line x1="750" y1="113" x2="768" y2="137" stroke="#000000" stroke-width="1.5"/>
+      <text x="750" y="157" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+        «actor» Marketing Team
+      </text>
+
+      <line x1="750" y1="165" x2="750" y2="198" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-2)"/>
+
+      <!-- Step 1: Create Program Planning Request with SKUs -->
+      <g filter="url(#staruml-shadow-2)">
+        <rect x="470" y="200" width="560" height="85" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="750" y="222" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#475569">«action» Marketing</text>
+        <text x="750" y="242" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="14" fill="#000000">
+          Create Program Planning Request with SKUs
+        </text>
+        <line x1="470" y1="252" x2="1030" y2="252" stroke="#000000" stroke-width="1"/>
+        <text x="750" y="271" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Inputs: Campaign title, target Plant, material specifications &amp; planned SKU rows
+        </text>
+      </g>
+
+      <line x1="750" y1="285" x2="750" y2="328" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-2)"/>
+
+      <!-- Parallel Fork Bar -->
+      <rect x="300" y="330" width="900" height="9" fill="#000000" rx="2"/>
+      <text x="750" y="322" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#475569">
+        PARALLEL FORK: REQUEST BROADCAST TO SAMPLING &amp; PLANT TEAMS
+      </text>
+
+      <line x1="480" y1="339" x2="480" y2="378" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-2)"/>
+      <line x1="1020" y1="339" x2="1020" y2="378" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-2)"/>
+
+      <!-- Branch A: Sampling Team Review -->
+      <g filter="url(#staruml-shadow-2)">
+        <rect x="300" y="380" width="360" height="95" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="480" y="402" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#475569">«team» Sampling Team</text>
+        <text x="480" y="422" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Claim Task &amp; Review SKUs
+        </text>
+        <line x1="300" y1="432" x2="660" y2="432" stroke="#000000" stroke-width="1"/>
+        <text x="480" y="451" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Member claims work &amp; evaluates
+        </text>
+        <text x="480" y="466" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          material substrate &amp; structural suitability
+        </text>
+      </g>
+
+      <!-- Branch B: Plant Team Review -->
+      <g filter="url(#staruml-shadow-2)">
+        <rect x="840" y="380" width="360" height="95" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="1020" y="402" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#475569">«team» Plant Team</text>
+        <text x="1020" y="422" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Claim Task &amp; Review SKUs
+        </text>
+        <line x1="840" y1="432" x2="1200" y2="432" stroke="#000000" stroke-width="1"/>
+        <text x="1020" y="451" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Member claims work &amp; evaluates
+        </text>
+        <text x="1020" y="466" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          plant tooling, line availability &amp; constraints
+        </text>
+      </g>
+
+      <line x1="480" y1="475" x2="480" y2="518" stroke="#000000" stroke-width="1.5"/>
+      <line x1="1020" y1="475" x2="1020" y2="518" stroke="#000000" stroke-width="1.5"/>
+
+      <!-- Parallel Join Bar -->
+      <rect x="300" y="520" width="900" height="9" fill="#000000" rx="2"/>
+      <text x="750" y="542" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#475569">
+        PARALLEL JOIN: DUAL EVALUATION SIGNED OFF
+      </text>
+
+      <line x1="750" y1="529" x2="750" y2="568" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-2)"/>
+
+      <!-- Step 2: Respond Against Marketing's SKUs -->
+      <g filter="url(#staruml-shadow-2)">
+        <rect x="470" y="570" width="560" height="82" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="750" y="591" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#475569">«action» Dual Teams</text>
+        <text x="750" y="611" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="14" fill="#000000">
+          Respond Against Marketing's SKUs
+        </text>
+        <line x1="470" y1="621" x2="1030" y2="621" stroke="#000000" stroke-width="1"/>
+        <text x="750" y="640" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Dual feedback &amp; operational feasibility recorded on planned SKU rows
+        </text>
+      </g>
+
+      <line x1="750" y1="652" x2="750" y2="688" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-2)"/>
+
+      <!-- Step 3: Program Planning Finished -->
+      <g filter="url(#staruml-shadow-2)">
+        <rect x="470" y="690" width="560" height="75" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5" rx="4"/>
+        <text x="750" y="711" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#7c3aed" font-weight="600">«planning complete»</text>
+        <text x="750" y="731" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Program Planning Finished (Dual Sign-Off)
+        </text>
+        <line x1="470" y1="741" x2="1030" y2="741" stroke="#7c3aed" stroke-width="1"/>
+        <text x="750" y="756" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Program planning phase terminates here; matrix ready for commercial promotion
+        </text>
+      </g>
+
+      <line x1="750" y1="765" x2="750" y2="788" stroke="#000000" stroke-width="1.5"/>
+      <circle cx="750" cy="794" r="6" fill="#000000"/>
+      <circle cx="750" cy="794" r="10" fill="none" stroke="#000000" stroke-width="1.5"/>
+
+      <!-- Red Callout Annotations -->
+      <path d="M 640 70 Q 690 65 730 70" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-2)"/>
+      <text x="630" y="74" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        Actor: Marketing
+      </text>
+
+      <path d="M 210 425 Q 255 425 295 425" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-2)"/>
+      <text x="200" y="429" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        Parallel Tasks: Sampling &amp; Plant
+      </text>
+
+      <path d="M 1045 610 Q 1070 610 1090 610" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-2)"/>
+      <text x="1100" y="614" text-anchor="start" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        Respond Against SKUs
+      </text>
+
+      <path d="M 1045 730 Q 1070 730 1090 730" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-2)"/>
+      <text x="1100" y="734" text-anchor="start" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        Program Planning Ends Here!
+      </text>
+    </svg>
+
+    </div>
+
+    <!-- Slide 3: Sampling (4 Commercial Scopes) Flow -->
+    <div class="slide-view" id="view-slide-3">
+      
+    <svg id="svg-slide-3" class="diagram-svg" viewBox="0 0 1600 860" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="staruml-shadow-3" x="-4%" y="-4%" width="110%" height="112%" filterUnits="userSpaceOnUse">
+          <feDropShadow dx="2.5" dy="2.5" stdDeviation="0" flood-color="#000000" flood-opacity="0.14" />
+        </filter>
+        <marker id="solid-arrow-3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M 1 1 L 8 5 L 1 9 Z" fill="#000000"/>
+        </marker>
+        <marker id="red-arrow-3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="#dc2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <!-- Frame -->
+      <rect x="20" y="16" width="1560" height="828" fill="none" stroke="#000000" stroke-width="1.5"/>
+      <path d="M 20 16 L 440 16 L 460 40 L 460 48 L 20 48 Z" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+      <text x="34" y="38" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+        act [Slide 3] Sampling_Request_4_Commercial_Scopes
+      </text>
+
+
+      <!-- ====================================================================== -->
+      <!-- LANE 1: DESIGN REQUEST (x = 40 to 395)                                 -->
+      <!-- ====================================================================== -->
+      <rect x="40" y="55" width="355" height="32" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.2" rx="4"/>
+      <text x="217" y="76" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#6b21a8">
+        1. DESIGN REQUEST FLOW
+      </text>
+
+      <!-- Step 1.1: Raise Design Request -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="45" y="105" width="345" height="65" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="217" y="124" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#475569">«action» Marketing</text>
+        <text x="217" y="142" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Raise Design Request
+        </text>
+        <line x1="45" y1="150" x2="390" y2="150" stroke="#000000" stroke-width="1"/>
+        <text x="217" y="163" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Inputs: Target design count, packaging type &amp; brief
+        </text>
+      </g>
+
+      <line x1="217" y1="170" x2="217" y2="198" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 1.2: Creative Builds Designs -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="45" y="200" width="345" height="68" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="217" y="219" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#475569">«team» Creative Team</text>
+        <text x="217" y="237" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Create &amp; Submit Designs
+        </text>
+        <line x1="45" y1="245" x2="390" y2="245" stroke="#000000" stroke-width="1"/>
+        <text x="217" y="259" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Creative team develops artwork concepts &amp; submits
+        </text>
+      </g>
+
+      <line x1="217" y1="268" x2="217" y2="298" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 1.3: Marketing Reviews Designs (Decision Diamond) -->
+      <polygon points="217,300 320,330 217,360 114,330" fill="#ffffff" stroke="#000000" stroke-width="1.5" filter="url(#staruml-shadow-3)"/>
+      <text x="217" y="326" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#000000">
+        Marketing Review?
+      </text>
+      <text x="217" y="341" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#475569">
+        (Designs received)
+      </text>
+
+      <!-- Fewer designs loop back to Creative -->
+      <path d="M 114 330 L 48 330 L 48 234 L 43 234" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <rect x="52" y="270" width="48" height="34" fill="#ffffff" stroke="#b45309" stroke-width="0.8" rx="2"/>
+      <text x="76" y="284" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="9" fill="#b45309">Fewer</text>
+      <text x="76" y="297" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="8.5" fill="#475569">Designs</text>
+
+      <!-- Accept branch -->
+      <line x1="217" y1="360" x2="217" y2="390" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <rect x="225" y="365" width="55" height="18" fill="#ffffff" stroke="#15803d" stroke-width="1" rx="2"/>
+      <text x="252" y="378" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10.5" fill="#15803d">
+        [Accept]
+      </text>
+
+      <!-- Step 1.4: Design Request Closed -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="45" y="392" width="345" height="65" fill="#ffffff" stroke="#15803d" stroke-width="1.5" rx="4"/>
+        <text x="217" y="410" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#15803d" font-weight="600">«terminal closed»</text>
+        <text x="217" y="428" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Design Request Closed
+        </text>
+        <line x1="45" y1="436" x2="390" y2="436" stroke="#15803d" stroke-width="1"/>
+        <text x="217" y="450" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Accepted designs stored for downstream requests
+        </text>
+      </g>
+
+      <line x1="217" y1="457" x2="217" y2="488" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 1.5: Future Options from Accepted Design -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="45" y="490" width="345" height="150" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5" rx="4"/>
+        <text x="217" y="511" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="11" fill="#7c3aed" font-weight="600">«future downstream options»</text>
+        <text x="217" y="530" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+          From Accepted Design:
+        </text>
+        <line x1="45" y1="539" x2="390" y2="539" stroke="#7c3aed" stroke-width="1"/>
+        <text x="65" y="559" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#0f172a">
+          Marketing can choose this design to:
+        </text>
+        <text x="80" y="580" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="11.5" fill="#0284c7">
+          ✔ Raise Mockup Request
+        </text>
+        <text x="80" y="600" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="11.5" fill="#059669">
+          ✔ Raise Sampling Request
+        </text>
+        <text x="80" y="620" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="11.5" fill="#b45309">
+          ✔ Raise Costing Request
+        </text>
+      </g>
+
+      <line x1="217" y1="640" x2="217" y2="675" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <circle cx="217" cy="685" r="7" fill="#000000"/>
+      <circle cx="217" cy="685" r="11" fill="none" stroke="#000000" stroke-width="1.5"/>
+
+
+      <!-- ====================================================================== -->
+      <!-- LANE 2: MOCKUP REQUEST (x = 425 to 780)                                -->
+      <!-- ====================================================================== -->
+      <rect x="425" y="55" width="355" height="32" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.2" rx="4"/>
+      <text x="602" y="76" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#0369a1">
+        2. MOCKUP REQUEST FLOW
+      </text>
+
+      <!-- Step 2.1: Raise Mockup Request -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="430" y="105" width="345" height="65" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="602" y="124" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#475569">«action» Marketing</text>
+        <text x="602" y="142" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Raise Mockup Request
+        </text>
+        <line x1="430" y1="150" x2="775" y2="150" stroke="#000000" stroke-width="1"/>
+        <text x="602" y="163" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Inputs: Product specifications &amp; due date
+        </text>
+      </g>
+
+      <line x1="602" y1="170" x2="602" y2="198" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 2.2: Creative Input -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="430" y="200" width="345" height="68" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="602" y="219" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#475569">«team» Creative Team</text>
+        <text x="602" y="237" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Provide Creative Input
+        </text>
+        <line x1="430" y1="245" x2="775" y2="245" stroke="#000000" stroke-width="1"/>
+        <text x="602" y="259" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Adds creative specs &amp; sends to Studio Team
+        </text>
+      </g>
+
+      <line x1="602" y1="268" x2="602" y2="298" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 2.3: Studio Builds Mockup -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="430" y="300" width="345" height="68" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="602" y="319" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#475569">«team» Studio Team</text>
+        <text x="602" y="337" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Build Mockup &amp; Deliver
+        </text>
+        <line x1="430" y1="345" x2="775" y2="345" stroke="#000000" stroke-width="1"/>
+        <text x="602" y="359" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Prepares CAD dieline &amp; delivers to Marketing
+        </text>
+      </g>
+
+      <line x1="602" y1="368" x2="602" y2="398" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 2.4: Marketing Reviews Mockup (Decision Diamond) -->
+      <polygon points="602,400 705,430 602,460 499,430" fill="#ffffff" stroke="#000000" stroke-width="1.5" filter="url(#staruml-shadow-3)"/>
+      <text x="602" y="426" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#000000">
+        Marketing Decision?
+      </text>
+      <text x="602" y="441" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#475569">
+        (Mockup output)
+      </text>
+
+      <!-- Reject Loop back to Studio -->
+      <path d="M 705 430 L 765 430 L 765 334 L 775 334" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <rect x="715" y="375" width="45" height="34" fill="#ffffff" stroke="#b91c1c" stroke-width="0.8" rx="2"/>
+      <text x="737" y="389" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="9" fill="#b91c1c">Reject</text>
+      <text x="737" y="402" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="8.5" fill="#475569">Revision</text>
+
+      <!-- Accept branch -->
+      <line x1="602" y1="460" x2="602" y2="490" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <rect x="610" y="465" width="55" height="18" fill="#ffffff" stroke="#15803d" stroke-width="1" rx="2"/>
+      <text x="637" y="478" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10.5" fill="#15803d">
+        [Accept]
+      </text>
+
+      <!-- Step 2.5: Mockup Request Closed -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="430" y="492" width="345" height="65" fill="#ffffff" stroke="#15803d" stroke-width="1.5" rx="4"/>
+        <text x="602" y="510" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#15803d" font-weight="600">«terminal closed»</text>
+        <text x="602" y="528" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Mockup Request Closed
+        </text>
+        <line x1="430" y1="536" x2="775" y2="536" stroke="#15803d" stroke-width="1"/>
+        <text x="602" y="550" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Mockup accepted and finalized
+        </text>
+      </g>
+
+      <line x1="602" y1="557" x2="602" y2="588" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <circle cx="602" cy="598" r="7" fill="#000000"/>
+      <circle cx="602" cy="598" r="11" fill="none" stroke="#000000" stroke-width="1.5"/>
+
+
+      <!-- ====================================================================== -->
+      <!-- LANE 3: SAMPLING REQUEST (x = 810 to 1175)                             -->
+      <!-- ====================================================================== -->
+      <rect x="810" y="55" width="365" height="32" fill="#ecfdf5" stroke="#059669" stroke-width="1.2" rx="4"/>
+      <text x="992" y="76" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#047857">
+        3. SAMPLING REQUEST FLOW
+      </text>
+
+      <!-- Step 3.1: Raise Sample Request -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="815" y="105" width="355" height="60" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="992" y="122" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10" fill="#475569">«action» Marketing</text>
+        <text x="992" y="139" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+          Raise Sample Request
+        </text>
+        <line x1="815" y1="147" x2="1170" y2="147" stroke="#000000" stroke-width="1"/>
+        <text x="992" y="159" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#334155">
+          Inputs: Product specs, sample quantity &amp; target plant
+        </text>
+      </g>
+
+      <line x1="992" y1="165" x2="992" y2="188" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 3.2: Creative Input -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="815" y="190" width="355" height="60" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="992" y="207" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10" fill="#475569">«team» Creative Team</text>
+        <text x="992" y="224" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+          Provide Creative Input
+        </text>
+        <line x1="815" y1="232" x2="1170" y2="232" stroke="#000000" stroke-width="1"/>
+        <text x="992" y="244" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#334155">
+          Fills assigned specifications &amp; sends to Studio Team
+        </text>
+      </g>
+
+      <line x1="992" y1="250" x2="992" y2="273" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 3.3: Studio Builds Artwork & Creative Approves -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="815" y="275" width="355" height="65" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="992" y="293" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10" fill="#475569">«team» Studio &amp; Creative QA</text>
+        <text x="992" y="311" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+          Build Artwork &amp; Creative Approval
+        </text>
+        <line x1="815" y1="319" x2="1170" y2="319" stroke="#000000" stroke-width="1"/>
+        <text x="992" y="332" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#334155">
+          Studio prepares artwork; Creative QA validates &amp; approves
+        </text>
+      </g>
+
+      <line x1="992" y1="340" x2="992" y2="363" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 3.4: Studio releases FTP path to Plant -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="815" y="365" width="355" height="60" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="992" y="382" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10" fill="#475569">«action» Studio Team</text>
+        <text x="992" y="399" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+          Studio Releases FTP Path to Plant
+        </text>
+        <line x1="815" y1="407" x2="1170" y2="407" stroke="#000000" stroke-width="1"/>
+        <text x="992" y="419" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#334155">
+          FTP file assets placed on Plant FTP server
+        </text>
+      </g>
+
+      <line x1="992" y1="425" x2="992" y2="448" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 3.5: Sampling Team Review & Release -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="815" y="450" width="355" height="65" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="992" y="468" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10" fill="#475569">«team» Sampling Team</text>
+        <text x="992" y="486" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+          Sampling Team Review &amp; Release
+        </text>
+        <line x1="815" y1="494" x2="1170" y2="494" stroke="#000000" stroke-width="1"/>
+        <text x="992" y="507" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#334155">
+          SAMP team performs final review &amp; releases to Plant
+        </text>
+      </g>
+
+      <line x1="992" y1="515" x2="992" y2="538" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 3.6: Plant Accepts & Records Deviation -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="815" y="540" width="355" height="90" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" rx="4"/>
+        <text x="992" y="558" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10" fill="#0284c7" font-weight="600">«plant handoff milestone»</text>
+        <text x="992" y="576" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+          Plant Accepts &amp; Records Deviations
+        </text>
+        <line x1="815" y1="584" x2="1170" y2="584" stroke="#0284c7" stroke-width="1"/>
+        <text x="992" y="601" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#0f172a">
+          1. Plant receives and accepts sample handoff
+        </text>
+        <text x="992" y="618" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="11" fill="#b45309">
+          2. Plant records any operational deviations
+        </text>
+      </g>
+
+      <line x1="992" y1="630" x2="992" y2="653" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 3.7: Sample Request Closed -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="815" y="655" width="355" height="65" fill="#ffffff" stroke="#15803d" stroke-width="1.5" rx="4"/>
+        <text x="992" y="673" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10" fill="#15803d" font-weight="600">«terminal closed»</text>
+        <text x="992" y="691" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+          Sample Request Closed
+        </text>
+        <line x1="815" y1="699" x2="1170" y2="699" stroke="#15803d" stroke-width="1"/>
+        <text x="992" y="712" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#334155">
+          Sampling complete with plant execution &amp; deviation logged
+        </text>
+      </g>
+
+      <line x1="992" y1="720" x2="992" y2="743" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <circle cx="992" cy="753" r="7" fill="#000000"/>
+      <circle cx="992" cy="753" r="11" fill="none" stroke="#000000" stroke-width="1.5"/>
+
+
+      <!-- ====================================================================== -->
+      <!-- LANE 4: COSTING REQUEST (x = 1205 to 1560)                             -->
+      <!-- ====================================================================== -->
+      <rect x="1205" y="55" width="355" height="32" fill="#fef3c7" stroke="#b45309" stroke-width="1.2" rx="4"/>
+      <text x="1382" y="76" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#92400e">
+        4. COSTING REQUEST FLOW
+      </text>
+
+      <!-- Step 4.1: Raise Costing Request -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="1210" y="105" width="345" height="65" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="1382" y="124" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#475569">«action» Marketing</text>
+        <text x="1382" y="142" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Raise Costing Request
+        </text>
+        <line x1="1210" y1="150" x2="1555" y2="150" stroke="#000000" stroke-width="1"/>
+        <text x="1382" y="163" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Inputs: Quantity, packaging specs &amp; due date
+        </text>
+      </g>
+
+      <line x1="1382" y1="170" x2="1382" y2="198" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 4.2: Decision: Creative Input Needed? -->
+      <polygon points="1382,200 1485,230 1382,260 1279,230" fill="#ffffff" stroke="#000000" stroke-width="1.5" filter="url(#staruml-shadow-3)"/>
+      <text x="1382" y="226" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#000000">
+        Creative Input Needed?
+      </text>
+      <text x="1382" y="241" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#475569">
+        (Marketing choice)
+      </text>
+
+      <!-- Branch A: Yes -> Creative Team -->
+      <line x1="1382" y1="260" x2="1382" y2="290" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <rect x="1390" y="265" width="45" height="18" fill="#ffffff" stroke="#7c3aed" stroke-width="1" rx="2"/>
+      <text x="1412" y="278" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10.5" fill="#7c3aed">
+        [Yes]
+      </text>
+
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="1210" y="292" width="345" height="68" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="1382" y="311" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#475569">«team» Creative Team</text>
+        <text x="1382" y="329" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Provide Creative Input
+        </text>
+        <line x1="1210" y1="337" x2="1555" y2="337" stroke="#000000" stroke-width="1"/>
+        <text x="1382" y="351" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Fills specs &amp; releases to Costing Team
+        </text>
+      </g>
+
+      <!-- Branch B: No -> Direct to Costing (Bypass line on right, cleanly inside lane) -->
+      <path d="M 1485 230 L 1540 230 L 1540 405 L 1530 405" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <rect x="1490" y="235" width="45" height="18" fill="#ffffff" stroke="#059669" stroke-width="1" rx="2"/>
+      <text x="1512" y="248" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10" fill="#059669">
+        [No]
+      </text>
+
+      <line x1="1382" y1="360" x2="1382" y2="390" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 4.3: Costing Team Attaches Costing Sheet -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="1210" y="392" width="345" height="78" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="1382" y="411" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#475569">«team» Costing Team</text>
+        <text x="1382" y="429" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Calculate &amp; Attach Costing Sheet
+        </text>
+        <line x1="1210" y1="437" x2="1555" y2="437" stroke="#000000" stroke-width="1"/>
+        <text x="1382" y="451" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Prepares costing sheet &amp; delivers back to Marketing
+        </text>
+      </g>
+
+      <line x1="1382" y1="470" x2="1382" y2="500" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+
+      <!-- Step 4.4: Costing Released to Marketing (Closed) -->
+      <g filter="url(#staruml-shadow-3)">
+        <rect x="1210" y="502" width="345" height="65" fill="#ffffff" stroke="#15803d" stroke-width="1.5" rx="4"/>
+        <text x="1382" y="520" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#15803d" font-weight="600">«terminal closed»</text>
+        <text x="1382" y="538" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Costing Released to Marketing
+        </text>
+        <line x1="1210" y1="546" x2="1555" y2="546" stroke="#15803d" stroke-width="1"/>
+        <text x="1382" y="560" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Costing output delivered to Marketing; scope closed
+        </text>
+      </g>
+
+      <line x1="1382" y1="567" x2="1382" y2="598" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-3)"/>
+      <circle cx="1382" cy="608" r="7" fill="#000000"/>
+      <circle cx="1382" cy="608" r="11" fill="none" stroke="#000000" stroke-width="1.5"/>
+    </svg>
+
+    </div>
+
+    <!-- Slide 4: Master Merged Architecture -->
+    <div class="slide-view" id="view-slide-4">
+      
+    <svg id="svg-slide-4" class="diagram-svg" viewBox="0 0 1600 860" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="staruml-shadow-4" x="-4%" y="-4%" width="110%" height="112%" filterUnits="userSpaceOnUse">
+          <feDropShadow dx="2.5" dy="2.5" stdDeviation="0" flood-color="#000000" flood-opacity="0.14" />
+        </filter>
+        <marker id="solid-arrow-4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M 1 1 L 8 5 L 1 9 Z" fill="#000000"/>
+        </marker>
+        <marker id="open-arrow-4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#0284c7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <marker id="red-arrow-4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="#dc2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <!-- Frame -->
+      <rect x="20" y="16" width="1560" height="828" fill="none" stroke="#000000" stroke-width="1.5"/>
+      <path d="M 20 16 L 470 16 L 490 40 L 490 48 L 20 48 Z" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+      <text x="34" y="38" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+        act [Slide 4: Master Architecture] Navneet_SAMP_End_to_End_Workflow
+      </text>
+
+      <!-- Top Actor: Marketing -->
+      <circle cx="800" cy="65" r="13" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+      <line x1="800" y1="78" x2="800" y2="105" stroke="#000000" stroke-width="1.5"/>
+      <line x1="777" y1="87" x2="823" y2="87" stroke="#000000" stroke-width="1.5"/>
+      <line x1="800" y1="105" x2="784" y2="127" stroke="#000000" stroke-width="1.5"/>
+      <line x1="800" y1="105" x2="816" y2="127" stroke="#000000" stroke-width="1.5"/>
+      <text x="800" y="145" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+        «actor» Marketing Team
+      </text>
+
+      <line x1="800" y1="152" x2="800" y2="178" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+
+      <!-- 3-Way Choice Decision Diamond -->
+      <polygon points="800,180 910,205 800,230 690,205" fill="#ffffff" stroke="#000000" stroke-width="1.5" filter="url(#staruml-shadow-4)"/>
+      <text x="800" y="202" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12" fill="#000000">
+        Select Request Type
+      </text>
+      <text x="800" y="217" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#475569">
+        (3 Available Request Paths)
+      </text>
+
+      <!-- Left Path: Choice 1 Sampling Request (Commercial Staging) -->
+      <path d="M 690 205 L 280 205 L 280 258" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+      <rect x="360" y="194" width="240" height="22" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="3"/>
+      <text x="480" y="209" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#0284c7">
+        [Choice 1: Sampling Request (Commercial)]
+      </text>
+
+      <!-- Center Path: Choice 2 Feasibility Check -->
+      <path d="M 800 230 L 800 258" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+      <rect x="715" y="235" width="170" height="20" fill="#ffffff" stroke="#0f766e" stroke-width="1" rx="2"/>
+      <text x="800" y="249" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10.5" fill="#0f766e">
+        [Choice 2: Feasibility Check]
+      </text>
+
+      <!-- Right Path: Choice 3 Program Planning -->
+      <path d="M 910 205 L 1320 205 L 1320 258" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+      <rect x="1000" y="194" width="220" height="22" fill="#ffffff" stroke="#7c3aed" stroke-width="1" rx="3"/>
+      <text x="1110" y="209" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#7c3aed">
+        [Choice 3: Program Planning]
+      </text>
+
+
+      <!-- ============================================== -->
+      <!-- PILLAR 1: COMMERCIAL STAGING 4 SCOPES (LEFT)   -->
+      <!-- ============================================== -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="40" y="260" width="480" height="75" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" rx="4"/>
+        <text x="280" y="280" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#0284c7" font-weight="600">«choice 1: commercial scopes»</text>
+        <text x="280" y="299" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Commercial Staging (4 Selectable Scopes)
+        </text>
+        <line x1="40" y1="307" x2="520" y2="307" stroke="#0284c7" stroke-width="1"/>
+        <text x="280" y="324" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          1) Design Request  |  2) Mockup Request  |  3) Sampling Request  |  4) Costing Request
+        </text>
+      </g>
+
+      <!-- 4 Scope Sub-Blocks -->
+      <line x1="95" y1="335" x2="95" y2="368" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+      <line x1="215" y1="335" x2="215" y2="368" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+      <line x1="335" y1="335" x2="335" y2="368" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+      <line x1="455" y1="335" x2="455" y2="368" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+
+      <!-- Scope 1: Design Block -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="40" y="370" width="112" height="155" fill="#ffffff" stroke="#7c3aed" stroke-width="1.2" rx="4"/>
+        <text x="96" y="388" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#6b21a8">Design Scope</text>
+        <line x1="40" y1="396" x2="152" y2="396" stroke="#7c3aed" stroke-width="1"/>
+        <text x="46" y="413" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Creative input</text>
+        <text x="46" y="428" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Fewer loop</text>
+        <text x="46" y="443" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Accept/Close</text>
+        <text x="46" y="468" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10" fill="#7c3aed">Unlocks:</text>
+        <text x="46" y="483" font-family="'Segoe UI', Arial, sans-serif" font-size="9.5" fill="#475569">Mockup,</text>
+        <text x="46" y="497" font-family="'Segoe UI', Arial, sans-serif" font-size="9.5" fill="#475569">Sample,</text>
+        <text x="46" y="511" font-family="'Segoe UI', Arial, sans-serif" font-size="9.5" fill="#475569">Costing!</text>
+      </g>
+
+      <!-- Scope 2: Mockup Block -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="160" y="370" width="112" height="155" fill="#ffffff" stroke="#0284c7" stroke-width="1.2" rx="4"/>
+        <text x="216" y="388" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#0369a1">Mockup Scope</text>
+        <line x1="160" y1="396" x2="272" y2="396" stroke="#0284c7" stroke-width="1"/>
+        <text x="166" y="413" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Creative specs</text>
+        <text x="166" y="428" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Studio CAD</text>
+        <text x="166" y="443" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Mktg review</text>
+        <text x="166" y="458" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Reject loop</text>
+        <text x="166" y="483" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10" fill="#15803d">• Accept:</text>
+        <text x="166" y="498" font-family="'Segoe UI', Arial, sans-serif" font-size="9.5" fill="#475569">Closed!</text>
+      </g>
+
+      <!-- Scope 3: Sampling Block -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="280" y="370" width="112" height="155" fill="#ffffff" stroke="#059669" stroke-width="1.2" rx="4"/>
+        <text x="336" y="388" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#047857">Sample Scope</text>
+        <line x1="280" y1="396" x2="392" y2="396" stroke="#059669" stroke-width="1"/>
+        <text x="286" y="413" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Creative input</text>
+        <text x="286" y="428" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Studio artwork</text>
+        <text x="286" y="443" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Creative QA</text>
+        <text x="286" y="458" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Studio FTP</text>
+        <text x="286" y="473" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• SAMP Review</text>
+        <text x="286" y="488" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Plant Accept</text>
+        <text x="286" y="503" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="9.5" fill="#b45309">&amp; Deviations!</text>
+      </g>
+
+      <!-- Scope 4: Costing Block -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="400" y="370" width="120" height="155" fill="#ffffff" stroke="#b45309" stroke-width="1.2" rx="4"/>
+        <text x="460" y="388" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#92400e">Costing Scope</text>
+        <line x1="400" y1="396" x2="520" y2="396" stroke="#b45309" stroke-width="1"/>
+        <text x="406" y="413" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Creative (Y/N)</text>
+        <text x="406" y="430" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">• Costing sheet</text>
+        <text x="406" y="445" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#334155">  attached</text>
+        <text x="406" y="475" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10" fill="#15803d">• Released</text>
+        <text x="406" y="490" font-family="'Segoe UI', Arial, sans-serif" font-size="9.5" fill="#475569">to Marketing</text>
+      </g>
+
+
+      <!-- ============================================== -->
+      <!-- PILLAR 2: FEASIBILITY CHECK (CENTER)           -->
+      <!-- ============================================== -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="560" y="260" width="480" height="75" fill="#ffffff" stroke="#0f766e" stroke-width="1.5" rx="4"/>
+        <text x="800" y="280" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#0f766e" font-weight="600">«choice 2: feasibility check»</text>
+        <text x="800" y="299" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Feasibility Check Request
+        </text>
+        <line x1="560" y1="307" x2="1040" y2="307" stroke="#0f766e" stroke-width="1"/>
+        <text x="800" y="324" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Sampling Team Claims Task &amp; Issues 3-Way Viability Verdict
+        </text>
+      </g>
+
+      <line x1="800" y1="335" x2="800" y2="368" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+
+      <!-- 3-Way Verdict Diamond -->
+      <polygon points="800,370 890,395 800,420 710,395" fill="#ffffff" stroke="#000000" stroke-width="1.5" filter="url(#staruml-shadow-4)"/>
+      <text x="800" y="392" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#000000">
+        Sampling Verdict?
+      </text>
+      <text x="800" y="405" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="9.5" fill="#475569">
+        (Yes, Maybe, No)
+      </text>
+
+      <!-- Yes/Maybe Branch -> Unlocks Commercial Scopes! -->
+      <path d="M 710 395 L 670 395 L 670 448" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+      <rect x="620" y="384" width="85" height="18" fill="#ffffff" stroke="#15803d" stroke-width="1" rx="2"/>
+      <text x="662" y="397" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="9.5" fill="#15803d">
+        [Yes / Maybe]
+      </text>
+
+      <!-- Accepted Feasibility Block -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="560" y="450" width="220" height="135" fill="#ffffff" stroke="#15803d" stroke-width="1.5" rx="4"/>
+        <text x="670" y="470" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#15803d">
+          Marketing Accepts
+        </text>
+        <line x1="560" y1="478" x2="780" y2="478" stroke="#15803d" stroke-width="1"/>
+        <text x="568" y="496" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#0f172a">Unlocks Commercial:</text>
+        <text x="568" y="514" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="10.5" fill="#0284c7">✔ Sample Request</text>
+        <text x="568" y="531" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="10.5" fill="#7c3aed">✔ Mockup Request</text>
+        <text x="568" y="548" font-family="'Segoe UI', Arial, sans-serif" font-weight="600" font-size="10.5" fill="#b45309">✔ Costing Request</text>
+        <text x="568" y="570" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="9.5" fill="#475569">(Inherits feasible specs)</text>
+      </g>
+
+      <!-- Dashed derivation arrow from Accepted Feasibility back into Commercial Staging -->
+      <path d="M 560 515 L 528 515" fill="none" stroke="#0284c7" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#open-arrow-4)"/>
+      <text x="544" y="508" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="9" fill="#0284c7">
+        «derive»
+      </text>
+
+      <!-- No Branch -> Mandatory Close -->
+      <path d="M 890 395 L 930 395 L 930 448" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+      <rect x="895" y="384" width="60" height="18" fill="#ffffff" stroke="#b91c1c" stroke-width="1" rx="2"/>
+      <text x="925" y="397" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="9.5" fill="#b91c1c">
+        [No]
+      </text>
+
+      <!-- Mandatory Closed Block -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="820" y="450" width="220" height="135" fill="#ffffff" stroke="#b91c1c" stroke-width="1.5" rx="4"/>
+        <text x="930" y="470" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#b91c1c">
+          Mandatory Close
+        </text>
+        <line x1="820" y1="478" x2="1040" y2="478" stroke="#b91c1c" stroke-width="1"/>
+        <text x="828" y="496" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#334155">• Even if accepted</text>
+        <text x="828" y="513" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#334155">  with exception:</text>
+        <text x="828" y="533" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10.5" fill="#b91c1c">✖ NO commercial</text>
+        <text x="828" y="548" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="10.5" fill="#b91c1c">  conversion allowed!</text>
+        <text x="828" y="570" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="9.5" fill="#475569">Work permanently terminates</text>
+      </g>
+
+
+      <!-- ============================================== -->
+      <!-- PILLAR 3: PROGRAM PLANNING (RIGHT)             -->
+      <!-- ============================================== -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="1080" y="260" width="480" height="75" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5" rx="4"/>
+        <text x="1320" y="280" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#7c3aed" font-weight="600">«choice 3: program planning»</text>
+        <text x="1320" y="299" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13.5" fill="#000000">
+          Program Planning Request
+        </text>
+        <line x1="1080" y1="307" x2="1560" y2="307" stroke="#7c3aed" stroke-width="1"/>
+        <text x="1320" y="324" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Marketing creates campaign matrix with target plant &amp; SKU rows
+        </text>
+      </g>
+
+      <line x1="1320" y1="335" x2="1320" y2="368" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+
+      <!-- Parallel Fork & Review Box -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="1080" y="370" width="480" height="105" fill="#ffffff" stroke="#000000" stroke-width="1.5" rx="4"/>
+        <text x="1320" y="391" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12.5" fill="#000000">
+          Parallel Review: Sampling &amp; Plant Teams
+        </text>
+        <line x1="1080" y1="399" x2="1560" y2="399" stroke="#000000" stroke-width="1"/>
+        <text x="1100" y="418" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">• Sampling Team reviews material &amp; substrate suitability</text>
+        <text x="1100" y="436" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">• Plant Team reviews operational line capacity &amp; tooling</text>
+        <text x="1100" y="454" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#0f766e">• Both claim and respond directly against Marketing's SKUs</text>
+      </g>
+
+      <line x1="1320" y1="475" x2="1320" y2="505" stroke="#000000" stroke-width="1.5" marker-end="url(#solid-arrow-4)"/>
+
+      <!-- Program Planning Finished Box -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="1080" y="508" width="480" height="77" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5" rx="4"/>
+        <text x="1320" y="527" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-style="italic" font-size="10.5" fill="#7c3aed" font-weight="600">«planning complete»</text>
+        <text x="1320" y="546" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="13" fill="#000000">
+          Program Planning Finished (Dual Sign-Off)
+        </text>
+        <line x1="1080" y1="554" x2="1560" y2="554" stroke="#7c3aed" stroke-width="1"/>
+        <text x="1320" y="570" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#334155">
+          Dual sign-off completed; SKU matrix ready for commercial promotion
+        </text>
+      </g>
+
+
+      <!-- ============================================== -->
+      <!-- BOTTOM MASTER ARCHITECTURE SUMMARY BANNER      -->
+      <!-- ============================================== -->
+      <g filter="url(#staruml-shadow-4)">
+        <rect x="40" y="660" width="1520" height="120" fill="#f8fafc" stroke="#000000" stroke-width="1.4" rx="4"/>
+        <text x="60" y="684" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="12" fill="#0f172a">
+          ARCHITECTURE GOVERNANCE RULES &amp; TRANSITIONS:
+        </text>
+        <line x1="40" y1="693" x2="1560" y2="693" stroke="#cbd5e1" stroke-width="1"/>
+
+        <circle cx="65" cy="714" r="4" fill="#0284c7"/>
+        <text x="78" y="718" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#0284c7">Rule 1 (Downstream Inheritance):</text>
+        <text x="285" y="718" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Accepted Feasibility (Yes/Maybe) and Accepted Designs unlock future Mockup, Sampling, and Costing requests with pre-validated specifications.
+        </text>
+
+        <circle cx="65" cy="738" r="4" fill="#dc2626"/>
+        <text x="78" y="742" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">Rule 2 (Non-Feasible Quarantine):</text>
+        <text x="285" y="742" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          A 'No' verdict permanently closes the request. Even if Marketing logs an exception reason, the system strictly forbids conversion into commercial requests.
+        </text>
+
+        <circle cx="65" cy="762" r="4" fill="#7c3aed"/>
+        <text x="78" y="766" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#7c3aed">Rule 3 (Dual Sign-Off Concurrency):</text>
+        <text x="285" y="766" font-family="'Segoe UI', Arial, sans-serif" font-size="11.5" fill="#334155">
+          Program Planning executes parallel forks to Sampling (material suitability) and Plant (operational capacity) teams, joining upon dual sign-off.
+        </text>
+      </g>
+
+      <!-- Red Callout Annotations -->
+      <path d="M 680 65 Q 730 60 765 65" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-4)"/>
+      <text x="670" y="69" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        Actor: Marketing
+      </text>
+
+      <path d="M 640 160 Q 690 160 720 185" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-4)"/>
+      <text x="630" y="164" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11.5" fill="#dc2626">
+        3 Request Paths
+      </text>
+
+      <path d="M 670 610 Q 640 610 595 590" fill="none" stroke="#dc2626" stroke-width="1.4" marker-end="url(#red-arrow-4)"/>
+      <text x="680" y="614" text-anchor="start" font-family="'Segoe UI', Arial, sans-serif" font-weight="700" font-size="11" fill="#dc2626">
+        Accepted Feasibility Unlocks Commercial Staging!
+      </text>
+    </svg>
+
+    </div>
+  </main>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 4;
+    let isScrollMode = false;
+
+    function showSlide(slideNum) {
+      if (slideNum < 1) slideNum = 1;
+      if (slideNum > totalSlides) slideNum = totalSlides;
+      currentSlide = slideNum;
+
+      if (isScrollMode) {
+        toggleScrollMode(false);
+      }
+
+      // Update tabs
+      document.querySelectorAll(".slide-tab").forEach(tab => {
+        tab.classList.toggle("active", parseInt(tab.getAttribute("data-slide")) === currentSlide);
+      });
+
+      // Update views
+      document.querySelectorAll(".slide-view").forEach(view => {
+        view.classList.remove("active");
+      });
+      const activeView = document.getElementById(`view-slide-${currentSlide}`);
+      if (activeView) activeView.classList.add("active");
+    }
+
+    function toggleScrollMode(force) {
+      if (typeof force === "boolean") {
+        isScrollMode = force;
+      } else {
+        isScrollMode = !isScrollMode;
+      }
+      document.body.classList.toggle("scroll-mode", isScrollMode);
+      const toggleBtn = document.getElementById("btn-toggle-fit");
+      if (isScrollMode) {
+        toggleBtn.textContent = "📜 Scroll Mode (All)";
+        toggleBtn.classList.add("active-toggle");
+      } else {
+        toggleBtn.textContent = "🖥 Fit to Screen";
+        toggleBtn.classList.remove("active-toggle");
+        showSlide(currentSlide);
+      }
+    }
+
+    // Tab Click Listeners
+    document.querySelectorAll(".slide-tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        showSlide(parseInt(tab.getAttribute("data-slide")));
+      });
+    });
+
+    // Prev / Next Listeners
+    document.getElementById("btn-prev").addEventListener("click", () => {
+      showSlide(currentSlide - 1);
+    });
+    document.getElementById("btn-next").addEventListener("click", () => {
+      showSlide(currentSlide + 1);
+    });
+
+    // Fit / Scroll Toggle
+    document.getElementById("btn-toggle-fit").addEventListener("click", () => {
+      toggleScrollMode();
+    });
+
+    // Keyboard navigation (Arrow keys & 1-4 numbers)
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") showSlide(currentSlide - 1);
+      if (e.key === "ArrowRight") showSlide(currentSlide + 1);
+      if (e.key === "1") showSlide(1);
+      if (e.key === "2") showSlide(2);
+      if (e.key === "3") showSlide(3);
+      if (e.key === "4") showSlide(4);
+    });
+
+    // Download SVG of current active slide
+    document.getElementById("btn-svg").addEventListener("click", () => {
+      const svg = document.getElementById(`svg-slide-${currentSlide}`);
+      if (!svg) return;
+      const serializer = new XMLSerializer();
+      let source = serializer.serializeToString(svg);
+      source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+      const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Slide_${currentSlide}_Workflow.svg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  </script>
 </body>
 </html>

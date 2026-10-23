@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertCircle, CheckCircle2, CircleX, LoaderCircle, X } from "lucide-react";
-import { readAuthUser } from "@/lib/session";
-import type { UserProfile } from "@/features/auth";
 import {
   closeRequestApi,
   fetchRequestClosureApi,
@@ -18,6 +16,7 @@ export interface RequestClosureTarget {
 interface RequestClosureControlProps {
   requests: RequestClosureTarget[];
   canClose: boolean;
+  reasonRequired: boolean;
   onClosed?: () => void | Promise<void>;
 }
 
@@ -48,6 +47,7 @@ function readableError(error: unknown) {
 export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
   requests,
   canClose,
+  reasonRequired,
   onClosed,
 }) => {
   const requestKey = requests
@@ -75,8 +75,9 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const user = useMemo(() => readAuthUser<UserProfile>(), []);
-  const reasonRequired = String(user?.team || "").toLowerCase().includes("marketing");
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const isSavingRef = useRef(isSaving);
+  isSavingRef.current = isSaving;
 
   const refreshStatus = useCallback(async () => {
     if (!targets.length) {
@@ -119,12 +120,44 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
 
   useEffect(() => {
     if (!isDialogOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : triggerRef.current;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isSaving) setIsDialogOpen(false);
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      if (event.key === "Escape" && !isSavingRef.current) {
+        event.preventDefault();
+        setIsDialogOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusables = Array.from(dialog.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [contenteditable='true'], [tabindex]:not([tabindex='-1'])"
+      )).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true" && element.getClientRects().length > 0);
+      if (!focusables.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isDialogOpen, isSaving]);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [isDialogOpen]);
 
   if (!targets.length || !canClose) return null;
 
@@ -143,25 +176,38 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
     }
     setIsSaving(true);
     setSaveError(null);
+    let closure: RequestClosureRecord;
     try {
-      const closure = await closeRequestApi(selectedTarget.type, selectedTarget.id, reason.trim());
-      setClosures((current) => ({ ...current, [selectedTarget.key]: closure }));
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("app:request-closed", {
-            detail: {
-              requestType: selectedTarget.type,
-              requestId: selectedTarget.id,
-              closure,
-            },
-          })
-        );
-      }
-      setReason("");
-      await onClosed?.();
+      closure = await closeRequestApi(selectedTarget.type, selectedTarget.id, reason.trim());
     } catch (error) {
       setSaveError(readableError(error));
       await refreshStatus();
+      setIsSaving(false);
+      return;
+    }
+
+    setClosures((current) => ({ ...current, [selectedTarget.key]: closure }));
+    setStatusErrors((current) => {
+      const next = { ...current };
+      delete next[selectedTarget.key];
+      return next;
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("app:request-closed", {
+          detail: {
+            requestType: selectedTarget.type,
+            requestId: selectedTarget.id,
+            closure,
+          },
+        })
+      );
+    }
+    setReason("");
+    try {
+      await onClosed?.();
+    } catch {
+      setSaveError("Request was closed, but the workspace could not refresh. Reopen the request to load the latest details.");
     } finally {
       setIsSaving(false);
     }
@@ -172,13 +218,16 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
       {showAction && (
         <button
           type="button"
-          onClick={() => setIsDialogOpen(true)}
+          onClick={(event) => {
+            triggerRef.current = event.currentTarget;
+            setIsDialogOpen(true);
+          }}
           disabled={isLoadingStatus}
           aria-label={areAllClosed ? "View request closure details" : "Close request"}
           className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 disabled:cursor-wait disabled:opacity-60 ${
             areAllClosed
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
-              : "border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200"
+              ? "border-status-success-border bg-status-success-soft text-status-success hover:brightness-[0.97]"
+              : "border-status-danger-border bg-status-danger-soft text-status-danger hover:brightness-[0.97]"
           }`}
         >
           {isLoadingStatus ? (
@@ -200,7 +249,7 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
 
       {isDialogOpen && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/55 p-4"
+          className="fixed inset-0 z-[140] flex items-center justify-center overflow-y-auto bg-[var(--overlay-backdrop)] p-3 sm:p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !isSaving) setIsDialogOpen(false);
           }}
@@ -211,7 +260,7 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
             aria-modal="true"
             aria-labelledby="request-closure-title"
             tabIndex={-1}
-            className="w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 text-[var(--on-surface)] shadow-[0_24px_70px_-12px_rgba(11,28,48,0.35)] outline-none"
+            className="my-auto max-h-[min(90dvh,48rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-4 text-[var(--on-surface)] shadow-[0_24px_70px_-12px_rgba(11,28,48,0.35)] outline-none sm:p-5"
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
@@ -232,7 +281,7 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
             </div>
 
               {statusError && (
-              <div role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <div role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-status-warning-border bg-status-warning-soft px-3 py-2.5 text-xs text-status-warning">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">{statusError}</div>
                 <button type="button" onClick={() => void refreshStatus()} className="shrink-0 font-semibold underline underline-offset-2">Retry</button>
@@ -262,12 +311,12 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
               )}
 
               {selectedClosure ? (
-                <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm dark:border-emerald-900/70 dark:bg-emerald-950/20">
-                  <div className="flex items-center gap-2 font-semibold text-emerald-900 dark:text-emerald-100">
+                <section className="rounded-xl border border-status-success-border bg-status-success-soft p-4 text-sm">
+                  <div className="flex items-center gap-2 font-semibold text-status-success">
                     <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                     {selectedTarget ? REQUEST_TYPE_LABELS[selectedTarget.type] : "Request"} closed
                   </div>
-                  <dl className="mt-3 space-y-2 text-xs leading-5 text-emerald-950/85 dark:text-emerald-100/85">
+                  <dl className="mt-3 space-y-2 text-xs leading-5 text-status-success">
                     {selectedClosure.request_code && (
                       <div><dt className="inline font-semibold">Request code: </dt><dd className="inline font-mono">{selectedClosure.request_code}</dd></div>
                     )}
@@ -280,7 +329,7 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
                 </section>
               ) : canClose ? (
                 <>
-                  <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2.5 text-xs leading-5 text-rose-900 dark:border-rose-900/70 dark:bg-rose-950/20 dark:text-rose-100">
+                  <div className="rounded-lg border border-status-danger-border bg-status-danger-soft px-3 py-2.5 text-xs leading-5 text-status-danger">
                     This records a closure for {selectedTarget ? REQUEST_TYPE_LABELS[selectedTarget.type] : "this request"}.
                   </div>
                   <label className="block space-y-1.5 text-xs font-medium" htmlFor="request-closure-reason">
@@ -311,7 +360,7 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
                 </div>
               )}
 
-              {saveError && <p role="alert" className="text-xs font-medium text-rose-700 dark:text-rose-300">{saveError}</p>}
+              {saveError && <p role="alert" className="text-xs font-medium text-status-danger">{saveError}</p>}
 
               <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
                 <button
@@ -327,7 +376,7 @@ export const RequestClosureControl: React.FC<RequestClosureControlProps> = ({
                     type="button"
                     onClick={() => void handleCloseRequest()}
                     disabled={isSaving || (reasonRequired && !reason.trim()) || isLoadingStatus || Boolean(statusError)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-rose-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg bg-status-danger-strong px-3.5 py-2 text-xs font-semibold text-white hover:bg-status-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-danger)]/50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isSaving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
                     {isSaving ? "Closing…" : "Confirm closure"}

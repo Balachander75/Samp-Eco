@@ -36,6 +36,23 @@ export type CreativeSamplingTab =
   | "sample_only"
   | "both";
 
+const getRequestDisplayName = (request: SampleRequestItem) => {
+  const record = request as SampleRequestItem & Record<string, unknown>;
+  const name = [
+    record.requestName,
+    record.requestTitle,
+    record.productName,
+    request.productDescription,
+    record.opportunityName,
+    record.name,
+    record.description,
+  ].find((value) => typeof value === "string" && value.trim());
+
+  return typeof name === "string" && name.trim()
+    ? name.trim()
+    : `Sample Request ${request.srNumber || request.requestCode || request.id}`;
+};
+
 export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProps> = ({
   requests,
   selectedYear,
@@ -218,7 +235,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
         return (
           (r.requestCodes?.mockup || r.requestCode || r.srNumber || "").toLowerCase().includes(q) ||
           (r.materialCode || "").toLowerCase().includes(q) ||
-          (r.productDescription || "").toLowerCase().includes(q) ||
+          getRequestDisplayName(r).toLowerCase().includes(q) ||
           (r.customer || "").toLowerCase().includes(q) ||
           (r.targetPlant || "").toLowerCase().includes(q) ||
           (r.productCategory || "").toLowerCase().includes(q) ||
@@ -295,8 +312,8 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
     exportRecordsToCsv({
       filename: `sampling_mockup_queue_${dateStr}.csv`,
       columns: [
-        { header: "Mockup Code", accessor: (r) => r.requestCodes?.mockup || r.requestCode || r.srNumber || r.id },
-        { header: "Sample Description", accessor: (r) => r.productDescription },
+        { header: "Request ID", accessor: (r) => r.requestCodes?.mockup || r.requestCode || r.srNumber || r.id },
+        { header: "Request Name", accessor: getRequestDisplayName },
         { header: "Customer / Brand", accessor: (r) => r.customer },
         {
           header: "Product Category",
@@ -391,7 +408,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
     () => [
       {
         id: "sr_number",
-        header: "Mockup Code",
+        header: "Request ID",
         width: "w-[150px]",
         sortable: true,
         cell: (r) => (
@@ -405,8 +422,9 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       },
       {
         id: "product",
-        header: "Deliverable & Category",
+        header: "Request Name / Product",
         cell: (r) => {
+          const requestName = getRequestDisplayName(r);
           const categoryHierarchy = [
             r.productCategory,
             r.productSubCategory,
@@ -418,9 +436,9 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
             <div className="max-w-xs">
               <div
                 className="font-semibold text-xs text-[var(--on-surface)] truncate"
-                title={r.productDescription || (r as any).opportunityName || "Deliverable"}
+                title={requestName}
               >
-                {r.productDescription || (r as any).opportunityName || "Deliverable"}
+                {requestName}
               </div>
               <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 truncate">
                 {categoryHierarchy || r.materialCode || "Packaging"}
@@ -583,7 +601,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       totalCount={samplingMockupItems.length}
       extraBadges={
         mockupCount > 0 ? (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 shrink-0">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700  border border-teal-500/20 shrink-0">
             <Activity className="w-3 h-3 text-teal-500 animate-pulse" />
             <span>{mockupCount} CAD Simulations</span>
           </span>
@@ -728,20 +746,20 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
         onToggleSelectRow={(id) => handleToggleSelectRow(id)}
         onToggleSelectAll={handleToggleSelectAll}
         toolbarLeft={
-          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 ">
             <span className="truncate">
               Showing{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {filteredItems.length}
               </span>{" "}
               of{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {samplingMockupItems.length}
               </span>{" "}
               deliverables
             </span>
             {selectedIds.size > 0 && (
-              <span className="shrink-0 rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700 dark:text-indigo-300 font-bold">
+              <span className="shrink-0 rounded-md border border-indigo-300  bg-indigo-50  px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700  font-bold">
                 {selectedIds.size} selected
               </span>
             )}

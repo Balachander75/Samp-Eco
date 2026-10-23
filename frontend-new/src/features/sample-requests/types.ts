@@ -227,6 +227,7 @@ export interface SampleRequestItem {
   sourceRequestId?: number;
   sourceSampleRequestId?: number;
   sampleRequiredDate?: string;
+  qtyDesignCosting?: string | number;
   costingRequiredDate?: string | null;
   costingCreativeInputNeeded?: boolean;
   costingCreativeInputRemark?: string | null;
@@ -437,6 +438,9 @@ export interface MockupWorkflowState {
   creativeChangesRequired?: boolean;
   samplingRouting?: {
     stage?: "marketing" | "creative" | "studio" | "creative_approval" | "sampling_review" | "plant" | string;
+    sampleTrack?: string;
+    sampleType?: "full" | "partial";
+    partialRequirements?: string;
     creativeChangesRequired?: boolean;
     isResample?: boolean;
     isDesignVariant?: boolean;

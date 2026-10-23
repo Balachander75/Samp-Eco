@@ -50,7 +50,7 @@ export const DesignMetadataStrip: React.FC<DesignMetadataStripProps> = React.mem
             Artwork Target
           </span>
           <div className="flex items-center gap-1.5 mt-1 font-bold text-[var(--on-surface)]">
-            <Calendar className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+            <Calendar className="w-3.5 h-3.5 text-teal-600  shrink-0" />
             <span className="font-mono text-xs">
               {formatDate(activeRequest.targetArtworkDateCreative || activeRequest.sampleRequiredDate)}
             </span>
@@ -63,7 +63,7 @@ export const DesignMetadataStrip: React.FC<DesignMetadataStripProps> = React.mem
             {isCounterDatePending ? (
               <span
                 role="status"
-                className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
+                className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold text-amber-700 "
               >
                 <Clock className="h-3 w-3" /> Awaiting Marketing
               </span>
@@ -96,7 +96,7 @@ export const DesignMetadataStrip: React.FC<DesignMetadataStripProps> = React.mem
                 <span
                   className={`text-[9.5px] font-mono ${
                     slaStatus.isEligible
-                      ? "font-semibold text-emerald-600 dark:text-emerald-400"
+                      ? "font-semibold text-emerald-600 "
                       : "text-[var(--on-surface-subtle)]"
                   }`}
                 >
@@ -142,7 +142,7 @@ export const DesignMetadataStrip: React.FC<DesignMetadataStripProps> = React.mem
           Target Audience
         </span>
         <div className="flex items-center gap-1.5 mt-1 text-[var(--on-surface)] font-semibold truncate">
-          <Users className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+          <Users className="w-3.5 h-3.5 text-teal-600  shrink-0" />
           <span className="truncate text-xs">{activeRequest.targetAudience || "All Demographics"}</span>
         </div>
         <span className="text-[10px] text-[var(--on-surface-muted)] mt-1 truncate">

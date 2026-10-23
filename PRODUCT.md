@@ -20,7 +20,7 @@ The product is for internal Navneet users, including Marketing, Creative, Studio
 - Seasonal program requests with material specification rows and SAMP remarks.
 - Customer and plant reference data APIs.
 - Department workspace interactions such as filtering, selection, detail inspection, status updates, and CSV export where implemented.
-- Shared navigation, light/dark theme, operational date selection, business-year display, loading/error boundaries, and refresh events.
+- Shared navigation, eight-palette light theme, operational date selection, business-year display, loading/error boundaries, and refresh events.
 
 Plant, Analytics & SLA, Members & Plants, System Settings, Help & Support, and Notifications are represented in navigation or shell controls, but currently do not all have dedicated functional workspaces. Routes without a dedicated workspace render an in-development placeholder. The notification control is a shell affordance, not a full notification center.
 

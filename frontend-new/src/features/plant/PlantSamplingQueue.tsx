@@ -89,7 +89,7 @@ export function getUpcomingPhaseInfo(r: SampleRequestItem): {
   if (isClosed) {
     return {
       phase: "Request Closed",
-      badgeColor: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20",
+      badgeColor: "bg-rose-500/10 text-rose-700  border border-rose-500/20",
       dotColor: "bg-rose-500",
       description: "Request closed by marketing",
     };
@@ -99,7 +99,7 @@ export function getUpcomingPhaseInfo(r: SampleRequestItem): {
   if (isReleasedToPlant(r)) {
     return {
       phase: "Plant Fabrication",
-      badgeColor: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20",
+      badgeColor: "bg-emerald-500/10 text-emerald-700  border border-emerald-500/20",
       dotColor: "bg-emerald-500",
       description: "Released to plant for fabrication",
     };
@@ -114,7 +114,7 @@ export function getUpcomingPhaseInfo(r: SampleRequestItem): {
   ) {
     return {
       phase: "Feasibility Review",
-      badgeColor: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20",
+      badgeColor: "bg-sky-500/10 text-sky-700  border border-sky-500/20",
       dotColor: "bg-sky-500",
       description: "Technical feasibility assessment",
     };
@@ -130,7 +130,7 @@ export function getUpcomingPhaseInfo(r: SampleRequestItem): {
   ) {
     return {
       phase: "CAD / Artwork Design",
-      badgeColor: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20",
+      badgeColor: "bg-purple-500/10 text-purple-700  border border-purple-500/20",
       dotColor: "bg-purple-500",
       description: "Artwork design & CAD simulation",
     };
@@ -144,7 +144,7 @@ export function getUpcomingPhaseInfo(r: SampleRequestItem): {
   ) {
     return {
       phase: "Costing Estimation",
-      badgeColor: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20",
+      badgeColor: "bg-amber-500/10 text-amber-700  border border-amber-500/20",
       dotColor: "bg-amber-500",
       description: "BOM costing & margin evaluation",
     };
@@ -160,7 +160,7 @@ export function getUpcomingPhaseInfo(r: SampleRequestItem): {
   ) {
     return {
       phase: "Sampling Review",
-      badgeColor: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20",
+      badgeColor: "bg-teal-500/10 text-teal-700  border border-teal-500/20",
       dotColor: "bg-teal-500",
       description: "Sampling team review & release prep",
     };
@@ -169,7 +169,7 @@ export function getUpcomingPhaseInfo(r: SampleRequestItem): {
   // 6. Default Intake / Specification Gathering
   return {
     phase: "Intake & Specs",
-    badgeColor: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border border-zinc-500/20",
+    badgeColor: "bg-zinc-500/10 text-zinc-700  border border-zinc-500/20",
     dotColor: "bg-zinc-500",
     description: "Marketing intake & specification gathering",
   };
@@ -438,7 +438,7 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
               <CopyBadge text={r.srNumber || r.requestCode || `SR-${r.id}`} />
               <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] font-mono text-[var(--on-surface-subtle)]">
                 {upcoming ? (
-                  <span className="inline-flex items-center gap-0.5 text-indigo-600 dark:text-indigo-400 font-bold">
+                  <span className="inline-flex items-center gap-0.5 text-indigo-600  font-bold">
                     <ArrowUpRight className="w-2.5 h-2.5" />
                     <span>Upcoming</span>
                   </span>
@@ -561,7 +561,7 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
                 <span
                   className={
                     isOverdue
-                      ? "font-semibold text-rose-600 dark:text-rose-400"
+                      ? "font-semibold text-rose-600 "
                       : "text-[var(--on-surface-muted)]"
                   }
                 >
@@ -569,7 +569,7 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
                 </span>
               </div>
               {isOverdue && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200   ">
                   <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
                   <span>Overdue</span>
                 </span>
@@ -591,7 +591,7 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
           );
           if (isClosed) {
             return (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-500/10 text-rose-700  border border-rose-500/20">
                 Closed
               </span>
             );
@@ -600,7 +600,7 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
           const claimedBy = r.mockupWorkflowState?.claimedBy;
           if (upcoming) {
             return (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-500/10 text-indigo-700  border border-indigo-500/20">
                 Pre-Release
               </span>
             );
@@ -617,8 +617,8 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
                 <span
                   className={`inline-flex rounded-md px-1.5 py-0.2 text-[9px] font-mono font-bold ${
                     !claimedBy
-                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+                      ? "bg-amber-500/10 text-amber-700  border border-amber-500/20"
+                      : "bg-emerald-500/10 text-emerald-700  border border-emerald-500/20"
                   }`}
                 >
                   {!claimedBy ? "Needs Claim" : "Assigned"}
@@ -775,7 +775,7 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
       {error && (
         <div
           role="alert"
-          className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:bg-rose-950/30 dark:text-rose-200"
+          className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-800  "
         >
           {error}
         </div>
@@ -796,14 +796,14 @@ export const PlantSamplingQueue: React.FC<PlantSamplingQueueProps> = ({ user }) 
         }
         pageSize={30}
         toolbarLeft={
-          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 ">
             <span className="truncate">
               Showing{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {visible.length}
               </span>{" "}
               of{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {requests.length}
               </span>{" "}
               {selectedTab === "upcoming" ? "upcoming pre-production deliverables" : "plant deliverables"}

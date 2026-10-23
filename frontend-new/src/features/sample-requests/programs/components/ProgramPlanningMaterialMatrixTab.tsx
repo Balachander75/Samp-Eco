@@ -253,14 +253,14 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
                       <td className="px-3.5 py-2.5 border-r border-[var(--border-subtle)]">
                         <div className="space-y-1.5">
                           {mat.sampRemark && (
-                            <div className="flex items-start gap-1.5 text-[10.5px] text-emerald-800 dark:text-emerald-300">
-                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 border border-emerald-500/25 shrink-0 mt-0.5">SAMP</span>
+                            <div className="flex items-start gap-1.5 text-[10.5px] text-emerald-800 ">
+                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-emerald-500/15 text-emerald-900  border border-emerald-500/25 shrink-0 mt-0.5">SAMP</span>
                               <span className="line-clamp-2 leading-tight">{mat.sampRemark}</span>
                             </div>
                           )}
                           {mat.plantRemark && (
-                            <div className="flex items-start gap-1.5 text-[10.5px] text-teal-800 dark:text-teal-300">
-                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-teal-500/15 text-teal-900 dark:text-teal-200 border border-teal-500/25 shrink-0 mt-0.5">PLANT</span>
+                            <div className="flex items-start gap-1.5 text-[10.5px] text-teal-800 ">
+                              <span className="px-1 py-0.2 rounded font-mono font-bold text-[8.5px] bg-teal-500/15 text-teal-900  border border-teal-500/25 shrink-0 mt-0.5">PLANT</span>
                               <span className="line-clamp-2 leading-tight">{mat.plantRemark}</span>
                             </div>
                           )}
@@ -360,7 +360,7 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
       {isAddingSku &&
         createPortal(
           <div
-            className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs select-text animate-in fade-in duration-150"
+            className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-[var(--overlay-backdrop)] backdrop-blur-xs select-text animate-in fade-in duration-150"
             onClick={() => !isSubmitting && setIsAddingSku(false)}
           >
             <div
@@ -398,13 +398,13 @@ export const ProgramPlanningMaterialMatrixTab: React.FC<ProgramPlanningMaterialM
               {/* Form Body */}
               <form onSubmit={handleAddSkuSubmit} className="space-y-4 text-xs">
                 {addError && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 font-semibold flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700  font-semibold flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{addError}</span>
                   </div>
                 )}
                 {addSuccess && (
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800  font-semibold flex items-center gap-2">
                     <Check className="w-4 h-4 shrink-0" />
                     <span>SKU specification added successfully!</span>
                   </div>

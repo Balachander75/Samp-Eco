@@ -390,8 +390,8 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1080px] table-fixed border-collapse text-left text-xs">
           <colgroup>
-            <col className="w-[110px]" /> {/* Material Code */}
-            <col className="w-[220px]" /> {/* Description */}
+            <col className="w-[125px]" /> {/* Request Code */}
+            <col className="w-[205px]" /> {/* Description */}
             <col className="w-[100px]" /> {/* Request Type */}
             <col className="w-[160px]" /> {/* Required Date */}
             <col className="w-[70px]" />  {/* Qty */}
@@ -403,7 +403,7 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
           </colgroup>
           <thead>
             <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-low)]/50 text-[10px] font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">
-              <th className="px-2.5 py-2.5 font-mono">Material</th>
+              <th className="px-2.5 py-2.5 font-mono">Request Code</th>
               <th className="px-2.5 py-2.5">Description</th>
               <th className="px-2.5 py-2.5">Scope</th>
               <th className="px-2.5 py-2.5">Required Date <span className="text-rose-600">*</span></th>
@@ -424,17 +424,23 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
               const canDuplicate = !isFeasibilityHandoff && prod.scopes.length === 1 && prod.scopes[0] === "sample";
               const mockupMeta = prod.mockupMetadata;
               const sampleTrackInfo = prod.scopes.includes("sample") ? getSampleTrackInfo(prod) : null;
+              const requestCode =
+                prod.savedSrNumber?.trim() ||
+                prod.savedRequestCode?.trim() ||
+                prod.sourceRequestCode?.trim() ||
+                (/^(SR|MR|DR|CR|FC|PP)-/i.test(prod.materialCode || "") ? prod.materialCode.trim() : null) ||
+                (prod.isDraftSaved ? "Draft Assigned" : "Generating...");
               return (
               <tr key={prod.id} className="group transition-colors duration-150 hover:bg-[var(--surface-low)]/40">
-                {/* 1. Material Code */}
+                {/* 1. Request Code */}
                 <td className="px-2.5 py-2.5 align-middle">
                   <button
                     type="button"
                     onClick={() => onInspectProduct(prod)}
                     className="block max-w-full truncate font-mono text-[11px] font-bold text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] hover:underline cursor-pointer"
-                    title="Inspect staged product"
+                    title={`Inspect staged product (${requestCode})`}
                   >
-                    {prod.materialCode || "—"}
+                    {requestCode}
                   </button>
                   {prod.catalogMetadata?.sourceMaterialCode && prod.catalogMetadata.sourceMaterialCode !== prod.materialCode && (
                     <span className="mt-0.5 block truncate font-mono text-[9px] text-[var(--on-surface-subtle)]">
@@ -453,11 +459,11 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                   {isMockup && mockupMeta && (
                     <div className="mt-1 flex flex-wrap items-center gap-1">
                       {mockupMeta.designNeeded ? (
-                        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 border border-violet-200/80 dark:border-violet-800/60 shadow-2xs">
+                        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-violet-50 text-violet-700   border border-violet-200/80  shadow-2xs">
                           ✨ New Design
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 shadow-2xs">
+                        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-50 text-emerald-700   border border-emerald-200/80  shadow-2xs">
                           ⚡ Direct Studio{mockupMeta.marketingShutterstockNo ? ` · SS# ${mockupMeta.marketingShutterstockNo}` : ""}
                         </span>
                       )}
@@ -489,11 +495,11 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                       const isDesign = scope === "design";
                       const isCosting = scope === "costing";
                       const style = isScopeMockup
-                        ? "border-amber-300/80 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
+                        ? "border-amber-300/80 bg-amber-50 text-amber-900   "
                         : isDesign
-                        ? "border-violet-300/80 bg-violet-50 text-violet-900 dark:border-violet-700/60 dark:bg-violet-950/40 dark:text-violet-300"
+                        ? "border-violet-300/80 bg-violet-50 text-violet-900   "
                         : isCosting
-                        ? "border-sky-300/80 bg-sky-50 text-sky-900 dark:border-sky-700/60 dark:bg-sky-950/40 dark:text-sky-300"
+                        ? "border-sky-300/80 bg-sky-50 text-sky-900   "
                         : "border-[var(--accent-primary)]/30 bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)]";
                       return (
                         <span key={scope} className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none shadow-2xs ${style}`}>

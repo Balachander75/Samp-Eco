@@ -49,10 +49,11 @@ import {
 import { formatOdooDate } from "../utils/dateUtils";
 import { ImageLightboxModal } from "./inspector/ImageLightboxModal";
 import { fetchSampleRequestByIdApi } from "@/infrastructure/api/sampleRequestsApi";
-import { isMockupCreativeCharacteristic } from "./staging/mockupCreativeFields";
-import { isDirectPlantResampleRequest } from "../utils/sampleRouting";
+import { isListedCreativeCharacteristic, isMockupCreativeCharacteristic } from "./staging/mockupCreativeFields";
+import { getSampleTrackInfo, isDirectPlantResampleRequest } from "../utils/sampleRouting";
 import { MockupControlPanel, MockupSheetHeader } from "./mockup";
 import { RequestClosedStamp } from "./common/RequestClosedWatermark";
+import { SamplingResponsePanel } from "./common/SamplingResponsePanel";
 import type { RequestClosureTarget } from "./common/RequestClosureControl";
 import { ProductDocketView, isMissingSpec } from "./staging/ProductDocketView";
 import { DocketSkeleton } from "@/components/ui/loading";
@@ -117,6 +118,11 @@ type InspectorTab = "scope" | "specs" | "creative" | "studio" | "sampling" | "pl
 
 const KHANIWADE_PLANT_TARGET = "1505 - Khaniwade";
 
+function normalizeClosureRequestId(value: string | number | null | undefined): number | null {
+  const normalized = Number(String(value ?? "").replace(/^(?:sample|design|feasibility)-/i, ""));
+  return Number.isSafeInteger(normalized) && normalized > 0 ? normalized : null;
+}
+
 interface ChatterMessage {
   id: string;
   actorName: string;
@@ -141,6 +147,17 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 }) => {
   const [localOverride, setLocalOverride] = useState<SampleRequestItem | null>(null);
   const activeRequest = localOverride || request;
+  const requestTypes = activeRequest?.requestTypes || [];
+  const isMockupRequest = requestTypes.includes("mockup") || String(activeRequest?.mockupRequired || "").toLowerCase() === "yes";
+  const hasSampleScope = requestTypes.includes("sample");
+  const sampleTrackInfo = useMemo(
+    () => activeRequest && hasSampleScope ? getSampleTrackInfo(activeRequest) : null,
+    [activeRequest, hasSampleScope],
+  );
+  const isCostingRequest = requestTypes.includes("costing");
+  const isCostingOnly = isCostingRequest && !isMockupRequest && !hasSampleScope;
+  const needsCostingCreative = Boolean(activeRequest?.costingCreativeInputNeeded);
+  const hasCostingOutput = Boolean(activeRequest?.costingOutputPath);
 
   // Mockup inspectors always open on Scope; other request types retain role-based defaults.
   const currentUser = useMemo(() => {
@@ -165,12 +182,13 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   const initialTab = useMemo<InspectorTab>(() => {
     if (opensMockupScope) return "scope";
+    if (isCostingOnly && !needsCostingCreative) return "specs";
     if (role === "creative") return "creative";
     if (role === "studio") return "studio";
     if (role === "sampling") return "scope";
     if (role === "plant") return "plant";
     return "specs";
-  }, [opensMockupScope, role]);
+  }, [isCostingOnly, needsCostingCreative, opensMockupScope, role]);
 
   const [activeTab, setActiveTab] = useState<InspectorTab>(initialTab);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -308,6 +326,10 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     const dialog = dialogRef.current;
     dialog?.focus();
     const handleKeyDown = (e: KeyboardEvent) => {
+      const targetDialog = e.target instanceof Element
+        ? e.target.closest<HTMLElement>('[role="dialog"][aria-modal="true"]')
+        : null;
+      if (targetDialog && targetDialog !== dialog) return;
       if (e.key === "Escape") {
         if (selectedPreviewImageRef.current) {
           setSelectedPreviewImage(null);
@@ -415,24 +437,29 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     return activeRequest ? isDirectPlantResampleRequest(activeRequest) : false;
   }, [activeRequest]);
 
-  const requestTypes = activeRequest?.requestTypes || [];
-  const isMockupRequest = requestTypes.includes("mockup") || String(activeRequest?.mockupRequired || "").toLowerCase() === "yes";
-  const hasSampleScope = requestTypes.includes("sample");
   const closureRequests: RequestClosureTarget[] = [];
   const requestIdText = String(activeRequest?.id || "");
+  const normalizedRequestId = normalizeClosureRequestId(requestIdText);
   const isProgramRequest = activeRequest?.requestKind === "program" || requestIdText.startsWith("program-");
+  const isDesignRequest = activeRequest?.requestKind === "design" || requestIdText.startsWith("design-");
   if (activeRequest && !isProgramRequest) {
     if (activeRequest.requestKind === "feasibility" || requestIdText.startsWith("feasibility-")) {
-      const feasibilityId = Number(requestIdText.replace(/^feasibility-/, ""));
-      if (feasibilityId > 0) closureRequests.push({ type: "feasibility", id: feasibilityId });
+      if (normalizedRequestId) closureRequests.push({ type: "feasibility", id: normalizedRequestId });
+    } else if (isDesignRequest) {
+      const designId = normalizeClosureRequestId(activeRequest.designRequestId) || normalizedRequestId;
+      if (designId) closureRequests.push({ type: "design", id: designId });
     } else {
-      if (activeRequest.designRequestId && Number(activeRequest.designRequestId) > 0) {
-        closureRequests.push({ type: "design", id: activeRequest.designRequestId });
+      const designId = normalizeClosureRequestId(activeRequest.designRequestId);
+      if (designId) {
+        closureRequests.push({ type: "design", id: designId });
       }
-      if (isMockupRequest) closureRequests.push({ type: "mockup", id: activeRequest.id });
-      if (hasSampleScope) closureRequests.push({ type: "sample", id: activeRequest.id });
-      if (requestTypes.includes("costing")) closureRequests.push({ type: "costing", id: activeRequest.id });
-      if (!closureRequests.length) closureRequests.push({ type: "sample", id: activeRequest.id });
+      if (normalizedRequestId && isMockupRequest) closureRequests.push({ type: "mockup", id: normalizedRequestId });
+      if (normalizedRequestId && hasSampleScope) closureRequests.push({ type: "sample", id: normalizedRequestId });
+      if (normalizedRequestId && requestTypes.includes("costing")) closureRequests.push({ type: "costing", id: normalizedRequestId });
+      const mayFallbackToSample = requestTypes.length === 0 || hasSampleScope;
+      if (!closureRequests.length && normalizedRequestId && mayFallbackToSample) {
+        closureRequests.push({ type: "sample", id: normalizedRequestId });
+      }
     }
   }
   const isMarketingUser = role === "marketing" || String(currentUser?.team || "").toLowerCase().includes("marketing");
@@ -495,30 +522,51 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   }, [activeRequest, ws]);
   const isPlantSampleTask = hasSampleScope && isReleasedToPlant;
   const isResample = activeRequest ? isDirectPlantResampleRequest(activeRequest) : false;
+  const costingOutputHref = /^https?:\/\//i.test(activeRequest?.costingOutputPath || "")
+    ? activeRequest?.costingOutputPath || ""
+    : "";
+  const latestSamplingResponseEvent = [...(ws.events || [])].reverse().find((event) =>
+    (String(event.actorDepartment || "").toLowerCase().includes("sampling")
+      || String(event.action || "").toLowerCase().startsWith("sampling"))
+      && String(event.remark || "").trim()
+  );
+  const samplingResponseText = ws.samplingFeedback || ws.samplingReviewRemark || activeRequest?.samplingRemark || latestSamplingResponseEvent?.remark;
+  const samplingResponseDecision = isResample ? "bypassed" : ws.samplingReviewDecision || (isReleasedToPlant ? "approved" : "");
 
   const visibleTabs = useMemo(() => {
     const tabs: Array<{ id: InspectorTab; label: string; icon: LucideIcon; badge?: string; count?: number }> = [
-      { id: "scope", label: "Specifications & Scope", icon: FileText },
-      { id: "specs", label: "Product Classes & Characteristics", icon: Layers, count: productDetails.length },
+      { id: "scope", label: hasSampleScope ? "Sampling Specifications & Scope" : "Specifications & Scope", icon: FileText },
+      { id: "specs", label: hasSampleScope ? "Sampling Product Specs & Characteristics" : "Product Classes & Characteristics", icon: Layers, count: productDetails.length },
     ];
-    if (!isCreativeBypassed) {
-      tabs.push({ id: "creative", label: "Creative", icon: Palette, badge: isCreativeDone ? "Done" : "Pending" });
+    if (isResample) {
+      if (!isCostingOnly) {
+        tabs.push({ id: "plant", label: "Direct Plant", icon: Factory, badge: isReleasedToPlant ? "Released" : "Open" });
+      }
+      return tabs;
     }
-    tabs.push({ id: "studio", label: "Studio", icon: Box, badge: isStudioDone ? "Output Ready" : "Pending" });
+    const showCreativeTab = isCostingOnly ? needsCostingCreative : !isCreativeBypassed;
+    if (showCreativeTab) {
+      tabs.push({ id: "creative", label: isCostingOnly ? "Creative Input" : "Creative", icon: Palette, badge: isCreativeDone ? "Done" : "Pending" });
+    }
+    if (!isCostingOnly) {
+      tabs.push({ id: "studio", label: "Studio", icon: Box, badge: isStudioDone ? "Output Ready" : "Pending" });
+    }
     if (!isMockupOnly) {
-      tabs.push({ id: "sampling", label: isResample ? "Plant Resample Route" : "Sampling Team Review", icon: Beaker, badge: isReleasedToPlant ? "Released" : "Review" });
-      tabs.push({ id: "plant", label: "Plant Execution", icon: Factory, badge: "Open" });
+      tabs.push({ id: "sampling", label: isResample ? "Plant Resample Route" : isCostingOnly ? "Sampling Review" : "Sampling Team Review", icon: Beaker, badge: isCostingOnly ? hasCostingOutput ? "Submitted" : "Pending Costing" : isReleasedToPlant ? "Released" : "Review" });
+      if (!isCostingOnly) {
+        tabs.push({ id: "plant", label: "Plant Execution", icon: Factory, badge: isReleasedToPlant ? "Released" : "Open" });
+      }
     }
     return tabs;
-  }, [isCreativeBypassed, isCreativeDone, isMockupOnly, isReleasedToPlant, isResample, isStudioDone, productDetails.length]);
+  }, [hasCostingOutput, hasSampleScope, isCostingOnly, isCreativeBypassed, isCreativeDone, isMockupOnly, isReleasedToPlant, isResample, isStudioDone, needsCostingCreative, productDetails.length]);
 
   useEffect(() => {
     if (visibleTabs.some((tab) => tab.id === activeTab)) return;
     const fallbackTab = (role === "sampling" && visibleTabs.some((tab) => tab.id === "sampling"))
       ? "sampling"
-      : isCreativeBypassed ? "studio" : "specs";
+      : isCreativeBypassed && !isCostingOnly ? "studio" : "specs";
     setActiveTab(visibleTabs.some((tab) => tab.id === fallbackTab) ? fallbackTab : "specs");
-  }, [activeTab, isCreativeBypassed, role, visibleTabs]);
+  }, [activeTab, isCostingOnly, isCreativeBypassed, role, visibleTabs]);
 
   // Claim Status Logic
   const isTaskClaimed = Boolean(ws.claimedByUserId != null || ws.claimedBy);
@@ -531,7 +579,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
       : actorName && claimedBy?.trim().toLocaleLowerCase() === actorName.trim().toLocaleLowerCase()
   ));
 
-  const activeWorkflowStage = ws.stage || (isPlantSampleTask ? "plant" : "");
+  const activeWorkflowStage = ws.stage || ws.samplingRouting?.stage || (isPlantSampleTask ? "plant" : "");
 
   const [localClosed, setLocalClosed] = useState(false);
   const [closureDetail, setClosureDetail] = useState<any>(
@@ -539,13 +587,29 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   );
 
   useEffect(() => {
+    setLocalClosed(false);
+    setClosureDetail(request?.closure || (request as any)?.mockup_workflow_state?.closure || null);
+  }, [request?.id]);
+
+  useEffect(() => {
     const handleClosed = (event: Event) => {
       const customEvent = event as CustomEvent;
       const detail = customEvent.detail;
+      const targetId = normalizeClosureRequestId(detail?.requestId);
+      const activeId = normalizeClosureRequestId(activeRequest?.id);
+      const requestType = String(detail?.requestType || "");
+      const designId = normalizeClosureRequestId(
+        activeRequest?.designRequestId || (activeRequest?.requestKind === "design" ? activeRequest.id : null)
+      );
+      const isDesignClosure = requestType === "design" && targetId != null && targetId === designId;
+      const isFeasibilityClosure = requestType === "feasibility" && activeRequest?.requestKind === "feasibility" && targetId != null && targetId === activeId;
+      const isSampleWorkflowClosure = ["mockup", "sample", "costing"].includes(requestType) &&
+        activeRequest?.requestKind !== "design" && activeRequest?.requestKind !== "feasibility" &&
+        targetId != null && targetId === activeId;
       if (
         detail &&
         activeRequest &&
-        String(detail.requestId) === String(activeRequest.id)
+        (isDesignClosure || isFeasibilityClosure || isSampleWorkflowClosure)
       ) {
         setLocalClosed(true);
         if (detail.closure) setClosureDetail(detail.closure);
@@ -758,7 +822,11 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
     setCreativeFeedback(null);
     try {
       if (isSamplingCreativeTask || isMockupRequest) {
-        const savedDetails = await saveProductDetailsApi(Number(activeRequest.id), productDetails.map((detail) => ({
+        const creativeKeys = ws.samplingRouting?.creativePendingCharacteristicKeys || ws.creativePendingCharacteristicKeys || [];
+        const detailsToSave = isSamplingCreativeTask
+          ? creativeCharacteristics.filter((detail) => isListedCreativeCharacteristic(detail, creativeKeys))
+          : productDetails;
+        const savedDetails = await saveProductDetailsApi(Number(activeRequest.id), detailsToSave.map((detail) => ({
           className: detail.className,
           characteristicName: detail.characteristicName,
           value: detail.value == null ? null : String(detail.value),
@@ -979,10 +1047,10 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                       {tab.badge && (
                         <span className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
                           tab.badge === "Done" || tab.badge === "Released" || tab.badge === "CAD Ready"
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            ? "bg-emerald-50 text-emerald-700  "
                             : tab.badge === "Open"
-                            ? "bg-teal-50 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
-                            : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                            ? "bg-teal-50 text-teal-800  "
+                            : "bg-amber-50 text-amber-800  "
                         }`}>
                           {tab.badge}
                         </span>
@@ -1008,67 +1076,67 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
               />
 
               {claimError && (
-                <div className="mx-6 sm:mx-8 mt-3 p-2.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-medium border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/50">
+                <div className="mx-6 sm:mx-8 mt-3 p-2.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-medium border border-rose-200   ">
                   {claimError}
                 </div>
               )}
 
               {/* ── SAMPLING PMT ACTION & PLANT DISPATCH CONSOLE ── */}
-              {(role === "sampling" || isAdmin) && !isMockupOnly && isSamplingStage && (
+              {(role === "sampling" || isAdmin) && !isMockupOnly && !isResample && isSamplingStage && (
                 <div className="px-4 sm:px-8 pt-3">
                   {isResample ? (
-                    <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/25 flex items-start justify-between gap-4">
+                    <div className="p-4 rounded-xl border border-blue-200  bg-blue-50/70  flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                           <Factory className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-blue-950 dark:text-blue-200">
+                            <span className="font-bold text-blue-950 ">
                               Direct Repeat Resample Route · Bypassed PMT Review
                             </span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-100 text-blue-900 dark:bg-blue-900/60 dark:text-blue-200">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-100 text-blue-900  ">
                               DIRECT TO PLANT
                             </span>
                           </div>
-                          <p className="text-xs text-blue-800/80 dark:text-blue-300/80 mt-1">
+                          <p className="text-xs text-blue-800/80  mt-1">
                             Repeat order without creative modifications. Dispatched directly to <strong>{targetPlant || activeRequest.targetPlant || "Khaniwade"}</strong>.
                           </p>
                         </div>
                       </div>
                     </div>
                   ) : isReleasedToPlant ? (
-                    <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/25 flex items-start justify-between gap-4">
+                    <div className="p-4 rounded-xl border border-emerald-200  bg-emerald-50/70  flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                           <CheckCircle2 className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-emerald-950 dark:text-emerald-200">
+                            <span className="font-bold text-emerald-950 ">
                               Sample Successfully Released to Plant ({targetPlant})
                             </span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900  ">
                               PRODUCTION IN PROGRESS
                             </span>
                           </div>
-                          <p className="text-xs text-emerald-800/80 dark:text-emerald-300/80 mt-0.5">
+                          <p className="text-xs text-emerald-800/80  mt-0.5">
                             Technical verification complete. Dispatched to plant manufacturing line queue.
                           </p>
                         </div>
                       </div>
                     </div>
     ) : (
-                    <div className="p-4 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/60 dark:bg-teal-950/20 space-y-3">
+                    <div className="p-4 rounded-xl border border-teal-200  bg-teal-50/60  space-y-3">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                           <Beaker className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="text-xs font-bold text-teal-950 dark:text-teal-200 uppercase tracking-wider font-mono">
+                          <h3 className="text-xs font-bold text-teal-950  uppercase tracking-wider font-mono">
                             Sampling PMT Technical Verification &amp; Plant Dispatch
                           </h3>
-                          <p className="text-[11px] text-teal-800/80 dark:text-teal-300/80">
+                          <p className="text-[11px] text-teal-800/80 ">
                             Assign manufacturing plant, input machine guidelines, and officially release this sample to production.
                           </p>
                         </div>
@@ -1144,7 +1212,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                 {/* ═════════ TAB 1: SPECIFICATIONS & SCOPE ═════════ */}
                 {activeTab === "scope" && (
                   <div className="space-y-6">
-                    {(role === "marketing" || isAdmin) && isMarketingDecisionStage && (
+                    {isMockupRequest && (role === "marketing" || isAdmin) && isMarketingDecisionStage && (
                       <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 shadow-sm space-y-4">
                         <div className="flex items-start gap-3">
                           <div className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]"><CheckCircle2 className="h-5 w-5" /></div>
@@ -1158,7 +1226,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                           </div>
                         </div>
                         {ws.stage === "awaiting_marketing_direction" ? (
-                          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
+                          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-950   ">
                             <span className="font-semibold">Studio’s note: </span>{ws.studioRevisionRejectRemark || "Studio cannot complete the requested revision."}
                           </div>
                         ) : studioPreviewHref ? (
@@ -1219,14 +1287,134 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         onPreview={setSelectedPreviewImage}
                       />
                     )}
-                    <div className={`${isMockupRequest ? "hidden" : ""} flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2`}>
+                    {isCostingOnly && (
+                      <MockupScopeSpecificationsPanel
+                        description={activeRequest.productDescription}
+                        metrics={[
+                          {
+                            label: "Customer / Brand",
+                            value: activeRequest.customer || "Commercial Account",
+                            detail: activeRequest.brandName ? `Brand: ${activeRequest.brandName}` : undefined,
+                          },
+                          {
+                            label: "Costing Required Date",
+                            value: formatOdooDate(activeRequest.costingRequiredDate) || "Not specified",
+                          },
+                          {
+                            label: "Costing Quantity",
+                            value: activeRequest.qtyDesignCosting ? `${activeRequest.qtyDesignCosting} pcs` : "Not specified",
+                          },
+                          {
+                            label: "Material / Category",
+                            value: activeRequest.materialCode || "Custom Staged Material",
+                            detail: [activeRequest.productCategory, activeRequest.productSubCategory].filter(Boolean).join(" · ") || "Paper Stationery",
+                          },
+                        ]}
+                        notes={[
+                          {
+                            label: "Creative Input",
+                            value: needsCostingCreative
+                              ? activeRequest.costingCreativeInputRemark?.trim() || "Creative review is required before Costing."
+                              : "Not required. This request goes directly to Costing.",
+                          },
+                          ...(activeRequest.costingCounterDate
+                            ? [{ label: "Costing Counter Date", value: formatOdooDate(activeRequest.costingCounterDate) || activeRequest.costingCounterDate }]
+                            : []),
+                          {
+                            label: "Costing Sheet",
+                            value: activeRequest.costingOutputPath || "Not submitted",
+                          },
+                        ]}
+                        images={scopeReferenceImages.costing || []}
+                        onPreview={setSelectedPreviewImage}
+                        leftContent={(
+                          <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5 space-y-2">
+                            <h3 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Costing Request Details</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <span className="block text-[10px] text-[var(--on-surface-muted)]">Creative Route</span>
+                                <strong className="text-[var(--on-surface)]">{needsCostingCreative ? "Creative review, then Costing" : "Direct to Costing"}</strong>
+                              </div>
+                              <div>
+                                <span className="block text-[10px] text-[var(--on-surface-muted)]">Costing Sheet</span>
+                                {costingOutputHref ? (
+                                  <a href={costingOutputHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-[var(--accent-primary)] hover:underline">
+                                    Open submitted sheet <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                ) : (
+                                  <strong className="text-[var(--on-surface)]">{activeRequest.costingOutputPath ? "Path recorded" : "Pending"}</strong>
+                                )}
+                              </div>
+                            </div>
+                          </section>
+                        )}
+                      />
+                    )}
+                    <div className={`${isMockupRequest || isCostingOnly ? "hidden" : ""} flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2`}>
                       <FileText className="w-4 h-4 text-[var(--accent-primary)]" />
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
-                        1. Specification & Scope
+                        {hasSampleScope ? "1. Sampling Specifications & Scope" : "1. Specification & Scope"}
                       </h3>
                     </div>
+                    {hasSampleScope && sampleTrackInfo && (
+                      <section aria-label="Sampling request specifications" className="mb-4 rounded-xl border border-teal-200 bg-teal-50/50 p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-teal-200/70 pb-2">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-teal-950 font-mono">Sampling Request Specifications</h3>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${sampleTrackInfo.sampleTypeBadge.badgeClass}`}>
+                              {sampleTrackInfo.isFullSample ? "Full Sample" : "Partial Sample"}
+                            </span>
+                            <span title={sampleTrackInfo.description} className="rounded-full border border-teal-200 bg-white px-2.5 py-1 text-[10px] font-bold text-teal-900">
+                              {sampleTrackInfo.label}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <div>
+                            <span className="block text-[10px] font-mono uppercase tracking-wide text-teal-800/70">Sample Quantity</span>
+                            <strong className="mt-1 block text-xs text-teal-950">{activeRequest.qtyForSampling || "Not specified"} {activeRequest.unitPcPack || "pcs"}</strong>
+                            {activeRequest.qtyPerPack && <span className="text-[10px] text-teal-800/80">{activeRequest.qtyPerPack} per pack</span>}
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-mono uppercase tracking-wide text-teal-800/70">Required Date</span>
+                            <strong className="mt-1 block text-xs text-teal-950">{formatOdooDate(activeRequest.sampleRequiredDate) || "Immediate"}</strong>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-mono uppercase tracking-wide text-teal-800/70">Material / Category</span>
+                            <strong className="mt-1 block text-xs text-teal-950">{activeRequest.materialCode || "Custom sample"}</strong>
+                            <span className="text-[10px] text-teal-800/80">{[activeRequest.productCategory, activeRequest.productSubCategory].filter(Boolean).join(" / ") || "Category not specified"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-mono uppercase tracking-wide text-teal-800/70">Workflow Route</span>
+                            <strong className="mt-1 block text-xs text-teal-950">{isResample ? "Direct to Plant" : "Creative → Studio → Creative approval → Sampling → Plant"}</strong>
+                            <span className="text-[10px] text-teal-800/80">Current stage: {(activeWorkflowStage || "Marketing").replace(/_/g, " ")}</span>
+                          </div>
+                        </div>
+                        {!sampleTrackInfo.isFullSample && (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+                            <span className="block text-[10px] font-mono font-bold uppercase tracking-wide text-amber-800">Partial Sample Requirements</span>
+                            <p className="mt-1 whitespace-pre-wrap text-xs text-amber-950">{ws.samplingRouting?.partialRequirements || "No partial-sample requirements recorded."}</p>
+                          </div>
+                        )}
+                        {(scopeReferenceImages.sample || []).length > 0 && (
+                          <div className="space-y-2">
+                            <span className="block text-[10px] font-mono font-bold uppercase tracking-wide text-teal-800/70">Sampling Reference Images</span>
+                            <div className="flex flex-wrap gap-2">
+                              {(scopeReferenceImages.sample || []).map((image) => image.url ? (
+                                <button key={image.id} type="button" onClick={() => setSelectedPreviewImage(image.url || null)} className="flex items-center gap-2 rounded-lg border border-teal-200 bg-white p-1.5 text-left hover:border-teal-400">
+                                  <img src={image.url} alt={image.name} className="h-10 w-10 rounded-md object-cover" />
+                                  <span className="max-w-40 truncate text-[10px] font-medium text-teal-950">{image.name}</span>
+                                </button>
+                              ) : (
+                                <span key={image.id} className="text-[10px] text-teal-800">{image.name}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </section>
+                    )}
                     {/* Key Technical Information Grid */}
-                    <div className={`${isMockupRequest ? "hidden" : ""} grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4`}>
+                    <div className={`${isMockupRequest || isCostingOnly ? "hidden" : ""} grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4`}>
                       <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-1">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Customer / Brand</span>
                         <p className="text-xs font-semibold text-[var(--on-surface)]">{activeRequest.customer || "Commercial Account"}</p>
@@ -1279,7 +1467,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                     </div>
 
                     {(["sample", "mockup", "costing"] as const).some((scope) => (scopeReferenceImages[scope] || []).length > 0) && (
-                      <section aria-label="Request reference images" className={`${isMockupRequest ? "hidden" : ""} mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5`}>
+                      <section aria-label="Request reference images" className={`${isMockupRequest || isCostingOnly ? "hidden" : ""} mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3.5`}>
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <h3 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Request Reference Images</h3>
                           <span className="text-[10px] text-[var(--on-surface-muted)]">Compressed attachments</span>
@@ -1315,17 +1503,53 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                 {activeTab === "specs" && (
                   <div className="space-y-6">
                     {/* ── Section 2: Product Classes & Characteristics ── */}
+                    {isCostingOnly && (
+                      <section aria-label="Costing specifications" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-2">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">Costing Request Details</h3>
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${needsCostingCreative ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)]" : "bg-[var(--surface-low)] text-[var(--on-surface-muted)]"}`}>
+                            {needsCostingCreative ? "Creative Review Needed" : "Direct to Costing"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <div className="rounded-lg bg-[var(--surface-low)] p-3">
+                            <span className="block text-[10px] font-mono uppercase tracking-wide text-[var(--on-surface-subtle)]">Costing Quantity</span>
+                            <strong className="mt-1 block text-xs text-[var(--on-surface)]">{activeRequest.qtyDesignCosting || "Not specified"}{activeRequest.qtyDesignCosting ? " pcs" : ""}</strong>
+                          </div>
+                          <div className="rounded-lg bg-[var(--surface-low)] p-3">
+                            <span className="block text-[10px] font-mono uppercase tracking-wide text-[var(--on-surface-subtle)]">Required Date</span>
+                            <strong className="mt-1 block text-xs text-[var(--on-surface)]">{formatOdooDate(activeRequest.costingRequiredDate) || "Not specified"}</strong>
+                          </div>
+                          <div className="rounded-lg bg-[var(--surface-low)] p-3">
+                            <span className="block text-[10px] font-mono uppercase tracking-wide text-[var(--on-surface-subtle)]">Counter Date</span>
+                            <strong className="mt-1 block text-xs text-[var(--on-surface)]">{formatOdooDate(activeRequest.costingCounterDate) || "Not set"}</strong>
+                          </div>
+                          <div className="rounded-lg bg-[var(--surface-low)] p-3">
+                            <span className="block text-[10px] font-mono uppercase tracking-wide text-[var(--on-surface-subtle)]">Costing Sheet</span>
+                            {costingOutputHref ? (
+                              <a href={costingOutputHref} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent-primary)] hover:underline">
+                                Open sheet <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              <strong className="mt-1 block truncate text-xs text-[var(--on-surface)]" title={activeRequest.costingOutputPath || undefined}>
+                                {activeRequest.costingOutputPath ? "Path recorded" : "Not submitted"}
+                              </strong>
+                            )}
+                          </div>
+                        </div>
+                      </section>
+                    )}
                     <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2 pt-2">
                       <Layers className="w-4 h-4 text-teal-600" />
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--on-surface)] font-mono">
-                        2. Product Classes & Characteristics
+                        {hasSampleScope ? "2. Sampling Product Classes & Characteristics" : "2. Product Classes & Characteristics"}
                       </h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-low)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
                         {productDetails.length} Specs
                       </span>
                     </div>
                     <section aria-label="Product description" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-4 space-y-1.5">
-                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">Product Description</h4>
+                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-muted)]">{hasSampleScope ? "Sampling Product Description" : "Product Description"}</h4>
                       <p className="whitespace-pre-wrap text-xs sm:text-[13px] leading-relaxed text-[var(--on-surface)]">
                         {activeRequest.productDescription || <span className="italic text-[var(--on-surface-subtle)]">No product description provided.</span>}
                       </p>
@@ -1336,8 +1560,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="text-xs font-bold text-[var(--on-surface)] uppercase tracking-wider font-mono flex items-center gap-2">
-                              <Layers className="w-3.5 h-3.5 text-teal-600" />
-                              <span>Product Characteristics &amp; Classes ({productDetails.length})</span>
+                              <Layers className="w-3.5 h-3.5 text-[var(--accent-primary-strong)]" />
+                              <span>{hasSampleScope ? "Sampling Product Characteristics & Classes" : "Product Characteristics & Classes"} ({productDetails.length})</span>
                             </h3>
                             {canCreativeEdit && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)]">
@@ -1406,13 +1630,13 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                                     setIsExportingDocketCsv(false);
                                   }
                                 }}
-                                className="inline-flex h-6 items-center gap-1 rounded-md border border-emerald-300/60 bg-emerald-50 px-2 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer disabled:opacity-50"
+                                className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-strong)] bg-[var(--accent-primary-subtle)] px-2 text-[10px] font-semibold text-[var(--accent-primary-strong)] transition hover:bg-[var(--surface-container)] cursor-pointer disabled:opacity-50"
                                 title="Export Structured Docket to Excel / CSV (UI Styled)"
                               >
                                 {isExportingDocketCsv ? (
                                   <Loader2 className="h-3 w-3 animate-spin text-emerald-600" />
                                 ) : (
-                                  <FileSpreadsheet className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                  <FileSpreadsheet className="h-3 w-3 text-[var(--accent-primary-strong)]" />
                                 )}
                                 <span>{isExportingDocketCsv ? "Exporting..." : "Excel / CSV"}</span>
                               </button>
@@ -1426,7 +1650,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                                     console.error("Failed to print docket:", err);
                                   }
                                 }}
-                                className="inline-flex h-6 items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
+                                className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-2 text-[10px] font-semibold text-[var(--on-surface)] transition hover:bg-[var(--surface-low)] cursor-pointer"
                                 title="Print or Save Complete Docket as PDF"
                               >
                                 <Printer className="h-3 w-3" /> Print
@@ -1451,12 +1675,12 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                               type="button"
                               onClick={() => setCharFilter("configured")}
                               className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
-                                charFilter === "configured" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shadow-2xs" : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
+                                charFilter === "configured" ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] font-bold shadow-2xs" : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
                               }`}
                             >
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <CheckCircle2 className="w-3 h-3 text-[var(--accent-primary-strong)]" />
                               <span>Configured</span>
-                              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
+                              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] font-bold">
                                 {configuredCount}
                               </span>
                             </button>
@@ -1562,41 +1786,63 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                 )}
 
                 {/* ═════════ TAB 2: CREATIVE ═════════ */}
-                {!isCreativeBypassed && activeTab === "creative" && (
+                {isCostingOnly && needsCostingCreative && activeTab === "creative" && (
+                  <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-low)] p-5 space-y-3">
+                    <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-3">
+                      <Palette className="h-4 w-4 text-[var(--accent-primary)]" />
+                      <h3 className="text-sm font-bold text-[var(--on-surface)]">Creative Input for Costing</h3>
+                      <span className="ml-auto rounded-full bg-[var(--accent-primary-subtle)] px-2 py-1 text-[10px] font-bold text-[var(--accent-primary-strong)]">Required</span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-[var(--on-surface-muted)]">
+                      Creative reviews this request before it moves to Costing.
+                    </p>
+                    {activeRequest.costingCreativeInputRemark?.trim() ? (
+                      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3">
+                        <span className="block text-[10px] font-mono font-bold uppercase tracking-wide text-[var(--accent-primary-strong)]">Marketing Instructions</span>
+                        <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-[var(--on-surface)]">{activeRequest.costingCreativeInputRemark}</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[var(--on-surface-muted)]">No extra Creative instructions were provided.</p>
+                    )}
+                    <p className="text-[11px] text-[var(--on-surface-muted)]">Creative work and release to Costing are managed from the Creative Costing desk.</p>
+                  </section>
+                )}
+
+                {!isCostingOnly && !isCreativeBypassed && activeTab === "creative" && (
                   <div className="space-y-5">
                     {ws.designNeeded === false ? (
-                      <div className="p-5 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/20 space-y-3">
+                      <div className="p-5 rounded-2xl border border-emerald-200  bg-emerald-50/60  space-y-3">
                         <div className="flex items-center gap-2.5">
                           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                          <h3 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                          <h3 className="text-sm font-bold text-emerald-900 ">
                             Creative Stage Bypassed
                           </h3>
                         </div>
-                        <p className="text-xs text-emerald-800/90 dark:text-emerald-300/90">
+                        <p className="text-xs text-emerald-800/90 ">
                           Marketing chose <strong>"No new design needed"</strong> during mockup configuration. Creative was bypassed and the work routed directly to Studio.
                         </p>
-                        <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="pt-2 border-t border-emerald-200/60  grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                           <div>
-                            <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">Marketing Shutterstock Ref</span>
-                            <p className="font-mono font-semibold text-emerald-950 dark:text-emerald-100 mt-0.5">
+                            <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 ">Marketing Shutterstock Ref</span>
+                            <p className="font-mono font-semibold text-emerald-950  mt-0.5">
                               {ws.marketingShutterstockNo || "None specified"}
                             </p>
                           </div>
                           <div>
-                            <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">Marketing Styling Remark</span>
-                            <p className="font-medium text-emerald-950 dark:text-emerald-100 mt-0.5">
+                            <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 ">Marketing Styling Remark</span>
+                            <p className="font-medium text-emerald-950  mt-0.5">
                               {ws.marketingRemark || "None specified"}
                             </p>
                           </div>
                         </div>
                       </div>
                     ) : isSamplingCreativeTask && ws.stage === "creative_approval" ? (
-                      <div className="rounded-2xl bg-emerald-50/70 p-5 space-y-4 dark:bg-emerald-950/20">
+                      <div className="rounded-2xl bg-emerald-50/70 p-5 space-y-4 ">
                         <div className="flex items-start gap-3">
-                          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" />
+                          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 " />
                           <div>
-                            <h3 className="text-sm font-bold text-emerald-950 dark:text-emerald-200">Review Studio artwork</h3>
-                            <p className="mt-1 text-xs text-emerald-900/80 dark:text-emerald-200/80">Claim this Creative review, inspect the submitted artwork, then approve it for Sampling or return it to Studio with a clear revision note.</p>
+                            <h3 className="text-sm font-bold text-emerald-950 ">Review Studio artwork</h3>
+                            <p className="mt-1 text-xs text-emerald-900/80 ">Claim this Creative review, inspect the submitted artwork, then approve it for Sampling or return it to Studio with a clear revision note.</p>
                           </div>
                         </div>
                         {ws.mockupUrl && <a href={/^https?:\/\//i.test(ws.mockupUrl) ? ws.mockupUrl : undefined} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-[var(--surface-lowest)] px-3 py-2 text-xs font-semibold text-[var(--accent-primary-strong)]"><ExternalLink className="h-3.5 w-3.5" />Open Studio artwork</a>}
@@ -1609,23 +1855,23 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         </div>
                       </div>
                     ) : isCreativeDone && ws.stage !== "creative" ? (
-                      <div className="p-5 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/20 space-y-3">
+                      <div className="p-5 rounded-2xl border border-emerald-200  bg-emerald-50/60  space-y-3">
                         <div className="flex items-center gap-2.5">
                           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                          <h3 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                          <h3 className="text-sm font-bold text-emerald-900 ">
                             {isSamplingCreativeTask ? "Variant Specifications Sent to Studio" : "Creative Specifications Released to Studio"}
                           </h3>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
                           <div>
-                            <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">Asset / Shutterstock Ref</span>
-                            <p className="font-mono font-semibold text-emerald-950 dark:text-emerald-100 mt-0.5">
+                            <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 ">Asset / Shutterstock Ref</span>
+                            <p className="font-mono font-semibold text-emerald-950  mt-0.5">
                               {ws.creativeShutterstockNo || "—"}
                             </p>
                           </div>
                           <div>
-                            <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">Creative Remarks</span>
-                            <p className="font-medium text-emerald-950 dark:text-emerald-100 mt-0.5">
+                            <span className="font-mono text-[10px] uppercase font-bold text-emerald-700 ">Creative Remarks</span>
+                            <p className="font-medium text-emerald-950  mt-0.5">
                               {ws.creativeRemark || "—"}
                             </p>
                           </div>
@@ -1659,7 +1905,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                               placeholder={canCreativeEdit ? "e.g. SHUTTER-8923482 or asset reference" : "Locked (Claim task to edit)"}
                               className={`w-full px-3 py-2 rounded-lg border bg-[var(--surface-base)] text-xs text-[var(--on-surface)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] font-mono disabled:opacity-60 ${
                                 !creativeShutterstockNo.trim() && !creativeRemark.trim()
-                                  ? "border-amber-400 dark:border-amber-700"
+                                  ? "border-amber-400 "
                                   : "border-[var(--border-subtle)]"
                               }`}
                             />
@@ -1681,7 +1927,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                               placeholder={canCreativeEdit ? "Provide specific aesthetic, printing, color match, or dieline guidelines..." : "Locked (Claim task to edit)"}
                               className={`w-full px-3 py-2 rounded-lg border bg-[var(--surface-base)] text-xs text-[var(--on-surface)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] disabled:opacity-60 ${
                                 !creativeShutterstockNo.trim() && !creativeRemark.trim()
-                                  ? "border-amber-400 dark:border-amber-700"
+                                  ? "border-amber-400 "
                                   : "border-[var(--border-subtle)]"
                               }`}
                             />
@@ -1690,8 +1936,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                           {creativeFeedback && (
                             <div className={`p-3 rounded-lg text-xs font-medium flex items-center gap-2 ${
                               creativeFeedback.includes("released") || creativeFeedback.includes("submitted")
-                                ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 border border-emerald-200"
-                                : "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 border border-rose-200"
+                                ? "bg-emerald-50 text-emerald-800   border border-emerald-200"
+                                : "bg-rose-50 text-rose-800   border border-rose-200"
                             }`}>
                               {creativeFeedback.includes("released") || creativeFeedback.includes("submitted") ? (
                                 <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -1731,7 +1977,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                 )}
 
                 {/* ═════════ TAB 3: STUDIO ═════════ */}
-                {activeTab === "studio" && (
+                {activeTab === "studio" && !isCostingOnly && (
                   <div className="space-y-5">
                     {/* Handoff Context (Read-Only Context for Studio) */}
                     <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-2">
@@ -1752,7 +1998,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         </p>
                       )}
                       {(ws.samplingRouting?.studioRevisionRemark || ws.marketingRevisionRemark) && (
-                        <div className="rounded-lg border border-amber-300/60 bg-amber-50/60 p-3 text-xs text-amber-950 dark:border-amber-700/50 dark:bg-amber-950/20 dark:text-amber-100">
+                        <div className="rounded-lg border border-amber-300/60 bg-amber-50/60 p-3 text-xs text-amber-950   ">
                           <span className="font-bold">{ws.samplingRouting?.studioRevisionRemark ? "Creative revision request: " : "Marketing request: "}</span>{ws.samplingRouting?.studioRevisionRemark || ws.marketingRevisionRemark}
                         </div>
                       )}
@@ -1805,8 +2051,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                       {studioFeedback && (
                         <div className={`p-3 rounded-lg text-xs font-medium flex items-center gap-2 ${
                           studioFeedback.startsWith("Studio output submitted") || studioFeedback.startsWith("Artwork submitted") || studioFeedback.startsWith("Marketing has been asked")
-                            ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
-                            : "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+                            ? "bg-emerald-50 text-emerald-800  "
+                            : "bg-rose-50 text-rose-800  "
                         }`}>
                           <CheckCircle2 className="w-4 h-4 shrink-0" />
                           <span>{studioFeedback}</span>
@@ -1844,7 +2090,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                               type="button"
                               disabled={!canStudioEdit || isRejectingStudioRevision || !studioRevisionRejectRemark.trim()}
                               onClick={() => void handleStudioRevisionUnable()}
-                              className="rounded-lg border border-amber-300 px-3.5 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-950/30 disabled:opacity-50"
+                              className="rounded-lg border border-amber-300 px-3.5 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-50    disabled:opacity-50"
                             >
                               {isRejectingStudioRevision ? "Sending to Marketing..." : "Return to Marketing"}
                             </button>
@@ -1856,29 +2102,46 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                 )}
 
                 {/* ═════════ TAB 4: SAMPLING TEAM REVIEW & RELEASE (NO FEASIBILITY CHOICE) ═════════ */}
-                {activeTab === "sampling" && !isMockupOnly && (
+                {activeTab === "sampling" && !isMockupOnly && isCostingOnly && (
+                  <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 space-y-3">
+                    <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-3">
+                      <Beaker className="h-4 w-4 text-[var(--accent-primary)]" />
+                      <h3 className="text-sm font-bold text-[var(--on-surface)]">Sampling Review</h3>
+                      <span className="ml-auto rounded-full bg-[var(--surface-low)] px-2 py-1 text-[10px] font-bold text-[var(--on-surface-muted)]">
+                        {hasCostingOutput ? "Costing Submitted" : "Awaiting Costing"}
+                      </span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-[var(--on-surface-muted)]">
+                      {hasCostingOutput
+                        ? "Sampling reviews the submitted costing dossier from the Sampling Desk."
+                        : "Sampling review starts after the Costing team submits its sheet."}
+                    </p>
+                  </section>
+                )}
+
+                {activeTab === "sampling" && !isMockupOnly && !isCostingOnly && (
                   <div className="space-y-5">
                     {/* Status check alert */}
                     {isReleasedToPlant ? (
-                      <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 flex items-start gap-3">
+                      <div className="p-4 rounded-xl border border-emerald-200  bg-emerald-50/70  flex items-start gap-3">
                         <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                         <div className="space-y-1 text-xs">
-                          <p className="font-bold text-emerald-900 dark:text-emerald-200">
+                          <p className="font-bold text-emerald-900 ">
                             Sample Released to Plant
                           </p>
-                          <p className="text-emerald-800/80 dark:text-emerald-300/80">
+                          <p className="text-emerald-800/80 ">
                             Technical review complete. This sample was dispatched to the plant production line at {targetPlant}.
                           </p>
                         </div>
                       </div>
                     ) : (
-                      <div className="p-4 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/60 dark:bg-teal-950/20 flex items-start gap-3">
+                      <div className="p-4 rounded-xl border border-teal-200  bg-teal-50/60  flex items-start gap-3">
                         <Beaker className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                         <div className="space-y-1 text-xs">
-                          <p className="font-bold text-teal-900 dark:text-teal-200">
+                          <p className="font-bold text-teal-900 ">
                             Sampling Team Technical Verification &amp; Release
                           </p>
-                          <p className="text-teal-800/80 dark:text-teal-300/80">
+                          <p className="text-teal-800/80 ">
                             Review specifications and CAD deliverables. When ready, enter your technical remarks and release the sample directly to the manufacturing plant.
                           </p>
                         </div>
@@ -1918,8 +2181,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                       {samplingFeedbackMessage && (
                         <div className={`p-3 rounded-lg text-xs font-medium flex items-center gap-2 ${
                           samplingFeedbackMessage.startsWith("✓")
-                            ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
-                            : "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+                            ? "bg-emerald-50 text-emerald-800  "
+                            : "bg-rose-50 text-rose-800  "
                         }`}>
                           <CheckCircle2 className="w-4 h-4 shrink-0" />
                           <span>{samplingFeedbackMessage}</span>
@@ -1951,18 +2214,18 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                 )}
 
                 {/* ═════════ TAB 5: PLANT EXECUTION (KEPT OPEN & LIVE) ═════════ */}
-                {activeTab === "plant" && !isMockupOnly && (
+                {activeTab === "plant" && !isMockupOnly && !isCostingOnly && (
                   <div className="space-y-5">
                     {/* Live Plant Production Status Banner */}
-                    <div className="p-4 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/70 dark:bg-teal-950/25 flex items-start justify-between gap-4">
+                    <div className="p-4 rounded-xl border border-teal-200  bg-teal-50/70  flex items-start justify-between gap-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <Factory className="w-4 h-4 text-teal-600" />
-                          <h3 className="text-xs font-bold text-teal-950 dark:text-teal-200 uppercase tracking-wider font-mono">
+                          <h3 className="text-xs font-bold text-teal-950  uppercase tracking-wider font-mono">
                             Plant Production Desk: Live Operations Status
                           </h3>
                         </div>
-                        <p className="text-xs text-teal-900/80 dark:text-teal-300/80">
+                        <p className="text-xs text-teal-900/80 ">
                           {isReleasedToPlant
                             ? `Active at ${targetPlant || activeRequest.targetPlant || "Khaniwade"} Plant. Production queue ticket active.`
                             : "Plant queue is open and monitoring incoming release authorization from Sampling Team."}
@@ -1989,7 +2252,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                         <div className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] space-y-1">
                           <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] uppercase">Target Facility</span>
                           <p className="text-xs font-bold text-[var(--on-surface)]">{targetPlant || activeRequest.targetPlant || "Khaniwade Plant"}</p>
-                          <span className="text-[10px] text-teal-700 dark:text-teal-300 font-medium">Line: Commercial Samples</span>
+                          <span className="text-[10px] text-teal-700  font-medium">Line: Commercial Samples</span>
                         </div>
 
                         <div className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] space-y-1">
@@ -2034,6 +2297,16 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
                       </div>
                     </div>
                   </div>
+                )}
+
+                {(!isResample || activeTab === "plant") && (
+                  <SamplingResponsePanel
+                    className="mt-6"
+                    response={samplingResponseText}
+                    decision={samplingResponseDecision}
+                    reviewer={ws.samplingFeedbackBy || ws.samplingReviewedBy || ws.plantReleasedBy}
+                    respondedAt={ws.samplingFeedbackAt || ws.samplingReviewedAt || ws.plantReleasedAt}
+                  />
                 )}
 
               </div>

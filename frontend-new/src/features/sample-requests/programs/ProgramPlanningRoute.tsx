@@ -79,7 +79,7 @@ export const ProgramPlanningRoute: React.FC<ProgramPlanningRouteProps> = ({ user
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {error && (
-        <div role="alert" className="flex shrink-0 items-center justify-between gap-3 border-b border-rose-200 bg-rose-50 px-5 py-2.5 text-xs text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">
+        <div role="alert" className="flex shrink-0 items-center justify-between gap-3 border-b border-rose-200 bg-rose-50 px-5 py-2.5 text-xs text-rose-800   ">
           <span>{error}</span>
           <button type="button" onClick={() => void loadRequests()} className="shrink-0 font-semibold underline underline-offset-2 transition-colors cursor-pointer">
             Retry

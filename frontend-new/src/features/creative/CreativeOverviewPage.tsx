@@ -721,7 +721,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                 setWatchlistFilter("delayed");
                 scrollToSection("creative-watchlist");
               }}
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/15 text-rose-600  border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>{telemetry.totalDelayed} Overdue</span>
@@ -772,19 +772,19 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               scrollToSection("creative-watchlist");
             }}
             className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${telemetry.totalDrafts > 0
-              ? "border-amber-300 dark:border-amber-900/60 hover:border-amber-400"
+              ? "border-amber-300  hover:border-amber-400"
               : "border-[var(--border-subtle)] hover:border-amber-400/50"
               }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 ">
                 Pending Drafts
               </span>
-              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600  flex items-center justify-center transition-colors">
                 <FileEdit className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="text-2xl font-display font-bold tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
+            <div className="text-2xl font-display font-bold tracking-tight text-amber-600  tabular-nums">
               {isLoading ? "—" : telemetry.totalDrafts.toLocaleString()}
             </div>
             <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
@@ -805,7 +805,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 In Production
               </span>
-              <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-600  flex items-center justify-center transition-colors">
                 <Sparkles className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -825,24 +825,24 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               scrollToSection("creative-watchlist");
             }}
             className={`group p-4 rounded-xl bg-[var(--surface-lowest)] border hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 ${telemetry.totalClientReview > 0
-              ? "border-indigo-300 dark:border-indigo-900/60 hover:border-indigo-400"
-              : "border-[var(--border-subtle)] hover:border-indigo-400/50"
+              ? "border-[var(--accent-primary)] hover:border-[var(--accent-primary-strong)]"
+              : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/50"
               }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--accent-primary-strong)]">
                 Needs Decision
               </span>
-              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] flex items-center justify-center transition-colors">
                 <ShieldCheck className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="text-2xl font-display font-bold tracking-tight text-indigo-600 dark:text-indigo-400 tabular-nums">
+            <div className="text-2xl font-display font-bold tracking-tight text-[var(--accent-primary-strong)] tabular-nums">
               {isLoading ? "—" : telemetry.totalClientReview.toLocaleString()}
             </div>
             <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono flex items-center justify-between">
               <span>Client review / revisions</span>
-              <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+              <ChevronRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-[var(--accent-primary-strong)] group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
 
@@ -852,14 +852,14 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Fulfillment SLA
               </span>
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600  flex items-center justify-center transition-colors">
                 <CheckCircle2 className="w-3.5 h-3.5" />
               </div>
             </div>
             <div className="text-2xl font-display font-bold tracking-tight text-[var(--on-surface)] tabular-nums">
               {isLoading ? "—" : `${telemetry.onTimeRate}%`}
             </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono flex items-center justify-between">
+            <div className="text-[11px] text-emerald-600  mt-1 font-mono flex items-center justify-between">
               <span>{telemetry.totalOnTime} on-track tasks</span>
               <span className="text-[10px] font-bold">Target 95%</span>
             </div>
@@ -871,7 +871,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Dispatched
               </span>
-              <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-600  flex items-center justify-center transition-colors">
                 <Send className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -908,11 +908,11 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600  flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
                       <Palette className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-purple-600  transition-colors">
                         Artwork &amp; Design Briefs Desk
                       </h4>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
@@ -920,7 +920,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                       </span>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
+                  <span className="px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold bg-purple-50 text-purple-700   border border-purple-200 ">
                     {allDesignItems.length} Briefs
                   </span>
                 </div>
@@ -928,7 +928,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                   Intake of client artwork requests, brand typography, Shutterstock licensing, and variant generation.
                 </p>
               </div>
-              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-purple-600  transition-colors">
                 <span className="font-mono tabular-nums text-[var(--on-surface-muted)]">
                   {allDesignItems.length} active briefs
                 </span>
@@ -946,11 +946,11 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-600  flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
                       <Box className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-teal-600  transition-colors">
                         Sampling &amp; CAD Mockups Desk
                       </h4>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
@@ -958,7 +958,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                       </span>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200 dark:border-teal-800/40">
+                  <span className="px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold bg-teal-50 text-teal-700   border border-teal-200 ">
                     {samplingMockupRequests.length} Tasks
                   </span>
                 </div>
@@ -966,7 +966,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                   3D structural dummy mockups, substrate matching, folding simulations, and SAMP physical prototype verification.
                 </p>
               </div>
-              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-teal-600  transition-colors">
                 <span className="font-mono tabular-nums text-[var(--on-surface-muted)]">
                   {samplingMockupRequests.length} active mockups
                 </span>
@@ -984,11 +984,11 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600  flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
                       <CheckCircle2 className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                      <h4 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-emerald-600  transition-colors">
                         Prepress Certification &amp; QC
                       </h4>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">
@@ -996,7 +996,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                       </span>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                  <span className="px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold bg-emerald-50 text-emerald-700   border border-emerald-200 ">
                     {telemetry.totalCompleted} Certified
                   </span>
                 </div>
@@ -1004,7 +1004,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                   Final high-resolution PDF proof verification, CMYK/Pantone separations, and plant print authorization.
                 </p>
               </div>
-              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-emerald-600  transition-colors">
                 <span className="font-mono tabular-nums text-[var(--on-surface-muted)]">
                   {telemetry.totalCompleted} certified projects
                 </span>
@@ -1159,14 +1159,14 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                       {svgCurve.points[hoveredMonthIndex].inflow}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400">
+                  <div className="flex items-center justify-between gap-4 text-emerald-600 ">
                     <span>On-Time:</span>
                     <span className="font-bold tabular-nums">
                       {svgCurve.points[hoveredMonthIndex].onTime}
                     </span>
                   </div>
                   {svgCurve.points[hoveredMonthIndex].delayed > 0 && (
-                    <div className="flex items-center justify-between gap-4 text-rose-600 dark:text-rose-400">
+                    <div className="flex items-center justify-between gap-4 text-rose-600 ">
                       <span>Delayed:</span>
                       <span className="font-bold tabular-nums">
                         {svgCurve.points[hoveredMonthIndex].delayed}
@@ -1202,12 +1202,12 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                     <tr key={m.key} className="hover:bg-[var(--surface-low)] transition-colors">
                       <td className="py-2 px-3 font-semibold text-[var(--on-surface)]">{m.full}</td>
                       <td className="py-2 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{m.inflow}</td>
-                      <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
-                      <td className="py-2 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
+                      <td className="py-2 px-3 text-right text-emerald-600  font-semibold tabular-nums">{m.onTime}</td>
+                      <td className="py-2 px-3 text-right text-rose-600  font-semibold tabular-nums">{m.delayed}</td>
                       <td className="py-2 px-3 text-right tabular-nums">
                         <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${m.slaRate >= 90
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-500/20"
-                          : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-500/20"
+                          ? "bg-emerald-50 text-emerald-700   border border-emerald-500/20"
+                          : "bg-amber-50 text-amber-700   border border-amber-500/20"
                           }`}>
                           {m.slaRate}%
                         </span>
@@ -1292,10 +1292,10 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                           <td className="py-3 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">
                             {member.active}
                           </td>
-                          <td className="py-3 px-3 text-right text-amber-600 dark:text-amber-400 font-semibold tabular-nums">
+                          <td className="py-3 px-3 text-right text-amber-600  font-semibold tabular-nums">
                             {member.drafts}
                           </td>
-                          <td className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">
+                          <td className="py-3 px-3 text-right text-rose-600  font-semibold tabular-nums">
                             {member.delayed}
                           </td>
                           <td className="py-3 px-3">
@@ -1313,8 +1313,8 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                               </div>
                               <span
                                 className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${member.slaRate >= 90
-                                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                  : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                                  ? "bg-emerald-50 text-emerald-700  "
+                                  : "bg-amber-50 text-amber-700  "
                                   }`}
                               >
                                 {member.slaRate}%
@@ -1387,7 +1387,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                       <td className="py-3 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">
                         {account.active}
                       </td>
-                      <td className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">
+                      <td className="py-3 px-3 text-right text-rose-600  font-semibold tabular-nums">
                         {account.delayed}
                       </td>
                       <td className="py-3 px-3">
@@ -1400,8 +1400,8 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                           </div>
                           <span
                             className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${account.onTimeRate >= 90
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                              ? "bg-emerald-50 text-emerald-700  "
+                              : "bg-amber-50 text-amber-700  "
                               }`}
                           >
                             {account.onTimeRate}%
@@ -1450,7 +1450,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                   type="button"
                   onClick={() => setWatchlistFilter("drafts")}
                   className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${watchlistFilter === "drafts"
-                    ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs border border-amber-500/20"
+                    ? "bg-amber-50 text-amber-700   font-bold shadow-2xs border border-amber-500/20"
                     : "text-[var(--on-surface-muted)] hover:text-amber-600"
                     }`}
                 >
@@ -1460,7 +1460,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                   type="button"
                   onClick={() => setWatchlistFilter("concept")}
                   className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${watchlistFilter === "concept"
-                    ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-bold shadow-2xs border border-purple-500/20"
+                    ? "bg-purple-50 text-purple-700   font-bold shadow-2xs border border-purple-500/20"
                     : "text-[var(--on-surface-muted)] hover:text-purple-600"
                     }`}
                 >
@@ -1470,7 +1470,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                   type="button"
                   onClick={() => setWatchlistFilter("review")}
                   className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${watchlistFilter === "review"
-                    ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold shadow-2xs border border-indigo-500/20"
+                    ? "bg-indigo-50 text-indigo-700   font-bold shadow-2xs border border-indigo-500/20"
                     : "text-[var(--on-surface-muted)] hover:text-indigo-600"
                     }`}
                 >
@@ -1480,7 +1480,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                   type="button"
                   onClick={() => setWatchlistFilter("delayed")}
                   className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all ${watchlistFilter === "delayed"
-                    ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs border border-rose-500/20"
+                    ? "bg-rose-50 text-rose-700   font-bold shadow-2xs border border-rose-500/20"
                     : "text-[var(--on-surface-muted)] hover:text-rose-600"
                     }`}
                 >
@@ -1537,7 +1537,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                         {item.customer || "—"}
                       </td>
                       <td className="py-3 px-3 max-w-xs truncate text-[var(--on-surface)] font-medium">
-                        <span className="group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                        <span className="group-hover:text-purple-600  transition-colors">
                           {item.title}
                         </span>
                         {item.trend && (
@@ -1556,7 +1556,7 @@ export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
                       </td>
                       <td className="py-3 px-3 font-mono whitespace-nowrap">
                         {item._isDelayed ? (
-                          <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold">
+                          <span className="inline-flex items-center gap-1 text-rose-600  font-bold">
                             <Clock className="w-3 h-3" />
                             <span>{item.dueDate}</span>
                           </span>

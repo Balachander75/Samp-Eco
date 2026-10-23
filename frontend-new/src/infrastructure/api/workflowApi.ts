@@ -77,9 +77,27 @@ export function fetchCostingWorkflowsApi(year?: string, stage?: string): Promise
   return apiFetch<RequestWorkflowRecord[]>(`/api/v1/workflows/costing${query}`);
 }
 
-export function fetchSamplingWorkflowReviewsApi(year?: string): Promise<RequestWorkflowRecord[]> {
-  const query = year ? `?year=${encodeURIComponent(year)}` : "";
-  return apiFetch<RequestWorkflowRecord[]>(`/api/v1/workflows/reviews${query}`);
+export async function fetchSamplingWorkflowReviewsApi(year?: string): Promise<RequestWorkflowRecord[]> {
+  const pageSize = 2000;
+  const records: RequestWorkflowRecord[] = [];
+  let offset = 0;
+
+  while (true) {
+    const params = new URLSearchParams({ limit: String(pageSize), offset: String(offset) });
+    if (year) params.set("year", year);
+    const page = await apiFetch<RequestWorkflowRecord[]>(`/api/v1/workflows/reviews?${params.toString()}`);
+    records.push(...page);
+
+    const pageCounts = page.reduce<Record<string, number>>((counts, record) => {
+      counts[record.workflow_type] = (counts[record.workflow_type] || 0) + 1;
+      return counts;
+    }, {});
+    const hasMore = ["sample", "design", "mockup", "costing"]
+      .some((type) => pageCounts[type] === pageSize);
+    if (!hasMore) return records;
+
+    offset += pageSize;
+  }
 }
 
 export function submitCostingWorkflowApi(sampleRequestId: string | number): Promise<RequestWorkflowRecord> {

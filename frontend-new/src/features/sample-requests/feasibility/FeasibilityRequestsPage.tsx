@@ -479,21 +479,21 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
                     isDelayed ? "text-rose-500" : "text-[var(--on-surface-subtle)]"
                   }`}
                 />
-                <span className={isDelayed ? "font-semibold text-rose-600 dark:text-rose-400" : ""}>
+                <span className={isDelayed ? "font-semibold text-rose-600 " : ""}>
                   {req.sampleRequiredDate ? formatOdooDate(req.sampleRequiredDate) : "—"}
                 </span>
               </div>
 
               {req.counterDateDecision === "pending" && req.sampCounterDate ? (
                 <span
-                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200   "
                   title={`Sampling proposed revised date: ${req.sampCounterDate}`}
                 >
-                  <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <Clock className="w-2.5 h-2.5 text-amber-600  shrink-0" />
                   <span>Prop: {formatOdooDate(req.sampCounterDate)}</span>
                 </span>
               ) : isPastDue ? (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200   ">
                   <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
                   <span>Overdue</span>
                 </span>
@@ -775,20 +775,20 @@ export const FeasibilityRequestsPage: React.FC<FeasibilityRequestsPageProps> = (
         {loadError && (
           <div
             role="alert"
-            className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200"
+            className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-800   "
           >
             <div className="flex min-w-0 items-start gap-2 text-xs">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 " />
               <div className="min-w-0">
                 <p className="font-semibold">{requests.length ? "Refresh failed. Showing the last loaded requests." : "Feasibility requests could not be loaded."}</p>
-                <p className="mt-0.5 break-words text-rose-700 dark:text-rose-300">{loadError}</p>
+                <p className="mt-0.5 break-words text-rose-700 ">{loadError}</p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => void loadRequests()}
               disabled={isLoading}
-              className="min-h-8 shrink-0 rounded-md border border-rose-300 px-3 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-950/70"
+              className="min-h-8 shrink-0 rounded-md border border-rose-300 px-3 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60   "
             >
               {isLoading ? "Retrying…" : "Try again"}
             </button>

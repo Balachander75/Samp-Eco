@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { SampleRequestItem } from "../../types";
 import { formatOdooDate } from "../../utils/dateUtils";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { getSampleTrackInfo } from "../../utils/sampleRouting";
 
 const formatRelativeTime = (timestamp?: string): string => {
   if (!timestamp) return "";
@@ -39,6 +40,9 @@ export const MockupSheetHeader: React.FC<MockupSheetHeaderProps> = ({
   currentUserId,
 }) => {
   const ws = (activeRequest.mockupWorkflowState || {}) as Record<string, any>;
+  const sampleTrackInfo = (activeRequest.requestTypes || []).includes("sample")
+    ? getSampleTrackInfo(activeRequest)
+    : null;
 
   const lastViewer = useMemo(() => {
     const activities = (activeRequest.activities || []) as any[];
@@ -106,6 +110,16 @@ export const MockupSheetHeader: React.FC<MockupSheetHeaderProps> = ({
 
         {/* ── Right: Sleek Badges & Compact Actions (Feasibility Check Style) ── */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {sampleTrackInfo && (
+            <>
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${sampleTrackInfo.sampleTypeBadge.badgeClass}`}>
+                {sampleTrackInfo.isFullSample ? "Full Sample" : "Partial Sample"}
+              </span>
+              <span title={sampleTrackInfo.description} className="inline-flex items-center rounded-xl border border-teal-200 bg-teal-50 px-2.5 py-1.5 text-[10px] font-bold text-teal-900">
+                {sampleTrackInfo.label}
+              </span>
+            </>
+          )}
           {/* Target SLA Date Pill */}
           {requiredDate && (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-xs text-[var(--on-surface)] shadow-2xs">
@@ -126,7 +140,7 @@ export const MockupSheetHeader: React.FC<MockupSheetHeaderProps> = ({
 
           {/* Reviewer / Claim Pill */}
           {(activeRequest.is_closed || activeRequest.closure != null || String(activeRequest.status || "").toLowerCase().includes("closed")) ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs shadow-2xs font-bold">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700  text-xs shadow-2xs font-bold">
               <span>Request Closed</span>
             </div>
           ) : isClaimed && claimedBy ? (
@@ -144,7 +158,7 @@ export const MockupSheetHeader: React.FC<MockupSheetHeaderProps> = ({
               <span>{isClaiming ? "Claiming..." : "Claim Task"}</span>
             </button>
           ) : role !== "marketing" ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-xs shadow-2xs">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50/60  border border-amber-200/60  text-amber-800  text-xs shadow-2xs">
               <span className="font-medium text-[11px]">Unclaimed Task</span>
             </div>
           ) : null}

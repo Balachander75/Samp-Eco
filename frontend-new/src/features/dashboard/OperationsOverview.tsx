@@ -488,8 +488,8 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         sharePct: Math.round((mktTotal / totalRequests) * 100),
         statusTone:
           mktSla >= 90
-            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
-            : "text-amber-600 bg-amber-50 dark:bg-amber-950/40",
+            ? "text-emerald-600 bg-emerald-50 "
+            : "text-amber-600 bg-amber-50 ",
       },
       {
         id: "creative",
@@ -505,10 +505,10 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         sharePct: Math.round((crTotal / totalRequests) * 100),
         statusTone:
           crSla >= 90
-            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+            ? "text-emerald-600 bg-emerald-50 "
             : crSla >= 75
-              ? "text-amber-600 bg-amber-50 dark:bg-amber-950/40"
-              : "text-rose-600 bg-rose-50 dark:bg-rose-950/40",
+              ? "text-amber-600 bg-amber-50 "
+              : "text-rose-600 bg-rose-50 ",
       },
       {
         id: "studio",
@@ -524,8 +524,8 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         sharePct: Math.round((stTotal / totalRequests) * 100),
         statusTone:
           stSla >= 90
-            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
-            : "text-amber-600 bg-amber-50 dark:bg-amber-950/40",
+            ? "text-emerald-600 bg-emerald-50 "
+            : "text-amber-600 bg-amber-50 ",
       },
       {
         id: "samp",
@@ -541,10 +541,10 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         sharePct: Math.round((smTotal / totalRequests) * 100),
         statusTone:
           smSla >= 90
-            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+            ? "text-emerald-600 bg-emerald-50 "
             : smSla >= 75
-              ? "text-amber-600 bg-amber-50 dark:bg-amber-950/40"
-              : "text-rose-600 bg-rose-50 dark:bg-rose-950/40",
+              ? "text-amber-600 bg-amber-50 "
+              : "text-rose-600 bg-rose-50 ",
       },
       {
         id: "costing",
@@ -560,8 +560,8 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
         sharePct: Math.round((coTotal / totalRequests) * 100),
         statusTone:
           coSla >= 90
-            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
-            : "text-amber-600 bg-amber-50 dark:bg-amber-950/40",
+            ? "text-emerald-600 bg-emerald-50 "
+            : "text-amber-600 bg-amber-50 ",
       },
     ];
   }, [
@@ -915,7 +915,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                 <span className="text-[10px] font-mono font-medium uppercase tracking-wider text-[var(--on-surface-subtle)] leading-tight group-hover:text-[var(--on-surface)]">
                   In-Flight
                 </span>
-                <span className="font-mono font-bold text-sm text-blue-600 dark:text-blue-400 tabular-nums leading-tight mt-0.5">
+                <span className="font-mono font-bold text-sm text-blue-600  tabular-nums leading-tight mt-0.5">
                   {slaMetrics.inFlightCount.toLocaleString()}
                 </span>
               </button>
@@ -934,7 +934,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   <span className={`w-1.5 h-1.5 rounded-full ${slaMetrics.onTimeRate >= 90 ? "bg-emerald-500" : "bg-amber-500"}`} />
                 </div>
                 <span className={`font-mono font-bold text-sm tabular-nums leading-tight mt-0.5 ${
-                  slaMetrics.onTimeRate >= 90 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                  slaMetrics.onTimeRate >= 90 ? "text-emerald-600 " : "text-amber-600 "
                 }`}>
                   {slaMetrics.onTimeRate}%
                 </span>
@@ -954,7 +954,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               >
                 <div className="flex items-center gap-1.5">
                   <span className={`text-[10px] font-mono font-medium uppercase tracking-wider leading-tight ${
-                    slaMetrics.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400 font-bold" : "text-[var(--on-surface-subtle)]"
+                    slaMetrics.totalDelayed > 0 ? "text-rose-600  font-bold" : "text-[var(--on-surface-subtle)]"
                   }`}>
                     Overdue
                   </span>
@@ -963,7 +963,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   )}
                 </div>
                 <span className={`font-mono font-bold text-sm tabular-nums leading-tight mt-0.5 ${
-                  slaMetrics.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface)]"
+                  slaMetrics.totalDelayed > 0 ? "text-rose-600 " : "text-[var(--on-surface)]"
                 }`}>
                   {slaMetrics.totalDelayed}
                 </span>
@@ -1076,7 +1076,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                 <Flame className="w-3.5 h-3.5 text-amber-500" />
                 <span>Jump to Watchlist</span>
                 {slaMetrics.totalDelayed > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-rose-500/15 text-rose-600  border border-rose-500/30">
                     {slaMetrics.totalDelayed}
                   </span>
                 )}
@@ -1129,7 +1129,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 On-Time SLA
               </span>
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600  flex items-center justify-center transition-colors">
                 <CheckCircle2 className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -1137,7 +1137,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               <span>{slaMetrics.onTimeRate}%</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mb-1" />
             </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+            <div className="text-[11px] text-emerald-600  mt-1 font-mono">
               {slaMetrics.totalOnTime.toLocaleString()} on-track tasks
             </div>
           </div>
@@ -1156,20 +1156,20 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
           >
             <div className="flex items-center justify-between mb-2">
               <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
-                slaMetrics.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface-subtle)]"
+                slaMetrics.totalDelayed > 0 ? "text-rose-600 " : "text-[var(--on-surface-subtle)]"
               }`}>
                 Overdue Tasks
               </span>
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                 slaMetrics.totalDelayed > 0
-                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                  ? "bg-rose-500/15 text-rose-600 "
                   : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
               }`}>
                 <AlertTriangle className="w-3.5 h-3.5" />
               </div>
             </div>
             <div className={`text-2xl font-display font-bold tracking-tight tabular-nums ${
-              slaMetrics.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface)]"
+              slaMetrics.totalDelayed > 0 ? "text-rose-600 " : "text-[var(--on-surface)]"
             }`}>
               {slaMetrics.totalDelayed}
             </div>
@@ -1187,14 +1187,14 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
             className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-amber-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 ">
                 Imminent SLA
               </span>
-              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600  flex items-center justify-center transition-colors">
                 <Clock className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="text-2xl font-display font-bold tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
+            <div className="text-2xl font-display font-bold tracking-tight text-amber-600  tabular-nums">
               {slaMetrics.urgentCount}
             </div>
             <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
@@ -1211,7 +1211,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Active In-Flight
               </span>
-              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600  flex items-center justify-center transition-colors">
                 <Hourglass className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -1232,7 +1232,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Dispatched / Won
               </span>
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600  flex items-center justify-center transition-colors">
                 <Zap className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -1291,7 +1291,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
             {/* Readout 2: Largest Queue */}
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 hover:border-[var(--border-strong)] transition-all shadow-2xs">
               <div className="flex min-w-0 items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600  shrink-0">
                   <Hourglass className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
@@ -1313,7 +1313,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
             {/* Readout 3: Overdue Rate */}
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-3 hover:border-[var(--border-strong)] transition-all shadow-2xs">
               <div className="flex min-w-0 items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600  shrink-0">
                   <AlertTriangle className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
@@ -1325,7 +1325,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   </span>
                 </div>
               </div>
-              <span className="text-right text-xs font-bold text-rose-600 dark:text-rose-400 tabular-nums font-mono shrink-0">
+              <span className="text-right text-xs font-bold text-rose-600  tabular-nums font-mono shrink-0">
                 {slaMetrics.totalDelayed} ({managementReadout.overdueShare}%)
               </span>
             </div>
@@ -1673,11 +1673,11 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                         {monthlyTimeline.points[hoveredMonthIndex].intake}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400">
+                    <div className="flex items-center justify-between gap-4 text-emerald-600 ">
                       <span>On-Time:</span>
                       <span className="font-bold tabular-nums">{monthlyTimeline.points[hoveredMonthIndex].onTime}</span>
                     </div>
-                    <div className="flex items-center justify-between gap-4 text-rose-600 dark:text-rose-400">
+                    <div className="flex items-center justify-between gap-4 text-rose-600 ">
                       <span>Delayed:</span>
                       <span className="font-bold tabular-nums">{monthlyTimeline.points[hoveredMonthIndex].delayed}</span>
                     </div>
@@ -1727,15 +1727,15 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       <td className="py-2.5 px-3.5 text-right text-[var(--on-surface-muted)] tabular-nums">{m.mockup}</td>
                       <td className="py-2.5 px-3.5 text-right text-[var(--on-surface-muted)] tabular-nums">{m.sampling}</td>
                       <td className="py-2.5 px-3.5 text-right text-[var(--on-surface-muted)] tabular-nums">{m.costing}</td>
-                      <td className="py-2.5 px-3.5 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
-                      <td className="py-2.5 px-3.5 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
+                      <td className="py-2.5 px-3.5 text-right text-emerald-600  font-semibold tabular-nums">{m.onTime}</td>
+                      <td className="py-2.5 px-3.5 text-right text-rose-600  font-semibold tabular-nums">{m.delayed}</td>
                       <td className="py-2.5 px-3.5 text-right tabular-nums">
                         <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
                           m.slaRate >= 90
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            ? "bg-emerald-50 text-emerald-700  "
                             : m.slaRate >= 75
-                            ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                            : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                            ? "bg-amber-50 text-amber-700  "
+                            : "bg-rose-50 text-rose-700  "
                         }`}>
                           {m.slaRate}%
                         </span>
@@ -1780,7 +1780,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               >
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600  flex items-center justify-center shrink-0">
                       <Palette className="w-4 h-4" />
                     </div>
                     <div>
@@ -1788,7 +1788,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Creative Artwork</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-500/20">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-purple-50 text-purple-700   border border-purple-500/20">
                     {marketingDecomposition.design.pct}%
                   </span>
                 </div>
@@ -1800,7 +1800,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
                     {marketingDecomposition.design.count}
                   </span>
-                  <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                  <span className="text-xs text-purple-600  font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                     Creative Desk <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
@@ -1813,7 +1813,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               >
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600  flex items-center justify-center shrink-0">
                       <Box className="w-4 h-4" />
                     </div>
                     <div>
@@ -1821,7 +1821,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Dielines & 3D Form</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-500/20">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-indigo-50 text-indigo-700   border border-indigo-500/20">
                     {marketingDecomposition.mockup.pct}%
                   </span>
                 </div>
@@ -1833,7 +1833,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
                     {marketingDecomposition.mockup.count}
                   </span>
-                  <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                  <span className="text-xs text-indigo-600  font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                     Studio Desk <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
@@ -1846,7 +1846,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               >
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600  flex items-center justify-center shrink-0">
                       <FlaskConical className="w-4 h-4" />
                     </div>
                     <div>
@@ -1854,7 +1854,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Physical Prototypes</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-500/20">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-emerald-50 text-emerald-700   border border-emerald-500/20">
                     {marketingDecomposition.sampling.pct}%
                   </span>
                 </div>
@@ -1866,7 +1866,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
                     {marketingDecomposition.sampling.count}
                   </span>
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                  <span className="text-xs text-emerald-600  font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                     Sampling Team <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
@@ -1879,7 +1879,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
               >
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600  flex items-center justify-center shrink-0">
                       <Calculator className="w-4 h-4" />
                     </div>
                     <div>
@@ -1887,7 +1887,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Pricing & Margins</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-500/20">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-amber-50 text-amber-700   border border-amber-500/20">
                     {marketingDecomposition.costing.pct}%
                   </span>
                 </div>
@@ -1899,7 +1899,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   <span className="text-2xl font-bold font-display text-[var(--on-surface)] tabular-nums">
                     {marketingDecomposition.costing.count}
                   </span>
-                  <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                  <span className="text-xs text-amber-600  font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                     Costing Desk <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
@@ -2048,10 +2048,10 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                         </div>
                       </td>
                       <td className="py-3 px-3.5 text-right font-mono text-[var(--on-surface)] tabular-nums">{dept.active}</td>
-                      <td className="py-3 px-3.5 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{dept.onTime}</td>
-                      <td className="py-3 px-3.5 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                      <td className="py-3 px-3.5 text-right font-mono font-semibold text-emerald-600  tabular-nums">{dept.onTime}</td>
+                      <td className="py-3 px-3.5 text-right font-mono font-semibold text-rose-600  tabular-nums">
                         {dept.delayed > 0 ? (
-                          <span className="px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                          <span className="px-1.5 py-0.5 rounded bg-rose-50  text-rose-600  border border-rose-500/20">
                             {dept.delayed}
                           </span>
                         ) : (
@@ -2155,7 +2155,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-center font-mono">
               <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs">
                 <span className="text-[10px] uppercase font-semibold text-[var(--on-surface-subtle)] block mb-1">0 - 3 Days</span>
-                <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                <span className="text-xl font-bold text-emerald-600  tabular-nums">
                   {slaMetrics.aging.age0to3}
                 </span>
                 <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Fresh</span>
@@ -2163,7 +2163,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
 
               <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs">
                 <span className="text-[10px] uppercase font-semibold text-[var(--on-surface-subtle)] block mb-1">4 - 7 Days</span>
-                <span className="text-xl font-bold text-blue-600 dark:text-blue-400 tabular-nums">
+                <span className="text-xl font-bold text-blue-600  tabular-nums">
                   {slaMetrics.aging.age4to7}
                 </span>
                 <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Standard</span>
@@ -2171,7 +2171,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
 
               <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs">
                 <span className="text-[10px] uppercase font-semibold text-[var(--on-surface-subtle)] block mb-1">8 - 14 Days</span>
-                <span className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                <span className="text-xl font-bold text-amber-600  tabular-nums">
                   {slaMetrics.aging.age8to14}
                 </span>
                 <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Review</span>
@@ -2179,7 +2179,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
 
               <div className="p-3 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] shadow-2xs">
                 <span className="text-[10px] uppercase font-semibold text-[var(--on-surface-subtle)] block mb-1">&gt;14 Days</span>
-                <span className="text-xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                <span className="text-xl font-bold text-rose-600  tabular-nums">
                   {slaMetrics.aging.age15Plus}
                 </span>
                 <span className="text-[10px] text-[var(--on-surface-muted)] block mt-0.5">Stalled</span>
@@ -2227,7 +2227,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                       </td>
                       <td className="py-3 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{cust.total}</td>
                       <td className="py-3 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{cust.active}</td>
-                      <td className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{cust.delayed}</td>
+                      <td className="py-3 px-3 text-right text-rose-600  font-semibold tabular-nums">{cust.delayed}</td>
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2 w-32">
                           <div className="flex-1 bg-[var(--surface-container)] h-1.5 rounded-full overflow-hidden">
@@ -2238,8 +2238,8 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                           </div>
                           <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
                             cust.onTimeRate >= 90
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                              ? "bg-emerald-50 text-emerald-700  "
+                              : "bg-amber-50 text-amber-700  "
                           }`}>
                             {cust.onTimeRate}%
                           </span>
@@ -2339,7 +2339,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   type="button"
                   onClick={() => setWatchlistFilter("delayed")}
                   className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${watchlistFilter === "delayed"
-                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs"
+                      ? "bg-rose-50 text-rose-700   font-bold shadow-2xs"
                       : "text-[var(--on-surface-muted)] hover:text-rose-600"
                     }`}
                 >
@@ -2349,7 +2349,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   type="button"
                   onClick={() => setWatchlistFilter("urgent")}
                   className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${watchlistFilter === "urgent"
-                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs"
+                      ? "bg-amber-50 text-amber-700   font-bold shadow-2xs"
                       : "text-[var(--on-surface-muted)] hover:text-amber-600"
                     }`}
                 >
@@ -2359,7 +2359,7 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                   type="button"
                   onClick={() => setWatchlistFilter("ontime")}
                   className={`px-3 py-1 rounded-lg cursor-pointer transition-colors ${watchlistFilter === "ontime"
-                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-bold shadow-2xs"
+                      ? "bg-emerald-50 text-emerald-700   font-bold shadow-2xs"
                       : "text-[var(--on-surface-muted)] hover:text-emerald-600"
                     }`}
                 >
@@ -2409,14 +2409,14 @@ export const OperationsOverview: React.FC<OperationsOverviewProps> = ({ user, em
                 ) : (
                   filteredWatchlist.slice(0, 10).map((req) => {
                     const deptTones: Record<string, string> = {
-                      marketing: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-900/60",
-                      creative: "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-900/60",
-                      studio: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900/60",
-                      samp: "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border-teal-200 dark:border-teal-900/60",
-                      costing: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/60",
-                      plant: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-900/60",
+                      marketing: "bg-blue-50 text-blue-700   border-blue-200 ",
+                      creative: "bg-purple-50 text-purple-700   border-purple-200 ",
+                      studio: "bg-indigo-50 text-indigo-700   border-indigo-200 ",
+                      samp: "bg-teal-50 text-teal-700   border-teal-200 ",
+                      costing: "bg-emerald-50 text-emerald-700   border-emerald-200 ",
+                      plant: "bg-amber-50 text-amber-700   border-amber-200 ",
                     };
-                    const deptTone = deptTones[req._departmentKey.toLowerCase()] || "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300";
+                    const deptTone = deptTones[req._departmentKey.toLowerCase()] || "bg-zinc-100 text-zinc-700 border-zinc-200  ";
 
                     return (
                       <tr

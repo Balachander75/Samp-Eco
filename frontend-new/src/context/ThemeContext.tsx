@@ -43,15 +43,15 @@ export const APP_THEMES: AppTheme[] = [
     badge: "Recommended",
     category: "enterprise",
     preview: {
-      canvas: "#edf5f1",
-      sidebar: "#d8eadf",
+      canvas: "#f4f8f5",
+      sidebar: "#e5efe8",
       surface: "#ffffff",
-      accent: "#059669",
+      accent: "#047857",
       accentSoft: "#d1fae5",
       accentSecondary: "#2563eb",
-      accentTertiary: "#d97706",
-      text: "#0e291e",
-      border: "#cbdad0"
+      accentTertiary: "#b45309",
+      text: "#14251b",
+      border: "rgba(20, 37, 27, 0.12)"
     }
   },
   {
@@ -63,15 +63,15 @@ export const APP_THEMES: AppTheme[] = [
     badge: "Popular",
     category: "enterprise",
     preview: {
-      canvas: "#eaf2fb",
-      sidebar: "#cee1f7",
+      canvas: "#f3f7fc",
+      sidebar: "#e6eef8",
       surface: "#ffffff",
-      accent: "#2563eb",
+      accent: "#1d4ed8",
       accentSoft: "#dbeafe",
-      accentSecondary: "#06b6d4",
-      accentTertiary: "#eab308",
-      text: "#0a1b33",
-      border: "#c6d8eb"
+      accentSecondary: "#0e7490",
+      accentTertiary: "#b45309",
+      text: "#142438",
+      border: "rgba(20, 36, 56, 0.12)"
     }
   },
   {
@@ -83,15 +83,15 @@ export const APP_THEMES: AppTheme[] = [
     badge: "Studio Choice",
     category: "creative",
     preview: {
-      canvas: "#f4eefa",
-      sidebar: "#e5d5f8",
+      canvas: "#f7f5fb",
+      sidebar: "#eee8f6",
       surface: "#ffffff",
-      accent: "#7c3aed",
+      accent: "#6d28d9",
       accentSoft: "#ede9fe",
-      accentSecondary: "#db2777",
-      accentTertiary: "#f59e0b",
-      text: "#1d0f36",
-      border: "#d8c8ee"
+      accentSecondary: "#be185d",
+      accentTertiary: "#b45309",
+      text: "#20172a",
+      border: "rgba(32, 23, 42, 0.12)"
     }
   },
   {
@@ -102,15 +102,15 @@ export const APP_THEMES: AppTheme[] = [
     vibe: "Warm Editorial",
     category: "minimal",
     preview: {
-      canvas: "#f8f2e6",
-      sidebar: "#ebd6b5",
+      canvas: "#faf7f0",
+      sidebar: "#f1e9db",
       surface: "#ffffff",
-      accent: "#b45309",
+      accent: "#92400e",
       accentSoft: "#fef3c7",
-      accentSecondary: "#ea580c",
-      accentTertiary: "#0284c7",
-      text: "#291c10",
-      border: "#ded7c5"
+      accentSecondary: "#c2410c",
+      accentTertiary: "#b45309",
+      text: "#292114",
+      border: "rgba(41, 33, 20, 0.12)"
     }
   },
   {
@@ -121,15 +121,15 @@ export const APP_THEMES: AppTheme[] = [
     vibe: "Modern Minimal",
     category: "creative",
     preview: {
-      canvas: "#fcf0f3",
-      sidebar: "#f7d2dc",
+      canvas: "#faf5f6",
+      sidebar: "#f1e4e8",
       surface: "#ffffff",
-      accent: "#e11d48",
+      accent: "#be123c",
       accentSoft: "#ffe4e6",
-      accentSecondary: "#6366f1",
-      accentTertiary: "#d97706",
-      text: "#30111a",
-      border: "#e9d0d5"
+      accentSecondary: "#4338ca",
+      accentTertiary: "#b45309",
+      text: "#2b1820",
+      border: "rgba(43, 24, 32, 0.12)"
     }
   },
   {
@@ -141,15 +141,15 @@ export const APP_THEMES: AppTheme[] = [
     badge: "Bold Impact",
     category: "minimal",
     preview: {
-      canvas: "#f4f3ea",
-      sidebar: "#ded8b8",
+      canvas: "#f6f5ef",
+      sidebar: "#e8e6d8",
       surface: "#ffffff",
-      accent: "#ca8a04",
-      accentSoft: "#fef08a",
-      accentSecondary: "#09090b",
-      accentTertiary: "#ef4444",
-      text: "#09090b",
-      border: "#18181b"
+      accent: "#854d0e",
+      accentSoft: "#fef3c7",
+      accentSecondary: "#b91c1c",
+      accentTertiary: "#b45309",
+      text: "#171714",
+      border: "rgba(23, 23, 20, 0.20)"
     }
   },
   {
@@ -160,15 +160,15 @@ export const APP_THEMES: AppTheme[] = [
     vibe: "Glacial Clean",
     category: "enterprise",
     preview: {
-      canvas: "#eaf3f9",
-      sidebar: "#c7e3f8",
+      canvas: "#f3f7f9",
+      sidebar: "#e2edf3",
       surface: "#ffffff",
-      accent: "#0284c7",
+      accent: "#075985",
       accentSoft: "#e0f2fe",
-      accentSecondary: "#0d9488",
-      accentTertiary: "#f59e0b",
-      text: "#07192d",
-      border: "#c2daf0"
+      accentSecondary: "#0f766e",
+      accentTertiary: "#b45309",
+      text: "#132635",
+      border: "rgba(19, 38, 53, 0.12)"
     }
   },
   {
@@ -179,15 +179,15 @@ export const APP_THEMES: AppTheme[] = [
     vibe: "Warm Sandstone",
     category: "minimal",
     preview: {
-      canvas: "#f8eee1",
-      sidebar: "#f2ceb0",
+      canvas: "#faf6f0",
+      sidebar: "#efe3d6",
       surface: "#ffffff",
-      accent: "#ea580c",
+      accent: "#9a3412",
       accentSoft: "#ffedd5",
-      accentSecondary: "#65a30d",
-      accentTertiary: "#0284c7",
-      text: "#2c160a",
-      border: "#dfd2c0"
+      accentSecondary: "#4d7c0f",
+      accentTertiary: "#b45309",
+      text: "#2b2118",
+      border: "rgba(43, 33, 24, 0.12)"
     }
   }
 ];
@@ -263,7 +263,6 @@ export const ThemeProvider: React.FC<{ userId?: number | string; initialTheme?: 
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.documentElement.classList.remove("dark");
     document.documentElement.style.colorScheme = "light";
     storeThemeHint(theme);
     if (typeof window !== "undefined" && (window.scrollY !== 0 || window.scrollX !== 0)) {

@@ -125,57 +125,57 @@ export const BrandNewProductSpecifications: React.FC<BrandNewProductSpecificatio
   ).length;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60 dark:border-zinc-700 dark:bg-zinc-900/50">
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60  ">
       <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-3">
         <div>
-          <h3 className="text-xs font-bold text-slate-900 dark:text-zinc-100">Product specifications</h3>
-          <p className="mt-0.5 text-[11px] text-slate-600 dark:text-zinc-400">
+          <h3 className="text-xs font-bold text-slate-900 ">Product specifications</h3>
+          <p className="mt-0.5 text-[11px] text-slate-600 ">
             Open a class to add its characteristics. Fields you do not know can stay empty.
           </p>
         </div>
         {!isLoading && !loadError && classGroups.length > 0 && (
-          <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-mono font-semibold tabular-nums text-slate-600 dark:bg-white/[0.06] dark:text-zinc-300">
+          <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-mono font-semibold tabular-nums text-slate-600  ">
             {classGroups.length} classes
           </span>
         )}
       </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 border-t border-slate-200 px-3.5 py-4 text-xs text-slate-500 dark:border-zinc-700 dark:text-zinc-400">
+        <div className="flex items-center gap-2 border-t border-slate-200 px-3.5 py-4 text-xs text-slate-500  ">
           <LoaderCircle className="h-4 w-4 animate-spin" />
           Loading product classes...
         </div>
       ) : loadError ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rose-200 bg-rose-50 px-3.5 py-3 dark:border-rose-900/50 dark:bg-rose-950/20">
-          <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{loadError}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rose-200 bg-rose-50 px-3.5 py-3  ">
+          <p role="alert" className="text-xs text-rose-700 ">{loadError}</p>
           <button
             type="button"
             onClick={() => setReloadKey((current) => current + 1)}
-            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-800 transition-colors hover:bg-rose-100 cursor-pointer select-none dark:text-rose-200 dark:hover:bg-rose-900/40"
+            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-800 transition-colors hover:bg-rose-100 cursor-pointer select-none  "
           >
             Retry
           </button>
         </div>
       ) : classGroups.length === 0 ? (
-        <p className="border-t border-slate-200 px-3.5 py-4 text-xs text-slate-500 dark:border-zinc-700 dark:text-zinc-400">
+        <p className="border-t border-slate-200 px-3.5 py-4 text-xs text-slate-500  ">
           No active product classes are available.
         </p>
       ) : (
-        <div className="divide-y divide-slate-200 border-t border-slate-200 dark:divide-zinc-700 dark:border-zinc-700">
+        <div className="divide-y divide-slate-200 border-t border-slate-200  ">
           {classGroups.map(([className, items]) => {
             const enteredCount = filledCount(items);
             return (
-              <details key={className} className="group bg-white dark:bg-zinc-900/70">
-                <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-3 px-3.5 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)] dark:hover:bg-zinc-800/60">
-                  <span className="min-w-0 truncate text-xs font-semibold text-slate-800 dark:text-zinc-100">
+              <details key={className} className="group bg-white ">
+                <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-3 px-3.5 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)] ">
+                  <span className="min-w-0 truncate text-xs font-semibold text-slate-800 ">
                     {className.replace(/_/g, " ")}
                   </span>
-                  <span className="flex shrink-0 items-center gap-2 text-[10px] font-mono text-slate-500 dark:text-zinc-400">
+                  <span className="flex shrink-0 items-center gap-2 text-[10px] font-mono text-slate-500 ">
                     <span className="tabular-nums">{items.length} fields · {enteredCount} entered</span>
                     <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                   </span>
                 </summary>
-                <div className="grid gap-x-4 gap-y-3 border-t border-slate-100 bg-slate-50/70 px-3.5 py-3 dark:border-zinc-800 dark:bg-zinc-950/40 sm:grid-cols-2">
+                <div className="grid gap-x-4 gap-y-3 border-t border-slate-100 bg-slate-50/70 px-3.5 py-3   sm:grid-cols-2">
                   {items.map((item) => {
                     const key = detailKey(item.class_name, item.characteristic_name);
                     const value = String(valuesByKey.get(key)?.value ?? "");
@@ -184,13 +184,13 @@ export const BrandNewProductSpecifications: React.FC<BrandNewProductSpecificatio
                     return (
                       <label
                         key={key}
-                        className={`block min-w-0 space-y-1 text-[10.5px] font-medium text-slate-600 dark:text-zinc-300 ${creativeOwned ? "rounded-lg border border-rose-500 bg-rose-50/80 p-2.5 ring-1 ring-inset ring-rose-400 dark:border-rose-400 dark:bg-rose-950/25 dark:ring-rose-500" : ""}`}
+                        className={`block min-w-0 space-y-1 text-[10.5px] font-medium text-slate-600  ${creativeOwned ? "rounded-lg border border-rose-500 bg-rose-50/80 p-2.5 ring-1 ring-inset ring-rose-400   " : ""}`}
                       >
                         <span className="flex flex-wrap items-baseline justify-between gap-x-2">
                           <span className="break-words">
                             {item.characteristic_name.replace(/_/g, " ")}
                           </span>
-                          {item.uom && <span className="shrink-0 text-[10px] font-normal text-slate-400 dark:text-zinc-500">{item.uom}</span>}
+                          {item.uom && <span className="shrink-0 text-[10px] font-normal text-slate-400 ">{item.uom}</span>}
                         </span>
                         {options.length > 0 ? (
                           <Select
@@ -211,7 +211,7 @@ export const BrandNewProductSpecifications: React.FC<BrandNewProductSpecificatio
                             onChange={(event) => updateValue(item, event.target.value)}
                             onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}
                             placeholder="Enter value"
-                            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-normal text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-normal text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]    "
                           />
                         )}
                       </label>

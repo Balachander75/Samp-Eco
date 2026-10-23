@@ -97,41 +97,41 @@ export function getRequestTrackBadge(r: Partial<SampleRequestItem>): {
   if (isDesignRequest(r)) {
     return {
       label: "Design Request",
-      bg: "bg-purple-50 dark:bg-purple-950/40",
-      text: "text-purple-700 dark:text-purple-300",
-      border: "border-purple-200 dark:border-purple-800/50",
+      bg: "bg-purple-50 ",
+      text: "text-purple-700 ",
+      border: "border-purple-200 ",
       className:
-        "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50",
+        "bg-purple-50  text-purple-700  border border-purple-200 ",
     };
   }
   const track = getRequestTrackType(r);
   if (track === "feasibility_check") {
     return {
       label: "Feasibility NPD",
-      bg: "bg-purple-50 dark:bg-purple-950/40",
-      text: "text-purple-700 dark:text-purple-300",
-      border: "border-purple-200 dark:border-purple-800",
+      bg: "bg-purple-50 ",
+      text: "text-purple-700 ",
+      border: "border-purple-200 ",
       className:
-        "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800",
+        "bg-purple-50  text-purple-700  border border-purple-200 ",
     };
   }
   if (track === "program_planning") {
     return {
       label: "Program Planning",
-      bg: "bg-indigo-50 dark:bg-indigo-950/40",
-      text: "text-indigo-700 dark:text-indigo-300",
-      border: "border-indigo-200 dark:border-indigo-800",
+      bg: "bg-indigo-50 ",
+      text: "text-indigo-700 ",
+      border: "border-indigo-200 ",
       className:
-        "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800",
+        "bg-indigo-50  text-indigo-700  border border-indigo-200 ",
     };
   }
   return {
     label: "Sample Request",
-    bg: "bg-brand-50 dark:bg-brand-950/40",
-    text: "text-brand-700 dark:text-brand-300",
-    border: "border-brand-200 dark:border-brand-800",
+    bg: "bg-brand-50 ",
+    text: "text-brand-700 ",
+    border: "border-brand-200 ",
     className:
-      "bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800",
+      "bg-brand-50  text-brand-700  border border-brand-200 ",
   };
 }
 

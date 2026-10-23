@@ -73,6 +73,7 @@ export const FeasibilityControlPanel: React.FC<FeasibilityControlPanelProps> = (
           <RequestClosureControl
             requests={closureRequests}
             canClose={canCloseRequest}
+            reasonRequired={mode === "marketing"}
             onClosed={onRequestClosed}
           />
         )}

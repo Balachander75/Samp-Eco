@@ -69,7 +69,7 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
 
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--on-surface-muted)] mt-1 font-mono">
             <span>
-              Target: <strong className="text-[var(--on-surface)] font-semibold inline-flex items-center gap-1"><Factory className="w-3 h-3 text-teal-600 dark:text-teal-400" /> {targetPlant}</strong>
+              Target: <strong className="text-[var(--on-surface)] font-semibold inline-flex items-center gap-1"><Factory className="w-3 h-3 text-teal-600 " /> {targetPlant}</strong>
             </span>
             <span className="text-[var(--border-strong)]">·</span>
             <span>
@@ -89,20 +89,20 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("samp")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-semibold shadow-2xs cursor-pointer hover:bg-emerald-500/15 transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10  border border-emerald-500/25 text-emerald-800  text-xs font-semibold shadow-2xs cursor-pointer hover:bg-emerald-500/15 transition-all"
               title="Sampling Technical Review Completed. Click to view."
             >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600  shrink-0" />
               <span className="font-bold">SAMP: Reviewed</span>
             </button>
           ) : isSampClaimed ? (
             <button
               type="button"
               onClick={() => onNavigateToTab?.("samp")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 dark:bg-sky-950/40 border border-sky-500/25 text-xs text-sky-800 dark:text-sky-300 shadow-2xs cursor-pointer hover:bg-sky-500/15 transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10  border border-sky-500/25 text-xs text-sky-800  shadow-2xs cursor-pointer hover:bg-sky-500/15 transition-all"
               title={`Claimed by ${activeRequest.samplingClaimedBy || "Sampling Reviewer"}`}
             >
-              <UserCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+              <UserCheck className="w-3.5 h-3.5 text-sky-600  shrink-0" />
               <span className="text-[11px] font-mono opacity-70">SAMP:</span>
               <span className="font-semibold text-xs truncate max-w-[120px]">{activeRequest.samplingClaimedBy || "Claimed"}</span>
             </button>
@@ -120,7 +120,7 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("samp")}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-700 dark:text-amber-300 font-mono shadow-2xs cursor-pointer hover:bg-amber-500/15 transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-700  font-mono shadow-2xs cursor-pointer hover:bg-amber-500/15 transition-all"
             >
               <Clock className="w-3 h-3 text-amber-500" />
               <span>SAMP: Pending</span>
@@ -132,20 +132,20 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("plant")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500/10 dark:bg-teal-950/40 border border-teal-500/25 text-teal-800 dark:text-teal-300 text-xs font-semibold shadow-2xs cursor-pointer hover:bg-teal-500/15 transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500/10  border border-teal-500/25 text-teal-800  text-xs font-semibold shadow-2xs cursor-pointer hover:bg-teal-500/15 transition-all"
               title={`${targetPlant} Production Feasibility Confirmed. Click to view.`}
             >
-              <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-teal-600  shrink-0" />
               <span className="font-bold">{targetPlant}: Confirmed</span>
             </button>
           ) : isPlantClaimed ? (
             <button
               type="button"
               onClick={() => onNavigateToTab?.("plant")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 dark:bg-sky-950/40 border border-sky-500/25 text-xs text-sky-800 dark:text-sky-300 shadow-2xs cursor-pointer hover:bg-sky-500/15 transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10  border border-sky-500/25 text-xs text-sky-800  shadow-2xs cursor-pointer hover:bg-sky-500/15 transition-all"
               title={`Claimed by ${activeRequest.plantClaimedBy || "Plant Reviewer"}`}
             >
-              <UserCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+              <UserCheck className="w-3.5 h-3.5 text-sky-600  shrink-0" />
               <span className="text-[11px] font-mono opacity-70">Plant:</span>
               <span className="font-semibold text-xs truncate max-w-[120px]">{activeRequest.plantClaimedBy || "Claimed"}</span>
             </button>
@@ -163,7 +163,7 @@ export const ProgramPlanningSheetHeader: React.FC<ProgramPlanningSheetHeaderProp
             <button
               type="button"
               onClick={() => onNavigateToTab?.("plant")}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-700 dark:text-amber-300 font-mono shadow-2xs cursor-pointer hover:bg-amber-500/15 transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-700  font-mono shadow-2xs cursor-pointer hover:bg-amber-500/15 transition-all"
             >
               <Clock className="w-3 h-3 text-amber-500" />
               <span>Plant: Pending</span>

@@ -51,8 +51,8 @@ export const InspectorSheetHeader: React.FC<InspectorSheetHeaderProps> = ({
           <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/30">
             {code}
           </span>
-          <span className="text-slate-300 dark:text-zinc-700">/</span>
-          <span className="text-xs font-display font-semibold text-slate-500 dark:text-zinc-400">
+          <span className="text-slate-300 ">/</span>
+          <span className="text-xs font-display font-semibold text-slate-500 ">
             {trackType === "program_planning"
               ? "Seasonal Program Specification Sheet"
               : trackType === "feasibility_check"
@@ -84,7 +84,7 @@ export const InspectorSheetHeader: React.FC<InspectorSheetHeaderProps> = ({
             </h1>
             <p className="text-xs text-[var(--on-surface-subtle)] mt-1 flex items-center gap-1.5 flex-wrap">
               <span>Initiated by</span>
-              <span className="font-semibold text-slate-800 dark:text-zinc-200">
+              <span className="font-semibold text-slate-800 ">
                 {activeRequest.createdBy || "Marketing Desk"}
               </span>
               <span>·</span>
@@ -97,7 +97,7 @@ export const InspectorSheetHeader: React.FC<InspectorSheetHeaderProps> = ({
             {activeRequest.brandName && !isMockup && (
                 <>
                   <span>·</span>
-                  <span className="font-mono text-slate-600 dark:text-slate-300">
+                  <span className="font-mono text-slate-600 ">
                     Brand: {activeRequest.brandName}
                   </span>
                 </>
@@ -106,8 +106,8 @@ export const InspectorSheetHeader: React.FC<InspectorSheetHeaderProps> = ({
 
             {/* Seasonal Program Reference Badge */}
             {(activeRequest.programName || activeRequest.creationMode === "program_planning") && (
-              <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-800/40 text-indigo-950 dark:text-indigo-200 shadow-2xs text-xs">
-                <span className="text-[10px] font-mono uppercase font-bold text-indigo-600 dark:text-indigo-400 tracking-wider">
+              <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-indigo-50/90  border border-indigo-200/70  text-indigo-950  shadow-2xs text-xs">
+                <span className="text-[10px] font-mono uppercase font-bold text-indigo-600  tracking-wider">
                   Seasonal Reference
                 </span>
                 <span className="font-bold font-display">{activeRequest.programName || "Seasonal Program"}</span>
@@ -115,7 +115,7 @@ export const InspectorSheetHeader: React.FC<InspectorSheetHeaderProps> = ({
                   <span className="font-mono text-[11px] opacity-75">({activeRequest.programYear})</span>
                 )}
                 {activeRequest.sourceSampleCode && (
-                  <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-200 font-bold">
+                  <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-indigo-100  text-indigo-800  font-bold">
                     Ref: {activeRequest.sourceSampleCode}
                   </span>
                 )}
@@ -125,21 +125,21 @@ export const InspectorSheetHeader: React.FC<InspectorSheetHeaderProps> = ({
             {/* Merchandising Category Breadcrumb Bar (Commercial Taxonomy - Distinct from Technical SAP Specs) */}
             {!isMockup && (activeRequest.productCategory || activeRequest.productSubCategory || activeRequest.productThirdCategory) && (
               <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
-                <span className="text-[10px] font-mono uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider">
+                <span className="text-[10px] font-mono uppercase font-bold text-slate-400  tracking-wider">
                   Category
                 </span>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-emerald-50/90 to-teal-50/80 dark:from-emerald-950/30 dark:to-teal-950/20 border border-emerald-200/70 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-300 shadow-xs">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-emerald-50/90 to-teal-50/80   border border-emerald-200/70  text-emerald-900  shadow-xs">
                   <span className="font-bold font-display">{activeRequest.productCategory || "Uncategorized"}</span>
                   {activeRequest.productSubCategory && (
                     <>
-                      <span className="text-emerald-400/80 dark:text-emerald-600 font-sans">›</span>
-                      <span className="font-medium text-emerald-800 dark:text-emerald-200">{activeRequest.productSubCategory}</span>
+                      <span className="text-emerald-400/80  font-sans">›</span>
+                      <span className="font-medium text-emerald-800 ">{activeRequest.productSubCategory}</span>
                     </>
                   )}
                   {activeRequest.productThirdCategory && (
                     <>
-                      <span className="text-emerald-400/80 dark:text-emerald-600 font-sans">›</span>
-                      <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md bg-white/70 dark:bg-white/10 text-emerald-950 dark:text-emerald-100 font-semibold border border-emerald-200/50 dark:border-emerald-700/30">
+                      <span className="text-emerald-400/80  font-sans">›</span>
+                      <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md bg-white/70  text-emerald-950  font-semibold border border-emerald-200/50 ">
                         {activeRequest.productThirdCategory}
                       </span>
                     </>

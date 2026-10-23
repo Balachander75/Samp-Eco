@@ -340,7 +340,7 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
                 {skuCount} SKU{skuCount !== 1 ? "s" : ""}
               </span>
               {hasRecent && (
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-1 py-0.2 text-[8.5px] font-semibold uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-1 py-0.2 text-[8.5px] font-semibold uppercase text-emerald-700  ">
                   New
                 </span>
               )}
@@ -370,7 +370,7 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap ${
                 samp
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60"
+                  ? "bg-emerald-50 text-emerald-700   border border-emerald-200/60 "
                   : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)] border border-[var(--border-subtle)]"
               }`}
             >
@@ -391,7 +391,7 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap ${
                 plant
-                  ? "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/60"
+                  ? "bg-teal-50 text-teal-700   border border-teal-200/60 "
                   : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)] border border-[var(--border-subtle)]"
               }`}
             >
@@ -408,12 +408,12 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
         cell: (row) => {
           const isPaused = row.isActive === false;
           return isPaused ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap">
-              <Pause className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50  border border-amber-200  px-1.5 py-0.5 text-[10px] font-semibold text-amber-700  whitespace-nowrap">
+              <Pause className="w-2.5 h-2.5 text-amber-600  shrink-0" />
               <span>Paused</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50  border border-emerald-200/60  px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700  whitespace-nowrap">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
               <span>Active</span>
             </span>
@@ -428,8 +428,8 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
               width: "w-[110px]",
               cell: (row: SampleRequestItem) => (
                 <div className="flex items-center gap-1 min-w-0" title={row.createdBy || "Marketing"}>
-                  <div className="w-4.5 h-4.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/80 flex items-center justify-center shrink-0">
-                    <User className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400" />
+                  <div className="w-4.5 h-4.5 rounded-full bg-indigo-50  border border-indigo-200/80  flex items-center justify-center shrink-0">
+                    <User className="w-2.5 h-2.5 text-indigo-600 " />
                   </div>
                   <span
                     className="truncate text-xs font-medium text-[var(--on-surface)]"
@@ -556,20 +556,20 @@ export const PlantProgramPlanningView: React.FC<PlantProgramPlanningViewProps> =
         tableClassName="w-full table-fixed min-w-0"
         containerClassName="overflow-y-auto overflow-x-hidden"
         toolbarLeft={
-          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 ">
             <span className="truncate">
               Showing{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {filteredRequests.length}
               </span>{" "}
               of{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {plantScopedRequests.length}
               </span>{" "}
               programs
             </span>
             {selectedIds.size > 0 && (
-              <span className="shrink-0 rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700 dark:text-indigo-300 font-bold">
+              <span className="shrink-0 rounded-md border border-indigo-300  bg-indigo-50  px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700  font-bold">
                 {selectedIds.size} selected
               </span>
             )}

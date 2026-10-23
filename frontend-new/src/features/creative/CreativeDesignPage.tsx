@@ -395,7 +395,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
               {row.title}
             </div>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-500/10 text-purple-700  border border-purple-500/20">
                 {row.trend}
               </span>
               <span className="text-[10px] text-[var(--on-surface-subtle)] font-sans truncate">
@@ -633,20 +633,20 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
         }}
         onToggleSelectAll={handleToggleSelectAll}
         toolbarLeft={
-          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 ">
             <span className="truncate">
               Showing{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {filteredDesigns.length}
               </span>{" "}
               of{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {unifiedDesigns.length}
               </span>{" "}
               artwork briefs
             </span>
             {selectedIds.size > 0 && (
-              <span className="shrink-0 rounded-md border border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-purple-700 dark:text-purple-300 font-bold">
+              <span className="shrink-0 rounded-md border border-purple-300  bg-purple-50  px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-purple-700  font-bold">
                 {selectedIds.size} selected
               </span>
             )}

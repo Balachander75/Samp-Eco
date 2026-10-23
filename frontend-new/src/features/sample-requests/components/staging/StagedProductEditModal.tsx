@@ -3,6 +3,7 @@ import { Calculator, Layers, Package, X } from "lucide-react";
 import { OperationalDatePicker } from "@/components/erp";
 import { Button } from "@/components/ui/Button";
 import { StagedProductItem } from "../../types/staging";
+import { ScopeReferenceImagesGallery } from "./ScopeReferenceImagesGallery";
 
 interface StagedProductEditModalProps {
   item: StagedProductItem;
@@ -187,7 +188,7 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="staged-product-edit-title" onMouseDown={(event) => { if (!isSaving && event.target === event.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--overlay-backdrop)] p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="staged-product-edit-title" onMouseDown={(event) => { if (!isSaving && event.target === event.currentTarget) onClose(); }}>
       <form onSubmit={submit} className="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)] shadow-2xl">
         <header className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4 sm:px-6">
           <div className="min-w-0">
@@ -350,7 +351,38 @@ export const StagedProductEditModal: React.FC<StagedProductEditModalProps> = ({ 
             </>
           )}
 
-          {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">{error}</p>}
+          {item.scopeReferenceImages && (["sample", "mockup", "costing"] as const).some((scope) => (item.scopeReferenceImages?.[scope] || []).length > 0) && (
+            <section className={sectionClass}>
+              <div className="mb-1 flex items-center justify-between">
+                <h3 className="text-xs font-bold text-[var(--on-surface)]">Attached Reference Images</h3>
+                <span className="text-[10px] text-[var(--on-surface-muted)]">Preserved from initial setup</span>
+              </div>
+              <ScopeReferenceImagesGallery
+                images={item.scopeReferenceImages}
+                scopes={item.scopes.filter((scope): scope is "sample" | "mockup" | "costing" => scope !== "design")}
+                onPreview={(url) => window.open(url, "_blank", "noopener,noreferrer")}
+              />
+            </section>
+          )}
+
+          {item.designMetadata && item.designMetadata.images.length > 0 && (
+            <section className={sectionClass}>
+              <div className="mb-1 flex items-center justify-between">
+                <h3 className="text-xs font-bold text-[var(--on-surface)]">Design Reference Images</h3>
+                <span className="text-[10px] text-[var(--on-surface-muted)]">Preserved from initial brief</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {item.designMetadata.images.map((img) => (
+                  <div key={img.id} className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-2">
+                    <img src={img.url} alt={img.name} className="h-10 w-10 rounded object-cover border border-slate-200" />
+                    <span className="truncate text-xs font-medium text-[var(--on-surface)]" title={img.name}>{img.name}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700   ">{error}</p>}
         </div>
 
         <footer className="flex justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-5 py-3 sm:px-6">

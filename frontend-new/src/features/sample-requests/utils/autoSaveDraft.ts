@@ -157,6 +157,9 @@ export async function autoSaveStagedProductsToDraft(
             ...(prod.scopes.includes("sample") ? {
               samplingRouting: {
                 stage: "marketing",
+                sampleTrack: prod.sampleTrack || prod.samplingMetadata?.sampleTrack,
+                sampleType: prod.samplingMetadata?.sampleType || (String(prod.productType || "").toLowerCase().includes("partial") ? "partial" : "full"),
+                partialRequirements: prod.samplingMetadata?.partialRequirements || "",
                 isResample: getAutomaticSampleRoute(prod).isResample,
                 creativeChangesRequired: getAutomaticSampleRoute(prod).creativeChangesRequired,
                 isDesignVariant: Boolean(prod.variantNumber),
@@ -168,6 +171,9 @@ export async function autoSaveStagedProductsToDraft(
             isResample: getAutomaticSampleRoute(prod).isResample,
             samplingRouting: {
               stage: "marketing",
+              sampleTrack: prod.sampleTrack || prod.samplingMetadata?.sampleTrack,
+              sampleType: prod.samplingMetadata?.sampleType || (String(prod.productType || "").toLowerCase().includes("partial") ? "partial" : "full"),
+              partialRequirements: prod.samplingMetadata?.partialRequirements || "",
               isResample: getAutomaticSampleRoute(prod).isResample,
               creativeChangesRequired: getAutomaticSampleRoute(prod).creativeChangesRequired,
               isDesignVariant: Boolean(prod.variantNumber),
@@ -234,7 +240,9 @@ export async function autoSaveStagedProductsToDraft(
           if (resultsList && resultsList.length === validItems.length) {
             resultsList.forEach((saved: any, index: number) => {
               const id = saved?.id;
-              const sr = saved?.sr_number || saved?.srNumber;
+              const rawCodes = saved?.request_codes || saved?.requestCodes;
+              const firstCode = rawCodes && typeof rawCodes === 'object' ? Object.values(rawCodes)[0] : undefined;
+              const sr = saved?.sr_number || saved?.srNumber || saved?.request_code || saved?.requestCode || (typeof firstCode === 'string' ? firstCode : undefined);
               if (id !== undefined && id !== null) {
                 if (firstId === undefined) {
                   firstId = id;
@@ -242,8 +250,15 @@ export async function autoSaveStagedProductsToDraft(
                 }
                 savedIds.push(id);
                 if (validItems[index]) {
+                  validItems[index].savedRequestId = id;
+                  validItems[index].savedSrNumber = sr;
+                  validItems[index].savedRequestCode = sr;
+                  validItems[index].isDraftSaved = true;
+                }
+                if (items[index]) {
                   items[index].savedRequestId = id;
                   items[index].savedSrNumber = sr;
+                  items[index].savedRequestCode = sr;
                   items[index].isDraftSaved = true;
                 }
               }
@@ -346,6 +361,7 @@ export async function autoSaveStagedProductsToDraft(
       customBinding1: prod.samplingMetadata?.bindingType1 || prod.catalogMetadata?.bindingType1,
       customBinding2: prod.samplingMetadata?.bindingType2 || prod.catalogMetadata?.bindingType2,
       mockupRequired: prod.scopes.includes("mockup") ? "Yes" : undefined,
+      productType: prod.productType || (prod.samplingMetadata?.sampleType === "partial" ? "Partial Sample" : prod.scopes.includes("sample") ? "Full Sample" : undefined),
       mockupWorkflowState: prod.scopes.includes("mockup") ? {
         stage: "marketing",
         isResample: getAutomaticSampleRoute(prod).isResample,
@@ -368,6 +384,9 @@ export async function autoSaveStagedProductsToDraft(
         ...(prod.scopes.includes("sample") ? {
           samplingRouting: {
             stage: "marketing",
+            sampleTrack: prod.sampleTrack || prod.samplingMetadata?.sampleTrack,
+            sampleType: prod.samplingMetadata?.sampleType || (String(prod.productType || "").toLowerCase().includes("partial") ? "partial" : "full"),
+            partialRequirements: prod.samplingMetadata?.partialRequirements || "",
             isResample: getAutomaticSampleRoute(prod).isResample,
             creativeChangesRequired: getAutomaticSampleRoute(prod).creativeChangesRequired,
             isDesignVariant: Boolean(prod.variantNumber),
@@ -380,6 +399,9 @@ export async function autoSaveStagedProductsToDraft(
         isResample: getAutomaticSampleRoute(prod).isResample,
         samplingRouting: {
           stage: "marketing",
+          sampleTrack: prod.sampleTrack || prod.samplingMetadata?.sampleTrack,
+          sampleType: prod.samplingMetadata?.sampleType || (String(prod.productType || "").toLowerCase().includes("partial") ? "partial" : "full"),
+          partialRequirements: prod.samplingMetadata?.partialRequirements || "",
           isResample: getAutomaticSampleRoute(prod).isResample,
           creativeChangesRequired: getAutomaticSampleRoute(prod).creativeChangesRequired,
           isDesignVariant: Boolean(prod.variantNumber),
@@ -403,11 +425,13 @@ export async function autoSaveStagedProductsToDraft(
     const createAndRecordDraft = async () => {
       const created = await createSampleRequestApi(payload);
       if (!created) throw new Error("A staged product could not be saved.");
+      const createdCode = created.srNumber || created.requestCode || (created.requestCodes && Object.values(created.requestCodes)[0] as string | undefined);
       prod.savedRequestId = created.id;
-      prod.savedSrNumber = created.srNumber;
+      prod.savedSrNumber = createdCode;
+      prod.savedRequestCode = createdCode;
       if (index === 0) {
         firstSavedId = created.id;
-        firstSavedSr = created.srNumber;
+        firstSavedSr = createdCode;
       }
     };
 
@@ -416,6 +440,11 @@ export async function autoSaveStagedProductsToDraft(
         try {
           const updated = await updateSampleRequestApi(prod.savedRequestId, payload);
           if (!updated) throw new Error("The saved draft could not be updated.");
+          const updatedCode = updated.srNumber || updated.requestCode || (updated.requestCodes && Object.values(updated.requestCodes)[0] as string | undefined);
+          if (updatedCode) {
+            prod.savedSrNumber = updatedCode;
+            prod.savedRequestCode = updatedCode;
+          }
         } catch (err) {
           if (!isSampleRequestNotFoundError(err)) throw err;
           console.warn(`Staged draft ${prod.savedRequestId} no longer exists; creating a replacement draft.`);

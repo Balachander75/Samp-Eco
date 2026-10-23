@@ -107,38 +107,38 @@ const DocketCell: React.FC<CellProps> = React.memo(({ cell, searchFilter, onCrea
 
   return (
     <div
-      className={`h-full flex flex-col justify-between ${colClass} bg-white dark:bg-zinc-950 border-r border-[#bde0fa] dark:border-sky-900/40 last:border-r-0 min-w-0 overflow-hidden transition-colors ${
+      className={`h-full flex flex-col justify-between ${colClass} bg-[var(--surface-lowest)] border-r border-[var(--border-strong)] last:border-r-0 min-w-0 overflow-hidden transition-colors ${
         matchesSearch
-          ? "ring-2 ring-amber-400 bg-amber-50/90 dark:bg-amber-950/50 z-10"
-          : "hover:bg-sky-50/40 dark:hover:bg-zinc-900/40"
+          ? "ring-2 ring-amber-500 bg-amber-50 z-10"
+          : "hover:bg-[var(--surface-low)]"
       }`}
     >
       {/* Precision Header Bar of Cell (Fixed uniform height across all cells) */}
       <div
-        className="px-2.5 py-1.5 bg-[#f0f9ff] dark:bg-sky-950/50 border-b border-[#bde0fa] dark:border-sky-900/40 flex items-center min-h-[34px] h-[34px] select-none overflow-hidden"
+        className="px-2.5 py-1.5 bg-[var(--surface-low)] border-b border-[var(--border-strong)] flex items-center min-h-[38px] h-[38px] select-none overflow-hidden"
         title={label}
       >
-        <span className="text-[10px] font-bold text-[#384759] dark:text-sky-200 uppercase tracking-wider break-words line-clamp-2 leading-tight text-left w-full">
+        <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase tracking-wide break-words line-clamp-2 leading-tight text-left w-full">
           {label}
         </span>
       </div>
 
       {/* Structured Value Container (Balanced even flex area) */}
       <div
-        className="px-2.5 py-2 flex-1 flex items-center text-left min-h-[40px] bg-white dark:bg-zinc-950 overflow-hidden"
+        className="px-2.5 py-2 flex-1 flex items-center text-left min-h-[44px] bg-[var(--surface-lowest)] overflow-hidden"
         title={!isNa ? displayVal : undefined}
       >
         {creativeField && onCreativeFieldChange ? (
           <div className="w-full min-w-0 space-y-1">
             {label.toLowerCase().includes("printing") && !isNa && (
-              <p className="truncate text-[9px] font-mono text-slate-600 dark:text-zinc-300" title={displayVal}>{displayVal}</p>
+              <p className="truncate text-[10px] font-mono text-[var(--on-surface-muted)]" title={displayVal}>{displayVal}</p>
             )}
             {Array.isArray(creativeField.options) && creativeField.options.length > 0 ? (
               <select
                 aria-label={`${creativeField.className} ${creativeField.characteristicName}`}
                 value={creativeField.value || ""}
                 onChange={(event) => onCreativeFieldChange(creativeField, event.target.value)}
-                className="docket-screen-control w-full min-w-0 rounded border border-sky-300 bg-white px-1.5 py-1 text-[10px] font-mono font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-sky-700 dark:bg-zinc-900 dark:text-zinc-100"
+                className="docket-screen-control w-full min-w-0 rounded border border-[var(--border-strong)] bg-[var(--surface-lowest)] px-1.5 py-1 text-[11px] font-mono font-semibold text-[var(--on-surface)] outline-none focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--accent-primary)]/20"
               >
                 {!creativeField.value && <option value="">Select an option</option>}
                 {creativeField.value && !creativeField.options.includes(creativeField.value) && (
@@ -154,7 +154,7 @@ const DocketCell: React.FC<CellProps> = React.memo(({ cell, searchFilter, onCrea
                 value={creativeField.value || ""}
                 onChange={(event) => onCreativeFieldChange(creativeField, event.target.value)}
                 placeholder="Enter value"
-                className="docket-screen-control w-full min-w-0 rounded border border-sky-300 bg-white px-1.5 py-1 text-[10px] font-mono font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/40 dark:border-sky-700 dark:bg-zinc-900 dark:text-zinc-100"
+                className="docket-screen-control w-full min-w-0 rounded border border-[var(--border-strong)] bg-[var(--surface-lowest)] px-1.5 py-1 text-[11px] font-mono font-semibold text-[var(--on-surface)] outline-none focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--accent-primary)]/20"
               />
             )}
             <span className="docket-print-value hidden text-xs font-mono font-bold text-[#141f2e]">
@@ -163,14 +163,14 @@ const DocketCell: React.FC<CellProps> = React.memo(({ cell, searchFilter, onCrea
             </span>
           </div>
         ) : isNa ? (
-          <span className="text-xs font-mono text-slate-300 dark:text-zinc-600 italic select-none">
+          <span className="text-xs font-mono text-[var(--on-surface-subtle)] italic select-none">
             —
           </span>
         ) : (
-          <div className="text-xs font-mono font-bold text-[#141f2e] dark:text-zinc-100 break-words leading-tight w-full">
+          <div className="text-[12px] font-mono font-semibold text-[var(--on-surface)] break-words leading-snug w-full">
             <span>{displayVal}</span>
             {uom && (
-              <span className="ml-1 text-[10px] font-sans font-medium text-slate-500 dark:text-zinc-400 uppercase whitespace-nowrap">
+              <span className="ml-1 text-[10px] font-sans font-medium text-[var(--on-surface-muted)] uppercase whitespace-nowrap">
                 {uom}
               </span>
             )}
@@ -186,11 +186,11 @@ const DocketEmptyCell: React.FC<{ colSpan?: number }> = React.memo(({ colSpan = 
   const colClass = getColSpanClass(colSpan);
   return (
     <div
-      className={`h-full flex flex-col justify-between ${colClass} bg-[#f0f9ff]/30 dark:bg-zinc-950/40 border-r border-[#bde0fa] dark:border-sky-900/40 last:border-r-0 select-none overflow-hidden`}
+      className={`h-full flex flex-col justify-between ${colClass} bg-[var(--surface-low)] border-r border-[var(--border-strong)] last:border-r-0 select-none overflow-hidden`}
     >
-      <div className="px-2.5 py-1.5 bg-[#f0f9ff]/50 dark:bg-sky-950/30 border-b border-[#bde0fa] dark:border-sky-900/40 min-h-[34px] h-[34px]" />
+      <div className="px-2.5 py-1.5 bg-[var(--surface-container)] border-b border-[var(--border-strong)] min-h-[38px] h-[38px]" />
       <div className="flex-1 flex items-center justify-center min-h-[40px]">
-        <span className="text-slate-300 dark:text-zinc-700 text-xs font-mono">—</span>
+        <span className="text-[var(--on-surface-subtle)] text-xs font-mono">—</span>
       </div>
     </div>
   );
@@ -206,7 +206,7 @@ const DocketRow: React.FC<{
   const remainingCols = 6 - (totalCols % 6 || 6);
 
   return (
-    <div className="grid grid-cols-6 border-b border-[#bde0fa] dark:border-sky-900/40 last:border-b-0 w-full auto-rows-fr items-stretch">
+    <div className="grid grid-cols-6 border-b border-[var(--border-strong)] last:border-b-0 w-full auto-rows-fr items-stretch">
       {cells.map((cell, idx) => (
         <DocketCell
           key={`${cell.label}-${idx}`}
@@ -220,7 +220,7 @@ const DocketRow: React.FC<{
   );
 });
 
-// Section Header Banner with Title, Icon, Spec Count Badge, and Cyan Banner (#00a2e8)
+// Theme-aware section banner with a high-contrast title and spec count.
 const DocketSectionBanner: React.FC<{
   icon?: React.ReactNode;
   sectionNumber: number | string;
@@ -242,13 +242,13 @@ const DocketSectionBanner: React.FC<{
 }) => (
   <div
     onClick={onToggleCollapse}
-    className={`bg-[#00a2e8] text-white font-bold text-xs uppercase tracking-wider py-2.5 px-4 flex items-center justify-between select-none shadow-xs border-b border-[#008cd2] ${
-      onToggleCollapse ? "cursor-pointer hover:bg-[#0096d6] transition-colors" : ""
+    className={`bg-[var(--accent-primary-strong)] text-white font-bold text-xs uppercase tracking-wider py-2.5 px-4 flex items-center justify-between select-none border-b border-[var(--accent-primary-hover)] ${
+      onToggleCollapse ? "cursor-pointer hover:bg-[var(--accent-primary-hover)] transition-colors" : ""
     }`}
   >
     <div className="flex items-center gap-2.5 min-w-0">
       {icon && <span className="text-white shrink-0">{icon}</span>}
-      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-900/40 border border-white/20 text-white font-bold">
+      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/15 border border-white/30 text-white font-bold">
         SEC {sectionNumber}
       </span>
       <span className="text-xs font-bold text-white tracking-wider break-words">
@@ -258,9 +258,9 @@ const DocketSectionBanner: React.FC<{
 
     <div className="flex items-center gap-2.5 shrink-0">
       {totalCount !== undefined ? (
-        <div className="flex items-center gap-1.5 text-[10px] font-mono bg-sky-900/30 text-white px-2.5 py-0.5 rounded-full border border-white/20">
+        <div className="flex items-center gap-1.5 text-[10px] font-mono bg-black/15 text-white px-2.5 py-0.5 rounded-full border border-white/30">
           <span className="text-white font-bold">{configuredCount ?? 0}</span>
-          <span className="text-sky-200">/</span>
+          <span className="text-white/80">/</span>
           <span>{totalCount} Specs</span>
         </div>
       ) : countBadge ? (
@@ -273,7 +273,7 @@ const DocketSectionBanner: React.FC<{
         <button
           type="button"
           aria-label={isCollapsed ? "Expand section" : "Collapse section"}
-          className="text-white/80 hover:text-white p-0.5 rounded transition cursor-pointer"
+          className="text-white hover:text-white p-0.5 rounded transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
         >
           {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
@@ -384,7 +384,7 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = React.memo(({
   return (
     <div
       id={containerId}
-      className="w-full max-w-full space-y-4 font-sans select-text text-slate-900 dark:text-zinc-100 overflow-hidden"
+      className="w-full max-w-full space-y-4 overflow-x-auto font-sans select-text text-[var(--on-surface)]"
     >
       
 
@@ -394,7 +394,7 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = React.memo(({
       {visibleSections.map((sec) => (
         <section
           key={sec.id}
-          className="overflow-hidden rounded-md border border-[#74befa] dark:border-sky-800 bg-white dark:bg-zinc-950 shadow-xs"
+          className="min-w-[900px] overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[var(--surface-lowest)] shadow-sm xl:min-w-0"
         >
           <DocketSectionBanner
             icon={getSectionIcon(sec.id)}
@@ -410,7 +410,7 @@ export const ProductDocketView: React.FC<ProductDocketViewProps> = React.memo(({
           <div
             data-docket-print-body
             hidden={Boolean(collapsedSections[sec.id])}
-            className="divide-y divide-[#bde0fa] dark:divide-sky-900/40"
+            className="divide-y divide-[var(--border-strong)]"
           >
             {sec.rows.map((rowCells, rIdx) => (
               <DocketRow

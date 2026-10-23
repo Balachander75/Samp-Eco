@@ -311,10 +311,10 @@ export const UniversalChatterFeed: React.FC<UniversalChatterFeedProps> = ({
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-semibold leading-none ${
                               evt.verdictTag === "Yes"
-                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+                                ? "bg-emerald-500/10 text-emerald-700  border border-emerald-500/20"
                                 : evt.verdictTag === "No"
-                                ? "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20"
-                                : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                                ? "bg-rose-500/10 text-rose-700  border border-rose-500/20"
+                                : "bg-amber-500/10 text-amber-700  border border-amber-500/20"
                             }`}
                           >
                             {evt.verdictTag === "Yes"
@@ -329,8 +329,8 @@ export const UniversalChatterFeed: React.FC<UniversalChatterFeedProps> = ({
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-semibold leading-none ${
                               evt.decisionTag === "Accepted"
-                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
-                                : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20"
+                                ? "bg-emerald-500/10 text-emerald-700  border border-emerald-500/20"
+                                : "bg-rose-500/10 text-rose-700  border border-rose-500/20"
                             }`}
                           >
                             {evt.decisionTag === "Accepted" ? "Approved" : "Rejected"}
@@ -360,7 +360,7 @@ export const UniversalChatterFeed: React.FC<UniversalChatterFeedProps> = ({
 
                     {/* Condition details callout (clean inline border) */}
                     {evt.detail && (
-                      <div className="pl-2 border-l-2 border-amber-400 dark:border-amber-600 text-[10.5px] text-[var(--on-surface-muted)] py-0.5">
+                      <div className="pl-2 border-l-2 border-amber-400  text-[10.5px] text-[var(--on-surface-muted)] py-0.5">
                         <span className="font-medium text-[var(--on-surface)]">Conditions: </span>
                         {evt.detail}
                       </div>

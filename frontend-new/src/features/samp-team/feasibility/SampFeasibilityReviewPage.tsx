@@ -741,20 +741,20 @@ export const SampFeasibilityReviewPage: React.FC<SampFeasibilityReviewPageProps>
         {loadError && (
           <div
             role="alert"
-            className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200"
+            className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-800   "
           >
             <div className="flex min-w-0 items-start gap-2 text-xs">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 " />
               <div className="min-w-0">
                 <p className="font-semibold">{feasibilityRequests.length ? "Refresh failed. Showing the last loaded tasks." : "Feasibility tasks could not be loaded."}</p>
-                <p className="mt-0.5 break-words text-rose-700 dark:text-rose-300">{loadError}</p>
+                <p className="mt-0.5 break-words text-rose-700 ">{loadError}</p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => void handleRefresh()}
               disabled={isLoading}
-              className="min-h-8 shrink-0 rounded-md border border-rose-300 px-3 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-950/70"
+              className="min-h-8 shrink-0 rounded-md border border-rose-300 px-3 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60   "
             >
               {isLoading ? "Retrying…" : "Try again"}
             </button>

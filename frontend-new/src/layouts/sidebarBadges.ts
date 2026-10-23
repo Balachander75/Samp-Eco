@@ -10,7 +10,6 @@ import {
   fetchSampleRequestsApi,
   fetchSamplingWorkflowReviewsApi,
   fetchCreativeBriefsApi,
-  type RequestWorkflowRecord,
 } from "@/infrastructure/api";
 
 export interface SidebarBadgeAccess {
@@ -125,18 +124,6 @@ function isPendingStudioRequest(request: SampleRequestItem): boolean {
   return (stage === "studio" || (!stage && status.includes("studio"))) && isPendingWorkStatus(status);
 }
 
-function isPendingSamplingReview(record: RequestWorkflowRecord): boolean {
-  if (record.workflow_type === "design") {
-    const status = String(record.status || "").toLowerCase();
-    return !status.includes("draft")
-      && !status.includes("smt")
-      && !status.includes("pending allocation")
-      && isPendingWorkStatus(status);
-  }
-
-  return record.current_stage === "sampling_review" && record.reviewer_status !== "approved";
-}
-
 function safeLoad<T>(load: () => Promise<T[]>, enabled: boolean): Promise<T[]> {
   if (!enabled) return Promise.resolve([]);
   return load().catch(() => []);
@@ -171,9 +158,7 @@ export async function fetchSidebarBadges(year: string, access: SidebarBadgeAcces
   const programCount = access.marketing || access.samp
     ? programs.filter((request) => !hasSampProgramNote(request)).length
     : 0;
-  const sampSamplingCount = access.samp
-    ? sampReviews.filter(isPendingSamplingReview).length
-    : 0;
+  const sampSamplingCount = access.samp ? sampReviews.length : 0;
   const plantProgramCount = access.plant
     ? programs.filter((request) => !hasPlantProgramNote(request)).length
     : 0;

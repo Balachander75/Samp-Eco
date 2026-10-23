@@ -782,7 +782,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                 setWatchlistFilter("delayed");
                 scrollToSection("mkt-watchlist");
               }}
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/15 text-rose-600  border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>{telemetry.totalDelayed} Overdue</span>
@@ -841,7 +841,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Fulfillment SLA
               </span>
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600  flex items-center justify-center transition-colors">
                 <CheckCircle2 className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -849,7 +849,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
               <span>{isLoading ? "—" : `${telemetry.onTimeRate}%`}</span>
               <span className={`w-2 h-2 rounded-full inline-block mb-1 ${telemetry.onTimeRate >= 80 ? "bg-emerald-500" : "bg-amber-500"}`} />
             </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+            <div className="text-[11px] text-emerald-600  mt-1 font-mono">
               {telemetry.totalOnTime.toLocaleString()} on-track tasks
             </div>
           </div>
@@ -868,20 +868,20 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
           >
             <div className="flex items-center justify-between mb-2">
               <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
-                telemetry.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface-subtle)]"
+                telemetry.totalDelayed > 0 ? "text-rose-600 " : "text-[var(--on-surface-subtle)]"
               }`}>
                 Overdue Tasks
               </span>
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                 telemetry.totalDelayed > 0
-                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                  ? "bg-rose-500/15 text-rose-600 "
                   : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
               }`}>
                 <AlertTriangle className="w-3.5 h-3.5" />
               </div>
             </div>
             <div className={`text-2xl font-display font-bold tracking-tight tabular-nums ${
-              telemetry.totalDelayed > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--on-surface)]"
+              telemetry.totalDelayed > 0 ? "text-rose-600 " : "text-[var(--on-surface)]"
             }`}>
               {isLoading ? "—" : telemetry.totalDelayed}
             </div>
@@ -899,14 +899,14 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
             className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-amber-500/40 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 ">
                 Pending Drafts
               </span>
-              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600  flex items-center justify-center transition-colors">
                 <FileEdit className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="text-2xl font-display font-bold tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
+            <div className="text-2xl font-display font-bold tracking-tight text-amber-600  tabular-nums">
               {isLoading ? "—" : telemetry.totalDrafts}
             </div>
             <div className="text-[11px] text-[var(--on-surface-muted)] mt-1 font-mono">
@@ -923,7 +923,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 In Production
               </span>
-              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600  flex items-center justify-center transition-colors">
                 <Hourglass className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -944,7 +944,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)] group-hover:text-[var(--on-surface)] transition-colors">
                 Dispatched / Won
               </span>
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600  flex items-center justify-center transition-colors">
                 <Send className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -1013,22 +1013,22 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
             {/* Stream 2: Feasibility NPD */}
             <div
               onClick={() => navigate("/sample-requests/feasibility")}
-              className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-purple-400 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 flex flex-col justify-between"
+              className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-teal)] hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--accent-teal-subtle)] text-[var(--accent-teal-strong)] flex items-center justify-center">
                       <ShieldCheck className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                      <h3 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-[var(--accent-teal-strong)] transition-colors">
                         Feasibility NPD Desk
                       </h3>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Technical Feasibility</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-[var(--accent-teal-subtle)] text-[var(--accent-teal-strong)]">
                     {workstreams.feasibility.pct}%
                   </span>
                 </div>
@@ -1037,7 +1037,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center justify-between pt-2.5 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-purple-600 dark:group-hover:text-purple-400">
+              <div className="flex items-center justify-between pt-2.5 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-[var(--accent-teal-strong)]">
                 <span className="font-mono tabular-nums">{workstreams.feasibility.count} NPD Checks</span>
                 <span className="flex items-center gap-1">
                   Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
@@ -1048,22 +1048,22 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
             {/* Stream 3: Seasonal Retail Programs */}
             <div
               onClick={() => navigate("/sample-requests/programs")}
-              className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-indigo-400 hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 flex flex-col justify-between"
+              className="group p-4 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] hover:shadow-2xs hover:-translate-y-0.5 cursor-pointer transition-all duration-200 flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] flex items-center justify-center">
                       <Layers className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      <h3 className="text-xs font-bold text-[var(--on-surface)] group-hover:text-[var(--accent-primary-strong)] transition-colors">
                         Seasonal Programs Desk
                       </h3>
                       <span className="text-[10px] text-[var(--on-surface-subtle)] font-mono">Back to School & Retail</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+                  <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)]">
                     {workstreams.program.pct}%
                   </span>
                 </div>
@@ -1072,7 +1072,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center justify-between pt-2.5 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+              <div className="flex items-center justify-between pt-2.5 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--on-surface)] group-hover:text-[var(--accent-primary-strong)]">
                 <span className="font-mono tabular-nums">{workstreams.program.count} Programs</span>
                 <span className="flex items-center gap-1">
                   Open Desk <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
@@ -1208,14 +1208,14 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                       {svgCurve.points[hoveredMonthIndex].inflow}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400">
+                  <div className="flex items-center justify-between gap-4 text-emerald-600 ">
                     <span>On-Time:</span>
                     <span className="font-bold tabular-nums">
                       {svgCurve.points[hoveredMonthIndex].onTime}
                     </span>
                   </div>
                   {svgCurve.points[hoveredMonthIndex].delayed > 0 && (
-                    <div className="flex items-center justify-between gap-4 text-rose-600 dark:text-rose-400">
+                    <div className="flex items-center justify-between gap-4 text-rose-600 ">
                       <span>Delayed:</span>
                       <span className="font-bold tabular-nums">
                         {svgCurve.points[hoveredMonthIndex].delayed}
@@ -1245,14 +1245,14 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                     <tr key={m.key} className="hover:bg-[var(--surface-low)] transition-colors">
                       <td className="py-2 px-3 font-semibold text-[var(--on-surface)]">{m.full}</td>
                       <td className="py-2 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{m.inflow}</td>
-                      <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{m.onTime}</td>
-                      <td className="py-2 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{m.delayed}</td>
+                      <td className="py-2 px-3 text-right text-emerald-600  font-semibold tabular-nums">{m.onTime}</td>
+                      <td className="py-2 px-3 text-right text-rose-600  font-semibold tabular-nums">{m.delayed}</td>
                       <td className="py-2 px-3 text-right tabular-nums">
                         <span
                           className={`px-1.5 py-0.5 rounded font-bold ${
                             m.slaRate >= 90
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                              ? "bg-emerald-50 text-emerald-700  "
+                              : "bg-amber-50 text-amber-700  "
                           }`}
                         >
                           {m.slaRate}%
@@ -1353,10 +1353,10 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                           <td className="py-3 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">
                             {member.active}
                           </td>
-                          <td className="py-3 px-3 text-right text-amber-600 dark:text-amber-400 font-semibold tabular-nums">
+                          <td className="py-3 px-3 text-right text-amber-600  font-semibold tabular-nums">
                             {member.drafts}
                           </td>
-                          <td className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">
+                          <td className="py-3 px-3 text-right text-rose-600  font-semibold tabular-nums">
                             {member.delayed}
                           </td>
                           <td className="py-3 px-3">
@@ -1376,8 +1376,8 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                               <span
                                 className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
                                   member.slaRate >= 90
-                                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                    : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                                    ? "bg-emerald-50 text-emerald-700  "
+                                    : "bg-amber-50 text-amber-700  "
                                 }`}
                               >
                                 {member.slaRate}%
@@ -1447,7 +1447,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                       </td>
                       <td className="py-2.5 px-3 text-right font-bold text-[var(--on-surface)] tabular-nums">{account.total}</td>
                       <td className="py-2.5 px-3 text-right text-[var(--on-surface-muted)] tabular-nums">{account.active}</td>
-                      <td className="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold tabular-nums">{account.delayed}</td>
+                      <td className="py-2.5 px-3 text-right text-rose-600  font-semibold tabular-nums">{account.delayed}</td>
                       <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2 w-36">
                           <div className="flex-1 bg-[var(--surface-low)] h-1.5 rounded-full overflow-hidden">
@@ -1459,8 +1459,8 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                           <span
                             className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
                               account.onTimeRate >= 90
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                                ? "bg-emerald-50 text-emerald-700  "
+                                : "bg-amber-50 text-amber-700  "
                             }`}
                           >
                             {account.onTimeRate}%
@@ -1511,7 +1511,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                   onClick={() => setWatchlistFilter("drafts")}
                   className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95 ${
                     watchlistFilter === "drafts"
-                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-bold shadow-2xs border border-amber-300/50"
+                      ? "bg-amber-50 text-amber-700   font-bold shadow-2xs border border-amber-300/50"
                       : "text-[var(--on-surface-muted)] hover:text-amber-600 border border-transparent"
                   }`}
                 >
@@ -1522,7 +1522,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                   onClick={() => setWatchlistFilter("feasibility")}
                   className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95 ${
                     watchlistFilter === "feasibility"
-                      ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-bold shadow-2xs border border-purple-300/50"
+                      ? "bg-purple-50 text-purple-700   font-bold shadow-2xs border border-purple-300/50"
                       : "text-[var(--on-surface-muted)] hover:text-purple-600 border border-transparent"
                   }`}
                 >
@@ -1533,7 +1533,7 @@ export const MarketingOverviewPage: React.FC<MarketingOverviewPageProps> = ({
                   onClick={() => setWatchlistFilter("delayed")}
                   className={`px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95 ${
                     watchlistFilter === "delayed"
-                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold shadow-2xs border border-rose-300/50"
+                      ? "bg-rose-50 text-rose-700   font-bold shadow-2xs border border-rose-300/50"
                       : "text-[var(--on-surface-muted)] hover:text-rose-600 border border-transparent"
                   }`}
                 >

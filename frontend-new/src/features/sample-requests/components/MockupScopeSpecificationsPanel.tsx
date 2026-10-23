@@ -98,12 +98,12 @@ export const MockupScopeSpecificationsPanel: React.FC<MockupScopeSpecificationsP
 
         {notes.length > 0 && (
           <div className="space-y-1.5">
-            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 ">
               Brief &amp; Instructions
             </div>
-            <div className="p-3.5 rounded-xl border border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20 text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs whitespace-pre-wrap space-y-1.5">
+            <div className="p-3.5 rounded-xl border border-amber-200/70 bg-amber-50/50   text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs whitespace-pre-wrap space-y-1.5">
               {notes.map((note) => (
-                <p key={note.label} className={note.tone === "warning" ? "text-amber-800 dark:text-amber-300" : undefined}>
+                <p key={note.label} className={note.tone === "warning" ? "text-amber-800 " : undefined}>
                   <strong>{note.label}: </strong>{note.value}
                 </p>
               ))}
@@ -116,7 +116,7 @@ export const MockupScopeSpecificationsPanel: React.FC<MockupScopeSpecificationsP
         <div className="lg:col-span-6 sticky top-4">
           <div className="relative w-full h-[480px] sm:h-[520px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-low)]/50 overflow-hidden shadow-inner flex items-center justify-center p-4 sm:p-6 select-none group">
             <div
-              className="absolute inset-0 opacity-[0.35] dark:opacity-[0.18] pointer-events-none"
+              className="absolute inset-0 opacity-[0.35]  pointer-events-none"
               style={{ backgroundImage: "radial-gradient(var(--border-strong) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
             />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,var(--surface-container)_100%)] opacity-40 pointer-events-none" />
@@ -127,7 +127,7 @@ export const MockupScopeSpecificationsPanel: React.FC<MockupScopeSpecificationsP
                 alt={currentImage.name || "Mockup reference image"}
                 onClick={() => onPreview(currentImage.url)}
                 onError={() => setFailedImageUrl(currentImage.url)}
-                className="max-w-full max-h-full object-contain rounded-xl transition duration-300 group-hover:scale-[1.015] cursor-zoom-in filter drop-shadow-[0_8px_20px_rgba(11,28,48,0.12)] dark:drop-shadow-[0_12px_28px_rgba(0,0,0,0.6)] z-[1]"
+                className="max-w-full max-h-full object-contain rounded-xl transition duration-300 group-hover:scale-[1.015] cursor-zoom-in filter drop-shadow-[0_8px_20px_rgba(11,28,48,0.12)]  z-[1]"
               />
             ) : imageStatusFor(currentImage.url) === "error" || failedImageUrl === currentImage.url ? (
               <div className="flex flex-col items-center justify-center gap-2 text-rose-500 text-xs z-[1]">

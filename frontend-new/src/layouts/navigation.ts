@@ -315,6 +315,34 @@ export function getNavigationGroupsForUser(user: UserProfile): NavigationGroup[]
     : workflowTeam === "samp"
       ? "/samp-team-work/programs"
       : "/team-work/programs";
+  const creativeWorkspaceItems: NavigationItem[] = team === "creative"
+    ? [
+        {
+          id: "team-design",
+          title: "Design",
+          shortCode: "DS",
+          path: "/creative-work/design",
+          badgeKey: "creativeDesign",
+          departmentKey: "creative",
+        },
+        {
+          id: "team-creative-sampling",
+          title: "Sampling & Mockup",
+          shortCode: "SM",
+          path: "/creative-work/sampling",
+          badgeKey: "creativeSampling",
+          departmentKey: "creative",
+        },
+        {
+          id: "team-costing",
+          title: "Costing Requests",
+          shortCode: "CO",
+          path: "/creative-work/costing",
+          badgeKey: "creativeCosting",
+          departmentKey: "creative",
+        },
+      ]
+    : [];
   const items: NavigationItem[] = [
     {
       id: "team-overview",
@@ -323,16 +351,18 @@ export function getNavigationGroupsForUser(user: UserProfile): NavigationGroup[]
       path: getWorkspaceHome(user),
       departmentKey: "operations",
     },
-    {
-      id: "team-sample-requests",
-      title: "Sample Requests",
-      shortCode: "SR",
-      path: sampleRoute.path,
-      aliases: "aliases" in sampleRoute ? [...sampleRoute.aliases] : undefined,
-      badgeKey: sampleRoute.badgeKey,
-      departmentKey: "samp",
-      subItems: "subItems" in sampleRoute ? [...sampleRoute.subItems] : undefined,
-    },
+    ...(team === "creative"
+      ? creativeWorkspaceItems
+      : [{
+          id: "team-sample-requests",
+          title: "Sample Requests",
+          shortCode: "SR",
+          path: sampleRoute.path,
+          aliases: "aliases" in sampleRoute ? [...sampleRoute.aliases] : undefined,
+          badgeKey: sampleRoute.badgeKey,
+          departmentKey: "samp",
+          subItems: "subItems" in sampleRoute ? [...sampleRoute.subItems] : undefined,
+        }]),
     ...(team !== "plant"
       ? [{
           id: "team-feasibility",

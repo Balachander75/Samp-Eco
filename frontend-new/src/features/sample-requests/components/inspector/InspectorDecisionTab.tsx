@@ -26,9 +26,9 @@ export const InspectorDecisionTab: React.FC<InspectorDecisionTabProps> = ({
   return (
     <div className="py-4 space-y-5">
       {!activeRequest.samplingFeasibilityResponse ? (
-        <div className="p-8 rounded-2xl border border-slate-100 dark:border-white/5 bg-[var(--surface-low)] text-center text-slate-500">
+        <div className="p-8 rounded-2xl border border-slate-100  bg-[var(--surface-low)] text-center text-slate-500">
           <Clock className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-          <p className="font-bold text-sm text-slate-800 dark:text-zinc-200 font-display">
+          <p className="font-bold text-sm text-slate-800  font-display">
             Awaiting Technical Evaluation from Sampling Team
           </p>
           <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto font-sans">
@@ -39,7 +39,7 @@ export const InspectorDecisionTab: React.FC<InspectorDecisionTabProps> = ({
         <div className="space-y-4">
           {/* Commercial Decision Status & Form */}
           <div className="p-5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-[0_4px_20px_rgba(11,28,48,0.02)] space-y-3.5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 ">
               <span className="font-display font-bold text-xs uppercase text-slate-500">
                 Commercial Decision Status
               </span>
@@ -64,23 +64,23 @@ export const InspectorDecisionTab: React.FC<InspectorDecisionTabProps> = ({
 
             {activeRequest.marketingDecision ? (
               <div className="space-y-2 text-xs">
-                <div className="text-slate-600 dark:text-zinc-400">
+                <div className="text-slate-600 ">
                   Decided by:{" "}
-                  <span className="font-semibold text-slate-800 dark:text-zinc-200">
+                  <span className="font-semibold text-slate-800 ">
                     {activeRequest.marketingDecisionBy || "Marketing Authority"}
                   </span>
                 </div>
                 {activeRequest.marketingDecisionRemark && (
-                  <div className="p-3 rounded-xl bg-slate-50/70 dark:bg-zinc-900/60 border border-slate-100 dark:border-white/5 text-slate-800 dark:text-zinc-200 italic font-sans">
+                  <div className="p-3 rounded-xl bg-slate-50/70  border border-slate-100  text-slate-800  italic font-sans">
                     "{activeRequest.marketingDecisionRemark}"
                   </div>
                 )}
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="text-xs text-slate-600 dark:text-zinc-400">
+                <div className="text-xs text-slate-600 ">
                   Technical Verdict:{" "}
-                  <span className="font-bold text-slate-900 dark:text-zinc-100">
+                  <span className="font-bold text-slate-900 ">
                     {activeRequest.samplingFeasibilityResponse}
                   </span>
                   {activeRequest.samplingFeasibilityRemark && (
@@ -97,7 +97,7 @@ export const InspectorDecisionTab: React.FC<InspectorDecisionTabProps> = ({
                     value={decisionRemark}
                     onChange={(e) => onDecisionRemarkChange(e.target.value)}
                     placeholder="e.g. Approved for customer line; prototype required for buyer sign-off..."
-                    className="w-full h-9 px-3.5 rounded-xl border border-slate-200/80 dark:border-zinc-700 bg-slate-50/60 focus:bg-white text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-200/80  bg-slate-50/60 focus:bg-white text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                   />
                 </div>}
 
@@ -114,7 +114,7 @@ export const InspectorDecisionTab: React.FC<InspectorDecisionTabProps> = ({
                     type="button"
                     onClick={() => onMarketingFinalApprove(false)}
                     disabled={isSubmitting}
-                    className="bg-white dark:bg-zinc-800 text-rose-600 border border-rose-200 hover:bg-rose-50 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer transition disabled:opacity-50"
+                    className="bg-white  text-rose-600 border border-rose-200 hover:bg-rose-50 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer transition disabled:opacity-50"
                   >
                     Reject / Drop
                   </button>
@@ -125,7 +125,7 @@ export const InspectorDecisionTab: React.FC<InspectorDecisionTabProps> = ({
 
           {/* Commercial Sampling Request Conversion Card */}
           {activeRequest.marketingDecision === "Accepted" && (
-            <div className="p-5 rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--accent-primary-subtle)]/60 dark:bg-zinc-900/40 space-y-3">
+            <div className="p-5 rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--accent-primary-subtle)]/60  space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-[var(--accent-primary)] font-display">
                 <CheckCircle2 className="w-4 h-4 text-[var(--accent-primary)]" />
                 <span>Physical Prototype &amp; Sampling Creation</span>
@@ -147,7 +147,7 @@ export const InspectorDecisionTab: React.FC<InspectorDecisionTabProps> = ({
                 </div>
               ) : !readOnly ? (
                 <div className="flex items-center justify-between flex-wrap gap-3">
-                  <p className="text-xs text-slate-600 dark:text-zinc-400 max-w-lg">
+                  <p className="text-xs text-slate-600  max-w-lg">
                     Feasibility has been confirmed and accepted. Would you like to spawn a full Commercial Sample Request for this product now?
                   </p>
                   <button

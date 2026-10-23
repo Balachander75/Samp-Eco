@@ -1503,7 +1503,8 @@ def save_product_details(
         incoming = {(normalize(item.get("className") or item.get("class_name")),
                      normalize(item.get("characteristicName") or item.get("characteristic_name"))): str(item.get("value") or "")
                     for item in details if isinstance(item, dict)}
-        changed = {key for key in current.keys() | incoming.keys() if current.get(key, "") != incoming.get(key, "")}
+        # Creative sends only Creative-owned fields. Omitted catalog fields are untouched.
+        changed = {key for key in incoming if current.get(key, "") != incoming.get(key, "")}
         if changed - allowed:
             raise HTTPException(status_code=403, detail="Creative may update only the Creative-owned characteristics on this sample variant.")
 

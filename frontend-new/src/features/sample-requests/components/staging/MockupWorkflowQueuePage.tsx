@@ -301,7 +301,7 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
             outputUrl && (outputUrl.startsWith("http://") || outputUrl.startsWith("https://"));
           if (!outputUrl) {
             return (
-              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded">
+              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-600  font-semibold bg-amber-500/10 px-2 py-0.5 rounded">
                 <Clock className="w-3 h-3" />
                 <span>Awaiting Output</span>
               </span>
@@ -455,20 +455,20 @@ export const MockupWorkflowQueuePage: React.FC<MockupWorkflowQueuePageProps> = (
         onToggleSelectRow={toggleSelectRow}
         onToggleSelectAll={toggleSelectAll}
         toolbarLeft={
-          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500 ">
             <span className="truncate">
               Showing{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {filteredRequests.length}
               </span>{" "}
               of{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">
+              <span className="font-mono font-semibold tabular-nums text-zinc-900 ">
                 {totalCount}
               </span>{" "}
               mockups
             </span>
             {selectedIds.size > 0 && (
-              <span className="shrink-0 rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700 dark:text-indigo-300 font-bold">
+              <span className="shrink-0 rounded-md border border-indigo-300  bg-indigo-50  px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-indigo-700  font-bold">
                 {selectedIds.size} selected
               </span>
             )}

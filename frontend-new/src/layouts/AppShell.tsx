@@ -289,7 +289,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                             <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-[var(--accent-primary)]" : "bg-transparent"}`} />
                             <span className="tracking-tight">BY {y.year}</span>
                             {y.is_current && (
-                              <span className="text-[9px] font-sans font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                              <span className="text-[9px] font-sans font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 ">
                                 Current
                               </span>
                             )}
@@ -343,7 +343,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
               {/* Animated Profile Card Dropdown */}
               {isUserMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-2xl shadow-black/15 dark:shadow-black/50 p-2 z-50 select-none header-dropdown-menu backdrop-blur-xl">
+                <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-[var(--surface-lowest)] text-[var(--on-surface)] border border-[var(--border-subtle)] shadow-2xl shadow-black/15  p-2 z-50 select-none header-dropdown-menu backdrop-blur-xl">
                   {/* User Profile Header Tile */}
                   <div className="p-3 rounded-xl bg-[var(--surface-low)]/80 border border-[var(--border-subtle)]/60 mb-1.5 flex items-start gap-3">
                     <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--sidebar-accent)] to-[var(--accent-primary)] text-white font-bold flex items-center justify-center text-sm font-display shadow-sm shrink-0">
@@ -390,10 +390,10 @@ export const AppShell: React.FC<AppShellProps> = ({
                         setIsUserMenuOpen(false);
                         onLogout();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-950/40 rounded-xl transition-all duration-150 text-left cursor-pointer font-semibold text-xs group mt-1"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10   rounded-xl transition-all duration-150 text-left cursor-pointer font-semibold text-xs group mt-1"
                     >
                       <div className="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0 group-hover:bg-rose-500/20 transition-colors">
-                        <LogOut className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                        <LogOut className="w-3.5 h-3.5 text-rose-600 " />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div>Sign Out</div>

@@ -82,7 +82,7 @@ export const DesignNextWorkTab: React.FC<DesignNextWorkTabProps> = React.memo(({
                 <span className="flex items-center gap-2 text-xs font-semibold text-[var(--on-surface)]">
                   {option.title}
                   {included && (
-                    <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                    <span className="text-[10px] font-medium text-emerald-700 ">
                       Already added
                     </span>
                   )}
@@ -182,7 +182,7 @@ export const DesignNextWorkTab: React.FC<DesignNextWorkTabProps> = React.memo(({
       })}
 
       {followupError && (
-        <div role="alert" className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
+        <div role="alert" className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800  ">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>{followupError}</span>
         </div>

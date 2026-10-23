@@ -37,14 +37,14 @@ export const RequestClosedStamp: React.FC<{ label?: string }> = ({ label = "REQU
       aria-hidden="true"
       className="pointer-events-none select-none absolute inset-0 z-20 flex items-center justify-center overflow-hidden p-6"
     >
-      <div className="flex -rotate-12 transform flex-col items-center justify-center rounded-3xl border-8 border-dashed border-rose-600/25 dark:border-rose-500/20 bg-rose-500/[0.03] px-10 py-6 sm:px-16 sm:py-8 shadow-2xl backdrop-blur-[1px]">
+      <div className="flex -rotate-12 transform flex-col items-center justify-center rounded-3xl border-8 border-dashed border-rose-600/25  bg-rose-500/[0.03] px-10 py-6 sm:px-16 sm:py-8 shadow-2xl backdrop-blur-[1px]">
         <div className="flex items-center gap-3">
-          <CircleSlash className="h-10 w-10 sm:h-14 sm:w-14 text-rose-600/35 dark:text-rose-400/30 stroke-[2.5]" />
-          <span className="font-mono text-3xl sm:text-5xl lg:text-6xl font-black tracking-widest text-rose-600/35 dark:text-rose-400/30 uppercase">
+          <CircleSlash className="h-10 w-10 sm:h-14 sm:w-14 text-rose-600/35  stroke-[2.5]" />
+          <span className="font-mono text-3xl sm:text-5xl lg:text-6xl font-black tracking-widest text-rose-600/35  uppercase">
             {label}
           </span>
         </div>
-        <div className="mt-2.5 flex items-center gap-2 border-t-2 border-rose-600/25 pt-2 text-[11px] sm:text-xs font-mono font-bold tracking-widest text-rose-600/40 dark:text-rose-400/35 uppercase">
+        <div className="mt-2.5 flex items-center gap-2 border-t-2 border-rose-600/25 pt-2 text-[11px] sm:text-xs font-mono font-bold tracking-widest text-rose-600/40  uppercase">
           <span>TERMINATED</span>
           <span>&bull;</span>
           <span>READ-ONLY ARCHIVE</span>
@@ -73,7 +73,7 @@ export const RequestClosedBanner: React.FC<RequestClosedWatermarkProps> = ({
     <aside
       role="alert"
       aria-live="assertive"
-      className={`relative z-30 overflow-hidden rounded-2xl border-2 border-rose-300 dark:border-rose-800/80 bg-rose-50/95 dark:bg-rose-950/45 p-4 sm:p-5 text-rose-950 dark:text-rose-100 shadow-md ${className}`}
+      className={`relative z-30 overflow-hidden rounded-2xl border-2 border-rose-300  bg-rose-50/95  p-4 sm:p-5 text-rose-950  shadow-md ${className}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
@@ -87,45 +87,45 @@ export const RequestClosedBanner: React.FC<RequestClosedWatermarkProps> = ({
                 REQUEST WAS CLOSED
               </span>
               {scopeLabel && (
-                <span className="rounded-md border border-rose-300 dark:border-rose-700 bg-white/80 dark:bg-zinc-900 px-2 py-0.5 font-mono text-[11px] font-bold text-rose-800 dark:text-rose-200">
+                <span className="rounded-md border border-rose-300  bg-white/80  px-2 py-0.5 font-mono text-[11px] font-bold text-rose-800 ">
                   {scopeLabel}
                 </span>
               )}
             </div>
-            <p className="text-xs sm:text-sm font-semibold text-rose-900 dark:text-rose-200">
+            <p className="text-xs sm:text-sm font-semibold text-rose-900 ">
               This request was officially closed. All further inputs, task claims, and workflow changes are permanently locked across all teams.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-3 border-t border-rose-200/80 dark:border-rose-800/60 text-xs">
+      <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-3 border-t border-rose-200/80  text-xs">
         <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-rose-700 dark:text-rose-400 shrink-0" />
+          <User className="h-4 w-4 text-rose-700  shrink-0" />
           <span className="truncate">
-            <strong className="text-rose-900 dark:text-rose-200">Closed By:</strong>{" "}
+            <strong className="text-rose-900 ">Closed By:</strong>{" "}
             {closedBy}{closedTeam}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-rose-700 dark:text-rose-400 shrink-0" />
+          <Clock className="h-4 w-4 text-rose-700  shrink-0" />
           <span className="truncate">
-            <strong className="text-rose-900 dark:text-rose-200">Closed On:</strong>{" "}
+            <strong className="text-rose-900 ">Closed On:</strong>{" "}
             {closedAt}
           </span>
         </div>
         <div className="flex items-center gap-2 sm:col-span-1">
-          <ShieldAlert className="h-4 w-4 text-rose-700 dark:text-rose-400 shrink-0" />
-          <span className="font-semibold text-rose-700 dark:text-rose-300">Read-Only Enforced</span>
+          <ShieldAlert className="h-4 w-4 text-rose-700  shrink-0" />
+          <span className="font-semibold text-rose-700 ">Read-Only Enforced</span>
         </div>
       </div>
 
       {reason && (
-        <div className="mt-2.5 rounded-xl border border-rose-200 dark:border-rose-800/50 bg-white/70 dark:bg-zinc-900/60 p-3 text-xs">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
+        <div className="mt-2.5 rounded-xl border border-rose-200  bg-white/70  p-3 text-xs">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-rose-700 ">
             Closure Reason:
           </span>
-          <p className="mt-0.5 text-rose-950 dark:text-rose-100 whitespace-pre-wrap break-words font-medium">
+          <p className="mt-0.5 text-rose-950  whitespace-pre-wrap break-words font-medium">
             "{reason}"
           </p>
         </div>

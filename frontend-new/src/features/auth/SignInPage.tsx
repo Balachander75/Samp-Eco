@@ -215,13 +215,13 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
         .apple-shake {
           animation: appleShakeKeyframe 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
         }
-        @keyframes appleSpringPulse {
+        @keyframes appleIconPulse {
           0% { transform: scale(1) translateY(0); }
-          35% { transform: scale(1.15) translateY(-1px); }
+          35% { transform: scale(1.06) translateY(-1px); }
           100% { transform: scale(1) translateY(0); }
         }
-        .apple-icon-spring {
-          animation: appleSpringPulse 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        .apple-icon-pulse {
+          animation: appleIconPulse 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
         @keyframes appleIconError {
           0%, 100% { transform: translateX(0); }
@@ -246,7 +246,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
         }
       `}</style>
 
-      {/* Atmospheric hero backdrop: Clean dark overlay so the white card pops out with sharp contrast */}
+      {/* Atmospheric hero backdrop: High-contrast overlay keeps the sign-in card clear */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0 bg-slate-950/45"
@@ -296,7 +296,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
                       isIdentifierError
                         ? "apple-icon-error inline-flex items-center justify-center"
                         : userPulseKey > 0
-                        ? "apple-icon-spring inline-flex items-center justify-center"
+                        ? "apple-icon-pulse inline-flex items-center justify-center"
                         : "inline-flex items-center justify-center"
                     }
                   >
@@ -351,7 +351,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({ onSignInSuccess }) => {
                       isPasswordError
                         ? "apple-icon-error inline-flex items-center justify-center"
                         : lockPulseKey > 0
-                        ? "apple-icon-spring inline-flex items-center justify-center"
+                        ? "apple-icon-pulse inline-flex items-center justify-center"
                         : "inline-flex items-center justify-center"
                     }
                   >

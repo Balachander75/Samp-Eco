@@ -1,0 +1,1118 @@
+{
+  "_type": "Project",
+  "_id": "AAAAAAFf0adeaed15cb4d28a",
+  "name": "SAMP_Marketing_Request_Workflow",
+  "author": "Google DeepMind pair programming",
+  "company": "Navneet SAMP Operations",
+  "version": "1.0.0",
+  "ownedElements": [
+    {
+      "_type": "UMLModel",
+      "_id": "AAAAAAF2d4df707f73f4404a",
+      "_parent": {
+        "$ref": "AAAAAAFf0adeaed15cb4d28a"
+      },
+      "name": "SAMP_Marketing_Lifecycle_Model",
+      "ownedElements": [
+        {
+          "_type": "UMLClassDiagram",
+          "_id": "AAAAAAF42c03266c3734a35b",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "req [Diagram] SAMP_Marketing_Request_SDLC_Specification",
+          "defaultDiagram": true,
+          "ownedViews": [
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF1df89a7e5e2d48028",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAFaadc3d5adb124ae1b"
+              },
+              "left": 1360,
+              "top": 80,
+              "width": 460,
+              "height": 90
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAFab3e9767f0ba449d9",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF07e83fac88fa43b0b"
+              },
+              "left": 100,
+              "top": 280,
+              "width": 380,
+              "height": 90
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAFb76022eb47c842798",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF1aa14d7af0f04836b"
+              },
+              "left": 80,
+              "top": 480,
+              "width": 360,
+              "height": 160
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF1ce6a39e11ff42229",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF79fc57696cd145649"
+              },
+              "left": 80,
+              "top": 700,
+              "width": 360,
+              "height": 150
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF9da0eeb0c3a64eb4b",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAFf4e119c60a8d40c3a"
+              },
+              "left": 80,
+              "top": 910,
+              "width": 360,
+              "height": 150
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF8bfa04a0a87c45e29",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF388b6b45b85049d79"
+              },
+              "left": 80,
+              "top": 1120,
+              "width": 360,
+              "height": 170
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF091ede16d05747128",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF9c46da2770c04b9e8"
+              },
+              "left": 80,
+              "top": 1470,
+              "width": 360,
+              "height": 170
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF40b7ebc26cce492db",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAFf35f9b01880444ea9"
+              },
+              "left": 760,
+              "top": 280,
+              "width": 420,
+              "height": 90
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF800acde9fe3744afa",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF71195badd26144ffb"
+              },
+              "left": 520,
+              "top": 480,
+              "width": 330,
+              "height": 190
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAFfe7b7fb7b553456b9",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAFcc8a65b3a6834d2eb"
+              },
+              "left": 890,
+              "top": 480,
+              "width": 340,
+              "height": 200
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF998a0a4cd78440c58",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF17eab7b1ac704d89a"
+              },
+              "left": 1270,
+              "top": 480,
+              "width": 380,
+              "height": 240
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF3df5b830ae4341108",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF3a2dfa47fcc34ab19"
+              },
+              "left": 1270,
+              "top": 1050,
+              "width": 380,
+              "height": 200
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF01e5e18ac5cf49778",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAFc0b8f5ccfb284211b"
+              },
+              "left": 1780,
+              "top": 280,
+              "width": 400,
+              "height": 90
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF3f3f0e6d328140f28",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAFcfa59d49e2a14d1ea"
+              },
+              "left": 1760,
+              "top": 480,
+              "width": 380,
+              "height": 160
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAFd145a2ce0e9347df8",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAFe2af3e9344994bbe9"
+              },
+              "left": 1690,
+              "top": 740,
+              "width": 250,
+              "height": 130
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAFae6dab06d0fd4b29a",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF20c7593cd01640ea9"
+              },
+              "left": 1980,
+              "top": 740,
+              "width": 250,
+              "height": 130
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAFc7b1563bf3484c69a",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF36cb2c31a68a4fe8a"
+              },
+              "left": 1760,
+              "top": 1150,
+              "width": 380,
+              "height": 170
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF6c351f028bc547329",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF22804cee06d54127a"
+              },
+              "left": 2400,
+              "top": 280,
+              "width": 410,
+              "height": 90
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAFbb0c2a386d8f4362a",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF2dfb3864211340509"
+              },
+              "left": 2390,
+              "top": 480,
+              "width": 420,
+              "height": 210
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "AAAAAAF4b2f50eb770345408",
+              "_parent": {
+                "$ref": "AAAAAAF42c03266c3734a35b"
+              },
+              "model": {
+                "$ref": "AAAAAAF63f24cf4b63044069"
+              },
+              "left": 2390,
+              "top": 780,
+              "width": 420,
+              "height": 200
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAFaadc3d5adb124ae1b",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "SAMP_Marketing_Specification",
+          "documentation": "Master System Specification for SAMP Marketing Request Lifecycle: Feasibility, Commercial Product Staging, Seasonal Planning, and Closure Governance.",
+          "stereotype": "specification",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFe61e33aa54334d5db",
+              "_parent": {
+                "$ref": "AAAAAAFaadc3d5adb124ae1b"
+              },
+              "name": "id = \"SPEC-SAMP-MKT-01\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFe3f10707453347de9",
+              "_parent": {
+                "$ref": "AAAAAAFaadc3d5adb124ae1b"
+              },
+              "name": "system = \"SAMP Operations Core\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFb53f24b8f68b49118",
+              "_parent": {
+                "$ref": "AAAAAAFaadc3d5adb124ae1b"
+              },
+              "name": "version = \"2026.1-Enterprise\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF07e83fac88fa43b0b",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Feasibility_Assessment",
+          "documentation": "Technical feasibility assessment prior to commercial staging. Separates SAMP technical judgment from Marketing commercial decision.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFb5c1d1ed441644bdb",
+              "_parent": {
+                "$ref": "AAAAAAF07e83fac88fa43b0b"
+              },
+              "name": "id = \"REQ-FEAS-01\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF29648445297944d28",
+              "_parent": {
+                "$ref": "AAAAAAF07e83fac88fa43b0b"
+              },
+              "name": "owner = \"Marketing & SAMP PMT\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF1aa14d7af0f04836b",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Feasibility_Intake",
+          "documentation": "Marketing captures technical packet: Customer, target Plant, feasibility type, packaging notes, references, and required working date.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF259e1a9b294341409",
+              "_parent": {
+                "$ref": "AAAAAAF1aa14d7af0f04836b"
+              },
+              "name": "id = \"REQ-FEAS-1.1\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF3e78a4f0b12a41e18",
+              "_parent": {
+                "$ref": "AAAAAAF1aa14d7af0f04836b"
+              },
+              "name": "queue = \"Pending Feasibility\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF403507054fe047e0b",
+              "_parent": {
+                "$ref": "AAAAAAF1aa14d7af0f04836b"
+              },
+              "name": "inputs = \"Customer, Plant, Type, Notes, Refs, Date\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF79fc57696cd145649",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Independent_SAMP_Review",
+          "documentation": "SAMP reviewer claims task. Creator cannot self-assess; independent technical assessment is mandatory.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFe55d515c45bf4641b",
+              "_parent": {
+                "$ref": "AAAAAAF79fc57696cd145649"
+              },
+              "name": "id = \"REQ-FEAS-1.2\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFa1bae471a36f450d8",
+              "_parent": {
+                "$ref": "AAAAAAF79fc57696cd145649"
+              },
+              "name": "invariant = \"Creator cannot self-verdict\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFc2de27646a5744ff8",
+              "_parent": {
+                "$ref": "AAAAAAF79fc57696cd145649"
+              },
+              "name": "status = \"Under SAMP Review\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAFf4e119c60a8d40c3a",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Date_Proposal_Protocol",
+          "documentation": "SAMP may propose one revised date. Auto-accepted after 4 operational workdays if Marketing does not decide.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF32961d89fe3743ce8",
+              "_parent": {
+                "$ref": "AAAAAAFf4e119c60a8d40c3a"
+              },
+              "name": "id = \"REQ-FEAS-1.3\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFe1e1b064791048318",
+              "_parent": {
+                "$ref": "AAAAAAFf4e119c60a8d40c3a"
+              },
+              "name": "clock_rule = \"Pauses SAMP clock while pending\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFf560afc4ee274d4e8",
+              "_parent": {
+                "$ref": "AAAAAAFf4e119c60a8d40c3a"
+              },
+              "name": "auto_timeout = \"4 Workdays auto-accept\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF388b6b45b85049d79",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Technical_Verdict_Assessment",
+          "documentation": "SAMP records technical verdict: Yes, Maybe, or No with remarks. Verdict timestamp closes technical review.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFd0fc70d440884590a",
+              "_parent": {
+                "$ref": "AAAAAAF388b6b45b85049d79"
+              },
+              "name": "id = \"REQ-FEAS-1.4\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF7852812e9ae24608a",
+              "_parent": {
+                "$ref": "AAAAAAF388b6b45b85049d79"
+              },
+              "name": "verdicts = \"Yes (Feasible) | Maybe (Conditional) | No\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF0356ea1a6e874031a",
+              "_parent": {
+                "$ref": "AAAAAAF388b6b45b85049d79"
+              },
+              "name": "invariant = \"Verdict timestamp is not commercial closure\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF9c46da2770c04b9e8",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Commercial_Staging_Linkage",
+          "documentation": "Only accepted Yes/Maybe feasibility records can link to a matching Product Staging draft with customer/type validation.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF5bca6cdd94074ae79",
+              "_parent": {
+                "$ref": "AAAAAAF9c46da2770c04b9e8"
+              },
+              "name": "id = \"REQ-FEAS-1.5\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF318dbcdd7aaa4fd6b",
+              "_parent": {
+                "$ref": "AAAAAAF9c46da2770c04b9e8"
+              },
+              "name": "eligibility = \"Accepted Yes or Maybe only\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFb0df35b6dedb465cb",
+              "_parent": {
+                "$ref": "AAAAAAF9c46da2770c04b9e8"
+              },
+              "name": "reject_rule = \"No/Reject: manual closure required\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAFf35f9b01880444ea9",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Product_Staging_&_Release",
+          "documentation": "Marketing builds multi-scope commercial request. Scopes can run independently or combined upon release.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFeb31001a3ae64bc28",
+              "_parent": {
+                "$ref": "AAAAAAFf35f9b01880444ea9"
+              },
+              "name": "id = \"REQ-COMM-02\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFa4cd7cc3ea614658b",
+              "_parent": {
+                "$ref": "AAAAAAFf35f9b01880444ea9"
+              },
+              "name": "scopes = \"Design, Mockup, Sample, Costing\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF2cfd52ff45094619b",
+              "_parent": {
+                "$ref": "AAAAAAFf35f9b01880444ea9"
+              },
+              "name": "execution = \"Independent parallel execution\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF71195badd26144ffb",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Design_Scope_Workflow",
+          "documentation": "Artwork creation lifecycle. Creative uploads numbered deliverables. Accept closes; remaining loops back.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFd78a637233b64393a",
+              "_parent": {
+                "$ref": "AAAAAAF71195badd26144ffb"
+              },
+              "name": "id = \"REQ-DSGN-03\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF8a591b36a92440258",
+              "_parent": {
+                "$ref": "AAAAAAF71195badd26144ffb"
+              },
+              "name": "inputs = \"Count, Brief, Trend, Due Date\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFb08da09e46c74579b",
+              "_parent": {
+                "$ref": "AAAAAAF71195badd26144ffb"
+              },
+              "name": "delivery = \"Partial delivery supported\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF13ab4ec8054c453b9",
+              "_parent": {
+                "$ref": "AAAAAAF71195badd26144ffb"
+              },
+              "name": "terminal = \"Accept -> Approved / Closed\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAFcc8a65b3a6834d2eb",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Mockup_Scope_Workflow",
+          "documentation": "CAD dieline / physical mockup. Routes via Creative if needed, or straight to Studio CAD. Revision loop back to Studio.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF99bd95b716b84046a",
+              "_parent": {
+                "$ref": "AAAAAAFcc8a65b3a6834d2eb"
+              },
+              "name": "id = \"REQ-MCKP-04\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF155b38be10744ff79",
+              "_parent": {
+                "$ref": "AAAAAAFcc8a65b3a6834d2eb"
+              },
+              "name": "fork = \"If creativeInputNeeded -> Creative else Studio\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF6c46b9e5fd804caeb",
+              "_parent": {
+                "$ref": "AAAAAAFcc8a65b3a6834d2eb"
+              },
+              "name": "output = \"CAD/dieline file or link\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFb2801e484b8748e8b",
+              "_parent": {
+                "$ref": "AAAAAAFcc8a65b3a6834d2eb"
+              },
+              "name": "exception = \"Studio escalation -> Marketing direction\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF17eab7b1ac704d89a",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Standalone_&_Combined_Sampling",
+          "documentation": "Sample production lifecycle. New variants go Creative -> Studio -> Creative QA -> SAMP -> Plant. Resample bypasses directly to Plant.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF75b5b791719648cf9",
+              "_parent": {
+                "$ref": "AAAAAAF17eab7b1ac704d89a"
+              },
+              "name": "id = \"REQ-SMPL-05\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF3d82018ce3324c8ca",
+              "_parent": {
+                "$ref": "AAAAAAF17eab7b1ac704d89a"
+              },
+              "name": "classification = \"New/Changed vs Unchanged Resample\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF6fb2b8b3f777495ba",
+              "_parent": {
+                "$ref": "AAAAAAF17eab7b1ac704d89a"
+              },
+              "name": "bypass_rule = \"Unchanged resample direct to Plant\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF71199f33ad934c49b",
+              "_parent": {
+                "$ref": "AAAAAAF17eab7b1ac704d89a"
+              },
+              "name": "combined_gate = \"Mockup accepted before SAMP review\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF70c94634ed8947029",
+              "_parent": {
+                "$ref": "AAAAAAF17eab7b1ac704d89a"
+              },
+              "name": "handoff_status = \"Released to Plant (Not Closed)\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF3a2dfa47fcc34ab19",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Costing_Scope_Workflow",
+          "documentation": "Production costing lifecycle. Optional Creative specs -> Costing attaches sheet -> SAMP review approves or returns.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF4136b7a3e74b453eb",
+              "_parent": {
+                "$ref": "AAAAAAF3a2dfa47fcc34ab19"
+              },
+              "name": "id = \"REQ-COST-06\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFfa0ee5eb54c5424fb",
+              "_parent": {
+                "$ref": "AAAAAAF3a2dfa47fcc34ab19"
+              },
+              "name": "creative_input = \"Optional Creative spec step\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF6b56753cd4ad4e6fb",
+              "_parent": {
+                "$ref": "AAAAAAF3a2dfa47fcc34ab19"
+              },
+              "name": "output = \"Costing sheet link/file attached\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF3e6d80c640ce42d5b",
+              "_parent": {
+                "$ref": "AAAAAAF3a2dfa47fcc34ab19"
+              },
+              "name": "terminal = \"SAMP Approve -> Approved / Closed\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAFc0b8f5ccfb284211b",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Seasonal_Program_Matrix",
+          "documentation": "Campaign and material suitability planning across SAMP and target Plant. Independent parallel reviews. Not a production order.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFd64939f2b78c4860a",
+              "_parent": {
+                "$ref": "AAAAAAFc0b8f5ccfb284211b"
+              },
+              "name": "id = \"REQ-PROG-07\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF0e212ab69e5f43dd8",
+              "_parent": {
+                "$ref": "AAAAAAFc0b8f5ccfb284211b"
+              },
+              "name": "nature = \"Campaign/Material Matrix, not order\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAFcfa59d49e2a14d1ea",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Material_Matrix_Intake",
+          "documentation": "Marketing enters Customer, campaign, business year, target Plant, and material rows with grade, finish, planned qty.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF18a75e04d676426ab",
+              "_parent": {
+                "$ref": "AAAAAAFcfa59d49e2a14d1ea"
+              },
+              "name": "id = \"REQ-PROG-3.1\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFb06d9ad4c4b2400d9",
+              "_parent": {
+                "$ref": "AAAAAAFcfa59d49e2a14d1ea"
+              },
+              "name": "status = \"Pending SAMP Review\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFfd46d252720d46b0a",
+              "_parent": {
+                "$ref": "AAAAAAFcfa59d49e2a14d1ea"
+              },
+              "name": "fields = \"Supplier, Grade, Finish, Qty, Notes\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAFe2af3e9344994bbe9",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "SAMP_Material_Suitability",
+          "documentation": "SAMP reviews technical viability of proposed packaging substrates and production compatibility.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF9dbe0a93682a4bb78",
+              "_parent": {
+                "$ref": "AAAAAAFe2af3e9344994bbe9"
+              },
+              "name": "id = \"REQ-PROG-3.2A\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF6b49e6d7fe99490cb",
+              "_parent": {
+                "$ref": "AAAAAAFe2af3e9344994bbe9"
+              },
+              "name": "focus = \"Substrate viability & specs\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF20c7593cd01640ea9",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Plant_Capacity_Review",
+          "documentation": "Selected Plant reviews operational schedule, equipment capacity, and tooling readiness.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF374fa1faefc845719",
+              "_parent": {
+                "$ref": "AAAAAAF20c7593cd01640ea9"
+              },
+              "name": "id = \"REQ-PROG-3.2B\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF3feebdc72eda45cc8",
+              "_parent": {
+                "$ref": "AAAAAAF20c7593cd01640ea9"
+              },
+              "name": "focus = \"Plant capacity & tooling\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF36cb2c31a68a4fe8a",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Plan_Lifecycle_Governance",
+          "documentation": "Promote material rows to commercial staging (Sample/Costing). Plan can be paused/resumed. Dismantle is terminal.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF5e34ac3275cb45fd8",
+              "_parent": {
+                "$ref": "AAAAAAF36cb2c31a68a4fe8a"
+              },
+              "name": "id = \"REQ-PROG-3.3\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFf8cf7e6bc4d642d88",
+              "_parent": {
+                "$ref": "AAAAAAF36cb2c31a68a4fe8a"
+              },
+              "name": "promotion = \"Promote SKU to Commercial Staging\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF6135acdbab2a4ee0a",
+              "_parent": {
+                "$ref": "AAAAAAF36cb2c31a68a4fe8a"
+              },
+              "name": "dismantle = \"Terminal; cannot be resumed\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF22804cee06d54127a",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Request_Closure_Rules",
+          "documentation": "Governance rules distinguishing team handoffs, automated approvals, and audited manual closures.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF4b2d3cb6b470492a8",
+              "_parent": {
+                "$ref": "AAAAAAF22804cee06d54127a"
+              },
+              "name": "id = \"REQ-CLSR-08\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF8f3b0c8f4263492b9",
+              "_parent": {
+                "$ref": "AAAAAAF22804cee06d54127a"
+              },
+              "name": "rule = \"Inspect scope terminal state, not parent\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF2dfb3864211340509",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Terminal_States_Definition",
+          "documentation": "Explicit terminal states: Design (Accepted), Mockup (Accepted), Costing (Approved). Sample Plant release is a handoff, not closure.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF114190007c6a4e8fa",
+              "_parent": {
+                "$ref": "AAAAAAF2dfb3864211340509"
+              },
+              "name": "id = \"REQ-CLSR-4.1\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFee5e2058f7a74f69a",
+              "_parent": {
+                "$ref": "AAAAAAF2dfb3864211340509"
+              },
+              "name": "terminal_closed = \"Design, Mockup, Costing Accepted/Approved\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF991989624da840a18",
+              "_parent": {
+                "$ref": "AAAAAAF2dfb3864211340509"
+              },
+              "name": "handoff_only = \"Sample: Released to Plant (Not Closed)\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFa0fc48988ec84cd48",
+              "_parent": {
+                "$ref": "AAAAAAF2dfb3864211340509"
+              },
+              "name": "feasibility_status = \"Verdict is not closure\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF701f4542439f4d00b",
+              "_parent": {
+                "$ref": "AAAAAAF2dfb3864211340509"
+              },
+              "name": "program_status = \"Dual Sign-off leaves plan Active\"",
+              "type": ""
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "AAAAAAF63f24cf4b63044069",
+          "_parent": {
+            "$ref": "AAAAAAF2d4df707f73f4404a"
+          },
+          "name": "Manual_Closure_Audit_Rule",
+          "documentation": "Creator or Admin only. Requires mandatory closure reason. Multi-scope cascade caution applies to combined drafts.",
+          "stereotype": "requirement",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF8f9710efb1274b5ea",
+              "_parent": {
+                "$ref": "AAAAAAF63f24cf4b63044069"
+              },
+              "name": "id = \"REQ-CLSR-4.2\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF618e78999ea94ecfa",
+              "_parent": {
+                "$ref": "AAAAAAF63f24cf4b63044069"
+              },
+              "name": "auth = \"Request Creator or Admin only\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAF42aa52067d6f46f09",
+              "_parent": {
+                "$ref": "AAAAAAF63f24cf4b63044069"
+              },
+              "name": "audit = \"Mandatory reason + timestamped user log\"",
+              "type": ""
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "AAAAAAFe5965b7ad1f4440fa",
+              "_parent": {
+                "$ref": "AAAAAAF63f24cf4b63044069"
+              },
+              "name": "cascade_alert = \"Closing parent may close sibling scopes\"",
+              "type": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -73,15 +73,15 @@ export const ScopeReferenceImageField: React.FC<ScopeReferenceImageFieldProps> =
   };
 
   return (
-    <section aria-label={`${scopeLabels[scope]} reference images`} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-zinc-700 dark:bg-zinc-900/45">
+    <section aria-label={`${scopeLabels[scope]} reference images`} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3  ">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-200">
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 ">
             {scopeLabels[scope]} reference images <span className="font-medium normal-case tracking-normal text-slate-500">(optional)</span>
           </h4>
-          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500 dark:text-zinc-400">Up to 2 images. Compressed to about 30% of the original size, with a 512 KB stored size limit each.</p>
+          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500 ">Up to 2 images. Compressed to about 30% of the original size, with a 512 KB stored size limit each.</p>
         </div>
-        <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300" aria-live="polite">
+        <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600   " aria-live="polite">
           {images.length}/2
         </span>
       </div>
@@ -89,18 +89,18 @@ export const ScopeReferenceImageField: React.FC<ScopeReferenceImageFieldProps> =
       {images.length > 0 && (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {images.map((image) => (
-            <li key={image.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-900">
-              <img src={image.url} alt={image.name} className="h-10 w-10 shrink-0 rounded-md border border-slate-200 object-cover dark:border-zinc-700" />
+            <li key={image.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white p-2  ">
+              <img src={image.url} alt={image.name} className="h-10 w-10 shrink-0 rounded-md border border-slate-200 object-cover " />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] font-medium text-slate-700 dark:text-zinc-200" title={image.name}>{image.name}</p>
-                {image.size && <p className="text-[10px] text-slate-500 dark:text-zinc-400">{image.size}</p>}
+                <p className="truncate text-[11px] font-medium text-slate-700 " title={image.name}>{image.name}</p>
+                {image.size && <p className="text-[10px] text-slate-500 ">{image.size}</p>}
               </div>
               <button
                 type="button"
                 onClick={() => removeImage(image.id)}
                 disabled={isProcessing}
                 aria-label={`Remove ${image.name}`}
-                className="rounded-md p-1.5 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-40 dark:text-rose-400 dark:hover:bg-rose-950/50 dark:hover:text-rose-300"
+                className="rounded-md p-1.5 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-40   "
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -115,14 +115,14 @@ export const ScopeReferenceImageField: React.FC<ScopeReferenceImageFieldProps> =
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={remaining === 0 || isProcessing}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-50   "
         >
           {isProcessing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
           {isProcessing ? "Compressing…" : remaining ? "Add image" : "2 images added"}
         </button>
-        <span className="text-[10px] text-slate-500 dark:text-zinc-400">JPEG, PNG, or WebP · max 15 MB each</span>
+        <span className="text-[10px] text-slate-500 ">JPEG, PNG, or WebP · max 15 MB each</span>
       </div>
-      {error && <p role="alert" className="text-[10px] font-medium text-rose-700 dark:text-rose-300">{error}</p>}
+      {error && <p role="alert" className="text-[10px] font-medium text-rose-700 ">{error}</p>}
     </section>
   );
 };

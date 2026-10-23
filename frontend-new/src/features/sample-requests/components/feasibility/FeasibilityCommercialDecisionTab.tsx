@@ -52,16 +52,16 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
       {activeRequest.counterDateDecision === "pending" && (
         <section
           role="status"
-          className="space-y-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 p-5"
+          className="space-y-4 rounded-xl bg-amber-50  border border-amber-200  p-5"
           aria-labelledby="marketing-counter-date-title"
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3
                 id="marketing-counter-date-title"
-                className="text-sm font-display font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5"
+                className="text-sm font-display font-bold text-amber-800  flex items-center gap-1.5"
               >
-                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <AlertTriangle className="w-4 h-4 text-amber-600 " />
                 <span>Marketing Action Needed: Sampling Team Proposed a Revised Date</span>
               </h3>
               <p className="mt-1 text-xs text-[var(--on-surface-muted)]">
@@ -94,7 +94,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
               <span className="text-[var(--on-surface-subtle)] font-mono text-[10px] uppercase">
                 SAMP Proposed Date
               </span>
-              <p className="mt-1 font-semibold text-amber-700 dark:text-amber-300 font-mono">
+              <p className="mt-1 font-semibold text-amber-700  font-mono">
                 {activeRequest.sampCounterDate} · {activeRequest.sampCounterDateProposedBy || "SAMP"}
               </p>
             </div>
@@ -127,7 +127,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
             </div>
           )}
           {decisionError && (
-            <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+            <p role="alert" className="text-xs font-semibold text-rose-600 ">
               {decisionError}
             </p>
           )}
@@ -156,10 +156,10 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
               <span
                 className={`px-2.5 py-0.5 rounded-lg text-xs font-display font-bold border ${
                   activeRequest.samplingFeasibilityResponse === "Yes"
-                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300/40"
+                    ? "bg-emerald-500/15 text-emerald-700  border-emerald-300/40"
                     : activeRequest.samplingFeasibilityResponse === "No"
-                    ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-300/40"
-                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300/40"
+                    ? "bg-rose-500/15 text-rose-700  border-rose-300/40"
+                    : "bg-amber-500/15 text-amber-700  border-amber-300/40"
                 }`}
               >
                 {activeRequest.samplingFeasibilityResponse === "Yes"
@@ -194,8 +194,8 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                 <span
                   className={`px-2.5 py-0.5 rounded-lg text-xs font-display font-bold border ${
                     activeRequest.marketingDecision === "Accepted"
-                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200/60"
-                      : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200/60"
+                      ? "bg-emerald-50  text-emerald-700  border-emerald-200/60"
+                      : "bg-rose-50  text-rose-700  border-rose-200/60"
                   }`}
                 >
                   {activeRequest.marketingDecision === "Accepted"
@@ -203,7 +203,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                     : "✕ Dropped / Cancelled"}
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200">
+                <span className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold bg-amber-50  text-amber-800  border border-amber-200">
                   Decision Needed
                 </span>
               )}
@@ -236,7 +236,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                   />
                 </div>
                 {decisionError && (
-                  <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                  <p role="alert" className="text-xs font-semibold text-rose-600 ">
                     {decisionError}
                   </p>
                 )}
@@ -255,7 +255,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                     type="button"
                     onClick={() => onMarketingFinalApprove(false)}
                     disabled={isSubmittingDecision}
-                    className="bg-[var(--surface-lowest)] text-rose-600 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer transition disabled:opacity-50 flex items-center gap-1.5"
+                    className="bg-[var(--surface-lowest)] text-rose-600 border border-rose-200  hover:bg-rose-50  px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer transition disabled:opacity-50 flex items-center gap-1.5"
                   >
                     <X className="w-3.5 h-3.5" />
                     <span>Reject</span>
@@ -280,7 +280,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
             </div>
 
             {activeRequest.samplingFeasibilityResponse === "No" ? (
-              <div role="alert" className="p-3 rounded-xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/50 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2 font-medium">
+              <div role="alert" className="p-3 rounded-xl bg-rose-50/80  border border-rose-200/80  text-xs text-rose-800  flex items-center gap-2 font-medium">
                 <X className="w-4 h-4 text-rose-600 shrink-0" />
                 <span>Prototyping blocked — Technical review evaluated Not Feasible.</span>
               </div>
@@ -390,7 +390,7 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                 </div>
 
                 {conversionError && (
-                  <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                  <p role="alert" className="text-xs font-semibold text-rose-600 ">
                     {conversionError}
                   </p>
                 )}

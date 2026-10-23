@@ -1,5 +1,6 @@
 import { UniversalChatterFeed, UniversalChatterEvent } from "./common/UniversalChatterFeed";
 import { RequestClosedStamp } from "./common/RequestClosedWatermark";
+import { SamplingResponsePanel } from "./common/SamplingResponsePanel";
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -190,6 +191,15 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     if (!request) return null;
     return mergeWithWorkflowState(request);
   }, [request, localOverride, workflowVersion]);
+  const designWorkflowState = (activeRequest as any)?.workflowState || {};
+  const designSamplingEvents = Array.isArray((activeRequest as any)?.workflowEvents)
+    ? (activeRequest as any).workflowEvents
+    : Array.isArray(designWorkflowState.events) ? designWorkflowState.events : [];
+  const latestDesignSamplingEvent = [...designSamplingEvents].reverse().find((event: Record<string, any>) =>
+    (String(event.actorDepartment || "").toLowerCase().includes("sampling")
+      || String(event.action || "").toLowerCase().startsWith("sampling"))
+      && String(event.remark || event.body || "").trim()
+  );
 
   const hasVerifiedClaimOwnership = Boolean(
     activeRequest?.claimedByUserId != null && currentUser?.id != null &&
@@ -262,6 +272,10 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
     if (!isOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      const targetDialog = event.target instanceof Element
+        ? event.target.closest<HTMLElement>('[role="dialog"][aria-modal="true"]')
+        : null;
+      if (targetDialog && !targetDialog.hasAttribute("data-inspector-root")) return;
       event.preventDefault();
       if (isCounterDateModalOpen) return;
       if (!isSubmittingOutput && !isDeciding && !isAddingFollowups) onClose();
@@ -323,14 +337,19 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       const customEvent = event as CustomEvent;
       const detail = customEvent.detail;
       const targetId = detail?.requestId;
+      const normalizedTargetId = Number(String(targetId ?? "").replace(/^design-/i, ""));
+      const designIds = [
+        request?.designRequestId,
+        request?.id,
+        activeRequest?.designRequestId,
+        activeRequest?.id,
+        effectiveDesignId,
+      ].map((value) => Number(String(value ?? "").replace(/^design-/i, "")));
       if (
         detail &&
-        targetId &&
-        (String(targetId) === String(request?.id) ||
-         String(targetId) === String(request?.designRequestId) ||
-         String(targetId) === String(activeRequest?.id) ||
-         String(targetId) === String(activeRequest?.designRequestId) ||
-         (effectiveDesignId != null && String(targetId) === String(effectiveDesignId)))
+        detail.requestType === "design" &&
+        Number.isSafeInteger(normalizedTargetId) &&
+        designIds.some((id) => Number.isSafeInteger(id) && id === normalizedTargetId)
       ) {
         setLocalClosed(true);
         if (detail.closure) setClosureData(detail.closure);
@@ -1125,7 +1144,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/70"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-[var(--overlay-backdrop)]"
       onClick={(event) => {
         if (event.target === event.currentTarget && canCloseInspector) onClose();
       }}
@@ -1134,6 +1153,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
         role="dialog"
         aria-modal="true"
         aria-labelledby="design-inspector-title"
+        data-inspector-root="true"
         className="relative w-full max-w-[92vw] xl:max-w-6xl 2xl:max-w-7xl h-[88vh] max-h-[88vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
@@ -1199,17 +1219,17 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                     {deliveredCount}/{requestedCount}
                   </span>
                   {isAwaitingReview && (
-                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-amber-50 text-amber-800  ">
                       Review Pending
                     </span>
                   )}
                   {isCounterDateVisible && (
                     <span className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
                       activeRequest.counterDateDecision === "rejected"
-                        ? "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200"
+                        ? "bg-rose-50 text-rose-800  "
                         : activeRequest.counterDateDecision === "accepted" || activeRequest.counterDateDecision === "auto_accepted"
-                        ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
-                        : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200"
+                        ? "bg-emerald-50 text-emerald-800  "
+                        : "bg-amber-50 text-amber-800  "
                     }`}>
                       {activeRequest.counterDateDecision === "rejected"
                         ? "Date Declined"
@@ -1219,7 +1239,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                     </span>
                   )}
                   {isRemainingRequested && (
-                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
+                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-rose-50 text-rose-800  ">
                       Revisions
                     </span>
                   )}
@@ -1236,7 +1256,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                 >
                   <span>3. Commercial Sign-Off</span>
                   {isClosed && (
-                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-50 text-emerald-700  ">
                       ✓ Approved
                     </span>
                   )}
@@ -1264,16 +1284,16 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
             {/* ── 2. SCROLLABLE DOCUMENT WORKSPACE ── */}
             <div className="flex-1 overflow-y-auto min-h-0">
               {workflowError && (
-                <div role="alert" className="mx-6 sm:mx-8 mt-4 px-4 py-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 text-xs font-medium dark:bg-rose-950/30 dark:text-rose-200 dark:border-rose-900 shadow-2xs">
+                <div role="alert" className="mx-6 sm:mx-8 mt-4 px-4 py-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 text-xs font-medium    shadow-2xs">
                   {workflowError}
                 </div>
               )}
 
               {mode === "marketing" && activeRequest.mockupWorkflowState?.stage === "marketing" && activeRequest.mockupWorkflowState.mockupUrl && (
-                <div className="mx-6 sm:mx-8 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/25 shadow-2xs">
+                <div className="mx-6 sm:mx-8 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3   shadow-2xs">
                   <div>
-                    <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Studio mockup ready</p>
-                    <p className="mt-0.5 text-xs text-emerald-800/80 dark:text-emerald-300/80">Studio submitted the mockup for this request.</p>
+                    <p className="text-sm font-semibold text-emerald-900 ">Studio mockup ready</p>
+                    <p className="mt-0.5 text-xs text-emerald-800/80 ">Studio submitted the mockup for this request.</p>
                   </div>
                   <a
                     href={activeRequest.mockupWorkflowState.mockupUrl}
@@ -1320,13 +1340,13 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                     {canProposeCounterDate && (mode === "creative" || mode === "sampling") && (
                       <section
                         aria-label="Counter-date proposal"
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/20"
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3  "
                       >
                         <div className="flex min-w-0 items-start gap-2.5">
-                          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+                          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 " />
                           <div className="min-w-0">
-                            <p className="text-xs font-bold text-amber-950 dark:text-amber-200">Need a revised target date?</p>
-                            <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300">
+                            <p className="text-xs font-bold text-amber-950 ">Need a revised target date?</p>
+                            <p className="mt-0.5 text-[11px] text-amber-800 ">
                               Send a counter-date proposal to Marketing while the 48-hour window is open.
                             </p>
                           </div>
@@ -1415,7 +1435,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                       <div className="p-8 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center shadow-2xs space-y-3">
                         <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
                         <div>
-                          <h4 className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                          <h4 className="text-base font-bold text-emerald-600 ">
                             Design Request Approved &amp; Signed Off
                           </h4>
                           <p className="text-xs text-[var(--on-surface-muted)] mt-1 max-w-md mx-auto">
@@ -1450,7 +1470,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                           Select the client-approved design(s) in Creative Deliverables before signing off. You can approve a design already delivered while Creative is still working on the remaining request.
                         </p>
                         {decisionError && (
-                          <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs font-semibold text-rose-600 dark:text-rose-400">
+                          <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs font-semibold text-rose-600 ">
                             {decisionError}
                           </div>
                         )}
@@ -1506,6 +1526,19 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
                     effectiveDesignId={effectiveDesignId}
                   />
                 )}
+                <SamplingResponsePanel
+                  className="mt-6"
+                  response={activeRequest.samplingRemark
+                    || (activeRequest as any).samplingFeedback
+                    || (activeRequest as any).samplingReviewRemark
+                    || designWorkflowState.samplingFeedback
+                    || designWorkflowState.samplingReviewRemark
+                    || latestDesignSamplingEvent?.remark
+                    || latestDesignSamplingEvent?.body}
+                  decision={(activeRequest as any).samplingReviewDecision || designWorkflowState.samplingReviewDecision}
+                  reviewer={(activeRequest as any).samplingReviewedBy || (activeRequest as any).samplingFeedbackBy || designWorkflowState.samplingReviewedBy || latestDesignSamplingEvent?.actorName}
+                  respondedAt={(activeRequest as any).samplingReviewedAt || (activeRequest as any).samplingFeedbackAt || designWorkflowState.samplingReviewedAt || latestDesignSamplingEvent?.timestamp}
+                />
               </div>
             </div>
           </div>
@@ -1532,7 +1565,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       )}
 
       {mockupHandoffDialog === "missing_stock" && (
-        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-slate-950/60 p-4">
+        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-[var(--overlay-backdrop)] p-4">
           <section role="dialog" aria-modal="true" aria-labelledby="mockup-stock-confirm-title" className="w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 shadow-2xl">
             <h3 id="mockup-stock-confirm-title" className="text-sm font-bold text-[var(--on-surface)]">Continue without a Shutterstock number?</h3>
             <p className="mt-2 text-xs leading-5 text-[var(--on-surface-muted)]">
@@ -1557,13 +1590,13 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
       )}
 
       {mockupHandoffDialog === "product_required" && (
-        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-slate-950/60 p-4">
+        <div className="fixed inset-0 z-[115] flex items-center justify-center bg-[var(--overlay-backdrop)] p-4">
           <section role="dialog" aria-modal="true" aria-labelledby="mockup-product-required-title" className="w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-5 shadow-2xl">
             <h3 id="mockup-product-required-title" className="text-sm font-bold text-[var(--on-surface)]">Choose the product for each Mockup</h3>
             <p className="mt-2 text-xs leading-5 text-[var(--on-surface-muted)]">
               {selectedFollowupDesigns.mockup.length} separate Mockup request(s) will be created. Select a Material Code or Binding product in Product Staging, then set the required date. Each request will include its selected product and Creative reference before going to Studio.
             </p>
-            {followupError && <p role="alert" className="mt-3 text-xs font-medium text-rose-700 dark:text-rose-300">{followupError}</p>}
+            {followupError && <p role="alert" className="mt-3 text-xs font-medium text-rose-700 ">{followupError}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" disabled={isAddingFollowups} onClick={() => setMockupHandoffDialog(null)} className="h-9 rounded-lg border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)] disabled:opacity-50">Cancel</button>
               <button type="button" disabled={isAddingFollowups} onClick={handleContinueToProductStaging} className="h-9 rounded-lg bg-[var(--accent-primary)] px-3.5 text-xs font-semibold text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50">

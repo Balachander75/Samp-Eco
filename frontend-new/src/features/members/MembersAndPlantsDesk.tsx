@@ -218,14 +218,14 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
           className={"fixed bottom-4 left-4 right-4 z-[70] flex items-center gap-2 rounded-xl border px-4 py-3 text-sm shadow-lg sm:left-auto sm:right-5 sm:w-auto sm:max-w-md " +
             (feedback.type === "success"
               ? "border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface)]"
-              : "border-rose-500/30 bg-rose-50 text-rose-800 dark:bg-rose-950 dark:text-rose-200")}
+              : "border-rose-500/30 bg-rose-50 text-rose-800  ")}
         >
           {feedback.type === "success" ? <Check className="h-4 w-4 shrink-0 text-emerald-600" /> : <X className="h-4 w-4 shrink-0" />}
           <span>{feedback.text}</span>
         </div>
       )}
       {loadError && !isLoading && (
-        <div role="alert" className="mx-4 mt-3 rounded-lg border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-300 sm:mx-6">
+        <div role="alert" className="mx-4 mt-3 rounded-lg border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-700  sm:mx-6">
           Could not load team members: {loadError}
         </div>
       )}
@@ -242,7 +242,7 @@ export default function MembersAndPlantsDesk({ user }: MembersAndPlantsDeskProps
 
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--overlay-backdrop)] p-0 backdrop-blur-sm sm:items-center sm:p-4"
           onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}
         >
           <section

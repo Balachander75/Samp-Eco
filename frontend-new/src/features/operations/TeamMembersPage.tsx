@@ -54,7 +54,7 @@ export const TeamMembersPage: React.FC<TeamMembersPageProps> = ({ user }) => {
       <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
           {error && (
-            <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-900 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-100">
+            <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-900   ">
               <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <p className="text-sm leading-relaxed">{error}</p>
             </div>
@@ -117,7 +117,7 @@ export const TeamMembersPage: React.FC<TeamMembersPageProps> = ({ user }) => {
                             </td>
                             <td className="px-4 py-3 text-[var(--on-surface-muted)] sm:px-5">{memberRoleLabel(member)}</td>
                             <td className="px-4 py-3 sm:px-5">
-                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${member.isTeamAdmin ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)]" : member.isTeamHead ? "bg-amber-500/10 text-amber-800 dark:text-amber-200" : "bg-[var(--surface-low)] text-[var(--on-surface-muted)]"}`}>
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${member.isTeamAdmin ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)]" : member.isTeamHead ? "bg-amber-500/10 text-amber-800 " : "bg-[var(--surface-low)] text-[var(--on-surface-muted)]"}`}>
                                 {member.isTeamAdmin ? "Admin" : member.isTeamHead ? "Team Head" : "Member"}
                               </span>
                             </td>

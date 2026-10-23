@@ -117,7 +117,7 @@ export const FeasibilityCounterDateModal: React.FC<FeasibilityCounterDateModalPr
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[120] overflow-y-auto flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 select-text animate-smooth-backdrop"
+      className="fixed inset-0 z-[120] overflow-y-auto flex items-center justify-center p-3 sm:p-5 bg-[var(--overlay-backdrop)] select-text animate-smooth-backdrop"
       role="dialog"
       aria-modal="true"
       aria-labelledby="counter-date-dialog-title"
@@ -134,7 +134,7 @@ export const FeasibilityCounterDateModal: React.FC<FeasibilityCounterDateModalPr
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--surface-lowest)]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600  flex items-center justify-center shrink-0">
               <Calendar className="w-4 h-4 stroke-[2.2]" />
             </div>
             <div>
@@ -142,7 +142,7 @@ export const FeasibilityCounterDateModal: React.FC<FeasibilityCounterDateModalPr
                 <h3 id="counter-date-dialog-title" className="text-sm font-bold text-[var(--on-surface)] tracking-tight font-display">
                   Propose Counter Required Date
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-50  text-amber-700  border border-amber-200 ">
                   SAMP SLA
                 </span>
               </div>
@@ -165,15 +165,15 @@ export const FeasibilityCounterDateModal: React.FC<FeasibilityCounterDateModalPr
         <div
           className={`px-6 py-2.5 flex items-center justify-between text-xs border-b ${
             isEligible
-              ? "bg-amber-50/70 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 border-amber-100 dark:border-amber-900/30"
-              : "bg-rose-50/70 dark:bg-rose-950/20 text-rose-800 dark:text-rose-300 border-rose-100 dark:border-rose-900/30"
+              ? "bg-amber-50/70  text-amber-800  border-amber-100 "
+              : "bg-rose-50/70  text-rose-800  border-rose-100 "
           }`}
         >
           <div className="flex items-center gap-2">
             {isEligible ? (
-              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <Clock className="w-3.5 h-3.5 text-amber-600 " />
             ) : (
-              <Lock className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <Lock className="w-3.5 h-3.5 text-rose-600 " />
             )}
             <span className="font-semibold">{statusLabel}</span>
           </div>
@@ -185,7 +185,7 @@ export const FeasibilityCounterDateModal: React.FC<FeasibilityCounterDateModalPr
         {/* Form Body - Two Clean Fields Only: Date and Remark */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
           {error && (
-            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-rose-50  border border-rose-200  text-rose-700  text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -214,10 +214,10 @@ export const FeasibilityCounterDateModal: React.FC<FeasibilityCounterDateModalPr
               className="w-full"
             />
             {extensionWorkdays > 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-200">
-                <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50/80  border border-amber-200  text-xs text-amber-900  animate-in fade-in duration-200">
+                <Clock className="w-3.5 h-3.5 text-amber-600  shrink-0" />
                 <span>
-                  Timeline adjustment: <strong className="font-mono text-amber-950 dark:text-amber-100 font-bold">+{extensionWorkdays} operational workday{extensionWorkdays === 1 ? "" : "s"}</strong> extension requested
+                  Timeline adjustment: <strong className="font-mono text-amber-950  font-bold">+{extensionWorkdays} operational workday{extensionWorkdays === 1 ? "" : "s"}</strong> extension requested
                 </span>
               </div>
             )}

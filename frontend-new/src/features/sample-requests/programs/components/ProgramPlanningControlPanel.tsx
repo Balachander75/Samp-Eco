@@ -61,7 +61,7 @@ export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelPr
 
         {/* Status indicator: ACTIVE / PAUSED / DISMANTLED */}
         {isDismantled ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold shrink-0 bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/25">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold shrink-0 bg-rose-500/10 text-rose-700  border border-rose-500/25">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
             <span>DISMANTLED</span>
           </span>
@@ -69,8 +69,8 @@ export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelPr
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold shrink-0 ${
               isPaused
-                ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25"
-                : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25"
+                ? "bg-amber-500/10 text-amber-700  border border-amber-500/25"
+                : "bg-emerald-500/10 text-emerald-700  border border-emerald-500/25"
             }`}
           >
             <span
@@ -105,9 +105,9 @@ export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelPr
             {isTogglingPause ? (
               <Loader2 className="w-3 h-3 animate-spin" />
             ) : isPaused ? (
-              <Play className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+              <Play className="w-3 h-3 text-emerald-600 " />
             ) : (
-              <Pause className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+              <Pause className="w-3 h-3 text-amber-600 " />
             )}
             <span className="hidden md:inline text-[11px] font-semibold">{isPaused ? "Resume" : "Pause"}</span>
           </button>
@@ -119,13 +119,13 @@ export const ProgramPlanningControlPanel: React.FC<ProgramPlanningControlPanelPr
             type="button"
             onClick={onDismantle}
             disabled={isDismantling}
-            className="h-7 px-2.5 rounded-lg border border-rose-300/60 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50 active:scale-95 shadow-2xs"
+            className="h-7 px-2.5 rounded-lg border border-rose-300/60  bg-rose-50/70  hover:bg-rose-100  text-rose-700  text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50 active:scale-95 shadow-2xs"
             title="Permanently dismantle this program plan"
           >
             {isDismantling ? (
               <Loader2 className="w-3 h-3 animate-spin text-rose-600" />
             ) : (
-              <Ban className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+              <Ban className="w-3 h-3 text-rose-600 " />
             )}
             <span className="text-[11px]">Dismantle</span>
           </button>

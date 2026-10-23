@@ -95,39 +95,32 @@ const TONE_CLASSES: Record<
   { container: string; dot: string }
 > = {
   success: {
-    container:
-      "bg-emerald-50 text-emerald-800 border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60",
-    dot: "bg-emerald-600 dark:bg-emerald-400",
+    container: "bg-status-success-soft text-status-success border-status-success-border",
+    dot: "bg-status-success-strong",
   },
   warning: {
-    container:
-      "bg-amber-50 text-amber-900 border-amber-200/90 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60",
-    dot: "bg-amber-500",
+    container: "bg-status-warning-soft text-status-warning border-status-warning-border",
+    dot: "bg-status-warning-strong",
   },
   amber: {
-    container:
-      "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60",
-    dot: "bg-amber-500",
+    container: "bg-status-warning-soft text-status-warning border-status-warning-border",
+    dot: "bg-status-warning-strong",
   },
   danger: {
-    container:
-      "bg-rose-50 text-rose-800 border-rose-200/90 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60",
-    dot: "bg-rose-600 dark:bg-rose-400",
+    container: "bg-status-danger-soft text-status-danger border-status-danger-border",
+    dot: "bg-status-danger-strong",
   },
   purple: {
-    container:
-      "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/60",
-    dot: "bg-purple-600 dark:bg-purple-400",
+    container: "bg-status-purple-soft text-status-purple border-status-purple-border",
+    dot: "bg-status-purple-strong",
   },
   info: {
-    container:
-      "bg-brand-50 text-brand-800 border-brand-200/90 dark:bg-brand-950/40 dark:text-brand-300 dark:border-brand-800/60",
-    dot: "bg-brand-600 dark:bg-brand-400",
+    container: "bg-status-info-soft text-status-info border-status-info-border",
+    dot: "bg-status-info-strong",
   },
   neutral: {
-    container:
-      "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-300 dark:border-zinc-700/80",
-    dot: "bg-zinc-400 dark:bg-zinc-500",
+    container: "bg-status-neutral-soft text-status-neutral border-status-neutral-border",
+    dot: "bg-status-neutral-strong",
   },
 };
 

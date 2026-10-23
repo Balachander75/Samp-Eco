@@ -380,27 +380,31 @@ def _create_costing_if_missing(db, request, user, stage="marketing"):
     return workflow
 
 
-def _list_workflows(db, model, log_model, kind, year, stage, limit, viewer=None):
+def _filter_workflow_year(query, year):
+    if not year or year.strip().upper() == "ALL":
+        return query
+    clean_year = year.strip()
+    date_range = get_business_year_date_range(clean_year)
+    if not date_range:
+        return query.filter(CreateSampleRequest.year == clean_year)
+    range_start, range_end = (value.isoformat() for value in date_range)
+    return query.filter(or_(
+        CreateSampleRequest.year == clean_year,
+        and_(
+            CreateSampleRequest.date_request_created >= range_start,
+            CreateSampleRequest.date_request_created < range_end,
+        ),
+    ))
+
+
+def _list_workflows(db, model, log_model, kind, year, stage, limit, viewer=None, offset=0):
     query = db.query(model, CreateSampleRequest).join(
         CreateSampleRequest, CreateSampleRequest.id == model.sample_request_id
     )
-    if year and year.strip().upper() != "ALL":
-        clean_year = year.strip()
-        date_range = get_business_year_date_range(clean_year)
-        if date_range:
-            range_start, range_end = (value.isoformat() for value in date_range)
-            second_year = clean_year.split("-", 1)[1]
-            query = query.filter(or_(
-                CreateSampleRequest.year == clean_year,
-                and_(CreateSampleRequest.year == second_year,
-                     CreateSampleRequest.date_request_created >= range_start,
-                     CreateSampleRequest.date_request_created < range_end),
-            ))
-        else:
-            query = query.filter(CreateSampleRequest.year == clean_year)
+    query = _filter_workflow_year(query, year)
     if stage:
         query = query.filter(model.current_stage == stage)
-    rows = query.order_by(model.updated_at.desc(), model.id.desc()).limit(limit).all()
+    rows = query.order_by(model.updated_at.desc(), model.id.desc()).offset(offset).limit(limit).all()
     workflow_ids = [workflow.id for workflow, _ in rows]
     logs_by_workflow = {}
     if workflow_ids:
@@ -698,34 +702,47 @@ def complete_costing_work(sample_request_id: int, payload: Dict[str, Any] = Body
     return _serialize_workflow(db, workflow, request, "costing", CostingWorkflowLog, viewer=current_user)
 
 
-def _list_sample_requests_for_sampling(db, year, limit):
+def _list_sample_requests_for_sampling(db, year, limit, offset=0):
+    status = func.lower(func.coalesce(CreateSampleRequest.status, ""))
+    sampling_stage = CreateSampleRequest.mockup_workflow_state["samplingRouting"]["stage"].astext
+    workflow_stage = CreateSampleRequest.mockup_workflow_state["stage"].astext
+    legacy_sample_state = or_(
+        status.like("%samp%"),
+        status.like("%released to plant%"),
+        sampling_stage.in_(("sampling_review", "plant")),
+        workflow_stage.in_(("sampling_review", "plant")),
+    )
     query = db.query(CreateSampleRequest).filter(
         or_(
-            CreateSampleRequest.status.ilike("%sampling%"),
-            CreateSampleRequest.status == "SAMP",
-            CreateSampleRequest.status == "Released to Plant",
+            CreateSampleRequest.request_types.contains(["sample"]),
+            and_(
+                or_(CreateSampleRequest.request_types.is_(None), CreateSampleRequest.request_types == []),
+                legacy_sample_state,
+            ),
         )
     )
-    if year and year.strip().upper() != "ALL":
-        clean_year = year.strip()
-        date_range = get_business_year_date_range(clean_year)
-        if date_range:
-            range_start, range_end = (value.isoformat() for value in date_range)
-            second_year = clean_year.split("-", 1)[1] if "-" in clean_year else clean_year
-            query = query.filter(or_(
-                CreateSampleRequest.year == clean_year,
-                and_(CreateSampleRequest.year == second_year,
-                     CreateSampleRequest.date_request_created >= range_start,
-                     CreateSampleRequest.date_request_created < range_end),
-            ))
-        else:
-            query = query.filter(CreateSampleRequest.year == clean_year)
-    rows = query.order_by(CreateSampleRequest.updated_at.desc(), CreateSampleRequest.id.desc()).limit(limit).all()
+    query = _filter_workflow_year(query, year)
+    rows = query.order_by(CreateSampleRequest.updated_at.desc(), CreateSampleRequest.id.desc()).offset(offset).limit(limit).all()
     results = []
+    valid_stages = {
+        "marketing", "creative", "creative_approval", "studio", "costing",
+        "sampling_review", "plant", "awaiting_design_acceptance", "design_review",
+        "awaiting_marketing_acceptance", "awaiting_marketing_direction", "done",
+    }
     for req in rows:
         state = dict(req.mockup_workflow_state or {})
         routing = dict(state.get("samplingRouting") or {})
         request_types = set(req.request_types or [])
+        status_value = str(req.status or "").strip()
+        normalized_status = status_value.casefold()
+        routing_stage = str(routing.get("stage") or "").strip().casefold()
+        workflow_stage = str(state.get("stage") or "").strip().casefold()
+        explicit_stage = routing_stage or workflow_stage
+        has_sample_scope = "sample" in request_types
+        # Requests with other scopes are represented by their own workflow rows.
+        # Keep status-based discovery only for legacy sample requests without scoped types.
+        if request_types and not has_sample_scope:
+            continue
         creative_changes_required = bool(
             state.get("creativeChangesRequired")
             or state.get("hasCreativeChanges")
@@ -750,12 +767,41 @@ def _list_sample_requests_for_sampling(db, year, limit):
                 or req.creation_mode == "resample"
             )
         )
-        is_released_to_plant = req.status == "Released to Plant"
-        status = str(req.status or "").casefold()
-        is_awaiting_sampling = "sampling" in status or status == "samp"
-        if not is_awaiting_sampling and not (is_resample and is_released_to_plant):
-            continue
-        stage = "plant" if is_released_to_plant else "sampling_review"
+        is_released_to_plant = "released to plant" in normalized_status or explicit_stage == "plant"
+        is_awaiting_sampling = (
+            explicit_stage == "sampling_review"
+            or "sampling" in normalized_status
+            or normalized_status == "samp"
+            or normalized_status.startswith("samp ")
+        )
+        if routing_stage in valid_stages:
+            stage = routing_stage
+        elif is_released_to_plant:
+            stage = "plant"
+        elif is_awaiting_sampling:
+            stage = "sampling_review"
+        elif workflow_stage in valid_stages:
+            stage = workflow_stage
+        elif "closed" in normalized_status or "dispatched" in normalized_status:
+            stage = "done"
+        elif "creative" in normalized_status:
+            stage = "creative"
+        elif "studio" in normalized_status:
+            stage = "studio"
+        elif "costing" in normalized_status:
+            stage = "costing"
+        elif "plant" in normalized_status:
+            stage = "plant"
+        else:
+            stage = "marketing"
+        reviewer_status = (
+            "bypassed" if is_resample and is_released_to_plant
+            else "returned" if state.get("samplingReviewDecision") == "return"
+            else "approved" if state.get("samplingReviewDecision") == "approve" or (is_released_to_plant and not is_resample)
+            else "in_progress" if stage == "sampling_review" and state.get("samplingClaimedByUserId")
+            else "not_started" if stage == "sampling_review"
+            else "not_started"
+        )
         results.append({
             "workflow_type": "sample",
             "workflow_id": req.id,
@@ -764,6 +810,8 @@ def _list_sample_requests_for_sampling(db, year, limit):
             "sr_number": req.sr_number,
             "customer": req.customer,
             "brand_name": req.brand_name,
+            "program_name": req.program_name,
+            "program_year": req.program_year,
             "material_code": req.material_code,
             "product_description": req.product_description,
             "status": req.status,
@@ -772,6 +820,8 @@ def _list_sample_requests_for_sampling(db, year, limit):
             "created_at": req.created_at.isoformat() if req.created_at else None,
             "updated_at": req.updated_at.isoformat() if req.updated_at else None,
             "closed_at": state.get("plantReleasedAt"),
+            "is_closed": "closed" in normalized_status or stage == "done",
+            "closure": None,
             "request_data": {
                 "required_date": str(req.sample_required_date) if req.sample_required_date else None,
                 "quantity": req.qty_for_sampling or "1",
@@ -785,24 +835,28 @@ def _list_sample_requests_for_sampling(db, year, limit):
                 "claimedBy": state.get("claimedBy"),
                 "plantReleaseTarget": state.get("plantReleaseTarget") or req.target_plant,
             },
-            "reviewer_status": "bypassed" if is_resample and is_released_to_plant else "not_started" if req.status == "Sampling Review (PMT)" else "in_progress",
-            "reviewer_notes": state.get("samplingRemark") or state.get("samplingFeedback"),
-            "reviewer_name": state.get("samplingFeedbackBy") or state.get("plantReleasedBy"),
-            "reviewed_at": state.get("samplingFeedbackAt") or state.get("plantReleasedAt"),
+            "reviewer_status": reviewer_status,
+            "reviewer_notes": state.get("samplingReviewRemark") or state.get("samplingRemark") or state.get("samplingFeedback"),
+            "reviewer_name": state.get("samplingReviewedBy") or state.get("samplingFeedbackBy") or state.get("plantReleasedBy"),
+            "reviewed_at": state.get("samplingReviewedAt") or state.get("samplingFeedbackAt") or state.get("plantReleasedAt"),
             "logs": [],
         })
     return results
 
 
-def _list_design_requests_for_sampling(db, year, limit):
+def _list_design_requests_for_sampling(db, year, limit, offset=0):
     query = db.query(DesignRequest)
     if year and year.strip().upper() != "ALL":
         clean_year = year.strip()
-        query = query.filter(or_(
-            DesignRequest.program_year == clean_year,
-            DesignRequest.program_year == (clean_year.split("-", 1)[1] if "-" in clean_year else clean_year)
-        ))
-    rows = query.order_by(DesignRequest.updated_at.desc(), DesignRequest.id.desc()).limit(limit).all()
+        date_range = get_business_year_date_range(clean_year)
+        year_filters = [DesignRequest.program_year == clean_year]
+        if "-" in clean_year:
+            year_filters.append(DesignRequest.program_year == clean_year.split("-", 1)[1])
+        if date_range:
+            range_start, range_end = date_range
+            year_filters.append(and_(DesignRequest.created_at >= range_start, DesignRequest.created_at < range_end))
+        query = query.filter(or_(*year_filters))
+    rows = query.order_by(DesignRequest.updated_at.desc(), DesignRequest.id.desc()).offset(offset).limit(limit).all()
     results = []
     for d in rows:
         state = dict(d.workflow_state or {})
@@ -814,10 +868,12 @@ def _list_design_requests_for_sampling(db, year, limit):
             "sr_number": d.sr_number,
             "customer": d.customer_name,
             "brand_name": d.program_name,
+            "program_name": d.program_name,
+            "program_year": d.program_year,
             "material_code": d.request_code,
             "product_description": d.product_description or "Creative Design Brief",
             "status": d.status,
-            "current_stage": "design_review",
+            "current_stage": str(state.get("stage") or "design_review"),
             "request_types": ["design"],
             "created_at": d.created_at.isoformat() if d.created_at else None,
             "updated_at": d.updated_at.isoformat() if d.updated_at else None,
@@ -837,27 +893,16 @@ def _list_design_requests_for_sampling(db, year, limit):
     return results
 
 
-@router.get("/api/v1/workflows/reviews", summary="List Sampling reviews and direct Plant resamples")
+@router.get("/api/v1/workflows/reviews", summary="List work for the Sampling review desk")
 def list_sampling_workflow_reviews(year: Optional[str] = None,
-                                   limit: int = Query(500, ge=1, le=2000),
+                                   limit: int = Query(2000, ge=1, le=2000),
+                                   offset: int = Query(0, ge=0),
                                    db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     require_any_team(current_user, ("samp", "admin"))
-    mockups = _list_workflows(db, MockupWorkflow, MockupWorkflowLog, "mockup", year, None, limit, viewer=current_user)
-    costings = _list_workflows(db, CostingWorkflow, CostingWorkflowLog, "costing", year, None, limit, viewer=current_user)
-    mockups = [
-        item for item in mockups
-        if item.get("current_stage") == "sampling_review"
-        or item.get("reviewer_status") not in {"not_started", None}
-        or item.get("reviewed_at") is not None
-    ]
-    costings = [
-        item for item in costings
-        if item.get("current_stage") == "sampling_review"
-        or item.get("reviewer_status") not in {"not_started", None}
-        or item.get("reviewed_at") is not None
-    ]
-    samples = _list_sample_requests_for_sampling(db, year, limit)
-    designs = _list_design_requests_for_sampling(db, year, limit)
+    mockups = _list_workflows(db, MockupWorkflow, MockupWorkflowLog, "mockup", year, None, limit, viewer=current_user, offset=offset)
+    costings = _list_workflows(db, CostingWorkflow, CostingWorkflowLog, "costing", year, None, limit, viewer=current_user, offset=offset)
+    samples = _list_sample_requests_for_sampling(db, year, limit, offset)
+    designs = _list_design_requests_for_sampling(db, year, limit, offset)
     return samples + designs + mockups + costings
 
 

@@ -21,6 +21,7 @@ import { DeskWorkspaceLayout } from "@/components/erp";
 import { SamplingRequestsTable } from "./components/SamplingRequestsTable";
 import { DraftPackagesView } from "../components/DraftPackagesView";
 import { getPrimaryRequestCode, getRequestTypes } from "./utils/requestTypeUtils";
+import { mapDraftItemToStagedProduct } from "../utils/draftStaging";
 
 export interface SamplingRequestsPageProps {
   requests: SampleRequestItem[];
@@ -131,49 +132,13 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
       targetPlant: row.targetPlant || "",
       parentRequestId: row.id,
       parentSrNumber: getPrimaryRequestCode(row),
-      parentRequestTypes: row.requestTypes || [],
+      parentRequestTypes: getRequestTypes(row),
       parentMockupWorkflowState: row.mockupWorkflowState,
       parentCreationMode: row.creationMode,
     };
     sessionStorage.setItem("samp_active_program_form", JSON.stringify(stagingContext));
-
-    const cached = sessionStorage.getItem("samp_active_staged_products");
-    let stagedList: any[] = [];
-    try {
-      if (cached) stagedList = JSON.parse(cached);
-    } catch {}
-
-    if (!Array.isArray(stagedList) || stagedList.length === 0) {
-      const isDesign = (row.requestTypes || []).includes("design") || Boolean(row.designsCustomerCreative);
-      const initialItem = {
-        id: String(row.id),
-        productDescription: row.productDescription || "Commercial Product Sample",
-        materialCode: row.materialCode || row.srNumber || "NEW-SPEC",
-        scopes: row.requestTypes && row.requestTypes.length > 0 ? (row.requestTypes as any) : ["sample"],
-        stagedDate: row.dateRequestCreated || new Date().toISOString().split("T")[0],
-        timestamp: "Draft Intake",
-        designMetadata: isDesign
-          ? {
-              numberOfDesigns: Number(row.designsCustomerCreative || row.productArtworkNos) || 1,
-              designRequiredDate: row.targetArtworkDateCreative || row.designRequiredDate || row.sampleRequiredDate || "",
-              trend: row.trend || "",
-              targetAudience: row.targetAudience || "",
-              referenceImage: row.productImagePath || "",
-              remarks: row.designRemarks || (row as any).remarks || row.marketingRemarks || row.descriptionNotes || "",
-              images: (row.referenceImages || []).map((url, i) => ({ id: String(i), url, name: `Attachment ${i + 1}` })),
-              webLinks: row.referenceLinks || [],
-            }
-          : undefined,
-        samplingMetadata: {
-          sampleType: row.productType === "Partial Sample" ? "partial" : "full",
-          partialRequirements: (row as any).remarks || row.marketingRemarks || row.descriptionNotes || "",
-          sourceSrNumber: row.sourceSampleCode || "",
-          bindingType1: (row as any).customBinding1 || "",
-          bindingType2: (row as any).customBinding2 || "",
-        },
-      };
-      sessionStorage.setItem("samp_active_staged_products", JSON.stringify([initialItem]));
-    }
+    // Opening a specific draft must never inherit a different request's global staging cache.
+    sessionStorage.setItem("samp_active_staged_products", JSON.stringify([mapDraftItemToStagedProduct(row)]));
 
     navigate("/sample-requests/product-staging", { state: stagingContext });
   };
@@ -725,9 +690,9 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
                 }`}
                 title="View drafts grouped by Program Packages"
               >
-                <Boxes className={`w-3 h-3 ${draftViewMode === "grouped" ? "text-amber-600 dark:text-amber-400" : "opacity-70"}`} />
+                <Boxes className={`w-3 h-3 ${draftViewMode === "grouped" ? "text-amber-600 " : "opacity-70"}`} />
                 <span>Packages</span>
-                <span className="text-[9.5px] font-mono px-1 py-0.2 rounded-full tabular-nums bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold">
+                <span className="text-[9.5px] font-mono px-1 py-0.2 rounded-full tabular-nums bg-amber-500/15 text-amber-700  font-bold">
                   {draftPackagesCount}
                 </span>
               </button>
@@ -794,7 +759,7 @@ export const SamplingRequestsPage: React.FC<SamplingRequestsPageProps> = ({
 
       {/* ── Floating Executive Batch Action Dock ── */}
       {selectedIds.size > 0 && (selectedStageTab !== "draft" || draftViewMode === "items") && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-zinc-900/92 dark:bg-zinc-800/95 text-white backdrop-blur-md shadow-2xl border border-white/10 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-zinc-900/92  text-white backdrop-blur-md shadow-2xl border border-white/10 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="flex items-center gap-2 pr-2 border-r border-white/15">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="font-mono text-xs font-bold tabular-nums text-emerald-300">

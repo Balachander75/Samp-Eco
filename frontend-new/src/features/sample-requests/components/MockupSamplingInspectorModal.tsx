@@ -38,6 +38,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { ScopeReferenceImagesGallery } from "@/features/sample-requests/components/staging/ScopeReferenceImagesGallery";
 import { ProductDocketView } from "@/features/sample-requests/components/staging/ProductDocketView";
 import { RequestClosedStamp } from "./common/RequestClosedWatermark";
+import { SamplingResponsePanel } from "./common/SamplingResponsePanel";
 import { MockupScopeSpecificationsPanel } from "./MockupScopeSpecificationsPanel";
 import type { ProductSearchResult, SampleRequestItem } from "../types";
 
@@ -156,13 +157,19 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
   const [closureData, setClosureData] = useState<any>(record.closure || null);
 
   useEffect(() => {
+    setLocalClosed(false);
+    setClosureData(record.closure || null);
+  }, [record.sample_request_id, record.workflow_id, record.closure]);
+
+  useEffect(() => {
     const handleClosed = (event: Event) => {
       const customEvent = event as CustomEvent;
       const detail = customEvent.detail;
+      const requestType = String(detail?.requestType || "");
       if (
         detail &&
-        (String(detail.requestId) === String(record.sample_request_id) ||
-         String(detail.requestId) === String(record.workflow_id))
+        ["mockup", "sample"].includes(requestType) &&
+        String(detail.requestId) === String(record.sample_request_id)
       ) {
         setLocalClosed(true);
         if (detail.closure) setClosureData(detail.closure);
@@ -452,12 +459,12 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                       isCurrent
                         ? "bg-[var(--accent-primary)] text-white shadow-xs"
                         : isPast
-                        ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                        ? "bg-emerald-50 text-emerald-800  "
                         : "text-[var(--on-surface-subtle)] bg-transparent"
                     }`}
                   >
                     {isPast ? (
-                      <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                      <Check className="h-3 w-3 text-emerald-600 " />
                     ) : isCurrent ? (
                       <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
                     ) : null}
@@ -488,7 +495,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-500/20">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-indigo-50 text-indigo-700   border border-indigo-500/20">
                     <Boxes className="w-3 h-3 text-indigo-600" />
                     <span>Studio Mockup &amp; Dieline</span>
                   </span>
@@ -516,17 +523,17 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                   {/* Claim Status Indicator */}
                   <div className="flex items-center gap-2.5">
                     {isClaimedByMe ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 border border-emerald-300 text-xs font-bold">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800   border border-emerald-300 text-xs font-bold">
                         <UserCheck className="w-4 h-4 text-emerald-600" />
                         <span>Claimed by you</span>
                       </span>
                     ) : isClaimed ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-300 text-xs font-semibold">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800   border border-amber-300 text-xs font-semibold">
                         <ShieldAlert className="w-4 h-4 text-amber-600" />
                         <span>Claimed by {data.claimedBy || "another teammate"}</span>
                       </span>
                     ) : isClosed ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 border border-rose-300 text-xs font-bold">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 text-rose-800   border border-rose-300 text-xs font-bold">
                         <span>Request Closed</span>
                       </span>
                     ) : (
@@ -609,11 +616,11 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                   <Boxes className="w-3.5 h-3.5" />
                   <span>1. CAD / Mockup Deliverables</span>
                   {outputPath ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200/50">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700   font-bold border border-emerald-200/50">
                       ✓ Attached
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold border border-amber-200/50">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 text-amber-700   font-bold border border-amber-200/50">
                       Pending CAD
                     </span>
                   )}
@@ -647,11 +654,11 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>3. Sampling PMT Sign-Off</span>
                   {isClosed ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 text-emerald-700   font-bold">
                       ✓ Approved
                     </span>
                   ) : isSamplingReview ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-50 text-amber-700   font-bold">
                       Action Required
                     </span>
                   ) : null}
@@ -680,7 +687,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
               {error && (
                 <div
                   role="alert"
-                  className="flex items-start gap-2.5 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200"
+                  className="flex items-start gap-2.5 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-800   "
                 >
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
                   <span>{error}</span>
@@ -746,12 +753,12 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                         )}
                       </div>
                     ) : (
-                      <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/50 p-6 text-center space-y-2 dark:border-amber-800 dark:bg-amber-950/20">
+                      <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/50 p-6 text-center space-y-2  ">
                         <Boxes className="h-8 w-8 text-amber-600 mx-auto" />
-                        <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                        <h4 className="text-xs font-bold text-amber-900 ">
                           Studio Dieline Output Pending
                         </h4>
-                        <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 max-w-md mx-auto">
+                        <p className="text-[11px] text-amber-800/80  max-w-md mx-auto">
                           Studio has not yet linked the final CAD dieline file. Return to Studio with a revision note if urgent.
                         </p>
                       </div>
@@ -776,7 +783,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                           </p>
                         )}
                         {data.marketingRevisionRemark && (
-                          <p className="text-xs text-amber-800 dark:text-amber-300">
+                          <p className="text-xs text-amber-800 ">
                             <strong>Marketing Revision Note: </strong>
                             {data.marketingRevisionRemark}
                           </p>
@@ -898,7 +905,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">Brief & Instructions</span>
                         {data.marketingRemark && <p className="text-xs text-[var(--on-surface)]"><strong>Marketing Brief:</strong> {data.marketingRemark}</p>}
                         {!isCreativeBypassed && data.creativeRemark && <p className="text-xs text-[var(--on-surface)]"><strong>Creative Instructions:</strong> {data.creativeRemark}</p>}
-                        {data.marketingRevisionRemark && <p className="text-xs text-amber-800 dark:text-amber-300"><strong>Revision Note:</strong> {data.marketingRevisionRemark}</p>}
+                        {data.marketingRevisionRemark && <p className="text-xs text-amber-800 "><strong>Revision Note:</strong> {data.marketingRevisionRemark}</p>}
                       </div>
                     )}
 
@@ -951,7 +958,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                                 console.error("Failed to download PDF:", err);
                               }
                             }}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[10px] font-semibold text-rose-800 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50 cursor-pointer"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[10px] font-semibold text-rose-800 transition hover:bg-rose-100     cursor-pointer"
                             title="Download Complete Technical Docket PDF"
                           >
                             <Download className="h-3.5 w-3.5 text-rose-600" /> PDF
@@ -966,7 +973,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                                 console.error("Failed to download CSV:", err);
                               }
                             }}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 cursor-pointer"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100     cursor-pointer"
                             title="Export Structured Docket to Excel / CSV (UI Styled)"
                           >
                             <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" /> Excel / CSV
@@ -981,7 +988,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                                 console.error("Failed to print docket:", err);
                               }
                             }}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100     cursor-pointer"
                             title="Print or Save Complete Docket as PDF"
                           >
                             <Printer className="h-3.5 w-3.5" /> Print
@@ -1009,13 +1016,13 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                           onClick={() => setSpecViewMode("configured")}
                           className={`px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
                             specViewMode === "configured"
-                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shadow-2xs"
+                              ? "bg-emerald-500/15 text-emerald-700  font-bold shadow-2xs"
                               : "text-[var(--on-surface-subtle)] hover:text-[var(--on-surface)]"
                           }`}
                         >
                           <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                           <span>Configured</span>
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-300/40">
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-50 text-emerald-700   font-bold border border-emerald-300/40">
                             {configuredSpecs.length}
                           </span>
                         </button>
@@ -1059,10 +1066,10 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                                 console.error("Failed to download CSV:", err);
                               }
                             }}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-300/60 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-300/60 bg-emerald-50 px-2.5 text-[10px] font-semibold text-emerald-800 transition hover:bg-emerald-100     cursor-pointer"
                             title="Export Structured Docket to Excel / CSV (UI Styled)"
                           >
-                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Excel / CSV
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 " /> Excel / CSV
                           </button>
                           <button
                             type="button"
@@ -1074,7 +1081,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                                 console.error("Failed to print docket:", err);
                               }
                             }}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200 dark:hover:bg-sky-900/60 cursor-pointer"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-semibold text-sky-800 transition hover:bg-sky-100     cursor-pointer"
                             title="Print or Save Complete Docket as PDF"
                           >
                             <Printer className="h-3.5 w-3.5" /> Print / Save PDF
@@ -1144,25 +1151,25 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                 <div className="space-y-6">
                   {/* Status Banner */}
                   {isClosed ? (
-                    <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 flex items-start gap-3">
+                    <div className="p-4 rounded-xl border border-emerald-200  bg-emerald-50/70  flex items-start gap-3">
                       <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                       <div className="space-y-1 text-xs">
-                        <p className="font-bold text-emerald-900 dark:text-emerald-200">
+                        <p className="font-bold text-emerald-900 ">
                           Mockup Approved &amp; Closed
                         </p>
-                        <p className="text-emerald-800/80 dark:text-emerald-300/80">
+                        <p className="text-emerald-800/80 ">
                           Sampling PMT evaluation completed and forwarded. Commercial sign-off recorded.
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/60 dark:bg-teal-950/20 flex items-start gap-3">
+                    <div className="p-4 rounded-xl border border-teal-200  bg-teal-50/60  flex items-start gap-3">
                       <Boxes className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                       <div className="space-y-1 text-xs">
-                        <p className="font-bold text-teal-900 dark:text-teal-200">
+                        <p className="font-bold text-teal-900 ">
                           Sampling Team Technical CAD &amp; Physical Verification
                         </p>
-                        <p className="text-teal-800/80 dark:text-teal-300/80">
+                        <p className="text-teal-800/80 ">
                           Check Studio dielines against product specifications. When verified, approve the mockup for Marketing final sign-off or return to Studio with adjustments.
                         </p>
                       </div>
@@ -1186,7 +1193,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                               onClick={() => toggleChip(chip)}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
                                 active
-                                  ? "bg-teal-50 border-teal-500 text-teal-800 dark:bg-teal-950/40 dark:text-teal-200"
+                                  ? "bg-teal-50 border-teal-500 text-teal-800  "
                                   : "bg-[var(--surface-low)] border-[var(--border-subtle)] text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                               }`}
                             >
@@ -1236,7 +1243,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                           type="button"
                           disabled={saving || !isClaimedByMe || !note.trim()}
                           onClick={() => submitDecision("return")}
-                          className="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50/60 hover:bg-amber-100 text-xs font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200 transition cursor-pointer disabled:opacity-50"
+                          className="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50/60 hover:bg-amber-100 text-xs font-bold text-amber-900    transition cursor-pointer disabled:opacity-50"
                         >
                           {saving ? "Saving..." : "Return to Studio for Revision"}
                         </button>
@@ -1267,6 +1274,13 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                   />
                 </div>
               )}
+              <SamplingResponsePanel
+                className="mt-6"
+                response={record.reviewer_notes || data.samplingReviewRemark || data.samplingFeedback}
+                decision={record.reviewer_status || data.samplingReviewDecision}
+                reviewer={record.reviewer_name || data.samplingReviewedBy || data.samplingFeedbackBy}
+                respondedAt={record.reviewed_at || data.samplingReviewedAt || data.samplingFeedbackAt}
+              />
             </div>
         </div>
 
@@ -1293,7 +1307,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                   type="button"
                   disabled={saving || !isClaimedByMe || !note.trim()}
                   onClick={() => submitDecision("return")}
-                  className="min-h-9 rounded-xl border border-amber-300 bg-amber-50/60 hover:bg-amber-100 px-4 text-xs font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200 disabled:opacity-50 transition cursor-pointer"
+                  className="min-h-9 rounded-xl border border-amber-300 bg-amber-50/60 hover:bg-amber-100 px-4 text-xs font-bold text-amber-900    disabled:opacity-50 transition cursor-pointer"
                 >
                   {saving ? "Saving…" : "Return to Studio"}
                 </button>

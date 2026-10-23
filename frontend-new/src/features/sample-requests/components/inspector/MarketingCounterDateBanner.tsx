@@ -58,29 +58,29 @@ export const MarketingCounterDateBanner: React.FC<MarketingCounterDateBannerProp
   const StatusIcon = isAccepted ? Check : isRejected ? X : Clock;
   const tone = isAccepted
     ? {
-        border: "border-emerald-200 dark:border-emerald-900/50",
-        surface: "bg-emerald-50/70 dark:bg-emerald-950/20",
-        icon: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
-        title: "text-emerald-950 dark:text-emerald-200",
-        muted: "text-emerald-800 dark:text-emerald-300",
-        pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200",
+        border: "border-emerald-200 ",
+        surface: "bg-emerald-50/70 ",
+        icon: "bg-emerald-100 text-emerald-700  ",
+        title: "text-emerald-950 ",
+        muted: "text-emerald-800 ",
+        pill: "bg-emerald-100 text-emerald-800  ",
       }
     : isRejected
     ? {
-        border: "border-rose-200 dark:border-rose-900/50",
-        surface: "bg-rose-50/60 dark:bg-rose-950/20",
-        icon: "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300",
-        title: "text-rose-950 dark:text-rose-200",
-        muted: "text-rose-800 dark:text-rose-300",
-        pill: "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200",
+        border: "border-rose-200 ",
+        surface: "bg-rose-50/60 ",
+        icon: "bg-rose-100 text-rose-700  ",
+        title: "text-rose-950 ",
+        muted: "text-rose-800 ",
+        pill: "bg-rose-100 text-rose-800  ",
       }
     : {
-        border: "border-amber-200 dark:border-amber-900/50",
-        surface: "bg-amber-50/60 dark:bg-amber-950/20",
-        icon: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
-        title: "text-amber-950 dark:text-amber-200",
-        muted: "text-amber-800 dark:text-amber-300",
-        pill: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200",
+        border: "border-amber-200 ",
+        surface: "bg-amber-50/60 ",
+        icon: "bg-amber-100 text-amber-700  ",
+        title: "text-amber-950 ",
+        muted: "text-amber-800 ",
+        pill: "bg-amber-100 text-amber-800  ",
       };
 
   const statusTitle = isAccepted
@@ -147,7 +147,7 @@ export const MarketingCounterDateBanner: React.FC<MarketingCounterDateBannerProp
               type="button"
               disabled={isProcessing}
               onClick={() => setShowRejectInput(true)}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-rose-300 px-2.5 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30 disabled:cursor-wait disabled:opacity-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-rose-300 px-2.5 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30 disabled:cursor-wait disabled:opacity-50   "
             >
               <X className="h-3 w-3" />
               Decline
@@ -188,7 +188,7 @@ export const MarketingCounterDateBanner: React.FC<MarketingCounterDateBannerProp
           )}
           {isRejected && decisionNotes && (
             <div className="min-w-0 text-[11px] leading-4">
-              <div className="flex items-center gap-1 text-[10px] font-semibold text-rose-800 dark:text-rose-300">
+              <div className="flex items-center gap-1 text-[10px] font-semibold text-rose-800 ">
                 <MessageSquare className="h-3 w-3" />
                 Marketing note
               </div>
@@ -207,7 +207,7 @@ export const MarketingCounterDateBanner: React.FC<MarketingCounterDateBannerProp
       )}
 
       {actionError && (
-        <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] font-medium text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+        <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] font-medium text-rose-800   ">
           {actionError}
         </div>
       )}

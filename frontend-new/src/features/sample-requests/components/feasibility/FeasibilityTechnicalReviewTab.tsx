@@ -166,7 +166,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
         <div className="flex items-center gap-4 flex-wrap">
           {/* Target Required Date */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600  flex items-center justify-center shrink-0">
               <Calendar className="w-4 h-4" />
             </div>
             <div>
@@ -192,7 +192,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
               </span>
               <span className="font-sans font-bold text-xs text-[var(--on-surface)]">
                 {activeRequest.takenBySamp || (
-                  <span className="text-amber-600 dark:text-amber-400 italic">Pending Claim</span>
+                  <span className="text-amber-600  italic">Pending Claim</span>
                 )}
               </span>
             </div>
@@ -270,7 +270,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
                 className="w-full text-xs"
               />
               {extensionWorkdays > 0 && (
-                <span className="inline-block mt-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span className="inline-block mt-1 text-[11px] font-mono text-emerald-600  font-semibold">
                   +{extensionWorkdays} operational workdays extension
                 </span>
               )}
@@ -295,7 +295,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
           </div>
 
           {(localError || counterDateError) && (
-            <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
+            <p className="text-xs text-rose-600  font-semibold">
               {localError || counterDateError}
             </p>
           )}
@@ -326,20 +326,20 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
         <div
           className={`p-3.5 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs ${
             activeRequest.counterDateDecision === "pending"
-              ? "bg-amber-50/70 border-amber-200/80 dark:bg-amber-950/30 dark:border-amber-900/50 text-amber-950 dark:text-amber-200"
+              ? "bg-amber-50/70 border-amber-200/80   text-amber-950 "
               : activeRequest.counterDateDecision === "accepted"
-              ? "bg-emerald-50/70 border-emerald-200/80 dark:bg-emerald-950/30 dark:border-emerald-900/50 text-emerald-950 dark:text-emerald-200"
-              : "bg-rose-50/70 border-rose-200/80 dark:bg-rose-950/30 dark:border-rose-900/50 text-rose-950 dark:text-rose-200"
+              ? "bg-emerald-50/70 border-emerald-200/80   text-emerald-950 "
+              : "bg-rose-50/70 border-rose-200/80   text-rose-950 "
           }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div
               className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                 activeRequest.counterDateDecision === "pending"
-                  ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                  ? "bg-amber-500/20 text-amber-700 "
                   : activeRequest.counterDateDecision === "accepted"
-                  ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                  : "bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                  ? "bg-emerald-500/20 text-emerald-700 "
+                  : "bg-rose-500/20 text-rose-700 "
               }`}
             >
               <CalendarClock className="w-4 h-4" />
@@ -357,10 +357,10 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
                     activeRequest.counterDateDecision === "pending"
-                      ? "bg-amber-200/70 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200"
+                      ? "bg-amber-200/70 text-amber-900  "
                       : activeRequest.counterDateDecision === "accepted"
-                      ? "bg-emerald-200/70 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200"
-                      : "bg-rose-200/70 text-rose-900 dark:bg-rose-900/60 dark:text-rose-200"
+                      ? "bg-emerald-200/70 text-emerald-900  "
+                      : "bg-rose-200/70 text-rose-900  "
                   }`}
                 >
                   {activeRequest.counterDateDecision === "pending" && "Pending Marketing Review"}
@@ -398,10 +398,10 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
               <span
                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-display font-bold border ${
                   activeRequest.samplingFeasibilityResponse === "Yes"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60  "
                     : activeRequest.samplingFeasibilityResponse === "No"
-                    ? "bg-rose-50 text-rose-700 border-rose-200/60 dark:bg-rose-950/40 dark:text-rose-300"
-                    : "bg-amber-50 text-amber-800 border-amber-200/60 dark:bg-amber-950/40 dark:text-amber-300"
+                    ? "bg-rose-50 text-rose-700 border-rose-200/60  "
+                    : "bg-amber-50 text-amber-800 border-amber-200/60  "
                 }`}
               >
                 {activeRequest.samplingFeasibilityResponse === "Yes" && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
@@ -437,7 +437,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
             <div className="grid sm:grid-cols-2 gap-3">
               {activeRequest.feasibilityConditions && (
                 <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] p-3 shadow-2xs">
-                  <div className="mb-1 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  <div className="mb-1 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 ">
                     Conditions / Constraints
                   </div>
                   <p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--on-surface)]">
@@ -472,12 +472,12 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
           )}
         </div>
       ) : canEvaluateTechnical && isCreator && !isAdmin ? (
-        <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 p-6 text-center space-y-2">
-          <Lock className="mx-auto h-6 w-6 text-amber-600 dark:text-amber-400" />
-          <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+        <div className="rounded-xl border border-amber-200  bg-amber-50  p-6 text-center space-y-2">
+          <Lock className="mx-auto h-6 w-6 text-amber-600 " />
+          <h3 className="text-sm font-bold text-amber-900 ">
             Separation of Duties (Maker-Checker Rule)
           </h3>
-          <p className="text-xs text-amber-800 dark:text-amber-300 max-w-md mx-auto leading-relaxed">
+          <p className="text-xs text-amber-800  max-w-md mx-auto leading-relaxed">
             You created this feasibility request as Requester. In accordance with enterprise governance, technical evaluation must be independently claimed and assessed by a separate Sampling Team reviewer.
           </p>
         </div>
@@ -496,13 +496,13 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
           /* ── STEP 1: MUST CLAIM TASK FIRST ── */
           <div className="space-y-4">
             {isCreator && isAdmin && (
-              <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
+              <div className="rounded-lg border border-amber-300  bg-amber-50  px-3.5 py-2 text-xs text-amber-900  flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span><strong>Admin Self-Review:</strong> You created this request. Operating with Super Admin privileges.</span>
               </div>
             )}
             {claimError && (
-              <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 px-3.5 py-2 text-xs text-rose-900 dark:text-rose-200 flex items-center gap-2">
+              <div className="rounded-lg border border-rose-300  bg-rose-50  px-3.5 py-2 text-xs text-rose-900  flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                 <span>{claimError}</span>
               </div>
@@ -544,7 +544,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
             </div>
 
             {isCreator && isAdmin && (
-              <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
+              <div className="rounded-lg border border-amber-300  bg-amber-50  px-3.5 py-2 text-xs text-amber-900  flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span><strong>Admin Self-Review:</strong> You created this request. Operating with Super Admin privileges.</span>
               </div>
@@ -563,12 +563,12 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
                     onClick={() => onSampVerdictChoiceChange("Yes")}
                     className={`p-3.5 rounded-xl border text-left transition cursor-pointer select-none flex flex-col justify-between gap-2 ${
                       sampVerdictChoice === "Yes"
-                        ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/20 shadow-xs"
+                        ? "border-emerald-500 bg-emerald-50/70  text-emerald-900  ring-2 ring-emerald-500/20 shadow-xs"
                         : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)]"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-display font-bold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
+                      <span className="text-xs font-display font-bold flex items-center gap-1.5 text-emerald-700 ">
                         <CheckCircle2 className="w-4 h-4 stroke-[2.2]" />
                         <span>Feasible (Yes)</span>
                       </span>
@@ -584,12 +584,12 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
                     onClick={() => onSampVerdictChoiceChange("Maybe")}
                     className={`p-3.5 rounded-xl border text-left transition cursor-pointer select-none flex flex-col justify-between gap-2 ${
                       sampVerdictChoice === "Maybe"
-                        ? "border-amber-500 bg-amber-50/70 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 ring-2 ring-amber-500/20 shadow-xs"
+                        ? "border-amber-500 bg-amber-50/70  text-amber-900  ring-2 ring-amber-500/20 shadow-xs"
                         : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)]"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-display font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+                      <span className="text-xs font-display font-bold flex items-center gap-1.5 text-amber-700 ">
                         <AlertTriangle className="w-4 h-4 stroke-[2.2]" />
                         <span>Conditional (Maybe)</span>
                       </span>
@@ -605,12 +605,12 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
                     onClick={() => onSampVerdictChoiceChange("No")}
                     className={`p-3.5 rounded-xl border text-left transition cursor-pointer select-none flex flex-col justify-between gap-2 ${
                       sampVerdictChoice === "No"
-                        ? "border-rose-500 bg-rose-50/70 dark:bg-rose-950/40 text-rose-900 dark:text-rose-100 ring-2 ring-rose-500/20 shadow-xs"
+                        ? "border-rose-500 bg-rose-50/70  text-rose-900  ring-2 ring-rose-500/20 shadow-xs"
                         : "border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-[var(--on-surface-muted)] hover:bg-[var(--surface-low)]"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-display font-bold flex items-center gap-1.5 text-rose-700 dark:text-rose-300">
+                      <span className="text-xs font-display font-bold flex items-center gap-1.5 text-rose-700 ">
                         <XCircle className="w-4 h-4 stroke-[2.2]" />
                         <span>Not Feasible (No)</span>
                       </span>
@@ -629,7 +629,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
                   {sampVerdictChoice === "Yes" ? (
                     <span className="text-[10px] text-[var(--on-surface-subtle)] font-normal">(Optional notes)</span>
                   ) : (
-                    <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">(Required explanation)</span>
+                    <span className="text-[10px] text-rose-600  font-semibold">(Required explanation)</span>
                   )}
                 </label>
                 <textarea
@@ -688,7 +688,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
               </div>
 
               {sampVerdictError && (
-                <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
+                <p className="text-xs text-rose-600  font-semibold">
                   {sampVerdictError}
                 </p>
               )}
@@ -697,7 +697,7 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
               <div className="flex items-center justify-between flex-wrap gap-2 pt-3 border-t border-[var(--border-subtle)]">
                 <div className="text-[11px] font-mono text-[var(--on-surface-subtle)]">
                   {activeRequest.counterDateDecision === "pending" ? (
-                    <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                    <span className="text-amber-600  font-semibold flex items-center gap-1">
                       <Info className="w-3.5 h-3.5" /> Marketing date review in progress
                     </span>
                   ) : (
@@ -721,11 +721,11 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
           </div>
         )
       ) : (activeRequest.is_closed || activeRequest.closure != null || String(activeRequest.status || "").toLowerCase().includes("closed")) ? (
-        <div className="p-8 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 text-center space-y-2 shadow-2xs">
-          <h3 className="text-sm font-display font-bold text-rose-800 dark:text-rose-200">
+        <div className="p-8 rounded-xl border border-rose-200  bg-rose-50/40  text-center space-y-2 shadow-2xs">
+          <h3 className="text-sm font-display font-bold text-rose-800 ">
             Request Closed
           </h3>
-          <p className="text-xs text-rose-600 dark:text-rose-400 max-w-md mx-auto leading-relaxed">
+          <p className="text-xs text-rose-600  max-w-md mx-auto leading-relaxed">
             This request was officially closed. All further inputs and task claims are permanently locked.
           </p>
         </div>

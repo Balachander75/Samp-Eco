@@ -41,7 +41,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-neutral-600 dark:text-zinc-400">
+        <span className="text-xs text-neutral-600 ">
           Direct Material Allocations scheduled across paper, board, and accessories.
         </span>
         {!readOnly && !isAddingRow && (
@@ -68,19 +68,19 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
         </div>
       )}
 
-      <div className="border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700 rounded overflow-hidden">
+      <div className="border border-zinc-200   rounded overflow-hidden">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="bg-slate-50 dark:bg-zinc-800/60 dark:bg-zinc-850 border-b border-zinc-200 dark:border-zinc-700 dark:border-zinc-700 text-neutral-600 dark:text-zinc-300 font-bold text-[11px]">
-              <th className="p-2 border-r border-zinc-200 dark:border-zinc-700 dark:border-zinc-700 w-8 text-center">#</th>
-              <th className="p-2 border-r border-zinc-200 dark:border-zinc-700 dark:border-zinc-700">Type</th>
-              <th className="p-2 border-r border-zinc-200 dark:border-zinc-700 dark:border-zinc-700">Supplier</th>
-              <th className="p-2 border-r border-zinc-200 dark:border-zinc-700 dark:border-zinc-700">Grade</th>
-              <th className="p-2 border-r border-zinc-200 dark:border-zinc-700 dark:border-zinc-700">Color</th>
-              <th className="p-2 border-r border-zinc-200 dark:border-zinc-700 dark:border-zinc-700">Caliper / Wt</th>
-              <th className="p-2 border-r border-zinc-200 dark:border-zinc-700 dark:border-zinc-700 text-right">Qty</th>
-              <th className="p-2 border-r border-zinc-200 dark:border-zinc-700 dark:border-zinc-700">Unit</th>
-              <th className="p-2 border-r border-zinc-200 dark:border-zinc-700 dark:border-zinc-700">Marketing Remark</th>
+            <tr className="bg-slate-50   border-b border-zinc-200   text-neutral-600  font-bold text-[11px]">
+              <th className="p-2 border-r border-zinc-200   w-8 text-center">#</th>
+              <th className="p-2 border-r border-zinc-200  ">Type</th>
+              <th className="p-2 border-r border-zinc-200  ">Supplier</th>
+              <th className="p-2 border-r border-zinc-200  ">Grade</th>
+              <th className="p-2 border-r border-zinc-200  ">Color</th>
+              <th className="p-2 border-r border-zinc-200  ">Caliper / Wt</th>
+              <th className="p-2 border-r border-zinc-200   text-right">Qty</th>
+              <th className="p-2 border-r border-zinc-200  ">Unit</th>
+              <th className="p-2 border-r border-zinc-200  ">Marketing Remark</th>
               <th className="p-2">SAMP Remark</th>
             </tr>
           </thead>
@@ -88,39 +88,39 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
             {unifiedMatrixRows.map((row) => (
               <tr
                 key={row.id ?? row.index}
-                className="border-b border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 hover:bg-neutral-50/80 dark:hover:bg-zinc-800/40"
+                className="border-b border-zinc-100   hover:bg-neutral-50/80 "
               >
-                <td className="p-2 border-r border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 text-center font-mono text-neutral-400">
+                <td className="p-2 border-r border-zinc-100   text-center font-mono text-neutral-400">
                   {row.index}
                 </td>
-                <td className="p-2 border-r border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 font-semibold text-neutral-800 dark:text-zinc-200">
+                <td className="p-2 border-r border-zinc-100   font-semibold text-neutral-800 ">
                   {row.type}
                 </td>
-                <td className="p-2 border-r border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 text-neutral-600 dark:text-zinc-400">
+                <td className="p-2 border-r border-zinc-100   text-neutral-600 ">
                   {row.supplier}
                 </td>
-                <td className="p-2 border-r border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 font-mono text-neutral-600 dark:text-zinc-400">
+                <td className="p-2 border-r border-zinc-100   font-mono text-neutral-600 ">
                   {row.grade}
                 </td>
-                <td className="p-2 border-r border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 text-neutral-600 dark:text-zinc-400">
+                <td className="p-2 border-r border-zinc-100   text-neutral-600 ">
                   {row.color}
                 </td>
-                <td className="p-2 border-r border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 font-mono text-neutral-600 dark:text-zinc-400">
+                <td className="p-2 border-r border-zinc-100   font-mono text-neutral-600 ">
                   {row.caliper}
                 </td>
-                <td className="p-2 border-r border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 text-right font-mono tabular-nums font-bold text-neutral-800 dark:text-zinc-200">
+                <td className="p-2 border-r border-zinc-100   text-right font-mono tabular-nums font-bold text-neutral-800 ">
                   {row.qty}
                 </td>
-                <td className="p-2 border-r border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 text-neutral-500 font-mono">
+                <td className="p-2 border-r border-zinc-100   text-neutral-500 font-mono">
                   {row.unit}
                 </td>
-                <td className="p-2 border-r border-zinc-100 dark:border-zinc-800 dark:border-zinc-800 text-neutral-600 dark:text-zinc-400 italic">
+                <td className="p-2 border-r border-zinc-100   text-neutral-600  italic">
                   {row.remark}
                 </td>
                 <td className="p-2">
                   <div className="flex items-center gap-1.5">
                     {readOnly ? (
-                      <span className="text-xs text-neutral-600 dark:text-zinc-400">
+                      <span className="text-xs text-neutral-600 ">
                         {matrixRemarks[row.id ?? row.index] || "—"}
                       </span>
                     ) : (
@@ -130,7 +130,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
                       value={matrixRemarks[row.id ?? row.index] ?? ""}
                       onChange={(e) => onRemarkChange(row.id ?? row.index, e.target.value)}
                       placeholder="Add SAMP remark..."
-                      className="flex-1 px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs focus:ring-1 focus:ring-purple-600"
+                      className="flex-1 px-2 py-1 rounded border border-zinc-200   bg-white  text-xs focus:ring-1 focus:ring-purple-600"
                     />
                     <button
                       type="button"
@@ -151,8 +151,8 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
             ))}
 
             {!readOnly && isAddingRow && (
-              <tr className="bg-purple-50/50 dark:bg-purple-950/20 border-b border-purple-200 dark:border-purple-800">
-                <td className="p-2 border-r text-center font-mono text-purple-700 dark:text-purple-300 font-bold">
+              <tr className="bg-purple-50/50  border-b border-purple-200 ">
+                <td className="p-2 border-r text-center font-mono text-purple-700  font-bold">
                   {unifiedMatrixRows.length + 1}
                 </td>
                 <td className="p-2 border-r">
@@ -161,7 +161,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
                     placeholder="e.g. Paper"
                     value={newRowData.material_type || ""}
                     onChange={(e) => onNewRowDataChange("material_type", e.target.value)}
-                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white dark:bg-zinc-900"
+                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white "
                   />
                 </td>
                 <td className="p-2 border-r">
@@ -170,7 +170,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
                     placeholder="Supplier"
                     value={newRowData.supplier_name || ""}
                     onChange={(e) => onNewRowDataChange("supplier_name", e.target.value)}
-                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white dark:bg-zinc-900"
+                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white "
                   />
                 </td>
                 <td className="p-2 border-r">
@@ -179,7 +179,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
                     placeholder="Grade"
                     value={newRowData.grade || ""}
                     onChange={(e) => onNewRowDataChange("grade", e.target.value)}
-                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white dark:bg-zinc-900"
+                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white "
                   />
                 </td>
                 <td className="p-2 border-r">
@@ -188,7 +188,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
                     placeholder="Color"
                     value={newRowData.color_variant || ""}
                     onChange={(e) => onNewRowDataChange("color_variant", e.target.value)}
-                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white dark:bg-zinc-900"
+                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white "
                   />
                 </td>
                 <td className="p-2 border-r">
@@ -197,7 +197,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
                     placeholder="Caliper"
                     value={newRowData.caliper_wt || ""}
                     onChange={(e) => onNewRowDataChange("caliper_wt", e.target.value)}
-                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white dark:bg-zinc-900"
+                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white "
                   />
                 </td>
                 <td className="p-2 border-r">
@@ -206,7 +206,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
                     placeholder="Qty"
                     value={newRowData.quantity !== undefined && newRowData.quantity !== null ? String(newRowData.quantity) : ""}
                     onChange={(e) => onNewRowDataChange("quantity", e.target.value)}
-                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white dark:bg-zinc-900 text-right"
+                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white  text-right"
                   />
                 </td>
                 <td className="p-2 border-r">
@@ -215,7 +215,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
                     placeholder="Unit"
                     value={newRowData.unit || "sheets"}
                     onChange={(e) => onNewRowDataChange("unit", e.target.value)}
-                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white dark:bg-zinc-900"
+                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white "
                   />
                 </td>
                 <td className="p-2 border-r">
@@ -224,7 +224,7 @@ export const InspectorMaterialsTable: React.FC<InspectorMaterialsTableProps> = (
                     placeholder="Remark"
                     value={newRowData.remark || ""}
                     onChange={(e) => onNewRowDataChange("remark", e.target.value)}
-                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white dark:bg-zinc-900"
+                    className="w-full px-1.5 py-0.5 border rounded text-xs bg-white "
                   />
                 </td>
                 <td className="p-2">

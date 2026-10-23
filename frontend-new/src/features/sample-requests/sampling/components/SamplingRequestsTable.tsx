@@ -52,10 +52,10 @@ function getSlaUrgency(dateStr?: string | null): { label?: string; color: string
   const now = new Date();
   const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   if (diffDays < 0) {
-    return { label: "Overdue", color: "text-rose-600 dark:text-rose-400 font-semibold" };
+    return { label: "Overdue", color: "text-rose-600  font-semibold" };
   }
   if (diffDays <= 2) {
-    return { label: "Due Soon", color: "text-amber-600 dark:text-amber-400 font-semibold" };
+    return { label: "Due Soon", color: "text-amber-600  font-semibold" };
   }
   return { color: "text-[var(--on-surface-muted)]" };
 }
@@ -71,7 +71,7 @@ function renderRequiredDateCell(dateStr?: string | null): React.ReactNode {
         {formatOdooDate(dateStr)}
       </span>
       {label && (
-        <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+        <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-rose-600 ">
           {label}
         </span>
       )}
@@ -106,7 +106,7 @@ function renderQuantityCell(row: SampleRequestItem, typeFilter: string = "all"):
     if (!types.includes("sample")) return <span className="text-[var(--on-surface-subtle)] font-mono text-xs">—</span>;
     return (
       <div className="flex flex-col whitespace-nowrap">
-        <div className="flex items-center gap-1 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+        <div className="flex items-center gap-1 font-mono text-xs font-semibold text-emerald-700 ">
           <span>{sampleQty}</span>
           <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{sampleUnit}</span>
         </div>
@@ -120,11 +120,11 @@ function renderQuantityCell(row: SampleRequestItem, typeFilter: string = "all"):
   if (typeFilter === "design") {
     if (!types.includes("design")) return <span className="text-[var(--on-surface-subtle)] font-mono text-xs">—</span>;
     return (
-      <div className="flex items-center gap-1 font-mono text-xs font-semibold text-purple-700 dark:text-purple-300 whitespace-nowrap">
+      <div className="flex items-center gap-1 font-mono text-xs font-semibold text-purple-700  whitespace-nowrap">
         <span>{reqDesigns}</span>
         <span className="text-[10px] font-normal text-[var(--on-surface-subtle)]">Req</span>
         {recDesigns > 0 && (
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400">({recDesigns} Deliv)</span>
+          <span className="text-[10px] text-emerald-600 ">({recDesigns} Deliv)</span>
         )}
       </div>
     );
@@ -133,7 +133,7 @@ function renderQuantityCell(row: SampleRequestItem, typeFilter: string = "all"):
   if (typeFilter === "mockup") {
     if (!types.includes("mockup")) return <span className="text-[var(--on-surface-subtle)] font-mono text-xs">—</span>;
     return (
-      <div className="flex items-center gap-1 font-mono text-xs font-semibold text-amber-700 dark:text-amber-400 whitespace-nowrap">
+      <div className="flex items-center gap-1 font-mono text-xs font-semibold text-amber-700  whitespace-nowrap">
         <span>{mockupQty}</span>
         <span className="text-[10px] font-medium text-[var(--on-surface-subtle)]">Mockup{mockupQty !== "1" ? "s" : ""}</span>
       </div>
@@ -144,7 +144,7 @@ function renderQuantityCell(row: SampleRequestItem, typeFilter: string = "all"):
     if (!types.includes("costing")) return <span className="text-[var(--on-surface-subtle)] font-mono text-xs">—</span>;
     return (
       <div className="flex flex-col whitespace-nowrap">
-        <div className="flex items-center gap-1 font-mono text-xs font-semibold text-sky-700 dark:text-sky-300">
+        <div className="flex items-center gap-1 font-mono text-xs font-semibold text-sky-700 ">
           <span>{costingQty}</span>
           <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{costingUnit}</span>
         </div>
@@ -160,7 +160,7 @@ function renderQuantityCell(row: SampleRequestItem, typeFilter: string = "all"):
 
   if (types.includes("sample") || (!types.includes("design") && !types.includes("mockup") && !types.includes("costing"))) {
     items.push(
-      <span key="sample" className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+      <span key="sample" className="font-mono text-xs font-semibold text-emerald-700 ">
         {sampleQty} <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{sampleUnit}</span>
         {samplePackInfo && <span className="text-[9.5px] text-[var(--on-surface-subtle)] font-normal">{samplePackInfo}</span>}
       </span>
@@ -169,7 +169,7 @@ function renderQuantityCell(row: SampleRequestItem, typeFilter: string = "all"):
 
   if (types.includes("design")) {
     items.push(
-      <span key="design" className="font-mono text-xs font-semibold text-purple-700 dark:text-purple-300">
+      <span key="design" className="font-mono text-xs font-semibold text-purple-700 ">
         {reqDesigns} <span className="text-[10px] font-normal text-[var(--on-surface-subtle)]">DSG</span>
       </span>
     );
@@ -177,7 +177,7 @@ function renderQuantityCell(row: SampleRequestItem, typeFilter: string = "all"):
 
   if (types.includes("mockup")) {
     items.push(
-      <span key="mockup" className="font-mono text-xs font-semibold text-amber-700 dark:text-amber-400">
+      <span key="mockup" className="font-mono text-xs font-semibold text-amber-700 ">
         {mockupQty} <span className="text-[10px] font-normal text-[var(--on-surface-subtle)]">MUP</span>
       </span>
     );
@@ -185,7 +185,7 @@ function renderQuantityCell(row: SampleRequestItem, typeFilter: string = "all"):
 
   if (types.includes("costing")) {
     items.push(
-      <span key="costing" className="font-mono text-xs font-semibold text-sky-700 dark:text-sky-300">
+      <span key="costing" className="font-mono text-xs font-semibold text-sky-700 ">
         {costingQty} <span className="text-[10px] font-normal text-[var(--on-surface-subtle)]">CST</span>
       </span>
     );
@@ -272,7 +272,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
             </div>
             {row.productCategory && (
               <div className="mt-0.5">
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[130px]" title={row.productCategory}>
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-amber-500/10 text-amber-700  border border-amber-500/20 truncate max-w-[130px]" title={row.productCategory}>
                   {row.productCategory}
                 </span>
               </div>
@@ -316,7 +316,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                 return (
                   <div className="flex items-center gap-1.5 whitespace-nowrap min-w-0 max-w-[125px]">
                     <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 shrink-0"
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono font-bold bg-amber-500/10 text-amber-700  border border-amber-500/20 shrink-0"
                       title={creator}
                     >
                       {initials}
@@ -431,7 +431,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         return (
           <div className="flex items-center gap-1.5 whitespace-nowrap min-w-0 max-w-[120px]">
             <span
-              className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono font-bold bg-[#1b4332]/10 dark:bg-emerald-500/20 text-[#1b4332] dark:text-emerald-300 border border-[#1b4332]/20 dark:border-emerald-500/30 shrink-0"
+              className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono font-bold bg-[#1b4332]/10  text-[#1b4332]  border border-[#1b4332]/20  shrink-0"
               title={creator}
             >
               {initials}
@@ -467,7 +467,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                 {row.productDescription || "Commercial Product"}
               </div>
               {row.productCategory && (
-                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 truncate max-w-[130px]" title={row.productCategory}>
+                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-emerald-500/10 text-emerald-700  border border-emerald-500/20 truncate max-w-[130px]" title={row.productCategory}>
                   {row.productCategory}
                 </span>
               )}
@@ -506,7 +506,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
             const unit = row.unitPcPack || "PC";
             const packInfo = unit === "Pack" && row.qtyPerPack ? ` (${row.qtyPerPack}/pk)` : "";
             return (
-              <div className="flex items-center gap-1 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+              <div className="flex items-center gap-1 font-mono text-xs font-semibold text-emerald-700  whitespace-nowrap">
                 <span>{qty}</span>
                 <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{unit}</span>
                 {packInfo && (
@@ -545,7 +545,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
               </div>
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap min-w-0">
                 {row.productCategory && (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 truncate max-w-[110px]" title={row.productCategory}>
+                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-purple-500/10 text-purple-700  border border-purple-500/20 truncate max-w-[110px]" title={row.productCategory}>
                     {row.productCategory}
                   </span>
                 )}
@@ -570,11 +570,11 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
             );
             return (
               <div className="flex items-center gap-1 font-mono text-xs whitespace-nowrap min-w-0">
-                <span className="font-bold text-purple-700 dark:text-purple-300">
+                <span className="font-bold text-purple-700 ">
                   {reqDesigns} Req
                 </span>
                 <span className="text-[var(--on-surface-subtle)] font-normal">/</span>
-                <span className={`font-bold ${recDesigns >= reqDesigns ? "text-emerald-600 dark:text-emerald-400" : recDesigns > 0 ? "text-amber-600 dark:text-amber-400" : "text-[var(--on-surface-subtle)]"}`}>
+                <span className={`font-bold ${recDesigns >= reqDesigns ? "text-emerald-600 " : recDesigns > 0 ? "text-amber-600 " : "text-[var(--on-surface-subtle)]"}`}>
                   {recDesigns} Deliv
                 </span>
               </div>
@@ -634,7 +634,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
               </div>
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap min-w-0">
                 {row.productCategory && (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[110px]" title={row.productCategory}>
+                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-amber-500/10 text-amber-700  border border-amber-500/20 truncate max-w-[110px]" title={row.productCategory}>
                     {row.productCategory}
                   </span>
                 )}
@@ -658,7 +658,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
               : undefined;
             return (
               <div className="flex flex-col whitespace-nowrap font-mono min-w-0 max-w-[95px]">
-                <div className="flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-400">
+                <div className="flex items-center gap-1 text-xs font-bold text-amber-700 ">
                   <span>{mockupQty}</span>
                   <span className="text-[9.5px] font-medium text-[var(--on-surface-subtle)] font-sans">
                     Mockup{mockupQty !== "1" ? "s" : ""}
@@ -701,7 +701,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                 {row.productDescription || "Commercial Product"}
               </div>
               {row.productCategory && (
-                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 truncate max-w-[120px]" title={row.productCategory}>
+                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-sky-500/10 text-sky-700  border border-sky-500/20 truncate max-w-[120px]" title={row.productCategory}>
                   {row.productCategory}
                 </span>
               )}
@@ -739,7 +739,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
             const costingUnit = row.unitPcPack || "PC";
             const packInfo = costingUnit === "Pack" && row.qtyPerPack ? ` (${row.qtyPerPack}/pk)` : "";
             return (
-              <div className="flex items-center gap-1 font-mono text-xs font-semibold text-sky-700 dark:text-sky-300 whitespace-nowrap">
+              <div className="flex items-center gap-1 font-mono text-xs font-semibold text-sky-700  whitespace-nowrap">
                 <span>{costingQty}</span>
                 <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{costingUnit}</span>
                 {packInfo && (
@@ -760,11 +760,11 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
               <div className="flex flex-col min-w-0 max-w-[110px]">
                 <div className="flex items-center gap-1 whitespace-nowrap">
                   {hasCreativeInput ? (
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-purple-500/10 text-purple-700  border border-purple-500/20">
                       Creative First
                     </span>
                   ) : (
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-sky-500/10 text-sky-700  border border-sky-500/20">
                       Direct Costing
                     </span>
                   )}
@@ -810,7 +810,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
             <div className="flex items-center gap-1 mt-0.5 min-w-0">
               {row.productCategory && (
                 <span
-                  className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 truncate max-w-[110px]"
+                  className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-emerald-500/10 text-emerald-700  border border-emerald-500/20 truncate max-w-[110px]"
                   title={`Category: ${row.productCategory}${row.productSubCategory ? " › " + row.productSubCategory : ""}`}
                 >
                   {row.productCategory}
@@ -846,10 +846,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                   return (
                     <span
                       key="design"
-                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-purple-500/10 text-purple-700  border border-purple-500/20"
                       title="Design Request"
                     >
-                      <Palette className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                      <Palette className="w-2.5 h-2.5 text-purple-600  shrink-0" />
                       <span>Design</span>
                     </span>
                   );
@@ -858,10 +858,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                   return (
                     <span
                       key="mockup"
-                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-amber-500/10 text-amber-700  border border-amber-500/20"
                       title="Mockup Sample"
                     >
-                      <Layers className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <Layers className="w-2.5 h-2.5 text-amber-600  shrink-0" />
                       <span>Mockup</span>
                     </span>
                   );
@@ -870,10 +870,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                   return (
                     <span
                       key="costing"
-                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-sky-500/10 text-sky-700  border border-sky-500/20"
                       title="Costing Estimation"
                     >
-                      <Calculator className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                      <Calculator className="w-2.5 h-2.5 text-sky-600  shrink-0" />
                       <span>Costing</span>
                     </span>
                   );
@@ -881,10 +881,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                 return (
                   <span
                     key="sample"
-                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-emerald-500/10 text-emerald-700  border border-emerald-500/20"
                     title="Sampling Production"
                   >
-                    <Package className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <Package className="w-2.5 h-2.5 text-emerald-600  shrink-0" />
                     <span>Sampling</span>
                   </span>
                 );
@@ -964,7 +964,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
             {isDraftView ? "products" : "requests"}
           </span>
           {selectedIds.size > 0 && (
-            <span className="shrink-0 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] tabular-nums text-emerald-700 dark:text-emerald-300 font-bold">
+            <span className="shrink-0 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] tabular-nums text-emerald-700  font-bold">
               {selectedIds.size} selected
             </span>
           )}

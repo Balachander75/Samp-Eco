@@ -11,6 +11,7 @@ import {
   deleteSampleRequestApi,
   releaseSampleRequestIdsApi,
   fetchProductDetailsApi,
+  fetchSampleRequestByIdApi,
 } from "@/infrastructure/api";
 import { ProductSearchResult, BindingHierarchyResponse, SampleRequestItem } from "../types";
 import type { DesignFollowupArtwork } from "../types";
@@ -191,6 +192,63 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
     }
     return [];
   });
+
+  // Reconcile missing savedSrNumber from programContext or backend
+  useEffect(() => {
+    if (programContext.parentSrNumber && stagedProducts.length > 0 && !stagedProducts[0].savedSrNumber) {
+      setStagedProducts((prev) => {
+        if (!prev.length || prev[0].savedSrNumber) return prev;
+        const updated = [...prev];
+        updated[0] = {
+          ...updated[0],
+          savedSrNumber: programContext.parentSrNumber,
+          savedRequestCode: programContext.parentSrNumber,
+          savedRequestId: programContext.parentRequestId || updated[0].savedRequestId,
+          isDraftSaved: true,
+        };
+        sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    let isCancelled = false;
+    const itemsMissingSr = stagedProducts.filter((p) => p.savedRequestId && !p.savedSrNumber);
+    if (itemsMissingSr.length > 0) {
+      Promise.allSettled(
+        itemsMissingSr.map(async (item) => {
+          try {
+            const fetched = await fetchSampleRequestByIdApi(item.savedRequestId!);
+            if (fetched) {
+              const code = fetched.srNumber || fetched.requestCode || (fetched.requestCodes && Object.values(fetched.requestCodes)[0]);
+              return { id: item.id, code };
+            }
+          } catch {
+            // ignore
+          }
+          return null;
+        })
+      ).then((results) => {
+        if (isCancelled) return;
+        const updates = new Map<string, string>();
+        results.forEach((r) => {
+          if (r.status === "fulfilled" && r.value?.code) {
+            updates.set(r.value.id, r.value.code);
+          }
+        });
+        if (updates.size > 0) {
+          setStagedProducts((prev) => {
+            const next = prev.map((p) => (updates.has(p.id) ? { ...p, savedSrNumber: updates.get(p.id), savedRequestCode: updates.get(p.id), isDraftSaved: true } : p));
+            sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(next));
+            return next;
+          });
+        }
+      });
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [programContext.parentSrNumber, programContext.parentRequestId, stagedProductsStorageKey]);
 
   // Sync stagedProducts to sessionStorage whenever updated
   useEffect(() => {
@@ -655,6 +713,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
               ...(existingWorkflowState.samplingRouting || {}),
               stage: "marketing",
               sampleTrack: track,
+              sampleType: item.samplingMetadata?.sampleType || "full",
+              partialRequirements: item.samplingMetadata?.partialRequirements || "",
               isResample: sampleRoute.isResample,
               creativeChangesRequired: sampleRoute.creativeChangesRequired,
               isDesignVariant: Boolean(item.variantNumber),
@@ -671,6 +731,8 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
               ...(existingWorkflowState.samplingRouting || {}),
               stage: "marketing",
               sampleTrack: track,
+              sampleType: item.samplingMetadata?.sampleType || "full",
+              partialRequirements: item.samplingMetadata?.partialRequirements || "",
               isResample: sampleRoute.isResample,
               creativeChangesRequired: sampleRoute.creativeChangesRequired,
               isDesignVariant: Boolean(item.variantNumber),
@@ -681,6 +743,13 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
         : undefined;
       const saved = await updateSampleRequestApi(item.savedRequestId, {
         productDescription,
+        ...(item.scopes.includes("sample") ? {
+          productType: item.samplingMetadata?.sampleType === "partial" ? "Partial Sample" : "Full Sample",
+          qtyForSampling: item.qtyForSampling,
+          unitPcPack: item.unitPcPack,
+          qtyPerPack: item.qtyPerPack,
+          sampleRequiredDate: item.sampleRequiredDate,
+        } : {}),
         customDetails: details.map((detail) => ({
           className: detail.className || detail.class_name || "Product",
           characteristicName: detail.characteristicName || detail.characteristic_name || "",
@@ -1585,7 +1654,12 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       .then((res) => {
         if (res.success) {
           nextItem.isDraftSaved = true;
+          if (res.srNumber && !nextItem.savedSrNumber) {
+            nextItem.savedSrNumber = res.srNumber;
+            nextItem.savedRequestCode = res.srNumber;
+          }
           setStagedProducts([...nextProducts]);
+          sessionStorage.setItem(stagedProductsStorageKey, JSON.stringify(nextProducts));
           showToast(`✓ Staged product saved to Draft (${res.srNumber || programContext.parentSrNumber || "Draft queue"}).`);
         } else showToast(res.error || "Could not save this product as a draft. Your staged details are still here.", "error");
       })
@@ -2090,7 +2164,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
           <div
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-[var(--overlay-backdrop)] backdrop-blur-xs transition-opacity"
             onClick={() => {
               if (isSubmittingAll) return;
               if (designMockupHandoff) void handleReturnToDesk();
@@ -2386,17 +2460,17 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           aria-live="polite"
           className={`fixed bottom-6 right-6 z-[100] max-w-md px-4 py-3 rounded-2xl shadow-2xl border text-xs font-semibold flex items-center justify-between gap-3 transition-all duration-200 ${
             toastMsg.tone === "success"
-              ? "border-emerald-200 dark:border-emerald-900/60 bg-white dark:bg-zinc-900 text-emerald-800 dark:text-emerald-300 shadow-[0_8px_30px_rgba(16,185,129,0.15)]"
-              : "border-rose-200 dark:border-rose-900/60 bg-white dark:bg-zinc-900 text-rose-800 dark:text-rose-300 shadow-[0_8px_30px_rgba(225,29,72,0.15)]"
+              ? "border-emerald-200  bg-white  text-emerald-800  shadow-[0_8px_30px_rgba(16,185,129,0.15)]"
+              : "border-rose-200  bg-white  text-rose-800  shadow-[0_8px_30px_rgba(225,29,72,0.15)]"
           }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             {toastMsg.tone === "success" ? (
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-emerald-100  text-emerald-600 ">
                 <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
               </span>
             ) : (
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-rose-100  text-rose-600 ">
                 <AlertCircle className="w-4 h-4 stroke-[2.5]" />
               </span>
             )}
@@ -2405,7 +2479,7 @@ export const ProductStagingWorkspace: React.FC<ProductStagingWorkspaceProps> = (
           <button
             type="button"
             onClick={() => setToastMsg(null)}
-            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 shrink-0"
+            className="p-1 text-slate-400 hover:text-slate-700  transition-colors cursor-pointer rounded-lg hover:bg-slate-100  shrink-0"
             aria-label="Close notification"
           >
             <X className="w-3.5 h-3.5" />

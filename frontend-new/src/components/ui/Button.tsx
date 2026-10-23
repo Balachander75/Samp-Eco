@@ -46,7 +46,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       ghost:
         "bg-transparent hover:bg-[var(--surface-low)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
       danger:
-        "bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white shadow-xs border border-rose-700/40",
+        "bg-status-danger-strong hover:bg-status-danger active:brightness-90 text-white shadow-xs border border-status-danger",
     };
 
     return (

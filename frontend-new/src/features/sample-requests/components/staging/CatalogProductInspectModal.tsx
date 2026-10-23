@@ -172,7 +172,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 {product.material_code && (
-                  <span className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 font-mono text-xs font-bold text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-300">
+                  <span className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 font-mono text-xs font-bold text-indigo-700   ">
                     {product.material_code}
                   </span>
                 )}
@@ -208,20 +208,20 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
             <div className="space-y-2.5 border-b border-[var(--border-subtle)] p-3 sm:p-3.5 lg:shrink-0">
               <div className="flex flex-wrap items-center justify-between gap-2.5">
                 <div>
-                  <h3 className="text-xs font-bold text-slate-900 dark:text-zinc-100">{heading || "Product specifications"}</h3>
-                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-zinc-400">{intro || "Showing classes with saved values. Expand a class to view its specifications."}</p>
+                  <h3 className="text-xs font-bold text-slate-900 ">{heading || "Product specifications"}</h3>
+                  <p className="mt-0.5 text-[11px] text-slate-500 ">{intro || "Showing classes with saved values. Expand a class to view its specifications."}</p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   {!isLoading && !detailsError && (
-                    <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600 dark:bg-zinc-900 dark:text-zinc-300">
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600  ">
                       {classGroups.length} classes · {configuredCount} saved
                     </span>
                   )}
-                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-zinc-700 dark:bg-zinc-900" aria-label="Specification view">
-                    <button type="button" onClick={() => { setView("configured"); setExpandedClasses(new Set()); }} aria-pressed={view === "configured"} className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition ${view === "configured" ? "bg-white text-[var(--accent-primary)] shadow-sm dark:bg-zinc-800 dark:text-emerald-300" : "text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"}`}>
+                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5  " aria-label="Specification view">
+                    <button type="button" onClick={() => { setView("configured"); setExpandedClasses(new Set()); }} aria-pressed={view === "configured"} className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition ${view === "configured" ? "bg-white text-[var(--accent-primary)] shadow-sm  " : "text-slate-600 hover:text-slate-900  "}`}>
                       Configured <span className="ml-1 opacity-70">{configuredCount}</span>
                     </button>
-                    <button type="button" onClick={() => { setView("all"); setExpandedClasses(new Set()); }} aria-pressed={view === "all"} className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition ${view === "all" ? "bg-white text-[var(--accent-primary)] shadow-sm dark:bg-zinc-800 dark:text-emerald-300" : "text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"}`}>
+                    <button type="button" onClick={() => { setView("all"); setExpandedClasses(new Set()); }} aria-pressed={view === "all"} className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition ${view === "all" ? "bg-white text-[var(--accent-primary)] shadow-sm  " : "text-slate-600 hover:text-slate-900  "}`}>
                       All <span className="ml-1 opacity-70">{availableSpecCount}</span>
                     </button>
                   </div>
@@ -235,18 +235,18 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                   onChange={(event) => setCharacteristicQuery(event.target.value)}
                   placeholder="Filter classes and characteristics…"
                   aria-label="Filter classes and characteristics"
-                  className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                  className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15    "
                 />
               </label>
             </div>
 
             <div className={embedded ? "p-3 sm:p-3.5" : "p-3 sm:p-3.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"}>
               {isLoading ? (
-                <div className="flex h-48 items-center justify-center gap-2 text-sm text-slate-500 dark:text-zinc-400"><LoaderCircle className="h-4 w-4 animate-spin" /> Loading product details…</div>
+                <div className="flex h-48 items-center justify-center gap-2 text-sm text-slate-500 "><LoaderCircle className="h-4 w-4 animate-spin" /> Loading product details…</div>
               ) : detailsError ? (
-                <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">{detailsError}</div>
+                <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700   ">{detailsError}</div>
               ) : filteredClassGroups.length === 0 ? (
-                <div className="flex min-h-48 flex-col items-center justify-center px-4 text-center text-sm text-slate-500 dark:text-zinc-400">
+                <div className="flex min-h-48 flex-col items-center justify-center px-4 text-center text-sm text-slate-500 ">
                   {characteristicQuery.trim() ? "No specifications match this filter." : "No saved specifications are available for this product."}
                 </div>
               ) : (
@@ -264,17 +264,17 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                           className="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-[var(--surface-low)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-primary)] sm:px-3.5"
                         >
                           <span className="min-w-0">
-                            <span className="text-xs font-semibold text-slate-800 dark:text-zinc-100">
+                            <span className="text-xs font-semibold text-slate-800 ">
                               {displayClassName(className)}
                             </span>
-                            <span className="ml-2 text-[10px] text-slate-400 dark:text-zinc-500">
+                            <span className="ml-2 text-[10px] text-slate-400 ">
                               {view === "configured"
                                 ? `${configuredInClass} configured`
                                 : `${configuredInClass}/${allSpecsInClass.length} configured`}
                             </span>
                           </span>
                           <span className="flex shrink-0 items-center gap-2">
-                            <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-zinc-800 sm:block">
+                            <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-slate-100  sm:block">
                               <span
                                 className="block h-full rounded-full bg-[var(--accent-primary)]"
                                 style={{
@@ -295,26 +295,26 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
                             {specs.map((item) => (
                               <div
                                 key={`${item.className}-${item.characteristicName}`}
-                                className={`grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 border-t border-slate-100 px-3 py-2 text-[11px] dark:border-zinc-800/80 sm:px-3.5 ${highlightCreativeFields && (isMockupCreativeCharacteristic(item.className, item.characteristicName) || isListedCreativeCharacteristic(item, creativeCharacteristicKeys)) ? "border border-rose-500 bg-rose-50/80 ring-1 ring-inset ring-rose-400 dark:border-rose-400 dark:bg-rose-950/25 dark:ring-rose-500" : ""}`}
+                                className={`grid grid-cols-[minmax(0,1fr)_minmax(100px,0.8fr)_56px] gap-2 border-t border-slate-100 px-3 py-2 text-[11px]  sm:px-3.5 ${highlightCreativeFields && (isMockupCreativeCharacteristic(item.className, item.characteristicName) || isListedCreativeCharacteristic(item, creativeCharacteristicKeys)) ? "border border-rose-500 bg-rose-50/80 ring-1 ring-inset ring-rose-400   " : ""}`}
                               >
                                 <div className="min-w-0 break-words">
-                                  <span className="font-medium text-slate-700 dark:text-zinc-200">
+                                  <span className="font-medium text-slate-700 ">
                                     {item.characteristicName}
                                   </span>
                                   {highlightCreativeFields && (isMockupCreativeCharacteristic(item.className, item.characteristicName) || isListedCreativeCharacteristic(item, creativeCharacteristicKeys)) && (
-                                    <span className="ml-2 inline-flex rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-rose-800 dark:bg-rose-900/50 dark:text-rose-200">Creative input</span>
+                                    <span className="ml-2 inline-flex rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-rose-800  ">Creative input</span>
                                   )}
                                 </div>
                                 <span
                                   className={`min-w-0 break-words ${
                                     hasConfiguredValue(item.value)
-                                      ? "font-semibold text-slate-900 dark:text-zinc-100"
-                                      : "text-slate-400 dark:text-zinc-500"
+                                      ? "font-semibold text-slate-900 "
+                                      : "text-slate-400 "
                                   }`}
                                 >
                                   {hasConfiguredValue(item.value) ? item.value?.trim() : ""}
                                 </span>
-                                <span className="text-slate-500 dark:text-zinc-400">{item.uom || ""}</span>
+                                <span className="text-slate-500 ">{item.uom || ""}</span>
                               </div>
                             ))}
                           </div>
@@ -328,7 +328,7 @@ export const CatalogProductInspectModal: React.FC<CatalogProductInspectModalProp
           </main>
         </div>
         {footer && (
-          <footer className="shrink-0 border-t border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900 sm:px-6">
+          <footer className="shrink-0 border-t border-slate-200 bg-slate-50/80 px-4 py-3   sm:px-6">
             {footer}
           </footer>
         )}

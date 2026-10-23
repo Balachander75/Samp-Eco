@@ -82,6 +82,7 @@ export const DesignControlPanel: React.FC<DesignControlPanelProps> = ({
           <RequestClosureControl
             requests={closureRequests}
             canClose={canCloseRequest}
+            reasonRequired={mode === "marketing"}
             onClosed={onRequestClosed}
           />
         )}

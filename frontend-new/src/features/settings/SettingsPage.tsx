@@ -300,7 +300,7 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
           <div className="space-y-4">
             {/* ── Sleek Filter Toolbar & Active Theme Status ── */}
             <div className="rounded-xl border border-border-subtle bg-surface-lowest px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
-              {/* Left: Mode Switcher & Search */}
+              {/* Left: Theme Filters & Search */}
               <div className="flex flex-wrap items-center gap-2.5">
                 <div className="inline-flex p-0.5 rounded-lg bg-surface-low text-xs font-mono">
                   {[
@@ -406,12 +406,12 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
                 <span className="text-[10px] font-mono uppercase tracking-wider text-onSurface-subtle font-bold">
                   Status Isolation:
                 </span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-status-success-soft text-status-success border border-status-success-border">
+                  <span className="w-1.5 h-1.5 rounded-full bg-status-success-strong" />
                   Approved
                 </span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-brand-50 text-brand-800 border border-brand-200/90 dark:bg-brand-950/40 dark:text-brand-300 dark:border-brand-800/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-status-info-soft text-status-info border border-status-info-border">
+                  <span className="w-1.5 h-1.5 rounded-full bg-status-info-strong" />
                   In Plant
                 </span>
               </div>
@@ -445,8 +445,7 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
                   <button
                     key={option.id}
                     type="button"
-                    role="radio"
-                    aria-checked={isSelected}
+                    aria-pressed={isSelected}
                     onClick={() => {
                       void setTheme(option.id);
                     }}
@@ -461,17 +460,17 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
                       {/* Overlapping Swatch Dots */}
                       <div className="flex items-center -space-x-1 shrink-0 py-0.5">
                         <span
-                          className="w-4 h-4 rounded-full border border-black/10 dark:border-white/10 shadow-2xs relative z-30 transition-transform group-hover:scale-110"
+                          className="w-4 h-4 rounded-full border border-black/10  shadow-2xs relative z-30 transition-transform group-hover:scale-110"
                           style={{ backgroundColor: option.preview.accent }}
                           title={`Accent: ${option.preview.accent}`}
                         />
                         <span
-                          className="w-4 h-4 rounded-full border border-black/10 dark:border-white/10 shadow-2xs relative z-20 transition-transform group-hover:scale-110"
+                          className="w-4 h-4 rounded-full border border-black/10  shadow-2xs relative z-20 transition-transform group-hover:scale-110"
                           style={{ backgroundColor: option.preview.accentSecondary }}
                           title={`Secondary: ${option.preview.accentSecondary}`}
                         />
                         <span
-                          className="w-4 h-4 rounded-full border border-black/10 dark:border-white/10 shadow-2xs relative z-10 transition-transform group-hover:scale-110"
+                          className="w-4 h-4 rounded-full border border-black/10  shadow-2xs relative z-10 transition-transform group-hover:scale-110"
                           style={{ backgroundColor: option.preview.surface }}
                           title={`Surface: ${option.preview.surface}`}
                         />
@@ -516,7 +515,7 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
             {/* Profile Overview Header */}
             <div className="p-5 border-b border-border-subtle bg-surface-low/30 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent to-accent-secondary text-white flex items-center justify-center font-bold text-lg font-display shadow-xs">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent to-accent-secondaryStrong text-white flex items-center justify-center font-bold text-lg font-display shadow-xs">
                   {userInitials}
                 </div>
                 <div>
@@ -731,14 +730,14 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
                 <div
                   className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2.5 ${
                     passwordFeedback.type === "success"
-                      ? "bg-emerald-50 text-emerald-800 border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60"
-                      : "bg-rose-50 text-rose-800 border-rose-200/90 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60"
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-200/90   "
+                      : "bg-rose-50 text-rose-800 border-rose-200/90   "
                   }`}
                 >
                   {passwordFeedback.type === "success" ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 " />
                   ) : (
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 " />
                   )}
                   <span>{passwordFeedback.message}</span>
                 </div>

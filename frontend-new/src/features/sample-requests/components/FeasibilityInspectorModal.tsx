@@ -36,6 +36,7 @@ import {
 } from "./feasibility";
 import { ImageLightboxModal } from "./inspector";
 import { RequestClosedStamp } from "./common/RequestClosedWatermark";
+import { SamplingResponsePanel } from "./common/SamplingResponsePanel";
 
 // Domain Parsers & Types
 import {
@@ -178,11 +179,18 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
   const [closureData, setClosureData] = useState<any>((activeRequest as any)?.closure || null);
 
   useEffect(() => {
+    setLocalClosed(false);
+    setClosureData((activeRequest as any)?.closure || null);
+  }, [activeRequest?.id, (activeRequest as any)?.closure]);
+
+  useEffect(() => {
     const handleClosed = (event: Event) => {
       const customEvent = event as CustomEvent;
       const detail = customEvent.detail;
+      const requestType = String(detail?.requestType || "");
       if (
         detail &&
+        requestType === "feasibility" &&
         (String(detail.requestId) === String(activeRequest?.id) ||
          String(detail.requestId) === String(feasibilityRequestId))
       ) {
@@ -540,7 +548,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/70"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-[var(--overlay-backdrop)]"
       onClick={onClose}
     >
       <div
@@ -604,10 +612,10 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                       <span
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
                           activeRequest.samplingFeasibilityResponse === "Yes"
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            ? "bg-emerald-50 text-emerald-700  "
                             : activeRequest.samplingFeasibilityResponse === "No"
-                            ? "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
-                            : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                            ? "bg-rose-50 text-rose-700  "
+                            : "bg-amber-50 text-amber-800  "
                         }`}
                       >
                         {activeRequest.samplingFeasibilityResponse}
@@ -637,14 +645,14 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                       <span
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
                           activeRequest.marketingDecision === "Accepted"
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                            : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                            ? "bg-emerald-50 text-emerald-700  "
+                            : "bg-rose-50 text-rose-700  "
                         }`}
                       >
                         {activeRequest.marketingDecision}
                       </span>
                     ) : activeRequest.counterDateDecision === "pending" ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-amber-50 text-amber-800  ">
                         Date Decision
                       </span>
                     ) : activeRequest.samplingFeasibilityResponse ? (
@@ -713,7 +721,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                               {activeRequest.takenBySamp ? (
                                 <span className="text-[var(--on-surface)]">{activeRequest.takenBySamp}</span>
                               ) : (
-                                <span className="text-amber-600 dark:text-amber-400 font-semibold italic">
+                                <span className="text-amber-600  font-semibold italic">
                                   Pending Claim
                                 </span>
                               )}
@@ -765,10 +773,10 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                         {/* 3. Marketing Directives & Commercial Notes */}
                         {displayRemark && (
                           <div className="space-y-1.5">
-                            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 ">
                               Marketing Directives &amp; Commercial Notes
                             </div>
-                            <div className="p-3.5 rounded-xl border border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20 text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs whitespace-pre-wrap">
+                            <div className="p-3.5 rounded-xl border border-amber-200/70 bg-amber-50/50   text-xs text-[var(--on-surface)] font-sans leading-relaxed shadow-2xs whitespace-pre-wrap">
                               {displayRemark}
                             </div>
                           </div>
@@ -814,7 +822,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                             <div className="relative w-full h-[480px] sm:h-[520px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-low)]/50 overflow-hidden shadow-inner flex items-center justify-center p-4 sm:p-6 select-none group">
                               {/* Studio Light-Table Grid Backdrop (blends seamlessly with active theme) */}
                               <div
-                                className="absolute inset-0 opacity-[0.35] dark:opacity-[0.18] pointer-events-none"
+                                className="absolute inset-0 opacity-[0.35]  pointer-events-none"
                                 style={{
                                   backgroundImage: `radial-gradient(var(--border-strong) 1px, transparent 1px)`,
                                   backgroundSize: "20px 20px",
@@ -829,7 +837,7 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                                   src={imageSourceFor(currentImg.url)}
                                   alt={currentImg.name || "Reference image"}
                                   onClick={() => setSelectedPreviewImage(currentImg.url)}
-                                  className="max-w-full max-h-full object-contain rounded-xl transition duration-300 group-hover:scale-[1.015] cursor-zoom-in filter drop-shadow-[0_8px_20px_rgba(11,28,48,0.12)] dark:drop-shadow-[0_12px_28px_rgba(0,0,0,0.6)] z-[1]"
+                                  className="max-w-full max-h-full object-contain rounded-xl transition duration-300 group-hover:scale-[1.015] cursor-zoom-in filter drop-shadow-[0_8px_20px_rgba(11,28,48,0.12)]  z-[1]"
                                 />
                               ) : imageStatusFor(currentImg.url) === "error" ? (
                                 <div className="flex flex-col items-center justify-center gap-2 text-rose-500 text-xs z-[1]">
@@ -960,6 +968,15 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                     onConvertToSampling={handleConvertToSampling}
                   />
                 )}
+                <SamplingResponsePanel
+                  className="mt-6"
+                  response={activeRequest.samplingFeasibilityResponse
+                    ? `Feasibility response: ${activeRequest.samplingFeasibilityResponse}${activeRequest.samplingFeasibilityRemark ? `\n${activeRequest.samplingFeasibilityRemark}` : ""}`
+                    : activeRequest.samplingFeasibilityRemark}
+                  decision={activeRequest.samplingFeasibilityResponse ? "response_recorded" : ""}
+                  reviewer={activeRequest.samplingFeasibilityApprovedBy}
+                  respondedAt={activeRequest.samplingFeasibilityApprovedAt}
+                />
               </div>
             </div>
           </div>

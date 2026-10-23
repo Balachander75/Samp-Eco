@@ -253,10 +253,10 @@ export const MARKETING_REQUEST_TYPES: MarketingDeliverableType[] = [
     desc: "Cover artwork, graphic themes, illustrations, typography & creative brief",
     icon: Palette,
     tone: {
-      borderActive: "border-brand-600 dark:border-brand-500",
-      bgActive: "bg-brand-50/50 dark:bg-brand-950/25",
-      badge: "bg-brand-50 text-brand-800 border-brand-200 dark:bg-brand-950/60 dark:text-brand-300 dark:border-brand-800/80",
-      text: "text-brand-600 dark:text-brand-400",
+      borderActive: "border-brand-600 ",
+      bgActive: "bg-brand-50/50 ",
+      badge: "bg-brand-50 text-brand-800 border-brand-200   ",
+      text: "text-brand-600 ",
       ring: "ring-brand-500/20",
     },
   },
@@ -269,10 +269,10 @@ export const MARKETING_REQUEST_TYPES: MarketingDeliverableType[] = [
     desc: "CAD structural white dummy, die-line verification, folding format & digital 3D proof",
     icon: Box,
     tone: {
-      borderActive: "border-brand-600 dark:border-brand-500",
-      bgActive: "bg-brand-50/50 dark:bg-brand-950/25",
-      badge: "bg-brand-50 text-brand-800 border-brand-200 dark:bg-brand-950/60 dark:text-brand-300 dark:border-brand-800/80",
-      text: "text-brand-600 dark:text-brand-400",
+      borderActive: "border-brand-600 ",
+      bgActive: "bg-brand-50/50 ",
+      badge: "bg-brand-50 text-brand-800 border-brand-200   ",
+      text: "text-brand-600 ",
       ring: "ring-brand-500/20",
     },
   },
@@ -285,10 +285,10 @@ export const MARKETING_REQUEST_TYPES: MarketingDeliverableType[] = [
     desc: "Finished physical prototype with actual binding, ruling, paper stock & cover finishes",
     icon: Sparkles,
     tone: {
-      borderActive: "border-brand-600 dark:border-brand-500",
-      bgActive: "bg-brand-50/50 dark:bg-brand-950/25",
-      badge: "bg-brand-50 text-brand-800 border-brand-200 dark:bg-brand-950/60 dark:text-brand-300 dark:border-brand-800/80",
-      text: "text-brand-600 dark:text-brand-400",
+      borderActive: "border-brand-600 ",
+      bgActive: "bg-brand-50/50 ",
+      badge: "bg-brand-50 text-brand-800 border-brand-200   ",
+      text: "text-brand-600 ",
       ring: "ring-brand-500/20",
     },
   },
@@ -301,10 +301,10 @@ export const MARKETING_REQUEST_TYPES: MarketingDeliverableType[] = [
     desc: "Comprehensive Bill of Materials costing, machine run-rates & volume tiered pricing",
     icon: Calculator,
     tone: {
-      borderActive: "border-brand-600 dark:border-brand-500",
-      bgActive: "bg-brand-50/50 dark:bg-brand-950/25",
-      badge: "bg-brand-50 text-brand-800 border-brand-200 dark:bg-brand-950/60 dark:text-brand-300 dark:border-brand-800/80",
-      text: "text-brand-600 dark:text-brand-400",
+      borderActive: "border-brand-600 ",
+      bgActive: "bg-brand-50/50 ",
+      badge: "bg-brand-50 text-brand-800 border-brand-200   ",
+      text: "text-brand-600 ",
       ring: "ring-brand-500/20",
     },
   },
@@ -699,7 +699,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
     <div className="fixed inset-0 z-[100] overflow-y-auto" role="dialog" aria-modal="true">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs animate-smooth-backdrop transition-opacity duration-200"
+        className="fixed inset-0 bg-[var(--overlay-backdrop)] backdrop-blur-xs animate-smooth-backdrop transition-opacity duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -796,7 +796,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
           {/* Modal Body: Single Page Document Sheet */}
           <div className="p-5 sm:p-6 max-h-[78vh] overflow-y-auto">
             {error && (
-              <div className="mb-4 px-3.5 py-2.5 rounded border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-medium">
+              <div className="mb-4 px-3.5 py-2.5 rounded border border-rose-200  bg-rose-50  text-rose-700  text-xs font-medium">
                 {error}
               </div>
             )}
@@ -967,7 +967,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                           <span
                             className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full transition-colors font-mono ${
                               uploadedImages.length >= 2 && webLinks.length >= 1
-                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/40"
+                                ? "bg-amber-100 text-amber-800   border border-amber-300/40"
                                 : totalAttachments > 0
                                 ? "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] border border-[var(--accent-primary)]/20"
                                 : "bg-[var(--surface-low)] text-[var(--on-surface-subtle)]"
@@ -1118,7 +1118,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                     type="button"
                                     onClick={() => handleRemoveImage(img.id)}
                                     title="Remove image"
-                                    className="p-1.5 rounded-lg text-[var(--on-surface-subtle)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0 cursor-pointer"
+                                    className="p-1.5 rounded-lg text-[var(--on-surface-subtle)] hover:text-rose-600 hover:bg-rose-50  transition-colors shrink-0 cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -1149,7 +1149,7 @@ export const NewSampleRequestModal: React.FC<NewSampleRequestModalProps> = ({
                                     type="button"
                                     onClick={() => handleRemoveWebLink(idx)}
                                     title="Remove link"
-                                    className="p-1.5 rounded-lg text-[var(--on-surface-subtle)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0 cursor-pointer"
+                                    className="p-1.5 rounded-lg text-[var(--on-surface-subtle)] hover:text-rose-600 hover:bg-rose-50  transition-colors shrink-0 cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>

@@ -7,11 +7,8 @@
     <script>
       (function() {
         try {
-          var darkThemes = ['midnight', 'forest-night', 'nocturne', 'tokyo-neon', 'titanium'];
           var validThemes = [
-            'emerald', 'ocean', 'violet', 'amber', 'rose', 'neo-brutalism',
-            'nordic-frost', 'terracotta', 'midnight', 'forest-night',
-            'nocturne', 'tokyo-neon', 'titanium'
+            'emerald', 'ocean', 'violet', 'amber', 'rose', 'neo-brutalism', 'nordic-frost', 'terracotta'
           ];
           var saved = localStorage.getItem('erp_theme_id');
           if (!saved) {
@@ -24,10 +21,8 @@
             } catch (e) {}
           }
           var themeId = (saved && validThemes.indexOf(saved) !== -1) ? saved : 'emerald';
-          var isDark = darkThemes.indexOf(themeId) !== -1;
           document.documentElement.dataset.theme = themeId;
-          document.documentElement.classList.toggle('dark', isDark);
-          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+          document.documentElement.style.colorScheme = 'light';
         } catch (e) {}
       })();
     </script>
@@ -39,7 +34,7 @@
       rel="stylesheet"
     />
   </head>
-  <body class="h-full w-full overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-primary)] selection:text-white">
+  <body class="h-full w-full overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

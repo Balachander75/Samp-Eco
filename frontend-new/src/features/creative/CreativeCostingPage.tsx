@@ -67,12 +67,12 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
 
     requests.forEach((r) => {
       const hasRemark = Boolean(r.costing_creative_input_remark && r.costing_creative_input_remark.trim() !== "");
-      const isInputNeeded = r.costing_creative_input_needed || (!hasRemark && r.status !== "done" && r.current_stage === "creative");
+      const isInputNeeded = r.costing_creative_input_needed === true;
 
       if (isInputNeeded && !hasRemark) {
         inputNeeded++;
       }
-      if (hasRemark) {
+      if (isInputNeeded && hasRemark) {
         inputProvided++;
       }
 
@@ -114,11 +114,11 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
       const hasRemark = Boolean(r.costing_creative_input_remark && r.costing_creative_input_remark.trim() !== "");
-      const isInputNeeded = r.costing_creative_input_needed || (!hasRemark && r.status !== "done" && r.current_stage === "creative");
+      const isInputNeeded = r.costing_creative_input_needed === true;
 
       // Stage Tab Filter
       if (selectedStageTab === "input_needed" && (!isInputNeeded || hasRemark)) return false;
-      if (selectedStageTab === "input_provided" && !hasRemark) return false;
+      if (selectedStageTab === "input_provided" && (!isInputNeeded || !hasRemark)) return false;
       if (selectedStageTab === "overdue") {
         if (!r.creative_due_at) return false;
         const dt = new Date(r.creative_due_at);
@@ -321,9 +321,9 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
       width: "w-[130px]",
       cell: (request) => {
         const hasRemark = Boolean(request.costing_creative_input_remark && request.costing_creative_input_remark.trim() !== "");
-        const isNeeded = request.costing_creative_input_needed || (!hasRemark && request.status !== "done");
+        const isNeeded = request.costing_creative_input_needed === true;
 
-        if (hasRemark) {
+        if (isNeeded && hasRemark) {
           return (
             <div className="space-y-0.5 min-w-0">
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
@@ -394,17 +394,17 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
     {
       id: "actions",
       header: "Action",
-      width: "w-[80px]",
+      width: "w-[95px]",
       align: "right",
       cell: (request) => (
         <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
-            aria-label={`Inspect ${request.sr_number || request.request_code}`}
+            aria-label={`Respond to ${request.sr_number || request.request_code}`}
             onClick={() => setSelectedKey(request.sample_request_id)}
             className="select-none rounded-lg px-2 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
           >
-            <span>Inspect</span>
+            <span>Respond</span>
             <ChevronRight className="w-3 h-3" />
           </button>
         </div>

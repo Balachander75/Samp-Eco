@@ -80,7 +80,7 @@ export const NewProgramPlanningModal: React.FC<NewProgramPlanningModalProps> = (
     <div className="fixed inset-0 z-[100] overflow-y-auto" role="dialog" aria-modal="true">
       {/* Soft diffused backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/60 transition-opacity"
+        className="fixed inset-0 bg-[var(--overlay-backdrop)] transition-opacity"
         onClick={onClose}
       />
 
