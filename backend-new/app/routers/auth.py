@@ -34,15 +34,20 @@ ThemeId = Literal[
     "violet",
     "amber",
     "rose",
-    "midnight",
-    "forest-night",
-    "nocturne",
     "neo-brutalism",
     "nordic-frost",
     "terracotta",
-    "tokyo-neon",
-    "titanium",
 ]
+VALID_THEMES = {
+    "emerald",
+    "ocean",
+    "violet",
+    "amber",
+    "rose",
+    "neo-brutalism",
+    "nordic-frost",
+    "terracotta",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +163,7 @@ def _user_to_out(user: User) -> dict:
         "is_costing_admin": getattr(user, "is_costing_admin", False),
         "plant_code": getattr(user, "plant_code", None),
         "plant_codes": getattr(user, "plant_codes", []),
-        "theme_id": getattr(user, "theme_id", "emerald"),
+        "theme_id": getattr(user, "theme_id", "emerald") if getattr(user, "theme_id", "emerald") in VALID_THEMES else "emerald",
         "is_active": user.is_active,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
@@ -550,7 +555,8 @@ def change_password(
     summary="Get the current user's workspace theme",
 )
 def get_theme_preference(current_user: User = Depends(get_current_user)):
-    return {"theme_id": getattr(current_user, "theme_id", "emerald") or "emerald"}
+    theme = getattr(current_user, "theme_id", "emerald")
+    return {"theme_id": theme if theme in VALID_THEMES else "emerald"}
 
 
 @router.put(

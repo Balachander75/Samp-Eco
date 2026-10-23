@@ -25,7 +25,6 @@ The application orchestrates requests through seven interconnected enterprise wo
 ┌───────────────────────────────────────────────────────────────────────────────────┐
 │                           1. MARKETING / SALES INTAKE                             │
 │  - Catalog Product Search & Custom Specs: /sample-requests/product-staging        │
-│  - Staging Drawer & Autosaved Drafts:     /sample-requests/draft-workspace        │
 │  - Request Types: [Design] [Mockup] [Sampling] [Costing]                          │
 └────────────────────────────────────────┬──────────────────────────────────────────┘
                                          │ Bulk Release
@@ -328,7 +327,6 @@ npm run build
 | If you need to modify... | Target File / Directory |
 |---|---|
 | **Marketing Request intake, wizard or staging drawer** | `frontend-new/src/features/sample-requests/components/staging/` |
-| **Draft workspace, bulk release, or autosave logic** | `frontend-new/src/features/sample-requests/components/DraftWorkspacePage.tsx` |
 | **Sample requests table columns, status pills, or filters** | `frontend-new/src/features/sample-requests/sampling/` |
 | **Sample request inspection sheet tabs** | `frontend-new/src/features/sample-requests/components/inspector/` |
 | **Feasibility review tabs, counter-dates, or verdicts** | `frontend-new/src/features/sample-requests/components/FeasibilityInspectorModal.tsx` |

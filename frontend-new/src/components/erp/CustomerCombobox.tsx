@@ -194,7 +194,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
           }}
           className={`h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 ${
             value ? "pr-14" : "pr-8"
-          } text-xs font-semibold text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700/80 dark:bg-zinc-900/80 dark:text-zinc-100`}
+          } text-xs font-semibold text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 disabled:cursor-not-allowed disabled:opacity-60`}
         />
         {value && (
           <button
@@ -203,7 +203,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
             title="Clear customer"
             onMouseDown={(event) => event.preventDefault()}
             onClick={clearCustomer}
-            className="absolute right-7 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+            className="absolute right-7 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
           >
             <X className="h-3 w-3" />
           </button>
@@ -220,7 +220,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
               inputRef.current?.focus();
             }
           }}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-600 cursor-pointer"
         >
           <ChevronDown
             className={`h-3.5 w-3.5 transition-transform duration-150 ${
@@ -243,7 +243,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
               width: dropdownPosition.width,
               maxHeight: dropdownPosition.maxHeight,
             }}
-            className="z-[99999] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1.5 shadow-[0_12px_36px_rgba(15,23,42,0.2)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_12px_36px_rgba(0,0,0,0.6)]"
+            className="z-[99999] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1.5 shadow-[0_12px_36px_rgba(15,23,42,0.2)]"
           >
             {/* Custom customer suggestion option if typed query has no exact match */}
             {query.trim() &&
@@ -259,7 +259,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
                     setQuery(query.trim());
                     setIsOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border-b border-zinc-100 dark:border-zinc-800 mb-1 cursor-pointer transition-colors"
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 border-b border-zinc-100 mb-1 cursor-pointer transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5 shrink-0 stroke-[2.5]" />
                   <span className="truncate">
@@ -285,8 +285,8 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
                     tabIndex={-1}
                     className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left transition-colors cursor-pointer ${
                       index === activeIndex || isSelected
-                        ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950/50 dark:text-emerald-200 font-semibold"
-                        : "hover:bg-slate-50 text-zinc-800 dark:hover:bg-zinc-800/60 dark:text-zinc-200"
+                        ? "bg-emerald-50 text-emerald-950 font-semibold"
+                        : "hover:bg-slate-50 text-zinc-800"
                     }`}
                   >
                     <span className="min-w-0">
@@ -294,19 +294,19 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
                         {customer.name}
                       </span>
                       {customer.country && (
-                        <span className="block truncate text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                        <span className="block truncate text-[10px] font-mono text-zinc-500">
                           {customer.country}
                         </span>
                       )}
                     </span>
                     {isSelected && (
-                      <Check className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400 stroke-[2.5]" />
+                      <Check className="h-3.5 w-3.5 shrink-0 text-emerald-700 stroke-[2.5]" />
                     )}
                   </button>
                 );
               })
             ) : (
-              <div className="px-2.5 py-3 text-center text-[11px] text-zinc-500 dark:text-zinc-400">
+              <div className="px-2.5 py-3 text-center text-[11px] text-zinc-500">
                 No matching customer found. Type to use a custom account.
               </div>
             )}

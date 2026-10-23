@@ -390,7 +390,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
           disabled && "cursor-not-allowed bg-[var(--surface-low)] opacity-50",
           !disabled && "bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)]",
           isSelectedValueHoliday || hasError
-            ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:ring-1 focus:ring-rose-500 dark:text-rose-200"
+            ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:ring-1 focus:ring-rose-500"
             : "border-[var(--border-subtle)] text-[var(--on-surface)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15"
         )}
       >
@@ -415,7 +415,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
                   ({formatDisplayDate(value)})
                 </span>
                 {isSelectedValueHoliday && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 shrink-0">
                     ⚠️ HOLIDAY ({selectedValueHolidayInfo?.badge})
                   </span>
                 )}
@@ -452,7 +452,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
 
       {/* Holiday / Error banner below input */}
       {isSelectedValueHoliday && (
-        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-rose-600 font-medium">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           <span>
             {selectedValueHolidayInfo?.label || "Plant Holiday"}: This date is restricted. Please select an active working day.
@@ -512,7 +512,7 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
 
           {/* Restriction Notice Banner (if user attempted to click holiday) */}
           {rejectedAttemptMessage && (
-            <div className="mb-2 p-2 rounded bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 text-[11px] leading-tight flex items-start gap-1.5 animate-pulse">
+            <div className="mb-2 p-2 rounded bg-rose-50 border border-rose-200 text-rose-700 text-[11px] leading-tight flex items-start gap-1.5 animate-pulse">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
               <span>{rejectedAttemptMessage}</span>
             </div>
@@ -529,9 +529,9 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
                   className={cn(
                     "text-[10px] font-mono font-bold uppercase tracking-wider py-0.5",
                     isSundayCol
-                      ? "text-rose-600 dark:text-rose-400"
+                      ? "text-rose-600"
                       : isSaturdayCol
-                      ? "text-amber-700 dark:text-amber-400"
+                      ? "text-amber-700"
                       : "text-[var(--on-surface-subtle)]"
                   )}
                   title={
@@ -584,14 +584,14 @@ export const OperationalDatePicker: React.FC<OperationalDatePickerProps> = ({
                     title={`Restricted: ${holidayLabel} (Plant Off)`}
                     className={cn(
                       "relative h-8 rounded flex flex-col items-center justify-center transition-all cursor-not-allowed",
-                      "bg-rose-50/70 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-900/50",
-                      "text-rose-600 dark:text-rose-400 hover:border-rose-400 active:scale-95"
+                      "bg-rose-50/70 border border-rose-200/60",
+                      "text-rose-600 hover:border-rose-400 active:scale-95"
                     )}
                   >
                     <span className="text-[11px] font-mono font-bold leading-none">
                       {dayNumber}
                     </span>
-                    <span className="text-[7.5px] font-mono font-black uppercase text-rose-700 dark:text-rose-300 bg-rose-200/80 dark:bg-rose-900/80 px-1 py-0.2 rounded-xs leading-none mt-0.5 tracking-tighter">
+                    <span className="text-[7.5px] font-mono font-black uppercase text-rose-700 bg-rose-200/80 px-1 py-0.2 rounded-xs leading-none mt-0.5 tracking-tighter">
                       OFF
                     </span>
                   </button>

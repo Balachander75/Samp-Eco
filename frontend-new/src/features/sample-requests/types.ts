@@ -63,6 +63,7 @@ export interface FeasibilityRequestRecord extends FeasibilityRequestPayload {
   samplingFeasibilityResponse?: "Yes" | "No" | "Maybe" | null;
   samplingFeasibilityRemark?: string | null;
   samplingFeasibilityApprovedBy?: string | null;
+  samplingFeasibilityApprovedAt?: string | null;
   plantFeasibilityResponse?: "Yes" | "No" | "Maybe" | null;
   plantFeasibilityRemark?: string | null;
   feasibilityClosedAt?: string | null;
@@ -271,6 +272,7 @@ export interface SampleRequestItem {
   samplingFeasibilityResponse?: "Yes" | "No" | "Maybe" | null;
   samplingFeasibilityRemark?: string | null;
   samplingFeasibilityApprovedBy?: string | null;
+  samplingFeasibilityApprovedAt?: string | null;
   plantFeasibilityResponse?: "Yes" | "No" | "Maybe" | null;
   plantFeasibilityRemark?: string | null;
   feasibilityClosedAt?: string | null;

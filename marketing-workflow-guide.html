@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Navneet SAMP — Application Workflow Architecture</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700;800&family=Inter:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      padding: 24px 16px;
+      line-height: 1.4;
+    }
+
+    .wrapper {
+      max-width: 1040px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    /* TOP STICKY BAR */
+    .top-bar {
+      background: #ffffff;
+      border: 2px solid #0f172a;
+      border-radius: 10px;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      position: sticky;
+      top: 12px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #0f172a;
+      color: #fff;
+    }
+
+    /* NAV LINKS */
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: #f1f5f9;
+      border: 1.5px solid #cbd5e1;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      color: #334155;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover {
+      background: #0f172a;
+      color: #ffffff;
+      border-color: #0f172a;
+    }
+
+    .print-btn {
+      background: #0f172a;
+      color: #ffffff;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* CHART CARD */
+    .chart-card {
+      background: #ffffff;
+      border: 2px solid #0f172a;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+      overflow-x: auto;
+    }
+    .chart-header {
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .chart-title {
+      font-size: 18px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: -0.2px;
+    }
+    .chart-desc {
+      font-size: 13px;
+      color: #475569;
+      margin-top: 3px;
+    }
+    .pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1.5px solid;
+    }
+    .pill-amber { background: #fffbeb; border-color: #d97706; color: #92400e; }
+    .pill-green { background: #f0fdf4; border-color: #059669; color: #065f46; }
+    .pill-purple { background: #faf5ff; border-color: #7c3aed; color: #5b21b6; }
+
+    /* SVG FLOWCHART STYLES */
+    svg.flow {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .terminal {
+      fill: #ffffff;
+      stroke: #0f172a;
+      stroke-width: 2.2;
+      rx: 20;
+      ry: 20;
+    }
+    .terminal.start, .terminal.end {
+      fill: #f0fdf4;
+      stroke: #059669;
+    }
+    .terminal.close {
+      fill: #fef2f2;
+      stroke: #dc2626;
+    }
+
+    .box {
+      fill: #ffffff;
+      stroke: #0f172a;
+      stroke-width: 2;
+      rx: 5;
+      ry: 5;
+    }
+    .diamond {
+      fill: #ffffff;
+      stroke: #0f172a;
+      stroke-width: 2.2;
+    }
+
+    .line {
+      stroke: #0f172a;
+      stroke-width: 2;
+      fill: none;
+    }
+    .line-green {
+      stroke: #059669;
+      stroke-width: 2.2;
+      fill: none;
+    }
+    .line-red {
+      stroke: #dc2626;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .txt {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      font-weight: 800;
+      fill: #0f172a;
+      text-anchor: middle;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .txt-sm {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 800;
+      fill: #0f172a;
+      text-anchor: middle;
+      text-transform: uppercase;
+    }
+
+    .badge-yes { fill: #ecfdf5; stroke: #059669; stroke-width: 1.5; rx: 3; ry: 3; }
+    .txt-yes { fill: #065f46; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; text-anchor: middle; }
+
+    .badge-no { fill: #fef2f2; stroke: #dc2626; stroke-width: 1.5; rx: 3; ry: 3; }
+    .txt-no { fill: #991b1b; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; text-anchor: middle; }
+
+    .badge-maybe { fill: #fffbeb; stroke: #d97706; stroke-width: 1.5; rx: 3; ry: 3; }
+    .txt-maybe { fill: #92400e; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; text-anchor: middle; }
+
+    /* STEP NOTES */
+    .note-box {
+      background: #f8fafc;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 20px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .note-box strong { color: #0f172a; }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .top-bar, .no-print { display: none !important; }
+      .wrapper { max-width: 100%; gap: 16px; }
+      .chart-card { border: 1.5px solid #000; box-shadow: none; page-break-after: always; padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wrapper">
+
+    <!-- TOP STICKY BAR -->
+    <header class="top-bar no-print">
+      <div class="brand-title">
+        <span class="badge">SAMP-ECO</span>
+        <span>Marketing Workflow Flowcharts</span>
+      </div>
+
+      <nav class="nav-tabs">
+        <a href="#flow-feasibility" class="tab-btn">1. Feasibility Flow</a>
+        <a href="#flow-sample" class="tab-btn">2. Sample Request Flow (4 Scopes)</a>
+        <a href="#flow-program" class="tab-btn">3. Program Planning Flow</a>
+      </nav>
+
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+    </header>
+
+    <!-- SHARED SVG ARROW DEFINITIONS -->
+    <svg width="0" height="0" style="position:absolute;">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 8 5 L 0 9 z" fill="#0f172a" />
+        </marker>
+        <marker id="arr-g" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 8 5 L 0 9 z" fill="#059669" />
+        </marker>
+        <marker id="arr-r" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 8 5 L 0 9 z" fill="#dc2626" />
+        </marker>
+      </defs>
+    </svg>
+
+    <!-- ==================================================================== -->
+    <!-- 1. EXACT FEASIBILITY REQUEST FLOWCHART                               -->
+    <!-- ==================================================================== -->
+    <!-- ==================================================================== -->
+    <!-- 1. EXACT FEASIBILITY REQUEST FLOWCHART                               -->
+    <!-- ==================================================================== -->
+    <section id="feasibility-flow" class="chart-card">
+      <a id="flow-feasibility"></a>
+      <div class="chart-header">
+        <div>
+          <h2 class="chart-title">1. Feasibility Check Flowchart</h2>
+          <p class="chart-desc">Marketing raises request ➔ Sampling team responds (Yes / No / Maybe) ➔ Marketing accepts or rejects ➔ If accepted, unlocks Mockup, Sampling, or Costing</p>
+        </div>
+        <span class="pill pill-amber">Marketing ➔ Sampling Team</span>
+      </div>
+
+      <svg class="flow" width="900" height="790" viewBox="0 0 900 790">
+        <!-- 1. START -->
+        <rect x="370" y="15" width="160" height="36" class="terminal start" />
+        <text x="450" y="38" class="txt" style="fill:#065f46;">START</text>
+
+        <path d="M 450 51 L 450 78" class="line" marker-end="url(#arr)" />
+
+        <!-- 2. MARKETING RAISES FEASIBILITY -->
+        <rect x="250" y="78" width="400" height="42" class="box" style="stroke:#059669; fill:#f0fdf4;" />
+        <text x="450" y="104" class="txt" style="fill:#065f46;">1. MARKETING RAISES FEASIBILITY REQUEST</text>
+
+        <path d="M 450 120 L 450 155" class="line" marker-end="url(#arr)" />
+
+        <!-- 3. SAMPLING TEAM REVIEWS -->
+        <rect x="250" y="155" width="400" height="42" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
+        <text x="450" y="181" class="txt" style="fill:#0f766e;">2. SAMPLING TEAM REVIEWS PACKAGING SPECS</text>
+
+        <path d="M 450 197 L 450 230" class="line" marker-end="url(#arr)" />
+
+        <!-- 4. DECISION: SAMPLING TEAM VERDICT (YES / NO / MAYBE) -->
+        <polygon points="450,230 590,265 450,300 310,265" class="diamond" style="stroke:#0d9488;" />
+        <text x="450" y="269" class="txt">3. SAMPLING VERDICT?</text>
+
+        <!-- VERDICT 1: "NO" (LEFT -> DOWN TO MARKETING REVIEW) -->
+        <path d="M 310 265 L 100 265 L 100 377 L 242 377" class="line-red" marker-end="url(#arr-r)" />
+        <rect x="135" y="244" width="110" height="20" class="badge-no" />
+        <text x="190" y="258" class="txt-no">NO (UNFEASIBLE)</text>
+
+        <!-- VERDICT 2: "YES" (STRAIGHT DOWN TO MARKETING REVIEW) -->
+        <path d="M 450 300 L 450 353" class="line-green" marker-end="url(#arr-g)" />
+        <rect x="395" y="315" width="110" height="20" class="badge-yes" />
+        <text x="450" y="329" class="txt-yes">YES (FEASIBLE)</text>
+
+        <!-- VERDICT 3: "MAYBE" (RIGHT -> DOWN TO MARKETING REVIEW) -->
+        <path d="M 590 265 L 800 265 L 800 377 L 658 377" class="line" marker-end="url(#arr)" />
+        <rect x="655" y="244" width="125" height="20" class="badge-maybe" />
+        <text x="717.5" y="258" class="txt-maybe">MAYBE (CONDITIONAL)</text>
+
+        <!-- 5. MARKETING RECEIVES VERDICT -->
+        <rect x="250" y="355" width="400" height="44" class="box" style="stroke:#059669; fill:#f0fdf4;" />
+        <text x="450" y="378" class="txt" style="fill:#065f46;">4. MARKETING RECEIVES SAMPLING VERDICT</text>
+        <text x="450" y="392" class="txt-sm" style="fill:#64748b; font-size:9.5px;">(Reviews Remarks: YES, NO, or MAYBE)</text>
+
+        <path d="M 450 399 L 450 435" class="line" marker-end="url(#arr)" />
+
+        <!-- 6. DECISION: MARKETING DECISION (ACCEPT OR REJECT) -->
+        <polygon points="450,435 590,470 450,505 310,470" class="diamond" style="stroke:#059669;" />
+        <text x="450" y="474" class="txt">5. MARKETING DECISION?</text>
+
+        <!-- REJECT: GOES TO CLOSE -->
+        <path d="M 310 470 L 188 470" class="line-red" marker-end="url(#arr-r)" />
+        <rect x="205" y="445" width="85" height="18" class="badge-no" />
+        <text x="247.5" y="458" class="txt-no">REJECT / CLOSE</text>
+
+        <!-- CLOSE BOX -->
+        <rect x="30" y="452" width="150" height="36" class="terminal close" />
+        <text x="105" y="475" class="txt" style="fill:#dc2626; font-size:10.5px;">REQUEST CLOSED</text>
+
+        <!-- ACCEPT (ONLY FOR YES OR MAYBE) -->
+        <path d="M 450 505 L 450 548" class="line-green" marker-end="url(#arr-g)" />
+        <rect x="350" y="515" width="200" height="20" class="badge-yes" />
+        <text x="450" y="529" class="txt-yes">ACCEPT (YES / MAYBE ONLY)</text>
+
+        <!-- 7. FEASIBILITY ACCEPTED - UNLOCKS OPTIONS -->
+        <rect x="220" y="550" width="460" height="42" class="box" style="stroke:#059669; fill:#ecfdf5; stroke-width:2.2;" />
+        <text x="450" y="576" class="txt" style="fill:#065f46;">6. FEASIBILITY ACCEPTED ➔ OPTIONS UNLOCKED</text>
+
+        <!-- SPLIT TO 3 OPTIONS (MOCKUP, SAMPLING, COSTING) -->
+        <path d="M 450 592 L 450 618" class="line" />
+        <path d="M 150 618 L 750 618" class="line" />
+
+        <!-- OPTION 1: MOCKUP REQUEST -->
+        <path d="M 150 618 L 150 640" class="line" marker-end="url(#arr)" />
+        <rect x="60" y="640" width="180" height="46" class="box" style="stroke:#2563eb; fill:#eff6ff;" />
+        <text x="150" y="660" class="txt-sm" style="fill:#1e40af;">RAISE MOCKUP</text>
+        <text x="150" y="675" class="txt-sm" style="fill:#64748b; font-size:9px;">(Studio Team / CAD Dieline)</text>
+
+        <!-- OPTION 2: SAMPLING REQUEST -->
+        <path d="M 450 618 L 450 640" class="line" marker-end="url(#arr)" />
+        <rect x="360" y="640" width="180" height="46" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
+        <text x="450" y="660" class="txt-sm" style="fill:#115e59;">RAISE SAMPLING</text>
+        <text x="450" y="675" class="txt-sm" style="fill:#64748b; font-size:9px;">(Physical Lab Sample)</text>
+
+        <!-- OPTION 3: COSTING REQUEST -->
+        <path d="M 750 618 L 750 640" class="line" marker-end="url(#arr)" />
+        <rect x="660" y="640" width="180" height="46" class="box" style="stroke:#d97706; fill:#fffbeb;" />
+        <text x="750" y="660" class="txt-sm" style="fill:#92400e;">RAISE COSTING</text>
+        <text x="750" y="675" class="txt-sm" style="fill:#64748b; font-size:9px;">(Costing Desk / Price &amp; BOM)</text>
+
+        <!-- MERGE TO SAMPLE WORKFLOW -->
+        <path d="M 150 686 L 150 715 L 450 715" class="line-green" />
+        <path d="M 450 686 L 450 715" class="line-green" />
+        <path d="M 750 686 L 750 715 L 450 715" class="line-green" />
+
+        <path d="M 450 715 L 450 738" class="line-green" marker-end="url(#arr-g)" />
+
+        <rect x="270" y="738" width="360" height="34" class="terminal end" />
+        <text x="450" y="760" class="txt-sm" style="fill:#065f46;">➔ MOVES INTO SAMPLE REQUEST PIPELINE</text>
+      </svg>
+
+      <div class="note-box">
+        <strong>Exact Feasibility Workflow:</strong><br>
+        1. <strong>Marketing</strong> raises a Feasibility Check request ➔ Directly sent to <strong>Sampling Team</strong>.<br>
+        2. <strong>Sampling Team</strong> reviews packaging specs &amp; responds with: <strong>YES</strong> (Feasible), <strong>NO</strong> (Not Feasible), or <strong>MAYBE</strong> (Conditional).<br>
+        3. Sampling Team's response returns to <strong>Marketing</strong>.<br>
+        4. <strong>Marketing Decision:</strong>
+           • If Marketing chooses <strong>Reject</strong> (or Sampling said No) ➔ Request is closed.<br>
+           • If Sampling said <strong>Yes</strong> or <strong>Maybe</strong> AND Marketing chooses <strong>Accept</strong> ➔ Marketing unlocks options in the system to raise: <strong>Mockup</strong> (Studio), <strong>Sampling</strong> (Physical Sample), or <strong>Costing</strong> (Price/BOM)!
+      </div>
+    </section>
+
+
+    <!-- ==================================================================== -->
+    <!-- 2. SAMPLE REQUEST (SR) WITH THE 4 SCOPES & PLANT                     -->
+    <!-- ==================================================================== -->
+    <section id="flow-sample" class="chart-card">
+      <a id="sample-flow"></a>
+      <div class="chart-header">
+        <div>
+          <h2 class="chart-title">2. Sample Request Flowchart (4 Options & Plant Khaniwade)</h2>
+          <p class="chart-desc">Draft ➔ Released ➔ Dispatched to matching teams ➔ Client Approves ➔ Khaniwade Plant (1505) produces</p>
+        </div>
+        <span class="pill pill-green">Draft ➔ Release ➔ Khaniwade 1505</span>
+      </div>
+
+      <svg class="flow" width="940" height="740" viewBox="0 0 940 740">
+        <!-- 1. START -->
+        <rect x="380" y="15" width="160" height="36" class="terminal start" />
+        <text x="460" y="38" class="txt" style="fill:#065f46;">START</text>
+
+        <path d="M 460 51 L 460 78" class="line" marker-end="url(#arr)" />
+
+        <!-- 2. MARKETING DRAFT -->
+        <rect x="310" y="78" width="300" height="40" class="box" style="stroke:#059669; fill:#f0fdf4;" />
+        <text x="460" y="103" class="txt" style="fill:#065f46;">MARKETING CREATES DRAFT</text>
+
+        <path d="M 460 118 L 460 148" class="line" marker-end="url(#arr)" />
+
+        <!-- 3. DECISION: READY TO RELEASE? -->
+        <polygon points="460,148 580,178 460,208 340,178" class="diamond" style="stroke:#059669;" />
+        <text x="460" y="182" class="txt">READY TO RELEASE?</text>
+
+        <!-- NO: LOOP BACK -->
+        <path d="M 580 178 L 680 178 L 680 98 L 615 98" class="line-red" marker-end="url(#arr-r)" />
+        <rect x="605" y="165" width="36" height="18" class="badge-no" />
+        <text x="623" y="178" class="txt-no">NO</text>
+
+        <!-- YES: RELEASE REQUEST -->
+        <path d="M 460 208 L 460 245" class="line-green" marker-end="url(#arr-g)" />
+        <rect x="468" y="217" width="36" height="18" class="badge-yes" />
+        <text x="486" y="230" class="txt-yes">YES</text>
+
+        <!-- 4 OPTIONS BUS LINE -->
+        <path d="M 110 265 L 810 265" class="line" />
+        <path d="M 460 245 L 460 265" class="line" />
+
+        <!-- ================= SCOPE 1: DESIGN ================= -->
+        <path d="M 110 265 L 110 295" class="line" marker-end="url(#arr)" />
+        <rect x="20" y="295" width="180" height="42" class="box" style="stroke:#7c3aed; fill:#faf5ff;" />
+        <text x="110" y="316" class="txt-sm" style="fill:#5b21b6;">[✓] DESIGN</text>
+        <text x="110" y="329" class="txt-sm" style="fill:#64748b; font-size:9px;">CREATIVE TEAM MAKES PROOF</text>
+
+        <!-- Marketing Approves Art? -->
+        <path d="M 110 337 L 110 365" class="line" marker-end="url(#arr)" />
+        <polygon points="110,365 175,390 110,415 45,390" class="diamond" style="stroke:#7c3aed;" />
+        <text x="110" y="394" class="txt-sm" style="font-size:9px;">ART OK?</text>
+
+        <!-- No: Loop -->
+        <path d="M 45 390 L 10 390 L 10 316 L 18 316" class="line-red" marker-end="url(#arr-r)" />
+        <rect x="15" y="378" width="26" height="14" class="badge-no" />
+        <text x="28" y="389" class="txt-no" style="font-size:8px;">NO</text>
+
+        <!-- Yes -->
+        <path d="M 110 415 L 110 480" class="line-green" />
+        <rect x="118" y="425" width="28" height="16" class="badge-yes" />
+        <text x="132" y="437" class="txt-yes" style="font-size:9px;">YES</text>
+
+
+        <!-- ================= SCOPE 2: MOCKUP ================= -->
+        <path d="M 340 265 L 340 295" class="line" marker-end="url(#arr)" />
+        <rect x="250" y="295" width="180" height="42" class="box" style="stroke:#2563eb; fill:#eff6ff;" />
+        <text x="340" y="316" class="txt-sm" style="fill:#1e40af;">[✓] MOCKUP</text>
+        <text x="340" y="329" class="txt-sm" style="fill:#64748b; font-size:9px;">STUDIO MAKES CAD DIELINE</text>
+        <path d="M 340 337 L 340 480" class="line" />
+
+
+        <!-- ================= SCOPE 3: COSTING ================= -->
+        <path d="M 580 265 L 580 295" class="line" marker-end="url(#arr)" />
+        <rect x="490" y="295" width="180" height="42" class="box" style="stroke:#d97706; fill:#fffbeb;" />
+        <text x="580" y="316" class="txt-sm" style="fill:#92400e;">[✓] COSTING</text>
+        <text x="580" y="329" class="txt-sm" style="fill:#64748b; font-size:9px;">COSTING TEAM GIVES QUOTE</text>
+        <path d="M 580 337 L 580 480" class="line" />
+
+
+        <!-- ================= SCOPE 4: SAMPLING ================= -->
+        <path d="M 810 265 L 810 295" class="line" marker-end="url(#arr)" />
+        <rect x="720" y="295" width="180" height="42" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
+        <text x="810" y="316" class="txt-sm" style="fill:#115e59;">[✓] SAMPLING</text>
+        <text x="810" y="329" class="txt-sm" style="fill:#64748b; font-size:9px;">PHYSICAL LAB SAMPLE</text>
+        <path d="M 810 337 L 810 480" class="line" />
+
+
+        <!-- CONVERGE TO SAMPLING LAB -->
+        <path d="M 110 480 L 810 480" class="line" />
+        <path d="M 460 480 L 460 510" class="line" marker-end="url(#arr)" />
+
+        <rect x="290" y="510" width="340" height="42" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
+        <text x="460" y="531" class="txt-sm" style="fill:#115e59;">SAMPLING LAB MAKES PHYSICAL SAMPLE</text>
+        <text x="460" y="544" class="txt-sm" style="fill:#64748b; font-size:9px;">(Lab QA check pass ➔ Courier to Client)</text>
+
+        <path d="M 460 552 L 460 580" class="line" marker-end="url(#arr)" />
+
+        <!-- CLIENT APPROVES SAMPLE? -->
+        <polygon points="460,580 590,610 460,640 330,610" class="diamond" style="stroke:#059669;" />
+        <text x="460" y="614" class="txt">CLIENT APPROVES SAMPLE?</text>
+
+        <!-- NO: LOOP BACK -->
+        <path d="M 590 610 L 880 610 L 880 98 L 615 98" class="line-red" marker-end="url(#arr-r)" />
+        <rect x="615" y="597" width="55" height="18" class="badge-no" />
+        <text x="642.5" y="610" class="txt-no">REVISE</text>
+
+        <!-- YES: GOES TO PLANT KHANIWADE (1505) -->
+        <path d="M 460 640 L 460 675" class="line-green" marker-end="url(#arr-g)" />
+        <rect x="468" y="648" width="36" height="18" class="badge-yes" />
+        <text x="486" y="661" class="txt-yes">YES</text>
+
+        <!-- KHANIWADE PLANT PRODUCTION -->
+        <rect x="250" y="675" width="420" height="42" class="terminal end" style="fill:#f5f3ff; stroke:#4338ca; stroke-width:2.5;" />
+        <text x="460" y="701" class="txt" style="fill:#3730a3;">PLANT (1505 KHANIWADE): MASS PRODUCTION</text>
+      </svg>
+
+      <div class="note-box">
+        <strong>Important Routing & Plant Rule:</strong><br>
+        • If a client <em>only</em> wants Design, Mockup, or Costing, the request finishes at that team. <strong>Plant is skipped</strong>.<br>
+        • <strong>Khaniwade Plant (1505)</strong> ONLY gets involved when a <strong>physical sample / mass production</strong> is confirmed by the client!
+      </div>
+    </section>
+
+
+    <!-- ==================================================================== -->
+    <!-- 3. PROGRAM PLANNING (SEASONAL CAMPAIGNS)                             -->
+    <!-- ==================================================================== -->
+    <section id="flow-program" class="chart-card">
+      <a id="program-flow"></a>
+      <div class="chart-header">
+        <div>
+          <h2 class="chart-title">3. Seasonal Program Planning Flowchart</h2>
+          <p class="chart-desc">Dual Sign-Off: Sampling Team validates materials + Khaniwade Plant (1505) validates machine capacity</p>
+        </div>
+        <span class="pill pill-purple">Sampling + Plant (1505 Khaniwade)</span>
+      </div>
+
+      <svg class="flow" width="860" height="430" viewBox="0 0 860 430">
+        <!-- START -->
+        <rect x="350" y="15" width="160" height="36" class="terminal start" />
+        <text x="430" y="38" class="txt" style="fill:#065f46;">START</text>
+
+        <path d="M 430 51 L 430 78" class="line" marker-end="url(#arr)" />
+
+        <!-- MARKETING ENTERS CAMPAIGN -->
+        <rect x="250" y="78" width="360" height="40" class="box" style="stroke:#7c3aed; fill:#faf5ff;" />
+        <text x="430" y="103" class="txt" style="fill:#5b21b6;">MARKETING CREATES CAMPAIGN & MATERIAL MATRIX</text>
+
+        <!-- DUAL CHECKS SPLIT -->
+        <path d="M 430 118 L 430 145" class="line" />
+        <path d="M 230 145 L 630 145" class="line" />
+        <path d="M 230 145 L 230 170" class="line" marker-end="url(#arr)" />
+        <path d="M 630 145 L 630 170" class="line" marker-end="url(#arr)" />
+
+        <!-- CHECK 1: SAMPLING -->
+        <rect x="80" y="170" width="300" height="42" class="box" style="stroke:#0d9488; fill:#f0fdfa;" />
+        <text x="230" y="196" class="txt-sm" style="fill:#115e59;">SAMPLING TEAM: MATERIAL QUALITY CHECK</text>
+
+        <!-- CHECK 2: PLANT KHANIWADE 1505 -->
+        <rect x="480" y="170" width="300" height="42" class="box" style="stroke:#4338ca; fill:#f5f3ff;" />
+        <text x="630" y="196" class="txt-sm" style="fill:#3730a3;">PLANT (1505 KHANIWADE): CAPACITY CHECK</text>
+
+        <!-- BOTH MERGE DOWN -->
+        <path d="M 230 212 L 230 250 L 430 250" class="line-green" />
+        <path d="M 630 212 L 630 250 L 430 250" class="line-green" />
+        <path d="M 430 250 L 430 275" class="line-green" marker-end="url(#arr-g)" />
+
+        <!-- DUAL APPROVAL LOCKED -->
+        <rect x="270" y="275" width="320" height="42" class="box" style="stroke:#059669; stroke-width:2.5; fill:#ecfdf5;" />
+        <text x="430" y="301" class="txt" style="fill:#065f46;">BOTH TEAMS APPROVED (DUAL LOCK 🔒)</text>
+
+        <path d="M 430 317 L 430 350" class="line" marker-end="url(#arr)" />
+
+        <!-- PRODUCTION AT KHANIWADE -->
+        <rect x="230" y="350" width="400" height="42" class="terminal end" style="stroke:#4338ca; fill:#f5f3ff; stroke-width:2.5;" />
+        <text x="430" y="376" class="txt" style="fill:#3730a3;">PLANT (1505 KHANIWADE): MASS CAMPAIGN PRODUCTION</text>
+      </svg>
+
+      <div class="note-box">
+        <strong>Dual Sign-Off System:</strong><br>
+        Both <strong>Sampling Team</strong> (for paper quality) and <strong>Khaniwade Plant (1505)</strong> (for factory capacity) must sign off before mass production can begin.
+      </div>
+    </section>
+
+  </div>
+
+</body>
+</html>

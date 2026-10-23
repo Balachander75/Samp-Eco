@@ -13,6 +13,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { StagedProductItem, DELIVERABLES } from "../../types/staging";
+import { getSampleTrackInfo } from "../../utils/sampleRouting";
 import { fetchProductDetailsApi, ProductDetailItem } from "@/infrastructure/api/masterApi";
 import { isMockupCreativeCharacteristic } from "./mockupCreativeFields";
 import { ScopeReferenceImagesGallery } from "./ScopeReferenceImagesGallery";
@@ -68,6 +69,11 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
     || inspectingProduct?.catalogMetadata?.sourceProductId
     || inspectingProduct?.samplingMetadata?.sourceSampleId;
   const detailsRequestId = sourceProductId || inspectingProduct?.savedRequestId;
+
+  const sampleTrackInfo = useMemo(() => {
+    if (!inspectingProduct || !inspectingProduct.scopes.includes("sample")) return null;
+    return getSampleTrackInfo(inspectingProduct);
+  }, [inspectingProduct]);
 
   const isDesignBrief = Boolean(
     inspectingProduct &&
@@ -623,6 +629,22 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
                   </span>
                 );
               })}
+              {sampleTrackInfo && (
+                <>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border shadow-2xs ${sampleTrackInfo.badgeClass}`}
+                    title={sampleTrackInfo.description}
+                  >
+                    {sampleTrackInfo.badgeLabel}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border shadow-2xs ${sampleTrackInfo.sampleTypeBadge.badgeClass}`}
+                    title={sampleTrackInfo.isFullSample ? "Finished Unit / Full Sample" : "Component / Dummy Partial Sample"}
+                  >
+                    {sampleTrackInfo.sampleTypeBadge.label}
+                  </span>
+                </>
+              )}
             </div>
 
             <ScopeReferenceImagesGallery
@@ -891,6 +913,26 @@ export const StagedProductDrawer: React.FC<StagedProductDrawerProps> = ({
             {/* Sampling Specifications */}
             {(inspectingProduct.scopes.includes("sample") || inspectingProduct.samplingMetadata) && (
               <div className="space-y-3 pt-3 border-t border-zinc-100 dark:border-white/[0.06]">
+                {sampleTrackInfo && (
+                  <div className="p-3.5 rounded-xl border border-indigo-200/80 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10.5px] font-mono font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-300">
+                        Sampling Workflow Track
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border shadow-2xs ${sampleTrackInfo.badgeClass}`}>
+                          {sampleTrackInfo.badgeLabel}
+                        </span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border shadow-2xs ${sampleTrackInfo.sampleTypeBadge.badgeClass}`}>
+                          {sampleTrackInfo.sampleTypeBadge.label}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                      {sampleTrackInfo.description}
+                    </p>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="p-3 rounded-lg border border-blue-200/80 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30">
                     <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 block uppercase font-medium">

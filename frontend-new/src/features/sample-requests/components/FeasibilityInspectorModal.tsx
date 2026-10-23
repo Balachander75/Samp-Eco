@@ -131,9 +131,21 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
   useEffect(() => {
     if (isOpen) {
-      setActiveTab("specs");
+      if (sourceDesk === "samp") {
+        setActiveTab("review");
+      } else if (
+        activeRequest?.convertedRequestCode ||
+        activeRequest?.convertedSrNumber ||
+        activeRequest?.marketingDecision ||
+        activeRequest?.samplingFeasibilityResponse ||
+        activeRequest?.counterDateDecision === "pending"
+      ) {
+        setActiveTab("decision");
+      } else {
+        setActiveTab("specs");
+      }
     }
-  }, [isOpen, request?.id]);
+  }, [isOpen, request?.id, sourceDesk]);
 
   useEffect(() => {
     if (!isOpen || !activeRequest?.id || activeRequest.counterDateDecision !== "pending") return;
@@ -528,13 +540,13 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-950/70"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/70"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
+        className="relative w-full max-w-[92vw] xl:max-w-6xl 2xl:max-w-7xl h-[88vh] max-h-[88vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
         {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
@@ -555,13 +567,12 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
 
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG) */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
-            <div className="max-w-4xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
-              {/* ── 1. PRIMARY SECTION TABS (TOP) ── */}
-              <div className="px-6 sm:px-8 pt-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
-                <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
+          <div className="min-h-0 min-w-0 flex-1 flex flex-col overflow-hidden bg-[var(--surface-base)]">
+            {/* ── 1. PRIMARY SECTION TABS (TOP) ── */}
+            <div className="px-6 sm:px-8 pt-2.5 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] shrink-0">
+              <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto scrollbar-none">
                   <button
                     type="button"
                     onClick={() => setActiveTab("specs")}
@@ -645,24 +656,25 @@ export const FeasibilityInspectorModal: React.FC<FeasibilityInspectorModalProps>
                 </div>
               </div>
 
-              {/* ── 2. DOCUMENT HERO & 4-CARD EXECUTIVE STRIP ── */}
-              <FeasibilitySheetHeader
-                activeRequest={activeRequest}
-                classificationLabel={classificationLabel}
-                sourceDesk={sourceDesk}
-                canEvaluateTechnical={canEvaluateTechnical}
-                canMakeCommercialDecision={canMakeCommercialDecision}
-                isClaiming={isClaiming}
-                onClaimTask={handleClaimTask}
-                onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
-                onCounterDateDecision={handleCounterDateDecision}
-                onSelectTab={setActiveTab}
-                currentUserName={user?.name}
-                currentUserId={user?.id}
-              />
+              {/* ── 2. SCROLLABLE DOCUMENT WORKSPACE ── */}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <FeasibilitySheetHeader
+                  activeRequest={activeRequest}
+                  classificationLabel={classificationLabel}
+                  sourceDesk={sourceDesk}
+                  canEvaluateTechnical={canEvaluateTechnical}
+                  canMakeCommercialDecision={canMakeCommercialDecision}
+                  isClaiming={isClaiming}
+                  onClaimTask={handleClaimTask}
+                  onOpenCounterDateModal={() => setIsCounterDateModalOpen(true)}
+                  onCounterDateDecision={handleCounterDateDecision}
+                  onSelectTab={setActiveTab}
+                  currentUserName={user?.name}
+                  currentUserId={user?.id}
+                />
 
-              {/* ── 3. ACTIVE TAB CONTENT ── */}
-              <div className="px-6 sm:px-8 pb-6 pt-2">
+                {/* ── 3. ACTIVE TAB CONTENT ── */}
+                <div className="px-6 sm:px-8 pb-8 pt-4 space-y-6">
 
                 {/* Tab 1: Scope & Specifications */}
                 {activeTab === "specs" && (

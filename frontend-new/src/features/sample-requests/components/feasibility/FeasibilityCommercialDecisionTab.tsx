@@ -146,7 +146,44 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
           </p>
         </div>
       ) : (
-        <div className="space-y-3.5">
+        <div className="space-y-4">
+          {/* Prominent Sampling Technical Assessment Card */}
+          <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+                Sampling Technical Assessment
+              </span>
+              <span
+                className={`px-2.5 py-0.5 rounded-lg text-xs font-display font-bold border ${
+                  activeRequest.samplingFeasibilityResponse === "Yes"
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300/40"
+                    : activeRequest.samplingFeasibilityResponse === "No"
+                    ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-300/40"
+                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300/40"
+                }`}
+              >
+                {activeRequest.samplingFeasibilityResponse === "Yes"
+                  ? "✓ FEASIBLE"
+                  : activeRequest.samplingFeasibilityResponse === "No"
+                  ? "✕ NOT FEASIBLE"
+                  : "⚠ CONDITIONAL"}
+              </span>
+            </div>
+
+            {activeRequest.samplingFeasibilityRemark && (
+              <p className="text-xs text-[var(--on-surface)] leading-relaxed bg-[var(--surface-base)] p-3 rounded-lg border border-[var(--border-subtle)]">
+                {activeRequest.samplingFeasibilityRemark}
+              </p>
+            )}
+
+            <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] flex items-center justify-between">
+              <span>Reviewed by {activeRequest.samplingFeasibilityApprovedBy || activeRequest.takenBySamp || "Sampling Team"}</span>
+              {(activeRequest.samplingFeasibilityApprovedAt || activeRequest.feasibilityClosedAt || activeRequest.updatedAt) && (
+                <span>{new Date(activeRequest.samplingFeasibilityApprovedAt || activeRequest.feasibilityClosedAt || activeRequest.updatedAt!).toLocaleDateString("en-IN")}</span>
+              )}
+            </div>
+          </div>
+
           {/* Commercial Decision Status & Action */}
           <div className="p-4 rounded-xl bg-[var(--surface-low)] border border-[var(--border-subtle)] space-y-2.5">
             <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
@@ -276,10 +313,10 @@ export const FeasibilityCommercialDecisionTab: React.FC<FeasibilityCommercialDec
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate("/sample-requests/draft-workspace")}
+                  onClick={() => navigate("/sample-requests/sampling")}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--accent-primary-hover)] cursor-pointer"
                 >
-                  <span>Open Drafts</span> <ArrowRight className="h-3 w-3" />
+                  <span>View Requests</span> <ArrowRight className="h-3 w-3" />
                 </button>
               </div>
             ) : (

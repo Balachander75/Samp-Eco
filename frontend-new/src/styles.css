@@ -49,51 +49,13 @@
     --radius-panel: 16px;
   }
 
-  .dark {
-    --bg-app: #060810;
-    --bg-panel: #0e1322;
-    --bg-subtle: #090d18;
-    --bg-muted: #151b2c;
-    --surface-base: #060810;
-    --surface-lowest: #0e1322;
-    --surface-low: #141b2e;
-    --surface-container: #1b243d;
-    --surface-high: #242f4e;
-    --surface-highest: #2e3a5f;
-    --on-surface: #f8fafc;
-    --on-surface-muted: #94a3b8;
-    --on-surface-subtle: #64748b;
-    --border-subtle: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --border-focus: #818cf8;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    --accent-primary: #818cf8;
-    --accent-primary-rgb: 129, 140, 248;
-    --accent-primary-hover: #a5b4fc;
-    --accent-primary-hover-rgb: 165, 180, 252;
-    --accent-primary-strong: #6366f1;
-    --accent-primary-strong-rgb: 99, 102, 241;
-    --accent-primary-fill-end: #6366f1;
-    --accent-primary-subtle: rgba(129, 140, 248, 0.18);
-    --accent-teal: #38bdf8;
-    --accent-teal-hover: #7dd3fc;
-    --accent-teal-subtle: rgba(56, 189, 248, 0.18);
-    --font-ui: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --font-display: "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
-    --font-data: "JetBrains Mono", "Geist Mono", "IBM Plex Mono", ui-monospace, monospace;
-    --radius-control: 8px;
-    --radius-panel: 16px;
-  }
-
   /* ══════════════════════════════════════════════════════════════════════
      CURATED MODERN ENTERPRISE THEMES — BESPOKE MODERN PALETTES
-     8 Light Palettes + 5 Dark/OLED Palettes with complete surface depth
+     8 Light Curated Palettes with complete surface depth
      ══════════════════════════════════════════════════════════════════════ */
 
   /* 1. JADE ATELIER (Light - Executive Swiss Alpine) */
-  :root:not(.dark)[data-theme="emerald"] {
+  :root[data-theme="emerald"] {
     --bg-app: #edf5f1; --bg-panel: #ffffff; --bg-subtle: #e2ede6; --bg-muted: #d0e2d7;
     --surface-base: #edf5f1; --surface-lowest: #ffffff; --surface-low: #e2f0e7; --surface-container: #d1e6d9;
     --surface-high: #bedac8; --surface-highest: #a8cfb4;
@@ -112,7 +74,7 @@
   }
 
   /* 2. COBALT OFFICE (Light - Corporate Navy) */
-  :root:not(.dark)[data-theme="ocean"] {
+  :root[data-theme="ocean"] {
     --bg-app: #eaf2fb; --bg-panel: #ffffff; --bg-subtle: #dde9f7; --bg-muted: #cadcf1;
     --surface-base: #eaf2fb; --surface-lowest: #ffffff; --surface-low: #dcedfa; --surface-container: #cbe0f6;
     --surface-high: #b5d3f0; --surface-highest: #9dc4ea;
@@ -131,7 +93,7 @@
   }
 
   /* 3. IRIS PAPER (Light - Linear Creative Violet) */
-  :root:not(.dark)[data-theme="violet"] {
+  :root[data-theme="violet"] {
     --bg-app: #f4eefa; --bg-panel: #ffffff; --bg-subtle: #ebdff7; --bg-muted: #dfcef2;
     --surface-base: #f4eefa; --surface-lowest: #ffffff; --surface-low: #ebdcf8; --surface-container: #dfcaf4;
     --surface-high: #ceb4ee; --surface-highest: #be9ce8;
@@ -150,7 +112,7 @@
   }
 
   /* 4. CITRUS & INK (Light - Warm Cashmere Editorial) */
-  :root:not(.dark)[data-theme="amber"] {
+  :root[data-theme="amber"] {
     --bg-app: #f8f2e6; --bg-panel: #ffffff; --bg-subtle: #ede2cd; --bg-muted: #ded0b5;
     --surface-base: #f8f2e6; --surface-lowest: #ffffff; --surface-low: #f1e4cf; --surface-container: #e5d2b3;
     --surface-high: #d5bd94; --surface-highest: #c4a574;
@@ -169,7 +131,7 @@
   }
 
   /* 5. CORAL STUDIO (Light - Modern Coral Rose) */
-  :root:not(.dark)[data-theme="rose"] {
+  :root[data-theme="rose"] {
     --bg-app: #fcf0f3; --bg-panel: #ffffff; --bg-subtle: #f7dee4; --bg-muted: #ecc5ce;
     --surface-base: #fcf0f3; --surface-lowest: #ffffff; --surface-low: #f9dee4; --surface-container: #f2c7d2;
     --surface-high: #e5adbd; --surface-highest: #d792a5;
@@ -188,7 +150,7 @@
   }
 
   /* 6. NEO BRUTALISM (Light - Modern Architectural Cyber) */
-  :root:not(.dark)[data-theme="neo-brutalism"] {
+  :root[data-theme="neo-brutalism"] {
     --bg-app: #f4f3ea; --bg-panel: #ffffff; --bg-subtle: #e7e4d2; --bg-muted: #d6d2b9;
     --surface-base: #f4f3ea; --surface-lowest: #ffffff; --surface-low: #ebe6d2; --surface-container: #dfd8bd;
     --surface-high: #cbcaa9; --surface-highest: #b5b38f;
@@ -207,7 +169,7 @@
   }
 
   /* 7. NORDIC FROST (Light - Glacial Polar Sky) */
-  :root:not(.dark)[data-theme="nordic-frost"] {
+  :root[data-theme="nordic-frost"] {
     --bg-app: #eaf3f9; --bg-panel: #ffffff; --bg-subtle: #dbeaf5; --bg-muted: #c5deef;
     --surface-base: #eaf3f9; --surface-lowest: #ffffff; --surface-low: #daf0fa; --surface-container: #c5e4f7;
     --surface-high: #acd5f0; --surface-highest: #91c4e7;
@@ -226,7 +188,7 @@
   }
 
   /* 8. SAHARA DUNE (Light - Mediterranean Terracotta) */
-  :root:not(.dark)[data-theme="terracotta"] {
+  :root[data-theme="terracotta"] {
     --bg-app: #f8eee1; --bg-panel: #ffffff; --bg-subtle: #eedcca; --bg-muted: #dec4ab;
     --surface-base: #f8eee1; --surface-lowest: #ffffff; --surface-low: #f3decb; --surface-container: #e7c7ad;
     --surface-high: #d8af8f; --surface-highest: #c89670;
@@ -244,138 +206,7 @@
     --accent-teal: #65a30d; --accent-teal-hover: #4d7c0f; --accent-teal-subtle: #ecfccb;
   }
 
-  :root:not(.dark) { color-scheme: light; }
-  :root.dark { color-scheme: dark; }
-
-  /* 9. OBSIDIAN BLUE (Dark - Deep Space OLED) */
-  :root.dark[data-theme="midnight"] {
-    --bg-app: #050814; --bg-panel: #0c142e; --bg-subtle: #080d20; --bg-muted: #131f42;
-    --surface-base: #050814; --surface-lowest: #0e1837; --surface-low: #14224e; --surface-container: #1c2d66;
-    --surface-high: #263b82; --surface-highest: #334c9f;
-    --on-surface: #f8fafc; --on-surface-muted: #94a3b8; --on-surface-subtle: #64748b;
-    --text-primary: #f8fafc; --text-secondary: #94a3b8; --text-muted: #64748b;
-    --border-subtle: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.16); --border-focus: #818cf8;
-    --accent-primary: #818cf8; --accent-primary-rgb: 129, 140, 248;
-    --accent-primary-hover: #a5b4fc; --accent-primary-hover-rgb: 165, 180, 252;
-    --accent-primary-strong: #6366f1; --accent-primary-strong-rgb: 99, 102, 241;
-    --accent-primary-fill-end: #6366f1; --accent-primary-subtle: rgba(129, 140, 248, 0.18);
-    --on-accent-primary: #ffffff;
-    --sidebar-surface: #090f24; --sidebar-surface-raised: #121c3d;
-    --sidebar-accent: #818cf8; --sidebar-accent-subtle: rgba(129, 140, 248, 0.18);
-    --sidebar-text: #f8fafc; --sidebar-text-muted: #94a3b8; --sidebar-text-subtle: #64748b;
-    --accent-teal: #38bdf8; --accent-teal-hover: #7dd3fc; --accent-teal-subtle: rgba(56, 189, 248, 0.18);
-  }
-
-  /* 10. ABYSSAL TEAL (Dark - Nordic Evergreen OLED) */
-  :root.dark[data-theme="forest-night"] {
-    --bg-app: #020c08; --bg-panel: #082218; --bg-subtle: #051811; --bg-muted: #0d3123;
-    --surface-base: #020c08; --surface-lowest: #0b291e; --surface-low: #10392b; --surface-container: #174d3b;
-    --surface-high: #20634c; --surface-highest: #2b7c60;
-    --on-surface: #ecfdf5; --on-surface-muted: #a7f3d0; --on-surface-subtle: #6ee7b7;
-    --text-primary: #ecfdf5; --text-secondary: #a7f3d0; --text-muted: #6ee7b7;
-    --border-subtle: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.16); --border-focus: #10b981;
-    --accent-primary: #10b981; --accent-primary-rgb: 16, 185, 129;
-    --accent-primary-hover: #34d399; --accent-primary-hover-rgb: 52, 211, 153;
-    --accent-primary-strong: #059669; --accent-primary-strong-rgb: 5, 150, 105;
-    --accent-primary-fill-end: #059669; --accent-primary-subtle: rgba(16, 185, 129, 0.18);
-    --on-accent-primary: #ffffff;
-    --sidebar-surface: #051610; --sidebar-surface-raised: #0d2a20;
-    --sidebar-accent: #10b981; --sidebar-accent-subtle: rgba(16, 185, 129, 0.18);
-    --sidebar-text: #ecfdf5; --sidebar-text-muted: #a7f3d0; --sidebar-text-subtle: #6ee7b7;
-    --accent-teal: #fbbf24; --accent-teal-hover: #fcd34d; --accent-teal-subtle: rgba(251, 191, 36, 0.18);
-  }
-
-  /* 11. ORCHID AFTERDARK (Dark - Cyber Velvet OLED) */
-  :root.dark[data-theme="nocturne"] {
-    --bg-app: #08020e; --bg-panel: #190a2c; --bg-subtle: #11041f; --bg-muted: #240e3f;
-    --surface-base: #08020e; --surface-lowest: #1f0d38; --surface-low: #2a124c; --surface-container: #371863;
-    --surface-high: #481f80; --surface-highest: #5b289f;
-    --on-surface: #faf5ff; --on-surface-muted: #e9d5ff; --on-surface-subtle: #c084fc;
-    --text-primary: #faf5ff; --text-secondary: #e9d5ff; --text-muted: #c084fc;
-    --border-subtle: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.16); --border-focus: #c084fc;
-    --accent-primary: #c084fc; --accent-primary-rgb: 192, 132, 252;
-    --accent-primary-hover: #d8b4fe; --accent-primary-hover-rgb: 216, 180, 254;
-    --accent-primary-strong: #a855f7; --accent-primary-strong-rgb: 168, 85, 247;
-    --accent-primary-fill-end: #a855f7; --accent-primary-subtle: rgba(192, 132, 252, 0.18);
-    --on-accent-primary: #ffffff;
-    --sidebar-surface: #120521; --sidebar-surface-raised: #1e0935;
-    --sidebar-accent: #c084fc; --sidebar-accent-subtle: rgba(192, 132, 252, 0.18);
-    --sidebar-text: #faf5ff; --sidebar-text-muted: #e9d5ff; --sidebar-text-subtle: #c084fc;
-    --accent-teal: #2dd4bf; --accent-teal-hover: #5eead4; --accent-teal-subtle: rgba(45, 212, 191, 0.18);
-  }
-
-  /* 12. TOKYO CYBERPUNK (Dark - High-Tech OLED Glow) */
-  :root.dark[data-theme="tokyo-neon"] {
-    --bg-app: #010204; --bg-panel: #070e24; --bg-subtle: #040815; --bg-muted: #0c173a;
-    --surface-base: #010204; --surface-lowest: #0a1435; --surface-low: #0f1d4a; --surface-container: #162863;
-    --surface-high: #1e3582; --surface-highest: #2844a4;
-    --on-surface: #ffffff; --on-surface-muted: #cbd5e1; --on-surface-subtle: #00f0ff;
-    --text-primary: #ffffff; --text-secondary: #cbd5e1; --text-muted: #00f0ff;
-    --border-subtle: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.16); --border-focus: #00f0ff;
-    --accent-primary: #00f0ff; --accent-primary-rgb: 0, 240, 255;
-    --accent-primary-hover: #38bdf8; --accent-primary-hover-rgb: 56, 189, 248;
-    --accent-primary-strong: #0891b2; --accent-primary-strong-rgb: 8, 145, 178;
-    --accent-primary-fill-end: #ff007a; --accent-primary-subtle: rgba(0, 240, 255, 0.18);
-    --on-accent-primary: #000000;
-    --sidebar-surface: #040714; --sidebar-surface-raised: #0a132e;
-    --sidebar-accent: #00f0ff; --sidebar-accent-subtle: rgba(0, 240, 255, 0.18);
-    --sidebar-text: #ffffff; --sidebar-text-muted: #cbd5e1; --sidebar-text-subtle: #00f0ff;
-    --accent-teal: #ff007a; --accent-teal-hover: #f43f5e; --accent-teal-subtle: rgba(255, 0, 122, 0.18);
-  }
-
-  /* 13. STEALTH TITANIUM (Dark - Aerospace Carbon OLED) */
-  :root.dark[data-theme="titanium"] {
-    --bg-app: #060709; --bg-panel: #12151d; --bg-subtle: #090b0e; --bg-muted: #1a1e28;
-    --surface-base: #060709; --surface-lowest: #161924; --surface-low: #1f2331; --surface-container: #2a3043;
-    --surface-high: #383f56; --surface-highest: #474f6b;
-    --on-surface: #f8fafc; --on-surface-muted: #cbd5e1; --on-surface-subtle: #94a3b8;
-    --text-primary: #f8fafc; --text-secondary: #cbd5e1; --text-muted: #94a3b8;
-    --border-subtle: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.16); --border-focus: #3b82f6;
-    --accent-primary: #3b82f6; --accent-primary-rgb: 59, 130, 246;
-    --accent-primary-hover: #60a5fa; --accent-primary-hover-rgb: 96, 165, 250;
-    --accent-primary-strong: #2563eb; --accent-primary-strong-rgb: 37, 99, 235;
-    --accent-primary-fill-end: #2563eb; --accent-primary-subtle: rgba(59, 130, 246, 0.18);
-    --on-accent-primary: #ffffff;
-    --sidebar-surface: #0c0d12; --sidebar-surface-raised: #151822;
-    --sidebar-accent: #3b82f6; --sidebar-accent-subtle: rgba(59, 130, 246, 0.18);
-    --sidebar-text: #f8fafc; --sidebar-text-muted: #cbd5e1; --sidebar-text-subtle: #94a3b8;
-    --accent-teal: #38bdf8; --accent-teal-hover: #7dd3fc; --accent-teal-subtle: rgba(56, 189, 248, 0.18);
-  }
-
-  /* ── Universal Deep Surface Cascades for all Dark Themes ── */
-  :root.dark[data-theme] [class*="dark:bg-[#0c0d12]"],
-  :root.dark[data-theme] [class~="dark:bg-[#0c0d12]"],
-  :root.dark[data-theme] [class*="dark:bg-zinc-950"],
-  :root.dark[data-theme] [class~="dark:bg-zinc-950"] {
-    background-color: var(--surface-base) !important;
-  }
-
-  :root.dark[data-theme] [class*="dark:bg-zinc-900"],
-  :root.dark[data-theme] [class~="dark:bg-zinc-900"] {
-    background-color: var(--surface-lowest) !important;
-  }
-
-  :root.dark[data-theme] [class*="dark:bg-zinc-800"],
-  :root.dark[data-theme] [class~="dark:bg-zinc-800"] {
-    background-color: var(--surface-low) !important;
-  }
-
-  :root.dark[data-theme] [class*="dark:border-zinc-800"],
-  :root.dark[data-theme] [class~="dark:border-zinc-800"] {
-    border-color: var(--border-subtle) !important;
-  }
-
-  :root.dark[data-theme] [class*="dark:border-zinc-700"],
-  :root.dark[data-theme] [class~="dark:border-zinc-700"] {
-    border-color: var(--border-strong) !important;
-  }
-
-
-
-  /* Strong accents are button fills in dark mode, so text labels need the light accent role. */
-  :root.dark [class~="text-[var(--accent-primary-strong)]"] {
-    color: var(--accent-primary);
-  }
+  :root { color-scheme: light; }
 
   html,
   body,
@@ -435,14 +266,6 @@
     background: color-mix(in srgb, var(--text-muted) 60%, transparent);
   }
 
-  .dark ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.14);
-  }
-
-  .dark ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.28);
-  }
-
   #root {
     width: 100%;
     height: 100%;
@@ -474,11 +297,6 @@
   textarea::placeholder {
     color: var(--text-muted);
     opacity: 0.82;
-  }
-
-  .dark ::selection {
-    color: var(--on-accent-primary);
-    background: color-mix(in srgb, var(--accent-primary) 30%, transparent);
   }
 
   :focus-visible {
@@ -619,21 +437,6 @@
   }
 }
 
-/* Universal Dark Mode Resilient Form & Table Controls */
-.dark select,
-.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-.dark textarea {
-  background-color: var(--surface-low);
-  color: var(--on-surface);
-  border-color: var(--border-subtle);
-}
-
-.dark select option {
-  background-color: var(--surface-lowest);
-  color: var(--on-surface);
-}
-
-
 /* Smooth Hardware-Accelerated Micro-Animations (Zero Jitter) */
 @keyframes luminousShimmer {
   0% {
@@ -693,17 +496,6 @@
   );
   animation: luminousShimmer 1.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
-}
-
-.dark .shimmer-luminous::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.02) 35%,
-    rgba(var(--accent-primary-rgb), 0.15) 50%,
-    rgba(255, 255, 255, 0.02) 65%,
-    transparent 100%
-  );
 }
 
 @keyframes smoothDrawerSlideIn {
@@ -809,11 +601,6 @@
   border: 1px solid var(--border-subtle);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 10px 15px -5px rgba(0, 0, 0, 0.02);
 }
-.dark .o_form_sheet {
-  background: var(--surface-lowest);
-  border-color: var(--border-subtle);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-}
 
 /* Odoo 19 Statusbar Polygon Chevron */
 .o_statusbar_status {
@@ -822,10 +609,6 @@
   border-radius: 4px;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  background: var(--surface-low);
-}
-.dark .o_statusbar_status {
-  border-color: var(--border-subtle);
   background: var(--surface-low);
 }
 
@@ -842,10 +625,6 @@
   align-items: center;
   transition: all 140ms cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
-}
-.dark .o_arrow_button {
-  color: var(--on-surface-muted);
-  background: var(--surface-low);
 }
 
 .o_arrow_button:first-child {
@@ -889,10 +668,6 @@
   background: var(--accent-primary-subtle) !important;
   color: var(--accent-primary-strong) !important;
 }
-.dark .o_arrow_button.done {
-  background: var(--accent-primary-subtle) !important;
-  color: var(--accent-primary-strong) !important;
-}
 .o_arrow_button.done::after {
   background: var(--accent-primary-subtle);
 }
@@ -914,16 +689,8 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
-.dark .glass-panel {
-  background: color-mix(in srgb, var(--surface-lowest) 82%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
 
 .ghost-border {
-  border: 1px solid var(--border-subtle);
-}
-.dark .ghost-border {
   border: 1px solid var(--border-subtle);
 }
 
@@ -969,9 +736,6 @@
 .card-hover-lift:hover {
   transform: translateY(-1.5px);
   box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
-}
-.dark .card-hover-lift:hover {
-  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.45);
 }
 
 .smooth-scroll,
@@ -1656,12 +1420,6 @@ button.theme-primary-cta:hover,
   background-color: #ecfdf5 !important;
   color: #065f46 !important;
   border-color: #a7f3d0 !important;
-}
-.dark .status-pill-success,
-.dark [data-status-tone="success"] {
-  background-color: rgba(6, 78, 59, 0.45) !important;
-  color: #6ee7b7 !important;
-  border-color: rgba(5, 150, 105, 0.5) !important;
 }
 
 

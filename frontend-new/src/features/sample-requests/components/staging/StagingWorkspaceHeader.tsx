@@ -58,7 +58,7 @@ export const StagingWorkspaceHeader: React.FC<StagingWorkspaceHeaderProps> = ({
   const costingCount = stagedProducts.filter((product) => product.scopes.includes("costing")).length;
 
   return (
-    <div className="rounded-xl border border-border-subtle bg-surface-lowest shadow-2xs overflow-hidden">
+    <div className="border-b border-border-subtle bg-surface-lowest shadow-2xs shrink-0">
       {/* ── 1. Top Bar: Breadcrumb, Document Title & Live Status ── */}
       <div className="px-5 py-3 border-b border-border-subtle flex flex-wrap items-center justify-between gap-3 bg-surface-low/70">
         {/* Left: Return Arrow + Breadcrumb & Title */}

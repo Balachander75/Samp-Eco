@@ -486,7 +486,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 select-text"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 select-text"
       onClick={onClose}
     >
       <section
@@ -494,7 +494,7 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
         role="dialog"
         aria-modal="true"
         aria-labelledby="costing-inspector-title"
-        className="relative w-full max-w-[96vw] 2xl:max-w-[1600px] h-[96vh] max-h-[96vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
+        className="relative w-full max-w-[92vw] xl:max-w-6xl 2xl:max-w-7xl h-[88vh] max-h-[88vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
         {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
@@ -664,9 +664,8 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
         )}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
-          <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--surface-low)] p-3 sm:p-4 lg:p-5">
-            <div className="mx-auto w-full max-w-[1100px] overflow-hidden rounded-2xl bg-[var(--surface-base)] shadow-[0_8px_30px_rgba(11,28,48,0.04)]">
-              <div className="flex items-center justify-between gap-4 bg-[var(--surface-lowest)] px-5 py-3.5 sm:px-7">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--surface-base)]">
+            <div className="flex items-center justify-between gap-4 bg-[var(--surface-lowest)] px-5 py-3.5 sm:px-7 border-b border-[var(--border-subtle)]">
                 <div className="min-w-0">
                   <h1 id="costing-inspector-title" className="truncate text-sm font-bold text-[var(--on-surface)] sm:text-base">
                     {record.product_description || "Commercial Product Costing Request"}
@@ -1696,7 +1695,6 @@ export const CostingWorkflowInspectorModal: React.FC<CostingWorkflowInspectorMod
                   </div>
                 )}
               </div>
-            </div>
           </div>
 
           {/* ── RIGHT PANEL: UNIVERSAL ACTIVITY CHATTER FEED ── */}

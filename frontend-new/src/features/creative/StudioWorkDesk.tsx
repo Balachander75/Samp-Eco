@@ -13,9 +13,9 @@ const MockupWorkflowQueuePage = React.lazy(() =>
     default: m.MockupWorkflowQueuePage,
   }))
 );
-const MockupWorkflowInspectorModal = React.lazy(() =>
-  import("@/features/sample-requests/components/staging/MockupWorkflowInspectorModal").then((m) => ({
-    default: m.MockupWorkflowInspectorModal,
+const SampleRequestInspector = React.lazy(() =>
+  import("@/features/sample-requests/components/SampleRequestInspector").then((m) => ({
+    default: m.SampleRequestInspector,
   }))
 );
 
@@ -84,8 +84,9 @@ export const StudioWorkDesk: React.FC<StudioWorkDeskProps> = ({ user }) => {
           onRefresh={load}
         />
         {selectedRequest && (
-          <MockupWorkflowInspectorModal
+          <SampleRequestInspector
             request={selectedRequest}
+            isOpen={Boolean(selectedRequest)}
             role="studio"
             readOnly={isReadOnlyTeamHead(user)}
             actorName={user?.name || user?.userid}

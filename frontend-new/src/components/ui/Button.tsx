@@ -40,9 +40,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       primary:
         "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] active:brightness-90 text-[var(--on-accent-primary)] shadow-sm border border-[var(--accent-primary-hover)]",
       secondary:
-        "bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)] active:bg-[var(--surface-container)] text-[var(--text-primary)] border border-[var(--border-subtle)] shadow-xs dark:shadow-none",
+        "bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)] active:bg-[var(--surface-container)] text-[var(--text-primary)] border border-[var(--border-subtle)] shadow-xs",
       subtle:
-        "bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--text-primary)] border border-transparent dark:border-[var(--border-subtle)]",
+        "bg-[var(--surface-low)] hover:bg-[var(--surface-container)] text-[var(--text-primary)] border border-transparent",
       ghost:
         "bg-transparent hover:bg-[var(--surface-low)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
       danger:

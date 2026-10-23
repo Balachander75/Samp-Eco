@@ -21,6 +21,8 @@ export interface RequestWorkflowRecord {
   sr_number: string | null;
   customer: string;
   brand_name?: string | null;
+  program_name?: string | null;
+  program_year?: string | null;
   material_code: string;
   product_description: string;
   status: string;

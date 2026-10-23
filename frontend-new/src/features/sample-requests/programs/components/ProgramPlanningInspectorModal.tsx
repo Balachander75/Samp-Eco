@@ -260,13 +260,13 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-3 bg-slate-950/75 backdrop-blur-sm select-text animate-in fade-in duration-150"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm select-text animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-[98vw] xl:max-w-[1360px] h-[93vh] max-h-[93vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.3)] overflow-hidden select-text text-xs"
+        className="relative w-full max-w-[92vw] xl:max-w-6xl 2xl:max-w-7xl h-[88vh] max-h-[88vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.3)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 1. TOP CONTROL PANEL */}
@@ -292,11 +292,10 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG CHATTER) */}
         <div className="flex-1 flex overflow-hidden min-h-0">
           {/* LEFT: WORKSPACE CANVAS */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)] [background-image:radial-gradient(var(--border-subtle)_1px,transparent_1px)] [background-size:20px_20px] min-w-0">
-            <div className="max-w-6xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
-              {/* ── 1. PRIMARY SECTION TABS (TOP) ── */}
-              <div className="px-6 sm:px-8 pt-2.5 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
-                <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
+          <div className="min-h-0 min-w-0 flex-1 flex flex-col overflow-hidden bg-[var(--surface-base)]">
+            {/* ── 1. PRIMARY SECTION TABS (TOP) ── */}
+            <div className="px-6 sm:px-8 pt-2.5 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] shrink-0">
+              <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto scrollbar-none">
                   {/* Tab 1: Substrate Matrix */}
                   <button
                     type="button"
@@ -362,19 +361,20 @@ export const ProgramPlanningInspectorModal: React.FC<ProgramPlanningInspectorMod
                 </div>
               </div>
 
-              {/* ── 2. COMPACT HERO HEADER ── */}
-              <ProgramPlanningSheetHeader
-                activeRequest={activeRequest}
-                mode={mode}
-                onNavigateToTab={(tab) => setActiveTab(tab)}
-                onClaimTask={handleClaimTask}
-                isClaiming={isClaiming}
-                currentUser={effectiveUser}
-                isAdmin={effectiveUser?.role?.toLowerCase() === "admin"}
-              />
+              {/* ── 2. SCROLLABLE DOCUMENT WORKSPACE ── */}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <ProgramPlanningSheetHeader
+                  activeRequest={activeRequest}
+                  mode={mode}
+                  onNavigateToTab={(tab) => setActiveTab(tab)}
+                  onClaimTask={handleClaimTask}
+                  isClaiming={isClaiming}
+                  currentUser={effectiveUser}
+                  isAdmin={effectiveUser?.role?.toLowerCase() === "admin"}
+                />
 
-              {/* ── 3. ACTIVE TAB CONTENT ── */}
-              <div className="px-6 sm:px-8 pb-6 pt-3">
+                {/* ── 3. ACTIVE TAB CONTENT ── */}
+                <div className="px-6 sm:px-8 pb-8 pt-4 space-y-6">
                 {activeTab === "matrix" && (
                   <ProgramPlanningMaterialMatrixTab
                     activeRequest={activeRequest}

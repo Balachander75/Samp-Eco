@@ -11,6 +11,7 @@ import { isDirectPlantResampleRequest } from "@/features/sample-requests/utils/s
 import { TopLoadingBar, WorkspaceSkeleton } from "@/components/ui/loading";
 import { TeamHeadReadOnlyNotice } from "@/components/ui/TeamHeadReadOnlyNotice";
 import { isReadOnlyTeamHead, isAdmin as isAdminUser } from "@/features/auth/permissions";
+import { showToast } from "@/lib/toast";
 
 const CreativeOverviewPage = React.lazy(() =>
   import("./CreativeOverviewPage").then((m) => ({ default: m.CreativeOverviewPage }))
@@ -24,9 +25,9 @@ const CreativeSamplingMockupPage = React.lazy(() =>
 const CreativeCostingPage = React.lazy(() =>
   import("./CreativeCostingPage").then((m) => ({ default: m.CreativeCostingPage }))
 );
-const MockupWorkflowInspectorModal = React.lazy(() =>
-  import("@/features/sample-requests/components/staging/MockupWorkflowInspectorModal").then((m) => ({
-    default: m.MockupWorkflowInspectorModal,
+const SampleRequestInspector = React.lazy(() =>
+  import("@/features/sample-requests/components/SampleRequestInspector").then((m) => ({
+    default: m.SampleRequestInspector,
   }))
 );
 
@@ -100,17 +101,11 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
   const [allRequests, setAllRequests] = useState<SampleRequestItem[]>([]);
   const [costingRequests, setCostingRequests] = useState<RequestWorkflowRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Inspector states
   const [selectedRequest, setSelectedRequest] = useState<SampleRequestItem | null>(null);
   const [isDesignInspectorOpen, setIsDesignInspectorOpen] = useState(false);
   const [isMockupInspectorOpen, setIsMockupInspectorOpen] = useState(false);
-
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  }, []);
 
   // Load briefs & sample requests
   const loadData = useCallback(async () => {
@@ -138,7 +133,7 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, showToast]);
+  }, [selectedYear]);
 
   useEffect(() => {
     loadData();
@@ -290,15 +285,6 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
     <div className="flex-1 flex flex-col h-full bg-[var(--bg-app)] text-[var(--on-surface)] overflow-hidden select-text relative">
       <TeamHeadReadOnlyNotice user={user} />
 
-
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[100] bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-[12px] font-semibold px-4 py-2.5 rounded-xl shadow-2xl border border-zinc-700/50 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {isLoading && <TopLoadingBar isLoading={true} />}
 
       {/* Active Sub-View Body */}
@@ -363,8 +349,9 @@ export const CreativeWorkDesk: React.FC<CreativeWorkDeskProps> = ({ user }) => {
       {/* Modals & Inspectors */}
       <React.Suspense fallback={null}>
         {selectedRequest && isMockupInspectorOpen && (
-          <MockupWorkflowInspectorModal
+          <SampleRequestInspector
             request={selectedRequest}
+            isOpen={isMockupInspectorOpen}
             role="creative"
             readOnly={isReadOnlyTeamHead(user)}
             actorName={user?.name || user?.userid}

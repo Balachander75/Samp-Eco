@@ -35,7 +35,7 @@ export const CopyBadge: React.FC<CopyBadgeProps> = ({
       type="button"
       onClick={handleClick}
       title={title || (copied ? "Copied to clipboard!" : `Click to copy: ${text}`)}
-      className={`group/copy inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-mono text-xs cursor-pointer select-none transition-all duration-150 border ${
+      className={`group/copy inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono text-xs cursor-pointer select-none transition-all duration-150 border ${
         copied
           ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
           : "bg-neutral-100/80 hover:bg-neutral-200/80 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 text-neutral-800 dark:text-zinc-200 border-neutral-200/90 dark:border-zinc-700"

@@ -408,34 +408,55 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       {
         id: "customer",
         header: "Customer / Brand",
-        width: "w-[150px]",
+        width: "w-[130px]",
         cell: (row) => (
-          <div>
-            <div className="flex items-center gap-1.5 font-semibold text-[var(--on-surface)]">
+          <div className="min-w-0 max-w-[130px]">
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--on-surface)] truncate">
               <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
-              <span className="truncate max-w-[130px]" title={row.customer || ""}>
+              <span className="truncate" title={row.customer || ""}>
                 {row.customer || "—"}
               </span>
             </div>
-            <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
+            <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5 truncate">
               Commercial Account
             </div>
           </div>
         ),
       },
       {
+        id: "program",
+        header: "Program / Year",
+        width: "w-[120px]",
+        cell: (row) => {
+          const progName = (row as any).programName || (row.rawReq as any)?.programName || (row.rawReq as any)?.programCampaignTitle || "—";
+          const progYear = (row as any).programYear || (row.rawReq as any)?.programYear;
+          return (
+            <div className="min-w-0 max-w-[120px]">
+              <span className="block truncate font-semibold text-xs text-[var(--on-surface)]" title={progName}>
+                {progName}
+              </span>
+              {progYear && (
+                <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
+                  BY {progYear}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
         id: "source",
         header: "Brief Source",
-        width: "w-[130px]",
+        width: "w-[110px]",
         cell: (row) =>
           row.isBrief ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 border border-purple-500/20">
               <Palette className="w-3 h-3 text-purple-600 shrink-0" />
               <span>Studio Brief</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-              <Palette className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400 shrink-0" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 border border-purple-500/20">
+              <Palette className="w-2.5 h-2.5 text-purple-600 shrink-0" />
               <span>Design</span>
             </span>
           ),
@@ -443,7 +464,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       {
         id: "variants",
         header: "Variants",
-        width: "w-[85px]",
+        width: "w-[75px]",
         align: "center",
         cell: (row) => (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full font-mono font-bold text-[11px] bg-[var(--surface-low)] text-[var(--on-surface)] tabular-nums border border-[var(--border-subtle)]">
@@ -453,11 +474,11 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       },
       {
         id: "designer",
-        header: "Designer Ownership",
-        width: "w-[140px]",
+        header: "Designer",
+        width: "w-[125px]",
         cell: (row) => (
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[10px] font-bold flex items-center justify-center text-[var(--accent-primary)] shrink-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="w-5 h-5 rounded-full bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[9px] font-bold flex items-center justify-center text-[var(--accent-primary)] shrink-0">
               {(row.designer || "U")[0].toUpperCase()}
             </span>
             <div className="min-w-0">
@@ -467,10 +488,10 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
               <span
                 className={`inline-flex rounded-md px-1.5 py-0.2 text-[9.5px] font-mono font-bold ${
                   row.isClosed
-                    ? "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20"
+                    ? "bg-rose-500/10 text-rose-700 border border-rose-500/20"
                     : row.designer === "Unassigned"
-                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-                    : "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
+                    ? "bg-amber-500/10 text-amber-700 border border-amber-500/20"
+                    : "bg-purple-500/10 text-purple-700 border border-purple-500/20"
                 }`}
               >
                 {row.isClosed ? "Closed" : row.designer === "Unassigned" ? "Needs Claim" : "Assigned"}
@@ -482,7 +503,7 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       {
         id: "sla",
         header: "Target SLA Date",
-        width: "w-[130px]",
+        width: "w-[120px]",
         cell: (row) => {
           let isOverdue = false;
           if (row.dueDate && row.proofStatus !== "Prepress Approved") {
@@ -492,15 +513,15 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
             }
           }
           return (
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--on-surface)]">
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-1 font-mono text-xs text-[var(--on-surface)] truncate">
                 <Clock className={`w-3.5 h-3.5 shrink-0 ${isOverdue ? "text-rose-500" : "text-[var(--on-surface-subtle)]"}`} />
-                <span className={isOverdue ? "font-semibold text-rose-600 dark:text-rose-400" : "text-[var(--on-surface-muted)]"}>
+                <span className={isOverdue ? "font-semibold text-rose-600" : "text-[var(--on-surface-muted)]"}>
                   {row.dueDate ? formatOdooDate(row.dueDate) : "Standard SLA"}
                 </span>
               </div>
               {isOverdue && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200">
                   <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
                   <span>Overdue</span>
                 </span>
@@ -511,8 +532,8 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       },
       {
         id: "status",
-        header: "Proof Review Status",
-        width: "w-[135px]",
+        header: "Review Status",
+        width: "w-[120px]",
         cell: (row) => <StatusPill status={row.proofStatus} size="sm" showDot />,
       },
     ],
@@ -587,6 +608,8 @@ export const CreativeDesignPage: React.FC<CreativeDesignPageProps> = ({
       <DataTable
         data={filteredDesigns}
         columns={columns}
+        tableClassName="w-full table-fixed min-w-0"
+        containerClassName="overflow-y-auto overflow-x-hidden"
         keyExtractor={(d) => d.id}
         isLoading={isRefreshing}
         emptyMessage={

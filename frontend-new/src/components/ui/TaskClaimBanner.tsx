@@ -36,14 +36,14 @@ export const TaskClaimBanner: React.FC<TaskClaimBannerProps> = ({
       aria-live="polite"
       className={`flex min-w-0 items-start gap-2.5 rounded-xl px-3.5 ${compact ? "py-2" : "py-3"} ${
         isClaimedByCurrentUser
-          ? "bg-emerald-50/80 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100"
-          : "bg-amber-50/85 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100"
+          ? "bg-emerald-50/80 text-emerald-950 border border-emerald-200"
+          : "bg-amber-50/85 text-amber-950 border border-amber-200"
       } ${className}`}
     >
       {isClaimedByCurrentUser ? (
-        <UserRoundCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
+        <UserRoundCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
       ) : (
-        <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+        <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
       )}
       <div className="min-w-0">
         <p className="text-xs font-bold">

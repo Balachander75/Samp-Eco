@@ -219,6 +219,21 @@ export const FeasibilityTechnicalReviewTab: React.FC<FeasibilityTechnicalReviewT
         )}
       </div>
 
+      {/* ── 1B. INLINE PRODUCT SCOPE SUMMARY (SO REVIEWER NEVER HAS TO BOUNCE TO TAB 1) ── */}
+      {(activeRequest.productDescription || activeRequest.feasibilityDescription || activeRequest.productCategory) && (
+        <div className="p-3.5 rounded-xl bg-[var(--surface-lowest)] border border-[var(--border-subtle)] space-y-1.5 shadow-2xs">
+          <div className="flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--on-surface-subtle)]">
+            <span>Product Scope Under Evaluation</span>
+            {activeRequest.productCategory && (
+              <span className="text-[var(--accent-primary)] font-semibold">{activeRequest.productCategory}</span>
+            )}
+          </div>
+          <p className="text-xs text-[var(--on-surface)] leading-relaxed whitespace-pre-wrap">
+            {activeRequest.productDescription || activeRequest.feasibilityDescription}
+          </p>
+        </div>
+      )}
+
       {/* ── 2. INLINE COUNTER-DATE PROPOSAL FORM (COMPACT & SLEEK) ── */}
       {showCounterDateComposer && !activeRequest.sampCounterDate && !isEvaluated && (
         <div className="p-4 rounded-xl border border-[var(--accent-primary)]/40 bg-[var(--surface-low)] space-y-3 shadow-2xs">

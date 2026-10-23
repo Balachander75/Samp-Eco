@@ -3,4 +3,3 @@ export * from "./MetricRibbonSkeleton";
 export * from "./TableShimmerSkeleton";
 export * from "./DocketSkeleton";
 export * from "./WorkspaceSkeleton";
-export * from "./PulseSpinner";

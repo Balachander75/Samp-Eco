@@ -7,5 +7,4 @@ export * from "./AddProductDesignStep";
 export * from "./AddProductSamplingStep";
 export * from "./AddProductCatalogStep";
 export * from "./CatalogProductInspectModal";
-export * from "./MockupWorkflowInspectorModal";
 export * from "./MockupWorkflowQueuePage";

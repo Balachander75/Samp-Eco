@@ -20,9 +20,6 @@ const SampleRequestsDesk = lazy(() =>
 const ProductStagingWorkspace = lazy(() =>
   import("@/features/sample-requests/components/ProductStagingWorkspace").then((module) => ({ default: module.ProductStagingWorkspace }))
 );
-const DraftWorkspacePage = lazy(() =>
-  import("@/features/sample-requests/components/DraftWorkspacePage").then((module) => ({ default: module.DraftWorkspacePage }))
-);
 const CreativeWorkDesk = lazy(() =>
   import("@/features/creative/CreativeWorkDesk").then((module) => ({ default: module.CreativeWorkDesk }))
 );
@@ -134,8 +131,6 @@ function AuthenticatedWorkspace({
             <SettingsPage currentUser={user} />
           ) : currentPath === "/sample-requests/product-staging" || currentPath === "/sample-requests/add-product" ? (
             <ProductStagingWorkspace user={user} />
-          ) : currentPath === "/sample-requests/draft-workspace" ? (
-            <DraftWorkspacePage user={user} />
           ) : currentPath === "/sample-requests/program-planning" ? (
             <ProgramPlanningWorkspace user={user} />
           ) : currentPath === "/sample-requests/programs" ? (

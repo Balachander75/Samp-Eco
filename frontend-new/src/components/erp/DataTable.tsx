@@ -166,7 +166,7 @@ export function DataTable<T>({
         ref={parentRef}
         className={`flex-1 min-h-0 relative ${containerClassName ?? "overflow-auto"}`}
       >
-        <table className={`w-full text-left ${density === "compact" ? "text-[12px]" : "text-[13px]"} border-collapse ${tableClassName ?? "min-w-[1080px]"}`}>
+        <table className={`w-full text-left ${density === "compact" ? "text-[12px]" : "text-[13px]"} border-collapse ${tableClassName ?? "w-full table-fixed min-w-0"}`}>
           {/* Sticky Header */}
           <thead className="sticky top-0 z-20 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] shadow-2xs">
             <tr>
@@ -202,7 +202,7 @@ export function DataTable<T>({
                     onClick={() => col.sortable && onSortChange && onSortChange(col.id)}
                     className={[
                       density === "compact" ? "px-2 py-1.5" : "px-3 py-2",
-                      `whitespace-nowrap ${density === "compact" ? "text-[10px]" : "text-[11px]"} font-semibold uppercase tracking-[0.045em] text-[var(--text-muted)]`,
+                      `whitespace-nowrap overflow-hidden ${density === "compact" ? "text-[10px]" : "text-[11px]"} font-semibold uppercase tracking-[0.045em] text-[var(--text-muted)]`,
                       col.width ?? "",
                       col.sortable
                         ? "cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 group select-none transition-colors"
@@ -214,8 +214,10 @@ export function DataTable<T>({
                         : "",
                     ].join(" ")}
                   >
-                    <div className={`flex items-center gap-1 ${alignClass}`}>
-                      <span>{col.header}</span>
+                    <div className={`flex items-center gap-1 min-w-0 ${alignClass}`}>
+                      <span className="truncate" title={typeof col.header === "string" ? col.header : undefined}>
+                        {col.header}
+                      </span>
                       {col.sortable && (
                         <span className="shrink-0">
                           {isSortActive ? (
@@ -327,6 +329,7 @@ export function DataTable<T>({
                           key={col.id}
                           className={[
                             density === "compact" ? "px-2 py-1.5" : "px-3 py-2",
+                            "overflow-hidden align-middle",
                             col.width ?? "",
                             col.align === "right"
                               ? "text-right"

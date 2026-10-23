@@ -224,9 +224,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
     () => [
       {
         id: "srAndMaterial",
-        header: "Draft / Material Code",
+        header: "Draft / Material",
+        width: "w-[110px]",
         cell: (row) => (
-          <div className="flex flex-col gap-1 whitespace-nowrap font-mono">
+          <div className="flex flex-col gap-0.5 whitespace-nowrap font-mono min-w-0">
             <div className="font-bold">
               {getPrimaryRequestCode(row, selectedTypeFilter) ? (
                 <CopyBadge text={getPrimaryRequestCode(row, selectedTypeFilter)} />
@@ -235,7 +236,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
               )}
             </div>
             {getSecondaryRequestCode(row) ? (
-              <span className="self-start px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[var(--on-surface-muted)]">
+              <span
+                className="self-start px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[var(--on-surface-muted)] truncate max-w-full"
+                title={getSecondaryRequestCode(row) || undefined}
+              >
                 {getSecondaryRequestCode(row)}
               </span>
             ) : (
@@ -247,10 +251,11 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       {
         id: "customer",
         header: "Customer",
+        width: "w-[110px]",
         cell: (row) => (
-          <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--on-surface)] whitespace-nowrap">
+          <div className="flex items-center gap-1 font-semibold text-xs text-[var(--on-surface)] whitespace-nowrap min-w-0">
             <Building2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-            <span className="truncate max-w-[160px]" title={row.customer || ""}>
+            <span className="truncate max-w-[85px]" title={row.customer || ""}>
               {row.customer || "—"}
             </span>
           </div>
@@ -258,15 +263,16 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       },
       {
         id: "stagedProducts",
-        header: "Classification & Staged Product",
+        header: "Classification & Product",
+        width: "w-[180px]",
         cell: (row) => (
-          <div className="max-w-xs">
+          <div className="min-w-0 max-w-[180px]">
             <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Product"}>
               {row.productDescription || row.materialCode || row.srNumber || "Commercial Product"}
             </div>
             {row.productCategory && (
               <div className="mt-0.5">
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[130px]" title={row.productCategory}>
                   {row.productCategory}
                 </span>
               </div>
@@ -276,14 +282,15 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       },
       {
         id: "programName",
-        header: "Program & Year",
+        header: "Program / Yr",
+        width: "w-[100px]",
         cell: (row) => (
-          <div className="max-w-xs">
-            <span className="block truncate font-medium text-xs text-[var(--on-surface)]" title={row.programName || row.programCampaignTitle || ""}>
+          <div className="min-w-0 max-w-[100px]">
+            <span className="block truncate font-semibold text-xs text-[var(--on-surface)]" title={row.programName || row.programCampaignTitle || ""}>
               {row.programName || row.programCampaignTitle || "—"}
             </span>
             {row.programYear && (
-              <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
+              <span className="inline-block mt-0.5 px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
                 BY {row.programYear}
               </span>
             )}
@@ -292,7 +299,8 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       },
       {
         id: "quantity",
-        header: "Quantity",
+        header: "Qty",
+        width: "w-[75px]",
         cell: (row) => renderQuantityCell(row, "all"),
       },
       ...(isAdmin
@@ -300,24 +308,25 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
             {
               id: "coordinator",
               header: "Raised By",
+              width: "w-[125px]",
               cell: (row: SampleRequestItem) => {
                 const creator = row.createdBy || row.requestCreatedBy || "Marketing Team";
                 const initials = getInitials(creator);
                 const dateCreated = row.dateRequestCreated || row.createdAt;
                 return (
-                  <div className="flex items-center gap-2 whitespace-nowrap">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap min-w-0 max-w-[125px]">
                     <span
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 shrink-0"
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 shrink-0"
                       title={creator}
                     >
                       {initials}
                     </span>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-semibold text-xs text-[var(--on-surface)] truncate max-w-[120px]" title={creator}>
+                    <div className="flex flex-col min-w-0 overflow-hidden">
+                      <span className="font-semibold text-xs text-[var(--on-surface)] truncate max-w-[90px]" title={creator}>
                         {creator}
                       </span>
                       {dateCreated && (
-                        <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">
+                        <span className="text-[9.5px] font-mono text-[var(--on-surface-subtle)] truncate">
                           {formatOdooDate(dateCreated)}
                         </span>
                       )}
@@ -336,9 +345,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
     // 1. Base Column: SR & Material Code (clubbed)
     const srAndMaterialCol: ColumnDef<SampleRequestItem> = {
       id: "srAndMaterial",
-      header: "SR / Material Code",
+      header: "SR / Material",
+      width: "w-[105px]",
       cell: (row) => (
-        <div className="flex flex-col gap-0.5 whitespace-nowrap font-mono">
+        <div className="flex flex-col gap-0.5 whitespace-nowrap font-mono min-w-0">
           <div className="font-bold">
             {getPrimaryRequestCode(row, selectedTypeFilter) ? (
               <CopyBadge text={getPrimaryRequestCode(row, selectedTypeFilter)} />
@@ -347,7 +357,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
             )}
           </div>
           {getSecondaryRequestCode(row) ? (
-            <span className="self-start px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[var(--on-surface-muted)]">
+            <span
+              className="self-start px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[var(--on-surface-muted)] truncate max-w-[95px]"
+              title={getSecondaryRequestCode(row) || undefined}
+            >
               {getSecondaryRequestCode(row)}
             </span>
           ) : (
@@ -361,12 +374,35 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
     const customerCol: ColumnDef<SampleRequestItem> = {
       id: "customer",
       header: "Customer",
+      width: "w-[105px]",
       cell: (row) => (
-        <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--on-surface)] whitespace-nowrap">
+        <div className="flex items-center gap-1 font-semibold text-xs text-[var(--on-surface)] whitespace-nowrap min-w-0">
           <Building2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-          <span className="truncate max-w-[125px]" title={row.customer || ""}>
+          <span className="truncate max-w-[85px]" title={row.customer || ""}>
             {row.customer || "—"}
           </span>
+        </div>
+      ),
+    };
+
+    // 3. Base Column: Program / Year
+    const programCol: ColumnDef<SampleRequestItem> = {
+      id: "programName",
+      header: "Program / Yr",
+      width: "w-[95px]",
+      cell: (row) => (
+        <div className="min-w-0 max-w-[95px]">
+          <span
+            className="block truncate font-semibold text-xs text-[var(--on-surface)]"
+            title={row.programName || row.programCampaignTitle || "—"}
+          >
+            {row.programName || row.programCampaignTitle || "—"}
+          </span>
+          {row.programYear && (
+            <span className="inline-block mt-0.5 px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
+              BY {row.programYear}
+            </span>
+          )}
         </div>
       ),
     };
@@ -375,8 +411,11 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
     const stageCol: ColumnDef<SampleRequestItem> = {
       id: "status",
       header: "Stage",
+      width: "w-[135px]",
       cell: (row) => (
-        <StatusPill status={row.status || "Draft"} size="sm" showDot />
+        <div className="flex items-center min-w-0 max-w-[135px]">
+          <StatusPill status={row.status || "Draft"} size="sm" showDot />
+        </div>
       ),
     };
 
@@ -384,24 +423,25 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
     const coordinatorCol: ColumnDef<SampleRequestItem> = {
       id: "coordinator",
       header: "Raised By",
+      width: "w-[120px]",
       cell: (row: SampleRequestItem) => {
         const creator = row.createdBy || row.requestCreatedBy || "Marketing Team";
         const initials = getInitials(creator);
         const dateCreated = row.dateRequestCreated || row.createdAt;
         return (
-          <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <div className="flex items-center gap-1.5 whitespace-nowrap min-w-0 max-w-[120px]">
             <span
               className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono font-bold bg-[#1b4332]/10 dark:bg-emerald-500/20 text-[#1b4332] dark:text-emerald-300 border border-[#1b4332]/20 dark:border-emerald-500/30 shrink-0"
               title={creator}
             >
               {initials}
             </span>
-            <div className="flex flex-col min-w-0">
-              <span className="font-semibold text-xs text-[var(--on-surface)] truncate max-w-[95px]" title={creator}>
+            <div className="flex flex-col min-w-0 overflow-hidden">
+              <span className="font-semibold text-xs text-[var(--on-surface)] truncate max-w-[85px]" title={creator}>
                 {creator}
               </span>
               {dateCreated && (
-                <span className="text-[9.5px] font-mono text-[var(--on-surface-subtle)]">
+                <span className="text-[9.5px] font-mono text-[var(--on-surface-subtle)] truncate">
                   {formatOdooDate(dateCreated)}
                 </span>
               )}
@@ -416,16 +456,18 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       const cols: ColumnDef<SampleRequestItem>[] = [
         srAndMaterialCol,
         customerCol,
+        programCol,
         {
           id: "classification",
           header: "Classification",
+          width: "w-[160px]",
           cell: (row) => (
-            <div className="min-w-0 max-w-[130px]">
+            <div className="min-w-0 max-w-[160px]">
               <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Commercial Product"}>
                 {row.productDescription || "Commercial Product"}
               </div>
               {row.productCategory && (
-                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 truncate max-w-[110px]" title={row.productCategory}>
+                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 truncate max-w-[130px]" title={row.productCategory}>
                   {row.productCategory}
                 </span>
               )}
@@ -435,21 +477,22 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         {
           id: "brandAndSku",
           header: "Brand / SKU",
+          width: "w-[110px]",
           cell: (row) => (
-            <div className="flex flex-col whitespace-nowrap min-w-0 max-w-[100px]">
+            <div className="flex flex-col whitespace-nowrap min-w-0 max-w-[110px]">
               <span className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.brandName || "—"}>
                 {row.brandName || "—"}
               </span>
               {row.customerProductCode ? (
-                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] truncate" title={row.customerProductCode}>
+                <span className="text-[9.5px] font-mono text-[var(--on-surface-subtle)] truncate" title={row.customerProductCode}>
                   {row.customerProductCode}
                 </span>
               ) : row.barcode ? (
-                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)] truncate" title={row.barcode}>
+                <span className="text-[9.5px] font-mono text-[var(--on-surface-subtle)] truncate" title={row.barcode}>
                   {row.barcode}
                 </span>
               ) : (
-                <span className="text-[10px] font-mono text-[var(--on-surface-subtle)]">—</span>
+                <span className="text-[9.5px] font-mono text-[var(--on-surface-subtle)]">—</span>
               )}
             </div>
           ),
@@ -457,6 +500,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         {
           id: "sampleQuantity",
           header: "Qty",
+          width: "w-[70px]",
           cell: (row) => {
             const qty = quantityLabel(row.qtyForSampling) || "1";
             const unit = row.unitPcPack || "PC";
@@ -475,6 +519,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         {
           id: "targetSla",
           header: "Req Date",
+          width: "w-[85px]",
           cell: (row) => renderRequiredDateCell(row.sampleRequiredDate),
         },
         stageCol,
@@ -488,22 +533,24 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       const cols: ColumnDef<SampleRequestItem>[] = [
         srAndMaterialCol,
         customerCol,
+        programCol,
         {
           id: "classification",
           header: "Classification",
+          width: "w-[150px]",
           cell: (row) => (
-            <div className="min-w-0 max-w-[160px]">
+            <div className="min-w-0 max-w-[150px]">
               <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Design Item"}>
                 {row.productDescription || "Commercial Product"}
               </div>
-              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap min-w-0">
                 {row.productCategory && (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 truncate max-w-[120px]" title={row.productCategory}>
+                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 truncate max-w-[110px]" title={row.productCategory}>
                     {row.productCategory}
                   </span>
                 )}
                 {row.brandName && (
-                  <span className="text-[10px] text-[var(--on-surface-subtle)] truncate max-w-[70px]">
+                  <span className="text-[9.5px] text-[var(--on-surface-subtle)] truncate max-w-[60px]" title={row.brandName}>
                     {row.brandName}
                   </span>
                 )}
@@ -513,7 +560,8 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
         {
           id: "designCount",
-          header: "Designs (Req / Deliv)",
+          header: "Designs",
+          width: "w-[95px]",
           cell: (row) => {
             const reqDesigns = Number(row.designsCustomerCreative || row.productArtworkNos || row.numberOfDesigns) || 1;
             const recDesigns = (row.creativeSubmissions || []).reduce(
@@ -521,7 +569,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
               0
             );
             return (
-              <div className="flex items-center gap-1.5 font-mono text-xs whitespace-nowrap">
+              <div className="flex items-center gap-1 font-mono text-xs whitespace-nowrap min-w-0">
                 <span className="font-bold text-purple-700 dark:text-purple-300">
                   {reqDesigns} Req
                 </span>
@@ -535,9 +583,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
         {
           id: "theme",
-          header: "Theme / Trend",
+          header: "Theme",
+          width: "w-[80px]",
           cell: (row) => (
-            <div className="whitespace-nowrap max-w-[110px] truncate" title={row.trend || "Standard"}>
+            <div className="whitespace-nowrap max-w-[80px] truncate" title={row.trend || "Standard"}>
               <span className="text-xs font-medium text-[var(--on-surface)]">
                 {row.trend || "—"}
               </span>
@@ -546,9 +595,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
         {
           id: "targetAudience",
-          header: "Target Audience",
+          header: "Audience",
+          width: "w-[80px]",
           cell: (row) => (
-            <div className="whitespace-nowrap max-w-[110px] truncate" title={row.targetAudience || "All Ages"}>
+            <div className="whitespace-nowrap max-w-[80px] truncate" title={row.targetAudience || "All Ages"}>
               <span className="text-xs text-[var(--on-surface-muted)]">
                 {row.targetAudience || "—"}
               </span>
@@ -557,7 +607,8 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
         {
           id: "targetSla",
-          header: "Required Date",
+          header: "Req Date",
+          width: "w-[85px]",
           cell: (row) => renderRequiredDateCell(row.designRequiredDate || row.targetArtworkDateCreative || row.sampleRequiredDate),
         },
         stageCol,
@@ -571,22 +622,24 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       const cols: ColumnDef<SampleRequestItem>[] = [
         srAndMaterialCol,
         customerCol,
+        programCol,
         {
           id: "classification",
           header: "Classification",
+          width: "w-[180px]",
           cell: (row) => (
             <div className="min-w-0 max-w-[180px]">
               <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Mockup Item"}>
                 {row.productDescription || "Commercial Product"}
               </div>
-              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap min-w-0">
                 {row.productCategory && (
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[120px]" title={row.productCategory}>
+                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate max-w-[110px]" title={row.productCategory}>
                     {row.productCategory}
                   </span>
                 )}
                 {row.brandName && (
-                  <span className="text-[10px] text-[var(--on-surface-subtle)] truncate max-w-[80px]">
+                  <span className="text-[9.5px] text-[var(--on-surface-subtle)] truncate max-w-[65px]" title={row.brandName}>
                     {row.brandName}
                   </span>
                 )}
@@ -597,21 +650,22 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         {
           id: "mockupQty",
           header: "Mockup Qty",
+          width: "w-[95px]",
           cell: (row) => {
             const mockupQty = quantityLabel((row as any).qtyForMockup || (row as any).mockupQty || (row.mockupWorkflowState as any)?.qtyForMockup) || "1";
             const mockupStage = row.mockupWorkflowState?.stage
               ? row.mockupWorkflowState.stage.replace(/_/g, " ")
               : undefined;
             return (
-              <div className="flex flex-col whitespace-nowrap font-mono">
+              <div className="flex flex-col whitespace-nowrap font-mono min-w-0 max-w-[95px]">
                 <div className="flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-400">
                   <span>{mockupQty}</span>
-                  <span className="text-[10px] font-medium text-[var(--on-surface-subtle)] font-sans">
+                  <span className="text-[9.5px] font-medium text-[var(--on-surface-subtle)] font-sans">
                     Mockup{mockupQty !== "1" ? "s" : ""}
                   </span>
                 </div>
                 {mockupStage && (
-                  <span className="text-[9.5px] text-[var(--on-surface-subtle)] font-sans capitalize">
+                  <span className="text-[9px] text-[var(--on-surface-subtle)] font-sans capitalize truncate" title={mockupStage}>
                     {mockupStage}
                   </span>
                 )}
@@ -621,7 +675,8 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
         {
           id: "targetSla",
-          header: "Required Date",
+          header: "Req Date",
+          width: "w-[85px]",
           cell: (row) => renderRequiredDateCell(row.mockupWorkflowState?.requiredDate || row.sampleRequiredDate),
         },
         stageCol,
@@ -635,16 +690,18 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       const cols: ColumnDef<SampleRequestItem>[] = [
         srAndMaterialCol,
         customerCol,
+        programCol,
         {
           id: "classification",
           header: "Classification",
+          width: "w-[150px]",
           cell: (row) => (
-            <div className="min-w-0 max-w-[160px]">
+            <div className="min-w-0 max-w-[150px]">
               <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || "Costing Item"}>
                 {row.productDescription || "Commercial Product"}
               </div>
               {row.productCategory && (
-                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 truncate max-w-[130px]" title={row.productCategory}>
+                <span className="inline-flex items-center mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 truncate max-w-[120px]" title={row.productCategory}>
                   {row.productCategory}
                 </span>
               )}
@@ -653,13 +710,14 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
         {
           id: "brandAndSku",
-          header: "Brand & SKU / Barcode",
+          header: "Brand / SKU",
+          width: "w-[105px]",
           cell: (row) => (
-            <div className="flex flex-col whitespace-nowrap min-w-0 max-w-[140px]">
+            <div className="flex flex-col whitespace-nowrap min-w-0 max-w-[105px]">
               <span className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.brandName || "—"}>
                 {row.brandName || "—"}
               </span>
-              <div className="flex items-center gap-1 text-[10px] font-mono text-[var(--on-surface-subtle)] truncate">
+              <div className="flex items-center gap-1 text-[9.5px] font-mono text-[var(--on-surface-subtle)] truncate">
                 {row.customerProductCode && (
                   <span title={`SKU: ${row.customerProductCode}`}>SKU: {row.customerProductCode}</span>
                 )}
@@ -674,7 +732,8 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
         {
           id: "costingQuantity",
-          header: "Costing Quantity",
+          header: "Costing Qty",
+          width: "w-[80px]",
           cell: (row) => {
             const costingQty = quantityLabel(row.qtyDesignCosting) || "1";
             const costingUnit = row.unitPcPack || "PC";
@@ -684,7 +743,7 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                 <span>{costingQty}</span>
                 <span className="text-[10px] font-bold text-[var(--on-surface-muted)] uppercase">{costingUnit}</span>
                 {packInfo && (
-                  <span className="text-[9.5px] text-[var(--on-surface-subtle)] font-normal">{packInfo}</span>
+                  <span className="text-[9px] text-[var(--on-surface-subtle)] font-normal">{packInfo}</span>
                 )}
               </div>
             );
@@ -692,25 +751,26 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
         {
           id: "costingRequirement",
-          header: "Requirement & Route",
+          header: "Requirement",
+          width: "w-[110px]",
           cell: (row) => {
             const hasCreativeInput = row.costingCreativeInputNeeded === true;
             const remark = row.costingCreativeInputRemark || row.marketingRemarks || row.descriptionNotes;
             return (
-              <div className="flex flex-col min-w-0 max-w-[150px]">
+              <div className="flex flex-col min-w-0 max-w-[110px]">
                 <div className="flex items-center gap-1 whitespace-nowrap">
                   {hasCreativeInput ? (
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
                       Creative First
                     </span>
                   ) : (
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
                       Direct Costing
                     </span>
                   )}
                 </div>
                 {remark && (
-                  <span className="text-[10px] text-[var(--on-surface-subtle)] truncate mt-0.5" title={remark}>
+                  <span className="text-[9.5px] text-[var(--on-surface-subtle)] truncate mt-0.5" title={remark}>
                     {remark}
                   </span>
                 )}
@@ -720,7 +780,8 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
         },
         {
           id: "targetSla",
-          header: "Required Date",
+          header: "Req Date",
+          width: "w-[85px]",
           cell: (row) => renderRequiredDateCell(row.costingRequiredDate || row.sampleRequiredDate),
         },
         stageCol,
@@ -733,31 +794,39 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
     const cols: ColumnDef<SampleRequestItem>[] = [
       srAndMaterialCol,
       customerCol,
+      programCol,
       {
         id: "classification",
-        header: "Classification & Scope",
+        header: "Classification",
+        width: "w-[170px]",
         cell: (row) => (
-          <div className="max-w-xs min-w-0">
-            <div className="font-semibold text-xs text-[var(--on-surface)] truncate" title={row.productDescription || row.programName || ""}>
+          <div className="min-w-0 max-w-[170px]">
+            <div
+              className="font-semibold text-xs text-[var(--on-surface)] truncate"
+              title={row.productDescription || row.programName || ""}
+            >
               {row.productDescription || row.programName || "Commercial Product Sample"}
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <div className="flex items-center gap-1 mt-0.5 min-w-0">
               {row.productCategory && (
                 <span
-                  className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 truncate max-w-[130px]"
+                  className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 truncate max-w-[110px]"
                   title={`Category: ${row.productCategory}${row.productSubCategory ? " › " + row.productSubCategory : ""}`}
                 >
                   {row.productCategory}
                   {row.productSubCategory && (
-                    <span className="opacity-75 font-normal ml-0.5">
+                    <span className="opacity-75 font-normal ml-0.5 truncate">
                       › {row.productSubCategory}
                     </span>
                   )}
                 </span>
               )}
               {row.brandName && (
-                <span className="text-[10px] text-[var(--on-surface-subtle)] font-sans truncate max-w-[80px]">
-                  Brand: {row.brandName}
+                <span
+                  className="text-[9.5px] text-[var(--on-surface-subtle)] font-sans truncate max-w-[55px]"
+                  title={`Brand: ${row.brandName}`}
+                >
+                  {row.brandName}
                 </span>
               )}
             </div>
@@ -766,20 +835,21 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       },
       {
         id: "requestScope",
-        header: "Type of Request",
+        header: "Request Type",
+        width: "w-[105px]",
         cell: (row) => {
           const requestTypes = getRequestTypes(row);
           return (
-            <div className="flex items-center gap-1 flex-wrap whitespace-nowrap">
+            <div className="flex flex-col gap-0.5 items-start min-w-0 max-w-[105px] whitespace-nowrap">
               {requestTypes.map((type) => {
                 if (type === "design") {
                   return (
                     <span
                       key="design"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
                       title="Design Request"
                     >
-                      <Palette className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" />
+                      <Palette className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400 shrink-0" />
                       <span>Design</span>
                     </span>
                   );
@@ -788,10 +858,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                   return (
                     <span
                       key="mockup"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
                       title="Mockup Sample"
                     >
-                      <Layers className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                      <Layers className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
                       <span>Mockup</span>
                     </span>
                   );
@@ -800,10 +870,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                   return (
                     <span
                       key="costing"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20"
                       title="Costing Estimation"
                     >
-                      <Calculator className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400" />
+                      <Calculator className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400 shrink-0" />
                       <span>Costing</span>
                     </span>
                   );
@@ -811,10 +881,10 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
                 return (
                   <span
                     key="sample"
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9.5px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
                     title="Sampling Production"
                   >
-                    <Package className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                    <Package className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>Sampling</span>
                   </span>
                 );
@@ -825,12 +895,14 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
       },
       {
         id: "quantity",
-        header: "Quantity",
+        header: "Qty",
+        width: "w-[70px]",
         cell: (row) => renderQuantityCell(row, "all"),
       },
       {
         id: "targetSla",
-        header: "Required Date",
+        header: "Req Date",
+        width: "w-[85px]",
         cell: (row) => renderRequiredDateCell(getRequestRequiredDate(row)),
       },
       stageCol,
@@ -847,7 +919,9 @@ export const SamplingRequestsTable: React.FC<SamplingRequestsTableProps> = ({
     <DataTable
       data={paginatedRequests}
       columns={isDraftView ? draftColumns : standardColumns}
-      tableClassName="w-full min-w-0"
+      tableClassName="w-full table-fixed min-w-0"
+      containerClassName="overflow-y-auto overflow-x-hidden"
+      density="compact"
       keyExtractor={(row) => row.id}
       isLoading={isLoading}
       emptyMessage={

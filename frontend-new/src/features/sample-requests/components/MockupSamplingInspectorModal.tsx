@@ -371,7 +371,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--on-surface)]/40 backdrop-blur-xs animate-smooth-backdrop sm:p-4 select-text"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--on-surface)]/40 backdrop-blur-xs animate-smooth-backdrop p-3 sm:p-6 select-text"
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget && !saving && !claiming) onClose();
@@ -383,7 +383,7 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
         role="dialog"
         aria-modal="true"
         aria-labelledby="mockup-inspector-title"
-        className="relative flex h-[92vh] max-h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs shadow-2xl xl:max-w-7xl animate-smooth-modal font-sans"
+        className="relative flex h-[88vh] max-h-[88vh] w-full max-w-[92vw] xl:max-w-6xl 2xl:max-w-7xl flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs shadow-2xl animate-smooth-modal font-sans"
         onClick={(e) => e.stopPropagation()}
       >
         {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
@@ -473,10 +473,9 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
         </div>
 
         {/* ── 3. MAIN WORKSPACE VIEWPORT ── */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] p-4 md:p-6 space-y-4">
-          <div className={`mx-auto w-full rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-200 ${"max-w-6xl"}`}>
-            {/* Dossier Header & Ribbon */}
-            <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-base)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--surface-base)]">
+          {/* Dossier Header & Ribbon */}
+          <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-base)]">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-low)] px-4 py-2.5 sm:px-8">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs font-bold text-[var(--accent-primary)]">
@@ -1269,7 +1268,6 @@ export const MockupSamplingInspectorModal: React.FC<MockupSamplingInspectorModal
                 </div>
               )}
             </div>
-          </div>
         </div>
 
         {/* ── 4. FOOTER CONTROLS ── */}

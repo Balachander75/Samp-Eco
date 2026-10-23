@@ -1,5 +1,7 @@
 export type DeliverableScopeId = "design" | "mockup" | "sample" | "costing";
 
+export type SampleTrack = "resample" | "design_change" | "new_sample" | "normal_sample";
+
 export type ReferenceImageScopeId = "mockup" | "sample" | "costing";
 
 export interface StagedReferenceImage {
@@ -65,6 +67,7 @@ export interface StagedProductItem {
   requestTypeTimestamps?: Record<string, string | null>;
   plant?: string;
   isResample?: boolean;
+  sampleTrack?: SampleTrack;
   resampleReason?: string;
   unitPcPack?: string;
   qtyForSampling?: string;
@@ -104,6 +107,7 @@ export interface StagedProductItem {
   };
   samplingMetadata?: {
     sampleType: "full" | "partial";
+    sampleTrack?: SampleTrack;
     isResample?: boolean;
     resampleReason?: string;
     partialRequirements?: string;

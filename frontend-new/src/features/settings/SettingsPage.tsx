@@ -9,8 +9,6 @@ import {
   Check,
   CheckCircle2,
   AlertCircle,
-  Sun,
-  Moon,
   Sliders,
   RefreshCw,
   ShieldCheck,
@@ -102,13 +100,12 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
   }, [newPassword]);
 
   // ── Appearance Filter State ──
-  const [themeModeFilter, setThemeModeFilter] = useState<"all" | "light" | "dark">("all");
+  const [themeCategoryFilter, setThemeCategoryFilter] = useState<"all" | "enterprise" | "creative" | "minimal">("all");
   const [themeSearchQuery, setThemeSearchQuery] = useState("");
 
   const filteredThemes = useMemo(() => {
     return APP_THEMES.filter((t) => {
-      if (themeModeFilter === "light" && t.mode !== "light") return false;
-      if (themeModeFilter === "dark" && t.mode !== "dark") return false;
+      if (themeCategoryFilter !== "all" && t.category !== themeCategoryFilter) return false;
       if (themeSearchQuery.trim()) {
         const q = themeSearchQuery.toLowerCase();
         return (
@@ -120,7 +117,7 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
       }
       return true;
     });
-  }, [themeModeFilter, themeSearchQuery]);
+  }, [themeCategoryFilter, themeSearchQuery]);
 
   const selectedTheme = useMemo(() => {
     return APP_THEMES.find((option) => option.id === theme) ?? APP_THEMES[0];
@@ -309,23 +306,28 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
                   {[
                     { id: "all", label: `All (${APP_THEMES.length})`, icon: Layout },
                     {
-                      id: "light",
-                      label: `Light (${APP_THEMES.filter((t) => t.mode === "light").length})`,
-                      icon: Sun,
+                      id: "enterprise",
+                      label: `Enterprise (${APP_THEMES.filter((t) => t.category === "enterprise").length})`,
+                      icon: Building2,
                     },
                     {
-                      id: "dark",
-                      label: `Dark (${APP_THEMES.filter((t) => t.mode === "dark").length})`,
-                      icon: Moon,
+                      id: "creative",
+                      label: `Creative (${APP_THEMES.filter((t) => t.category === "creative").length})`,
+                      icon: Palette,
+                    },
+                    {
+                      id: "minimal",
+                      label: `Minimal (${APP_THEMES.filter((t) => t.category === "minimal").length})`,
+                      icon: Layers,
                     },
                   ].map((item) => {
                     const ItemIcon = item.icon;
-                    const isSelected = themeModeFilter === item.id;
+                    const isSelected = themeCategoryFilter === item.id;
                     return (
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => setThemeModeFilter(item.id as any)}
+                        onClick={() => setThemeCategoryFilter(item.id as any)}
                         className={`px-3 py-1.5 rounded-md transition-all font-semibold cursor-pointer flex items-center gap-1.5 text-xs ${
                           isSelected
                             ? "bg-surface-lowest text-onSurface shadow-xs font-bold"
@@ -374,7 +376,7 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
                     }`}
                   />
                   <span className="text-onSurface font-semibold">Active: {selectedTheme.name}</span>
-                  <span className="text-onSurface-subtle capitalize">({selectedTheme.mode === "dark" ? "OLED Dark" : "Light"})</span>
+                  <span className="text-onSurface-subtle capitalize">(Light Theme)</span>
                 </div>
               </div>
             </div>
@@ -495,7 +497,7 @@ export default function SettingsPage({ currentUser: propUser }: { currentUser?: 
                         </span>
                       ) : (
                         <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-surface-low/80 text-onSurface-subtle">
-                          {option.mode === "dark" ? "OLED" : "Light"}
+                          Light
                         </span>
                       )}
                     </div>

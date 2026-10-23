@@ -60,7 +60,6 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
           "/sample-requests/programs",
           "/sample-requests/product-staging",
           "/sample-requests/add-product",
-          "/sample-requests/draft-workspace",
         ],
         departmentKey: "marketing",
         subItems: [

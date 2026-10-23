@@ -7,7 +7,6 @@ import {
   Palette,
   Box,
   Calculator,
-  ArrowUpRight,
 } from "lucide-react";
 import { DataTable } from "@/components/erp";
 import type { ColumnDef } from "@/components/erp";
@@ -155,28 +154,8 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
     return packageGroups.reduce((acc, g) => acc + g.items.length, 0);
   }, [packageGroups]);
 
-  const handleOpenWorkspace = useCallback((group: DraftPackageGroup) => {
-    const context: DraftPackageContext = {
-      id: group.id,
-      customer: group.customer,
-      programName: group.programName,
-      programYear: group.programYear,
-      year: group.year,
-      targetPlant: group.targetPlant,
-      createdBy: group.createdBy,
-      dateRequestCreated: group.dateRequestCreated,
-      requestKind: group.requestKind,
-    };
-    try {
-      sessionStorage.setItem("samp_active_draft_group", JSON.stringify(context));
-    } catch {
-      // The route state remains available for this navigation if session storage is full.
-    }
-    navigate("/sample-requests/draft-workspace", { state: { package: context } });
-  }, [navigate]);
-
-  const handleOpenStaging = useCallback((group: DraftPackageGroup, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleOpenStaging = useCallback((group: DraftPackageGroup, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const first = group.items[0];
     const stagedList: StagedProductItem[] = group.items.map(mapDraftItemToStagedProduct);
     const stagingContext = {
@@ -351,7 +330,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
       id: "actions",
       header: <span className="block text-right">Actions</span>,
       align: "right",
-      width: "160px",
+      width: "120px",
       cell: (group) => (
         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <button
@@ -361,21 +340,12 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
             title="Open in Product Staging Form"
           >
             <Package className="w-3 h-3 text-[var(--on-surface-subtle)]" />
-            <span>Staging</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleOpenWorkspace(group)}
-            className="group inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] hover:bg-[var(--surface-low)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-all cursor-pointer shadow-2xs hover:border-[var(--accent-primary)]/40 active:scale-95"
-            title="Open Full Draft Workspace"
-          >
-            <span>Workspace</span>
-            <ArrowUpRight className="w-3 h-3 text-[var(--on-surface-subtle)] group-hover:text-[var(--accent-primary)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+            <span>Open Staging</span>
           </button>
         </div>
       ),
     },
-  ], [handleOpenWorkspace, handleOpenStaging]);
+  ], [handleOpenStaging]);
 
   const hasDrafts = requests.some((item) => getStageIdForRequest(item) === "draft");
   const emptyMessage = hasDrafts
@@ -390,7 +360,7 @@ export const DraftPackagesView: React.FC<DraftPackagesViewProps> = ({
         keyExtractor={(group) => group.id}
         isLoading={isLoading}
         emptyMessage={emptyMessage}
-        onRowClick={handleOpenWorkspace}
+        onRowClick={handleOpenStaging}
         currentPage={currentPage}
         pageSize={pageSize}
         totalCount={packageGroups.length}

@@ -33,6 +33,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { CopyBadge } from "@/components/ui/CopyBadge";
 import { TableSkeletonRows } from "@/components/erp/TableSkeletonRows";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { BY_MONTHS } from "@/lib/businessYear";
 
 export interface CreativeOverviewPageProps {
   briefs: CreativeBriefItem[];
@@ -49,22 +50,6 @@ export interface CreativeOverviewPageProps {
   onRefresh?: () => Promise<void>;
   onExportCSV?: () => void;
 }
-
-// 12-Month Business Year sequence (October to September)
-const BY_MONTHS = [
-  { key: "10", label: "Oct", full: "October" },
-  { key: "11", label: "Nov", full: "November" },
-  { key: "12", label: "Dec", full: "December" },
-  { key: "01", label: "Jan", full: "January" },
-  { key: "02", label: "Feb", full: "February" },
-  { key: "03", label: "Mar", full: "March" },
-  { key: "04", label: "Apr", full: "April" },
-  { key: "05", label: "May", full: "May" },
-  { key: "06", label: "Jun", full: "June" },
-  { key: "07", label: "Jul", full: "July" },
-  { key: "08", label: "Aug", full: "August" },
-  { key: "09", label: "Sep", full: "September" },
-];
 
 export const CreativeOverviewPage: React.FC<CreativeOverviewPageProps> = ({
   briefs,

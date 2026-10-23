@@ -10,21 +10,16 @@ export type ThemeId =
   | "rose"
   | "neo-brutalism"
   | "nordic-frost"
-  | "terracotta"
-  | "midnight"
-  | "forest-night"
-  | "nocturne"
-  | "tokyo-neon"
-  | "titanium";
+  | "terracotta";
 
 export interface AppTheme {
   id: ThemeId;
   name: string;
   description: string;
-  mode: "light" | "dark";
+  mode: "light";
   vibe: string;
   badge?: string;
-  category: "all" | "enterprise" | "creative" | "dark_oled" | "minimal";
+  category: "all" | "enterprise" | "creative" | "minimal";
   preview: {
     canvas: string;
     sidebar: string;
@@ -194,105 +189,6 @@ export const APP_THEMES: AppTheme[] = [
       text: "#2c160a",
       border: "#dfd2c0"
     }
-  },
-  {
-    id: "midnight",
-    name: "Obsidian Blue",
-    description: "Deep cosmic slate, glowing periwinkle neon, and electric ice cyan.",
-    mode: "dark",
-    vibe: "Deep Space",
-    badge: "OLED Dark",
-    category: "dark_oled",
-    preview: {
-      canvas: "#050814",
-      sidebar: "#090f24",
-      surface: "#0e1837",
-      accent: "#818cf8",
-      accentSoft: "#182036",
-      accentSecondary: "#38bdf8",
-      accentTertiary: "#fbbf24",
-      text: "#f8fafc",
-      border: "#222a42"
-    }
-  },
-  {
-    id: "forest-night",
-    name: "Abyssal Teal",
-    description: "Deep midnight evergreen, luminous mint highlights, and antique gold.",
-    mode: "dark",
-    vibe: "Nordic Night",
-    category: "dark_oled",
-    preview: {
-      canvas: "#020c08",
-      sidebar: "#051610",
-      surface: "#0b291e",
-      accent: "#10b981",
-      accentSoft: "#152e28",
-      accentSecondary: "#fbbf24",
-      accentTertiary: "#60a5fa",
-      text: "#ecfdf5",
-      border: "#1b3831"
-    }
-  },
-  {
-    id: "nocturne",
-    name: "Orchid Afterdark",
-    description: "Velvet black cherry, radiant electric lilac, and glowing turquoise.",
-    mode: "dark",
-    vibe: "Cyber Velvet",
-    badge: "Vibrant Dark",
-    category: "creative",
-    preview: {
-      canvas: "#08020e",
-      sidebar: "#120521",
-      surface: "#1f0d38",
-      accent: "#c084fc",
-      accentSoft: "#241535",
-      accentSecondary: "#2dd4bf",
-      accentTertiary: "#f43f5e",
-      text: "#faf5ff",
-      border: "#341c45"
-    }
-  },
-  {
-    id: "tokyo-neon",
-    name: "Tokyo Neon",
-    description: "Deep pitch obsidian with electric neon cyan and hot magenta glow.",
-    mode: "dark",
-    vibe: "Tokyo Cyberpunk",
-    badge: "High Tech",
-    category: "dark_oled",
-    preview: {
-      canvas: "#010204",
-      sidebar: "#040714",
-      surface: "#0a1435",
-      accent: "#00f0ff",
-      accentSoft: "#151e32",
-      accentSecondary: "#ff007a",
-      accentTertiary: "#a855f7",
-      text: "#ffffff",
-      border: "#162033"
-    }
-  },
-  {
-    id: "titanium",
-    name: "Stealth Titanium",
-    description: "Aerospace carbon graphite, brushed titanium metal, and sapphire crystal.",
-    mode: "dark",
-    vibe: "Aerospace Pro",
-    badge: "Pro Stealth",
-    category: "dark_oled",
-    preview: {
-      canvas: "#060709",
-      sidebar: "#0c0d12",
-      surface: "#161924",
-      accent: "#3b82f6",
-      accentSoft: "#1a1e2a",
-      accentSecondary: "#94a3b8",
-      accentTertiary: "#38bdf8",
-      text: "#f8fafc",
-      border: "#202430"
-    }
   }
 ];
 
@@ -366,10 +262,9 @@ export const ThemeProvider: React.FC<{ userId?: number | string; initialTheme?: 
   const scrollRestoreVersion = useRef(0);
 
   useLayoutEffect(() => {
-    const isDark = APP_THEMES.find((option) => option.id === theme)?.mode === "dark";
     document.documentElement.dataset.theme = theme;
-    document.documentElement.classList.toggle("dark", isDark);
-    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+    document.documentElement.classList.remove("dark");
+    document.documentElement.style.colorScheme = "light";
     storeThemeHint(theme);
     if (typeof window !== "undefined" && (window.scrollY !== 0 || window.scrollX !== 0)) {
       window.scrollTo(0, 0);

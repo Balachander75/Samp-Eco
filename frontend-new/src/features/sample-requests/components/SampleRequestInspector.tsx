@@ -56,7 +56,6 @@ import { RequestClosedStamp } from "./common/RequestClosedWatermark";
 import type { RequestClosureTarget } from "./common/RequestClosureControl";
 import { ProductDocketView, isMissingSpec } from "./staging/ProductDocketView";
 import { DocketSkeleton } from "@/components/ui/loading";
-import { TaskClaimBanner } from "@/components/ui/TaskClaimBanner";
 import type { ProductSearchResult } from "../types";
 import { getPrimaryRequestCode } from "../sampling/utils/requestTypeUtils";
 import { MockupScopeSpecificationsPanel } from "./MockupScopeSpecificationsPanel";
@@ -499,8 +498,8 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   const visibleTabs = useMemo(() => {
     const tabs: Array<{ id: InspectorTab; label: string; icon: LucideIcon; badge?: string; count?: number }> = [
-      { id: "scope", label: "1. Specifications & Scope", icon: FileText },
-      { id: "specs", label: "2. Product Classes & Characteristics", icon: Layers, count: productDetails.length },
+      { id: "scope", label: "Specifications & Scope", icon: FileText },
+      { id: "specs", label: "Product Classes & Characteristics", icon: Layers, count: productDetails.length },
     ];
     if (!isCreativeBypassed) {
       tabs.push({ id: "creative", label: "Creative", icon: Palette, badge: isCreativeDone ? "Done" : "Pending" });
@@ -533,9 +532,6 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
   ));
 
   const activeWorkflowStage = ws.stage || (isPlantSampleTask ? "plant" : "");
-  const isTaskClaimedForActiveStage = Boolean(
-    isTaskClaimed && (ws.claimedStage ? ws.claimedStage === activeWorkflowStage : true)
-  );
 
   const [localClosed, setLocalClosed] = useState(false);
   const [closureDetail, setClosureDetail] = useState<any>(
@@ -917,7 +913,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--on-surface)]/40 backdrop-blur-xs animate-smooth-backdrop sm:p-4 select-text"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--on-surface)]/40 backdrop-blur-xs animate-smooth-backdrop p-3 sm:p-6 select-text"
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -929,7 +925,7 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="sample-inspector-title"
-        className="relative flex h-[92vh] max-h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] select-text xl:max-w-7xl animate-smooth-modal font-sans"
+        className="relative flex h-[88vh] max-h-[88vh] w-full max-w-[92vw] xl:max-w-6xl 2xl:max-w-7xl flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] text-xs shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] select-text animate-smooth-modal font-sans"
         onClick={(e) => e.stopPropagation()}
       >
         {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
@@ -953,63 +949,52 @@ export const SampleRequestInspector: React.FC<SampleRequestInspectorProps> = ({
 
 
         {/* ── 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + CHATTER) ── */}
-        {isTaskClaimedForActiveStage && (
-          <TaskClaimBanner
-            claimedBy={claimedBy}
-            claimedAt={ws.claimedAt}
-            isClaimedByCurrentUser={isClaimedByMe}
-            compact
-            className="mx-4 mt-3 shrink-0 sm:mx-6"
-          />
-        )}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           
           {/* ── LEFT: FORM SHEET (DOCUMENT BODY) ── */}
-          <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto bg-[var(--bg-app)] p-4 md:p-6">
-            <div className={`mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden transition-all duration-300 ${
-              "max-w-6xl"
-            }`}>
-              
-              {/* ── 1. PRIMARY SECTION TABS (TOP - EXACT FEASIBILITY CHECK STYLE) ── */}
-              <div className="px-6 sm:px-8 pt-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
-                <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
-                  {visibleTabs.map((tab, idx) => {
-                    const isActive = activeTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                          isActive
-                            ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                            : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                        }`}
-                      >
-                        <span>{idx + 1}. {tab.label}</span>
-                        {tab.count !== undefined && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-base)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
-                            {tab.count}
-                          </span>
-                        )}
-                        {tab.badge && (
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
-                            tab.badge === "Done" || tab.badge === "Released" || tab.badge === "CAD Ready"
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                              : tab.badge === "Open"
-                              ? "bg-teal-50 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
-                              : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                          }`}>
-                            {tab.badge}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+          <div className="min-h-0 min-w-0 flex-1 flex flex-col overflow-hidden bg-[var(--surface-base)]">
+            
+            {/* ── 1. PRIMARY SECTION TABS (TOP - EXACT FEASIBILITY CHECK STYLE) ── */}
+            <div className="px-6 sm:px-8 pt-2.5 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] shrink-0">
+              <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto scrollbar-none">
+                {visibleTabs.map((tab, idx) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                        isActive
+                          ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                          : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                      }`}
+                    >
+                      <span>{idx + 1}. {tab.label}</span>
+                      {tab.count !== undefined && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-base)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                          {tab.count}
+                        </span>
+                      )}
+                      {tab.badge && (
+                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
+                          tab.badge === "Done" || tab.badge === "Released" || tab.badge === "CAD Ready"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            : tab.badge === "Open"
+                            ? "bg-teal-50 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
+                            : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                        }`}>
+                          {tab.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+            </div>
 
-              {/* ── 2. DOCUMENT HERO & HEADER STRIP (EXACT FEASIBILITY CHECK STYLE) ── */}
+            {/* ── 2. SCROLLABLE DOCUMENT WORKSPACE ── */}
+            <div className="flex-1 overflow-y-auto min-h-0">
               <MockupSheetHeader
                 activeRequest={activeRequest}
                 role={role}

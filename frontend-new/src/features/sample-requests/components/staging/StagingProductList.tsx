@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Copy, Eye, Layers, Plus, X } from "lucide-react";
+import { Copy, Eye, Layers, X } from "lucide-react";
 import { OperationalDatePicker } from "@/components/erp";
 import { StagedProductItem, DELIVERABLES } from "../../types/staging";
+import { getSampleTrackInfo } from "../../utils/sampleRouting";
 
 const cellInputClass = "h-10 w-full min-w-[100px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-3 text-sm text-[var(--on-surface)] outline-none transition-shadow focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/15 disabled:opacity-60";
 
@@ -253,7 +254,6 @@ export interface StagingProductListProps {
 export const StagingProductList: React.FC<StagingProductListProps> = ({
   stagedProducts,
   isFeasibilityHandoff = false,
-  onOpenAddModal,
   onInspectProduct,
   onUpdateProduct,
   onDuplicateProduct,
@@ -342,7 +342,7 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
 
   if (stagedProducts.length === 0) {
     return (
-      <div className="flex min-h-[380px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-6 py-14 text-center shadow-2xs">
+      <div className="flex flex-1 min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-lowest)] px-6 py-16 text-center shadow-2xs">
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-low)] border border-[var(--border-subtle)] text-[var(--accent-primary)] shadow-2xs">
           <Layers className="h-7 w-7 stroke-[1.8]" />
         </div>
@@ -351,39 +351,10 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
         </h3>
         <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--on-surface-muted)]">
           {isFeasibilityHandoff
-            ? "Add the product covered by this feasibility request. Its selected Sample, Mockup, and Costing processes will start when you release from here."
-            : "This sample request currently has no staged items. Add product specifications, configure artwork briefs or prototype samples, and assign deliverables."}
+            ? "Add the product covered by this feasibility request using the + Add Product button above."
+            : "Use the + Add Product button above to add product specifications, artwork briefs, and deliverables."}
         </p>
-
-        {/* 3-Step Lifecycle Guidance Indicator */}
-        <div className="my-5 flex flex-wrap items-center justify-center gap-2 text-[11px] font-sans">
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)] font-semibold border border-[var(--accent-primary)]/20">
-            <span className="w-4 h-4 rounded-full bg-[var(--accent-primary)] text-white text-[10px] flex items-center justify-center font-bold">1</span>
-            <span>Add Product</span>
-          </div>
-          <span className="text-[var(--on-surface-subtle)]">→</span>
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)] font-medium">
-            <span className="w-4 h-4 rounded-full bg-[var(--surface-container)] text-[var(--on-surface)] text-[10px] flex items-center justify-center font-bold border border-[var(--border-subtle)]">2</span>
-            <span>Set Scopes &amp; Dates</span>
-          </div>
-          <span className="text-[var(--on-surface-subtle)]">→</span>
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-semibold">
-            <span className="w-4 h-4 rounded-full bg-emerald-600 text-white text-[10px] flex items-center justify-center font-bold">3</span>
-            <span>Click Release</span>
-          </div>
-        </div>
-
-        {onOpenAddModal && (
-          <button
-            type="button"
-            onClick={onOpenAddModal}
-            className="inline-flex h-9 items-center gap-2 rounded-xl px-5 text-xs font-bold text-white bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] shadow-xs transition-all cursor-pointer active:scale-98"
-          >
-            <Plus className="h-4 w-4 stroke-[2.5]" />
-            <span>Add First Product to Staging</span>
-          </button>
-        )}
-        <span className="mt-3 text-[11px] font-mono text-[var(--on-surface-subtle)]">
+        <span className="mt-4 text-[11px] font-mono text-[var(--on-surface-subtle)]">
           {isFeasibilityHandoff
             ? "One product per feasibility request · release selected workflows here"
             : "Specs are automatically preserved in Drafts"}
@@ -452,6 +423,7 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
               const isDesignOnly = prod.scopes.length === 1 && prod.scopes.includes("design");
               const canDuplicate = !isFeasibilityHandoff && prod.scopes.length === 1 && prod.scopes[0] === "sample";
               const mockupMeta = prod.mockupMetadata;
+              const sampleTrackInfo = prod.scopes.includes("sample") ? getSampleTrackInfo(prod) : null;
               return (
               <tr key={prod.id} className="group transition-colors duration-150 hover:bg-[var(--surface-low)]/40">
                 {/* 1. Material Code */}
@@ -491,21 +463,20 @@ export const StagingProductList: React.FC<StagingProductListProps> = ({
                       )}
                     </div>
                   )}
-                  {prod.scopes.length === 1 && prod.scopes.includes("sample") && (
-                    <div className="mt-1">
-                      {prod.isResample || prod.samplingMetadata?.isResample ? (
-                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-semibold text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-                          Resample to Plant
-                        </span>
-                      ) : prod.hasCreativeChanges || prod.creativeCharacteristicsCleared || prod.creativePendingCharacteristicKeys?.length || prod.variantNumber ? (
-                        <span className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[9px] font-semibold text-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
-                          Creative → Studio → Sampling → Plant
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-                          To Sampling Team Review
-                        </span>
-                      )}
+                  {sampleTrackInfo && (
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold border shadow-2xs ${sampleTrackInfo.badgeClass}`}
+                        title={sampleTrackInfo.description}
+                      >
+                        {sampleTrackInfo.badgeLabel}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold border shadow-2xs ${sampleTrackInfo.sampleTypeBadge.badgeClass}`}
+                        title={sampleTrackInfo.isFullSample ? "Finished Unit / Full Sample" : "Component / Dummy Partial Sample"}
+                      >
+                        {sampleTrackInfo.sampleTypeBadge.label}
+                      </span>
                     </div>
                   )}
                 </td>

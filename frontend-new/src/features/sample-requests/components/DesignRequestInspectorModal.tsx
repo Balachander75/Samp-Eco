@@ -1125,7 +1125,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-950/70"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/70"
       onClick={(event) => {
         if (event.target === event.currentTarget && canCloseInspector) onClose();
       }}
@@ -1134,7 +1134,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
         role="dialog"
         aria-modal="true"
         aria-labelledby="design-inspector-title"
-        className="relative w-full max-w-[96vw] xl:max-w-7xl h-[92vh] max-h-[92vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
+        className="relative w-full max-w-[92vw] xl:max-w-6xl 2xl:max-w-7xl h-[88vh] max-h-[88vh] flex flex-col bg-[var(--surface-lowest)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_70px_-12px_rgba(11,28,48,0.25)] overflow-hidden select-text text-xs"
         onClick={(e) => e.stopPropagation()}
       >
         {isClosed && <RequestClosedStamp label="REQUEST WAS CLOSED" />}
@@ -1162,129 +1162,130 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
 
 
         {/* 2. MAIN WORKSPACE VIEWPORT (SPLIT: FORM SHEET + TIME LOG) */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* LEFT: FORM SHEET (DOCUMENT BODY) */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-app)]">
-            {workflowError && (
-              <div role="alert" className="max-w-4xl mx-auto px-4 py-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 text-xs font-medium dark:bg-rose-950/30 dark:text-rose-200 dark:border-rose-900 shadow-2xs">
-                {workflowError}
-              </div>
-            )}
-
-            {mode === "marketing" && activeRequest.mockupWorkflowState?.stage === "marketing" && activeRequest.mockupWorkflowState.mockupUrl && (
-              <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/25 shadow-2xs">
-                <div>
-                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Studio mockup ready</p>
-                  <p className="mt-0.5 text-xs text-emerald-800/80 dark:text-emerald-300/80">Studio submitted the mockup for this request.</p>
-                </div>
-                <a
-                  href={activeRequest.mockupWorkflowState.mockupUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800 shadow-2xs"
+          <div className="min-h-0 min-w-0 flex-1 flex flex-col overflow-hidden bg-[var(--surface-base)]">
+            {/* ── 1. PRIMARY SECTION TABS (TOP OF SHEET) ── */}
+            <div className="px-6 sm:px-8 pt-2.5 bg-[var(--surface-low)] border-b border-[var(--border-subtle)] shrink-0">
+              <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("specs")}
+                  className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === "specs"
+                      ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                      : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                  }`}
                 >
-                  <span>Open mockup</span>
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
-            )}
-
-            <div className="max-w-4xl mx-auto rounded-2xl bg-[var(--surface-base)] border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(11,28,48,0.04)] overflow-hidden">
-              {/* ── 1. PRIMARY SECTION TABS (TOP OF SHEET) ── */}
-              <div className="px-6 sm:px-8 pt-3 bg-[var(--surface-low)] border-b border-[var(--border-subtle)]">
-                <div className="flex items-center space-x-6 text-xs font-semibold overflow-x-auto">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("specs")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                      activeTab === "specs"
-                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  >
-                    <span>1. Scope &amp; Design Brief</span>
-                    {references.length > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-base)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
-                        {references.length}
-                      </span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("deliverables")}
-                    className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                      activeTab === "deliverables"
-                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                        : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                    }`}
-                  >
-                    <span>2. Creative Deliverables &amp; Review</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold tabular-nums bg-[var(--surface-base)] text-[var(--on-surface)] border border-[var(--border-subtle)]">
-                      {deliveredCount}/{requestedCount}
+                  <span>1. Scope &amp; Design Brief</span>
+                  {references.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--surface-base)] text-[var(--on-surface)] font-bold border border-[var(--border-subtle)]">
+                      {references.length}
                     </span>
-                    {isAwaitingReview && (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
-                        Review Pending
-                      </span>
-                    )}
-                    {isCounterDateVisible && (
-                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
-                        activeRequest.counterDateDecision === "rejected"
-                          ? "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200"
-                          : activeRequest.counterDateDecision === "accepted" || activeRequest.counterDateDecision === "auto_accepted"
-                          ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
-                          : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200"
-                      }`}>
-                        {activeRequest.counterDateDecision === "rejected"
-                          ? "Date Declined"
-                          : activeRequest.counterDateDecision === "accepted" || activeRequest.counterDateDecision === "auto_accepted"
-                          ? "Date Accepted"
-                          : "Date Proposal"}
-                      </span>
-                    )}
-                    {isRemainingRequested && (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
-                        Revisions
-                      </span>
-                    )}
-                  </button>
+                  )}
+                </button>
 
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("deliverables")}
+                  className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === "deliverables"
+                      ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                      : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                  }`}
+                >
+                  <span>2. Creative Deliverables &amp; Review</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold tabular-nums bg-[var(--surface-base)] text-[var(--on-surface)] border border-[var(--border-subtle)]">
+                    {deliveredCount}/{requestedCount}
+                  </span>
+                  {isAwaitingReview && (
+                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                      Review Pending
+                    </span>
+                  )}
+                  {isCounterDateVisible && (
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-display font-bold ${
+                      activeRequest.counterDateDecision === "rejected"
+                        ? "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200"
+                        : activeRequest.counterDateDecision === "accepted" || activeRequest.counterDateDecision === "auto_accepted"
+                        ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
+                        : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200"
+                    }`}>
+                      {activeRequest.counterDateDecision === "rejected"
+                        ? "Date Declined"
+                        : activeRequest.counterDateDecision === "accepted" || activeRequest.counterDateDecision === "auto_accepted"
+                        ? "Date Accepted"
+                        : "Date Proposal"}
+                    </span>
+                  )}
+                  {isRemainingRequested && (
+                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
+                      Revisions
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("signoff")}
+                  className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === "signoff"
+                      ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
+                      : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
+                  }`}
+                >
+                  <span>3. Commercial Sign-Off</span>
+                  {isClosed && (
+                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      ✓ Approved
+                    </span>
+                  )}
+                </button>
+
+                {mode === "marketing" && isAcceptedByMarketing && (
                   <button
                     type="button"
-                    onClick={() => setActiveTab("signoff")}
+                    onClick={() => setActiveTab("next_work")}
                     className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                      activeTab === "signoff"
+                      activeTab === "next_work"
                         ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
                         : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
                     }`}
                   >
-                    <span>3. Commercial Sign-Off</span>
-                    {isClosed && (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-display font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                        ✓ Approved
-                      </span>
-                    )}
+                    <span>4. Next Work</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
+                      Mockup / Sampling
+                    </span>
                   </button>
-
-                  {mode === "marketing" && isAcceptedByMarketing && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("next_work")}
-                      className={`pb-3 border-b-2 font-display transition cursor-pointer select-none flex items-center gap-2 whitespace-nowrap ${
-                        activeTab === "next_work"
-                          ? "border-[var(--accent-primary)] text-[var(--accent-primary)] font-bold"
-                          : "border-transparent text-[var(--on-surface-muted)] hover:text-[var(--on-surface)]"
-                      }`}
-                    >
-                      <span>4. Next Work</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent-primary-subtle)] text-[var(--accent-primary)]">
-                        Mockup / Sampling
-                      </span>
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
+            </div>
+
+            {/* ── 2. SCROLLABLE DOCUMENT WORKSPACE ── */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {workflowError && (
+                <div role="alert" className="mx-6 sm:mx-8 mt-4 px-4 py-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 text-xs font-medium dark:bg-rose-950/30 dark:text-rose-200 dark:border-rose-900 shadow-2xs">
+                  {workflowError}
+                </div>
+              )}
+
+              {mode === "marketing" && activeRequest.mockupWorkflowState?.stage === "marketing" && activeRequest.mockupWorkflowState.mockupUrl && (
+                <div className="mx-6 sm:mx-8 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/25 shadow-2xs">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Studio mockup ready</p>
+                    <p className="mt-0.5 text-xs text-emerald-800/80 dark:text-emerald-300/80">Studio submitted the mockup for this request.</p>
+                  </div>
+                  <a
+                    href={activeRequest.mockupWorkflowState.mockupUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800 shadow-2xs"
+                  >
+                    <span>Open mockup</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
 
               {/* ── 2. DOCUMENT HERO & HEADER STRIP ── */}
               <DesignSheetHeader
@@ -1300,7 +1301,7 @@ export const DesignRequestInspectorModal: React.FC<DesignRequestInspectorModalPr
               />
 
               {/* ── 3. ACTIVE TAB CONTENT ── */}
-              <div className="px-6 sm:px-8 pb-6 pt-2">
+              <div className="px-6 sm:px-8 pb-8 pt-4 space-y-6">
                 {/* ── TAB 1: SCOPE & DESIGN BRIEF ── */}
                 {activeTab === "specs" && (
                   <div className="py-4">

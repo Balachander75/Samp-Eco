@@ -75,3 +75,25 @@ export function normalizeToBusinessYear(rawYear?: string | null): string {
   return clean;
 }
 
+export interface BusinessYearMonth {
+  key: string;
+  label: string;
+  full: string;
+}
+
+// 12-Month Business Year sequence (October to September)
+export const BY_MONTHS: readonly BusinessYearMonth[] = [
+  { key: "10", label: "Oct", full: "October" },
+  { key: "11", label: "Nov", full: "November" },
+  { key: "12", label: "Dec", full: "December" },
+  { key: "01", label: "Jan", full: "January" },
+  { key: "02", label: "Feb", full: "February" },
+  { key: "03", label: "Mar", full: "March" },
+  { key: "04", label: "Apr", full: "April" },
+  { key: "05", label: "May", full: "May" },
+  { key: "06", label: "Jun", full: "June" },
+  { key: "07", label: "Jul", full: "July" },
+  { key: "08", label: "Aug", full: "August" },
+  { key: "09", label: "Sep", full: "September" },
+];
+

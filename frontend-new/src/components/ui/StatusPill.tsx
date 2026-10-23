@@ -156,7 +156,8 @@ export const StatusPill: React.FC<StatusPillProps> = ({
   return (
     <span
       data-status-tone={finalTone}
-      className={`status-pill inline-flex items-center rounded-full border font-mono select-none ${toneStyle.container} ${SIZE_CLASSES[size]} ${className}`}
+      title={typeof displayText === "string" ? displayText : undefined}
+      className={`status-pill inline-flex items-center max-w-full min-w-0 rounded-full border font-mono select-none ${toneStyle.container} ${SIZE_CLASSES[size]} ${className}`}
     >
       {icon ? (
         <span className="shrink-0">{icon}</span>
@@ -168,7 +169,7 @@ export const StatusPill: React.FC<StatusPillProps> = ({
           aria-hidden="true"
         />
       ) : null}
-      <span className="truncate max-w-[160px]">{displayText}</span>
+      <span className="truncate min-w-0 max-w-[120px]">{displayText}</span>
     </span>
   );
 };

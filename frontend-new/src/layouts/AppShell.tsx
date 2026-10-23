@@ -66,6 +66,30 @@ export const AppShell: React.FC<AppShellProps> = ({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [globalToast, setGlobalToast] = useState<GlobalToast | null>(null);
 
+  // Global Toast event subscription & auto-dismiss
+  useEffect(() => {
+    const handleToast = (e: Event) => {
+      const customEvent = e as CustomEvent<Partial<GlobalToast>>;
+      if (customEvent.detail?.message) {
+        setGlobalToast({
+          id: String(Date.now()),
+          message: customEvent.detail.message,
+          tone: customEvent.detail.tone || "info",
+        });
+      }
+    };
+    window.addEventListener("app:toast", handleToast);
+    return () => window.removeEventListener("app:toast", handleToast);
+  }, []);
+
+  useEffect(() => {
+    if (!globalToast) return;
+    const timer = setTimeout(() => {
+      setGlobalToast(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [globalToast]);
+
   // Live system date & time sync
   const [currentDateTime, setCurrentDateTime] = useState<Date>(() => new Date());
 
@@ -386,13 +410,13 @@ export const AppShell: React.FC<AppShellProps> = ({
         {/* Global Toast Alert */}
         {globalToast && (
           <div className="fixed bottom-5 right-5 z-50 max-w-sm w-[calc(100vw-2.5rem)] animate-in fade-in slide-in-from-bottom-3 duration-200">
-            <div className={`px-4 py-3 rounded-xl shadow-xl border flex items-center gap-3 text-xs ${globalToast.tone === "error" ? "bg-rose-50 text-rose-950 border-rose-200 dark:bg-rose-950/70 dark:text-rose-100 dark:border-rose-800" : "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] border-[var(--border-subtle)]"}`}>
+            <div className={`px-4 py-3 rounded-xl shadow-xl border flex items-center gap-3 text-xs ${globalToast.tone === "error" ? "bg-rose-50 text-rose-950 border-rose-200" : "bg-[var(--accent-primary-subtle)] text-[var(--accent-primary-strong)] border-[var(--border-subtle)]"}`}>
               <span className="w-2 h-2 rounded-full shrink-0 bg-[var(--accent-primary)]" />
               <span className="flex-1 leading-snug font-medium">{globalToast.message}</span>
               <button
                 type="button"
                 onClick={() => setGlobalToast(null)}
-                className="text-current opacity-60 hover:opacity-100 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer transition"
+                className="text-current opacity-60 hover:opacity-100 p-1 rounded-lg hover:bg-black/5 cursor-pointer transition"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

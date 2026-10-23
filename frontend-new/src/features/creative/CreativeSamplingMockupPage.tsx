@@ -432,25 +432,46 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       {
         id: "customer",
         header: "Customer / Brand",
-        width: "w-[160px]",
+        width: "w-[130px]",
         cell: (r) => (
-          <div>
-            <div className="flex items-center gap-1.5 font-semibold text-[var(--on-surface)]">
+          <div className="min-w-0 max-w-[130px]">
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--on-surface)] truncate">
               <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
-              <span className="truncate max-w-[140px]" title={r.customer || ""}>
+              <span className="truncate" title={r.customer || ""}>
                 {r.customer || "—"}
               </span>
             </div>
-            <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5">
+            <div className="text-[10px] font-mono text-[var(--on-surface-subtle)] mt-0.5 pl-5 truncate">
               {r.brandName || "Commercial Account"}
             </div>
           </div>
         ),
       },
       {
+        id: "program",
+        header: "Program / Year",
+        width: "w-[120px]",
+        cell: (r) => {
+          const progName = r.programName || r.programCampaignTitle || (r as any).program_name || "—";
+          const progYear = r.programYear || (r as any).program_year;
+          return (
+            <div className="min-w-0 max-w-[120px]">
+              <span className="block truncate font-semibold text-xs text-[var(--on-surface)]" title={progName}>
+                {progName}
+              </span>
+              {progYear && (
+                <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
+                  BY {progYear}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
         id: "scopes",
         header: "Deliverable Scopes",
-        width: "w-[150px]",
+        width: "w-[120px]",
         cell: (r) => {
           const scopes = r.requestTypes || [];
           const hasMockup = scopes.includes("mockup") || String(r.mockupRequired || "").toLowerCase() === "yes";
@@ -458,13 +479,13 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
           return (
             <div className="flex items-center gap-1 flex-wrap">
               {hasMockup && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/10 text-teal-700 border border-teal-500/20">
                   <Box className="w-2.5 h-2.5" />
                   CAD
                 </span>
               )}
               {hasSample && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/10 text-sky-700 border border-sky-500/20">
                   <FlaskConical className="w-2.5 h-2.5" />
                   Sample
                 </span>
@@ -476,7 +497,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       {
         id: "qty",
         header: "Mockup / Qty",
-        width: "w-[110px]",
+        width: "w-[95px]",
         align: "center",
         cell: (r) => {
           const scopes = r.requestTypes || [];
@@ -493,9 +514,9 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       {
         id: "plant",
         header: "Plant",
-        width: "w-[110px]",
+        width: "w-[90px]",
         cell: (r) => (
-          <span className="font-mono text-xs text-[var(--on-surface-muted)]">
+          <span className="font-mono text-xs text-[var(--on-surface-muted)] truncate block" title={r.targetPlant || "Khaniwade"}>
             {r.targetPlant || "Khaniwade"}
           </span>
         ),
@@ -503,7 +524,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       {
         id: "sla",
         header: "Target SLA Date",
-        width: "w-[130px]",
+        width: "w-[115px]",
         cell: (r) => {
           let isOverdue = false;
           if (
@@ -518,8 +539,8 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
             }
           }
           return (
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--on-surface)]">
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-1 font-mono text-xs text-[var(--on-surface)] truncate">
                 <Clock
                   className={`w-3.5 h-3.5 shrink-0 ${
                     isOverdue ? "text-rose-500" : "text-[var(--on-surface-subtle)]"
@@ -528,7 +549,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
                 <span
                   className={
                     isOverdue
-                      ? "font-semibold text-rose-600 dark:text-rose-400"
+                      ? "font-semibold text-rose-600"
                       : "text-[var(--on-surface-muted)]"
                   }
                 >
@@ -536,7 +557,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
                 </span>
               </div>
               {isOverdue && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200">
                   <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
                   <span>Overdue</span>
                 </span>
@@ -548,7 +569,7 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       {
         id: "status",
         header: "Workflow Status",
-        width: "w-[130px]",
+        width: "w-[110px]",
         cell: (r) => <StatusPill status={r.status || "Creative"} size="sm" showDot />,
       },
     ],
@@ -692,6 +713,8 @@ export const CreativeSamplingMockupPage: React.FC<CreativeSamplingMockupPageProp
       <DataTable
         data={filteredItems}
         columns={columns}
+        tableClassName="w-full table-fixed min-w-0"
+        containerClassName="overflow-y-auto overflow-x-hidden"
         keyExtractor={(req) => req.id}
         isLoading={isLoading || isRefreshing}
         emptyMessage={

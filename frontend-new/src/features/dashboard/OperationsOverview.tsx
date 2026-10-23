@@ -8,6 +8,7 @@ import { SampleRequestItem } from "@/features/sample-requests/types";
 import { UserProfile } from "@/features/auth";
 import { useBusinessYear } from "@/context/BusinessYearContext";
 import { isDesignRequest } from "@/features/sample-requests/utils/trackTypes";
+import { BY_MONTHS } from "@/lib/businessYear";
 import {
   TrendingUp,
   Clock,
@@ -47,22 +48,6 @@ export interface OperationsOverviewProps {
   user?: UserProfile;
   embedded?: boolean;
 }
-
-// 12-Month Business Year sequence (October to September)
-const BY_MONTHS = [
-  { key: "10", label: "Oct", full: "October" },
-  { key: "11", label: "Nov", full: "November" },
-  { key: "12", label: "Dec", full: "December" },
-  { key: "01", label: "Jan", full: "January" },
-  { key: "02", label: "Feb", full: "February" },
-  { key: "03", label: "Mar", full: "March" },
-  { key: "04", label: "Apr", full: "April" },
-  { key: "05", label: "May", full: "May" },
-  { key: "06", label: "Jun", full: "June" },
-  { key: "07", label: "Jul", full: "July" },
-  { key: "08", label: "Aug", full: "August" },
-  { key: "09", label: "Sep", full: "September" },
-];
 
 const TEAM_SERIES = [
   { key: "marketing", label: "Marketing", barClass: "bg-blue-500", dotClass: "bg-blue-500" },

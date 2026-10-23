@@ -227,17 +227,17 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
     {
       id: "request",
       header: "Request",
-      width: "w-[150px]",
+      width: "w-[125px]",
       sortable: true,
       cell: (request) => {
         const code = request.sr_number || request.request_code || `CR-${request.sample_request_id}`;
         return (
-          <div>
+          <div className="min-w-0">
             <div className="font-mono font-bold">
               <CopyBadge text={code} />
             </div>
-            <div className="mt-0.5 text-[10px] font-mono text-[var(--on-surface-subtle)]">
-              Costing · Creative Review
+            <div className="mt-0.5 text-[10px] font-mono text-[var(--on-surface-subtle)] truncate">
+              Costing Review
             </div>
           </div>
         );
@@ -246,11 +246,11 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
     {
       id: "customer",
       header: "Customer / Brand",
-      width: "w-[160px]",
+      width: "w-[130px]",
       sortable: true,
       cell: (request) => (
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 font-semibold text-[var(--on-surface)] truncate" title={request.customer}>
+        <div className="min-w-0 max-w-[130px]">
+          <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--on-surface)] truncate" title={request.customer}>
             <Building2 className="w-3.5 h-3.5 text-[var(--on-surface-subtle)] shrink-0" />
             <span className="truncate">{request.customer || "—"}</span>
           </div>
@@ -259,6 +259,36 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
           </div>
         </div>
       ),
+    },
+    {
+      id: "program",
+      header: "Program / Year",
+      width: "w-[120px]",
+      cell: (request) => {
+        const progName =
+          request.program_name ||
+          request.request_data?.programName ||
+          request.request_data?.program_name ||
+          request.request_data?.programCampaignTitle ||
+          "—";
+        const progYear =
+          request.program_year ||
+          request.request_data?.programYear ||
+          request.request_data?.program_year;
+
+        return (
+          <div className="min-w-0 max-w-[120px]">
+            <span className="block truncate font-semibold text-xs text-[var(--on-surface)]" title={progName}>
+              {progName}
+            </span>
+            {progYear && (
+              <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-[var(--surface-low)] text-[var(--on-surface-muted)] border border-[var(--border-subtle)]">
+                BY {progYear}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       id: "product",
@@ -277,7 +307,7 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
     {
       id: "quantity",
       header: "Costing Qty",
-      width: "w-[120px]",
+      width: "w-[95px]",
       align: "center",
       cell: (request) => (
         <span className="inline-flex items-center px-2 py-0.5 rounded-full font-mono font-bold text-[11px] bg-[var(--surface-low)] text-[var(--on-surface)] tabular-nums border border-[var(--border-subtle)]">
@@ -288,19 +318,19 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
     {
       id: "creative_input",
       header: "Creative Input Status",
-      width: "w-[155px]",
+      width: "w-[130px]",
       cell: (request) => {
         const hasRemark = Boolean(request.costing_creative_input_remark && request.costing_creative_input_remark.trim() !== "");
         const isNeeded = request.costing_creative_input_needed || (!hasRemark && request.status !== "done");
 
         if (hasRemark) {
           return (
-            <div className="space-y-0.5">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+            <div className="space-y-0.5 min-w-0">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
                 <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
                 Input Logged
               </span>
-              <div className="text-[10px] font-mono text-[var(--on-surface-muted)] truncate max-w-[140px]" title={request.costing_creative_input_remark || ""}>
+              <div className="text-[10px] font-mono text-[var(--on-surface-muted)] truncate max-w-[125px]" title={request.costing_creative_input_remark || ""}>
                 {request.costing_creative_input_remark}
               </div>
             </div>
@@ -309,7 +339,7 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
 
         if (isNeeded) {
           return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 border border-amber-500/20">
               <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
               Input Needed
             </span>
@@ -325,8 +355,8 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
     },
     {
       id: "due",
-      header: "Creative Deadline (IST)",
-      width: "w-[160px]",
+      header: "Creative Deadline",
+      width: "w-[125px]",
       cell: (request) => {
         if (!request.creative_due_at) {
           return <span className="text-[11px] font-mono text-[var(--on-surface-subtle)]">Standard SLA</span>;
@@ -336,15 +366,15 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
         const isPast = !isNaN(dt.getTime()) && dt < now && request.status !== "done";
 
         return (
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5 font-mono text-xs tabular-nums text-[var(--on-surface)]">
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex items-center gap-1 font-mono text-xs tabular-nums text-[var(--on-surface)] truncate">
               <Clock className={`w-3.5 h-3.5 shrink-0 ${isPast ? "text-rose-500" : "text-[var(--on-surface-subtle)]"}`} />
-              <span className={isPast ? "font-semibold text-rose-600 dark:text-rose-400" : ""}>
+              <span className={isPast ? "font-semibold text-rose-600" : ""}>
                 {formatCreativeDeadline(request.creative_due_at)}
               </span>
             </div>
             {isPast && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200">
                 <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
                 <span>Overdue</span>
               </span>
@@ -356,7 +386,7 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
     {
       id: "status",
       header: "Status",
-      width: "w-[130px]",
+      width: "w-[105px]",
       cell: (request) => (
         <StatusPill status={request.status || request.current_stage || "Creative"} size="sm" showDot />
       ),
@@ -364,7 +394,7 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
     {
       id: "actions",
       header: "Action",
-      width: "w-[100px]",
+      width: "w-[80px]",
       align: "right",
       cell: (request) => (
         <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
@@ -372,7 +402,7 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
             type="button"
             aria-label={`Inspect ${request.sr_number || request.request_code}`}
             onClick={() => setSelectedKey(request.sample_request_id)}
-            className="select-none rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
+            className="select-none rounded-lg px-2 py-1 text-[11px] font-semibold text-white transition-colors bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] flex items-center gap-1 shadow-2xs cursor-pointer"
           >
             <span>Inspect</span>
             <ChevronRight className="w-3 h-3" />
@@ -454,26 +484,24 @@ export const CreativeCostingPage: React.FC<CreativeCostingPageProps> = ({
           </div>
         }
       >
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 sm:p-6">
-          <section className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-lowest)] shadow-2xs">
-            <DataTable
-              data={filteredRequests}
-              columns={columns}
-              keyExtractor={(request) => String(request.sample_request_id)}
-              isLoading={isLoading}
-              selectedRowId={selectedKey}
-              onRowClick={(request) => setSelectedKey(request.sample_request_id)}
-              emptyMessage={
-                search
-                  ? `No Costing requests match the search "${search}".`
-                  : selectedStageTab !== "all"
-                  ? "No Costing requests match the selected stage."
-                  : "No Costing requests are waiting for Creative review."
-              }
-              pageSize={30}
-            />
-          </section>
-        </div>
+        <DataTable
+          data={filteredRequests}
+          columns={columns}
+          keyExtractor={(request) => String(request.sample_request_id)}
+          isLoading={isLoading}
+          selectedRowId={selectedKey}
+          onRowClick={(request) => setSelectedKey(request.sample_request_id)}
+          tableClassName="w-full table-fixed min-w-0"
+          containerClassName="overflow-y-auto overflow-x-hidden"
+          emptyMessage={
+            search
+              ? `No Costing requests match the search "${search}".`
+              : selectedStageTab !== "all"
+              ? "No Costing requests match the selected stage."
+              : "No Costing requests are waiting for Creative review."
+          }
+          pageSize={30}
+        />
       </DeskWorkspaceLayout>
 
       {/* Inspector Modal */}

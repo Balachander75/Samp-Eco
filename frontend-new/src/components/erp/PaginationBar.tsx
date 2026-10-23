@@ -51,23 +51,23 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white dark:bg-zinc-900 border-t border-neutral-200/90 dark:border-white/[0.08] select-none text-xs text-neutral-600 dark:text-zinc-400 ${className}`}
+      className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-[var(--surface-lowest)] border-t border-[var(--border-subtle)] select-none text-xs text-[var(--on-surface-muted)] ${className}`}
     >
       {/* Entries Counter & Page Size */}
       <div className="flex items-center gap-3">
         <span>
-          Showing <span className="font-semibold text-neutral-900 dark:text-zinc-100">{startIdx}</span> to{" "}
-          <span className="font-semibold text-neutral-900 dark:text-zinc-100">{endIdx}</span> of{" "}
-          <span className="font-semibold text-neutral-900 dark:text-zinc-100">{totalCount}</span> {itemLabel}
+          Showing <span className="font-semibold text-[var(--on-surface)]">{startIdx}</span> to{" "}
+          <span className="font-semibold text-[var(--on-surface)]">{endIdx}</span> of{" "}
+          <span className="font-semibold text-[var(--on-surface)]">{totalCount}</span> {itemLabel}
         </span>
 
         {onPageSizeChange && (
-          <div className="flex items-center gap-1.5 ml-2 border-l border-neutral-200 dark:border-zinc-800 pl-3">
-            <span className="text-[11px] text-neutral-500">Per page:</span>
+          <div className="flex items-center gap-1.5 ml-2 border-l border-[var(--border-subtle)] pl-3">
+            <span className="text-[11px] text-[var(--on-surface-subtle)]">Per page:</span>
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="bg-neutral-50 dark:bg-zinc-800 border border-neutral-200 dark:border-zinc-700 rounded px-1.5 py-0.5 text-xs text-neutral-800 dark:text-zinc-200 cursor-pointer focus:outline-hidden"
+              className="bg-[var(--surface-low)] border border-[var(--border-subtle)] rounded px-1.5 py-0.5 text-xs text-[var(--on-surface)] cursor-pointer focus:outline-hidden"
             >
               {pageSizeOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -85,7 +85,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="p-1.5 rounded-lg border border-neutral-200 dark:border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-neutral-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+          className="p-1.5 rounded-lg border border-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--surface-low)] text-[var(--on-surface)] transition cursor-pointer"
           title="Previous Page"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
@@ -94,7 +94,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
         {getPageNumbers().map((p, idx) => {
           if (p === "...") {
             return (
-              <span key={`dots-${idx}`} className="px-2 text-neutral-400">
+              <span key={`dots-${idx}`} className="px-2 text-[var(--on-surface-subtle)]">
                 ...
               </span>
             );
@@ -108,8 +108,8 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
               onClick={() => onPageChange(pageNum)}
               className={`min-w-[28px] h-7 px-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 isActive
-                  ? "bg-purple-600 text-white shadow-2xs"
-                  : "hover:bg-neutral-100 dark:hover:bg-zinc-800 text-neutral-700 dark:text-zinc-300"
+                  ? "bg-[var(--accent-primary)] text-[var(--on-accent-primary)] shadow-2xs"
+                  : "hover:bg-[var(--surface-low)] text-[var(--on-surface)]"
               }`}
             >
               {pageNum}
@@ -121,7 +121,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="p-1.5 rounded-lg border border-neutral-200 dark:border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-neutral-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+          className="p-1.5 rounded-lg border border-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--surface-low)] text-[var(--on-surface)] transition cursor-pointer"
           title="Next Page"
         >
           <ChevronRight className="w-3.5 h-3.5" />
